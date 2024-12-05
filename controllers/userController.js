@@ -19,7 +19,6 @@ exports.processEvent = async (req, res) => {
           return errorResponse(res, null, 'Invalid Action Type', 400);
       }
 
-
       
     } else {
       return errorResponse(res, null, 'Invalid Request Type', 400);
