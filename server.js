@@ -1,8 +1,11 @@
 // server.js
 const express = require('express');
-const userRoutes = require('./routes/userRoutes');
 const bodyParser = require('./middleware/bodyParser');
 const globalErrorHandler = require('./middleware/errorHandler');
+const userRoutes = require('./routes/userRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const subtaskRoutes = require('./routes/subtaskRoutes');
+
 
 const app = express();
 
@@ -10,7 +13,8 @@ app.use(bodyParser);
 
 
 app.use('/api/users', userRoutes);
-
+app.use('/api/', taskRoutes);
+app.use('/api/', subtaskRoutes);
 
 app.use(globalErrorHandler);
 
