@@ -1,30 +1,82 @@
-// controllers/userController.js
-const { insertUser, updateUser, deleteUser } = require('../api/user/userService');
-const { successResponse, errorResponse } = require('../helpers/responseHelper');
+const { 
+  createUser, 
+  updateUser, 
+  deleteUser, 
+  getUser, 
+  getAllUsers 
+} = require('../api/user/userService');
 
-exports.userEvent = async (req, res) => {
+const { 
+  successResponse, 
+  errorResponse 
+} = require('../helpers/responseHelper');
+
+const UserSchema = require("../validators/userValidator");
+
+exports.createUser = async (req, res) => {
   try {
-    const payload = req.body;
-    const { request_type, action } = payload;
+      const payload = req.body;
+      const { error } = UserSchema.validate(payload, { abortEarly: false });
 
-    if (request_type === 'employee') {
-      switch (action) {
-        case 'insert':
-          return await insertUser(payload, res);
-        case 'update':
-          return await updateUser(payload, res);
-        case 'delete':
-          return await deleteUser(payload, res);
-        default:
-          return errorResponse(res, null, 'Invalid Action Type', 400);
+      if (error) {
+          const errorMessages = error.details.reduce((acc, err) => {
+              acc[err.path[0]] = err.message;
+              return acc;
+          }, {});
+
+          return errorResponse(res, errorMessages, "Validation Error", 403);
       }
 
-      
-    } else {
-      return errorResponse(res, null, 'Invalid Request Type', 400);
-    }
+      await createUser(payload, res);
   } catch (error) {
-    console.error("Error during processing:", error);
-    return errorResponse(res, null, 'Internal Server Error', 500);
+      console.error('Error creating user:', error.message);
+      return errorResponse(res, error.message, 'Error creating user', 500);
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+      const { id } = req.params;
+      const payload = req.body;
+      const { error } = UserSchema.validate(payload, { abortEarly: false });
+
+      if (error) {
+          const errorMessages = error.details.reduce((acc, err) => {
+              acc[err.path[0]] = err.message;
+              return acc;
+          }, {});
+
+          return errorResponse(res, errorMessages, "Validation Error", 403);
+      }
+
+      await updateUser(id, payload, res);
+  } catch (error) {
+      return errorResponse(res, error.message, 'Error updating user', 500);
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+      const { id } = req.params;
+      await deleteUser(id, res);
+  } catch (error) {
+      return errorResponse(res, error.message, 'Error deleting user', 500);
+  }
+};
+
+exports.getUser = async (req, res) => {
+  try {
+      const { id } = req.params;
+      await getUser(id, res);
+  } catch (error) {
+      return errorResponse(res, error.message, 'Error fetching user', 500);
+  }
+};
+
+exports.getAllUsers = async (req, res) => {
+  try {
+      await getAllUsers(res);
+  } catch (error) {
+      return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };

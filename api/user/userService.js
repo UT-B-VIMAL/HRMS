@@ -1,57 +1,129 @@
-// services/userService.js
-const db = require('../../config/db'); // Your database connection
+const bcrypt = require('bcryptjs');
+const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 
-// Insert user logic
-exports.insertUser = async (payload, res) => {
-  const { user_name, employee_id } = payload;
+// Create User
+exports.createUser = async (payload, res) => {
+  const {
+    name, employee_id, email, phone, email_verified_at,
+    password, team_id, role_id, designation_id, remember_token,
+    created_by, updated_by, created_at, updated_at, deleted_at
+  } = payload;
+
   try {
-    const query = 'INSERT INTO users (user_name, employee_id) VALUES (?, ?)';
-    const values = [user_name, employee_id];
+    // Hash the password before saving
+    const hashedPassword = await bcrypt.hash(password, 10);  // 10 is the saltRounds (higher is more secure)
+
+    const query = `
+      INSERT INTO users (
+        name, employee_id, email, phone, email_verified_at,
+        password, team_id, role_id, designation_id, remember_token,
+        created_by, updated_by, deleted_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
+    `;
+
+    const values = [
+      name, employee_id, email, phone, email_verified_at,
+      hashedPassword, team_id, role_id, designation_id, remember_token,
+      created_by, updated_by, created_at, updated_at, deleted_at
+    ];
+
     const [result] = await db.promise().query(query, values);
 
-    return successResponse(res, {
-      id: result.insertId,
-      user_name,
-      employee_id
-    }, 'User added successfully', 201);
+    return successResponse(res, { id: result.insertId, ...payload }, 'User created successfully', 201);
   } catch (error) {
-    return errorResponse(res, error.message, 'Error inserting user', 500);
+    console.error('Error creating user:', error.message);
+    return errorResponse(res, error.message, 'Error creating user', 500);
   }
 };
 
-// Update user logic
-exports.updateUser = async (payload, res) => {
-  const { id, user_name, employee_id } = payload;
-  try {
-    const query = 'UPDATE users SET user_name = ?, employee_id = ? WHERE id = ?';
-    const values = [user_name, employee_id, id];
-    const [result] = await db.promise().query(query, values);
 
-    if (result.affectedRows === 0) {
-      return errorResponse(res, null, 'User not found', 404);
+// Get User
+exports.getUser = async (id, res) => {
+  try {
+    const query = 'SELECT * FROM users WHERE id = ?';
+    const [rows] = await db.promise().query(query, [id]);
+
+    if (rows.length === 0) {
+      return errorResponse(res, null, 'User not found', 204);
     }
 
-    return successResponse(res, { id, user_name, employee_id }, 'User updated successfully');
+    return successResponse(res, rows[0], 'User retrieved successfully');
   } catch (error) {
-    return errorResponse(res, error, 'Error updating user', 500);
+    return errorResponse(res, error.message, 'Error retrieving user', 500);
   }
 };
 
-// Delete user logic
-exports.deleteUser = async (payload, res) => {
-  const { id } = payload;
+// Get All Users
+exports.getAllUsers = async (res) => {
   try {
-    const query = 'DELETE FROM users WHERE id = ?';
-    const values = [id];
+    const query = 'SELECT * FROM users WHERE deleted_at IS NULL';
+    const [rows] = await db.promise().query(query);
+
+    if (rows.length === 0) {
+      return errorResponse(res, null, 'No users found', 204);
+    }
+
+    return successResponse(res, rows, 'Users retrieved successfully');
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error retrieving users', 500);
+  }
+};
+
+// Update User
+exports.updateUser = async (id, payload, res) => {
+  const {
+    name, employee_id, email, phone, email_verified_at,
+    password, team_id, role_id, designation_id, remember_token,
+    created_by, updated_by, created_at, updated_at, deleted_at
+  } = payload;
+
+  try {
+    let query = `
+      UPDATE users SET
+        name = ?, employee_id = ?, email = ?, phone = ?, email_verified_at = ?,
+        team_id = ?, role_id = ?, designation_id = ?, remember_token = ?,
+        created_by = ?, updated_by = ?, created_at = ?, updated_at = ?, deleted_at = ?
+      WHERE id = ?
+    `;
+
+    let values = [
+      name, employee_id, email, phone, email_verified_at,
+      team_id, role_id, designation_id, remember_token,
+      created_by, updated_by, created_at, updated_at, deleted_at, id
+    ];
+
+    // If a new password is provided, hash it before saving
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
+      query = query.replace('password = ?,', 'password = ?,'); // Include password in the query
+      values.splice(5, 0, hashedPassword); // Insert the hashed password at the correct index
+    }
+
     const [result] = await db.promise().query(query, values);
 
     if (result.affectedRows === 0) {
-      return errorResponse(res, null, 'User not found', 404);
+      return errorResponse(res, null, 'User not found', 204);
+    }
+
+    return successResponse(res, { id, ...payload }, 'User updated successfully');
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error updating user', 500);
+  }
+};
+
+// Delete User
+exports.deleteUser = async (id, res) => {
+  try {
+    const query = `UPDATE users SET deleted_at = NOW() WHERE id = ?`;
+    const [result] = await db.promise().query(query, [id]);
+
+    if (result.affectedRows === 0) {
+      return errorResponse(res, null, 'User not found', 204);
     }
 
     return successResponse(res, null, 'User deleted successfully');
   } catch (error) {
-    return errorResponse(res, error, 'Error deleting user', 500);
+    return errorResponse(res, error.message, 'Error deleting user', 500);
   }
 };

@@ -3,7 +3,7 @@ const { StatusCodes } = require('http-status-codes');
 const getResponse = (response) => {
   return {
     statusCode: response.statusCode || StatusCodes.OK,
-    ...response, // Spread the remaining properties of `response`
+    ...response,
   };
 };
 
@@ -15,8 +15,7 @@ const successResponse = (res, data, message = 'Request successful', statusCode =
     data,
   };
 
-  // Send the pretty-printed JSON response
-  res.status(statusCode).json(getResponse(response)); // Express handles JSON formatting
+  res.status(statusCode).json(getResponse(response)); 
 };
 
 const errorResponse = (res, error, message = 'An error occurred', statusCode = 500) => {
@@ -26,8 +25,7 @@ const errorResponse = (res, error, message = 'An error occurred', statusCode = 5
     message,
     error,
   };
-
-  // Send the pretty-printed JSON response
+ // Send the pretty-printed JSON response
   res.status(statusCode).json(getResponse(response));
 };
 

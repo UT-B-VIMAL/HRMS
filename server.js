@@ -14,13 +14,13 @@ const app = express();
 
 app.use(bodyParser);
 
-app.use("/api/users", userRoutes);
 app.use("/api/", productRoutes);
 app.use("/api/", projectRoutes);
 app.use("/api/", teamsRoutes);
 app.use("/api/", designationRoutes);
 app.use("/api/", taskRoutes);
 app.use("/api/", subtaskRoutes);
+app.use('/api/', userRoutes);
 
 app.use(globalErrorHandler);
 
