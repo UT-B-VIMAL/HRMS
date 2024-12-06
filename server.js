@@ -12,14 +12,14 @@ const app = express();
 app.use(bodyParser);
 
 
-app.use('/api/users', userRoutes);
+app.use('/api/', userRoutes);
 app.use('/api/', taskRoutes);
 app.use('/api/', subtaskRoutes);
 
 app.use(globalErrorHandler);
 
 
-const PORT = 3000;
+const PORT = 2000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
