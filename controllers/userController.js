@@ -2,7 +2,7 @@
 const { insertUser, updateUser, deleteUser } = require('../api/user/userService');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
-exports.processEvent = async (req, res) => {
+exports.userEvent = async (req, res) => {
   try {
     const payload = req.body;
     const { request_type, action } = payload;

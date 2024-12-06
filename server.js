@@ -1,12 +1,14 @@
 // server.js
 const express = require("express");
+const bodyParser = require("./middleware/bodyParser");
+const globalErrorHandler = require("./middleware/errorHandler");
 const userRoutes = require("./routes/userRoutes");
+const taskRoutes = require("./routes/taskRoutes");
+const subtaskRoutes = require("./routes/subtaskRoutes");
 const productRoutes = require("./routes/productRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const teamsRoutes = require("./routes/teamRoutes");
 const designationRoutes = require("./routes/designationRoutes");
-const bodyParser = require("./middleware/bodyParser");
-const globalErrorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
@@ -17,6 +19,8 @@ app.use("/api/", productRoutes);
 app.use("/api/", projectRoutes);
 app.use("/api/", teamsRoutes);
 app.use("/api/", designationRoutes);
+app.use("/api/", taskRoutes);
+app.use("/api/", subtaskRoutes);
 
 app.use(globalErrorHandler);
 
