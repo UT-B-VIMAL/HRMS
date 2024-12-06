@@ -4,6 +4,6 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 
 // Define routes for user-related actions (insert, update, delete)
-router.post('/', userController.processEvent);
+router.post('/', userController.userEvent);
 
 module.exports = router;
