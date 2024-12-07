@@ -9,7 +9,6 @@ const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
 
 const app = express();
-
 app.use(bodyParser);
 
 //User
