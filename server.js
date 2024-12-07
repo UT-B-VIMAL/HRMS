@@ -11,44 +11,46 @@ const pmdashboardController = require('./controllers/pmController');
 
 const app = express();
 app.use(bodyParser);
+const apiRouter = express.Router();
 
-//User
-app.post('/user', userController.createUser);
-app.put('/user/:id', userController.updateUser);
-app.delete('/user/:id', userController.deleteUser);
-app.get('/user/:id', userController.getUser);
-app.get('/user', userController.getAllUsers);
+// User Routes
+apiRouter.post('/user', userController.createUser);
+apiRouter.put('/user/:id', userController.updateUser);
+apiRouter.delete('/user/:id', userController.deleteUser);
+apiRouter.get('/user/:id', userController.getUser);
+apiRouter.get('/user', userController.getAllUsers);
 
-//Product
-app.get("/products", productController.getAll);
-app.get("/products/:id", productController.find);
-app.put("/products/:id", productController.update);
-app.delete("/products/:id", productController.delete);
+// Product Routes
+apiRouter.get('/products', productController.getAll);
+apiRouter.get('/products/:id', productController.find);
+apiRouter.put('/products/:id', productController.update);
+apiRouter.delete('/products/:id', productController.delete);
 
-//Task 
-app.post('/task', taskController.createTask);   
-app.put('/task/:id', taskController.updateTask);     
-app.delete('/task/:id', taskController.deleteTask);
-app.get('/task/:id', taskController.getTask);   
-app.get('/task', taskController.getAllTasks); 
+// Task Routes
+apiRouter.post('/task', taskController.createTask);
+apiRouter.put('/task/:id', taskController.updateTask);
+apiRouter.delete('/task/:id', taskController.deleteTask);
+apiRouter.get('/task/:id', taskController.getTask);
+apiRouter.get('/task', taskController.getAllTasks);
 
-//Subtask 
-app.post('/subtask', subtaskController.createSubTask);   
-app.put('/subtask/:id', subtaskController.updateSubTask);     
-app.delete('/subtask/:id', subtaskController.deleteSubTask);
-app.get('/subtask/:id', subtaskController.getSubTask);   
-app.get('/subtask', subtaskController.getAllSubTasks);
+// Subtask Routes
+apiRouter.post('/subtask', subtaskController.createSubTask);
+apiRouter.put('/subtask/:id', subtaskController.updateSubTask);
+apiRouter.delete('/subtask/:id', subtaskController.deleteSubTask);
+apiRouter.get('/subtask/:id', subtaskController.getSubTask);
+apiRouter.get('/subtask', subtaskController.getAllSubTasks);
 
-//Idle Employee
-app.get('/idleEmployee', idleEmployeeController.get_idleEmployee);
+// Idle Employee Route
+apiRouter.get('/idleEmployee', idleEmployeeController.get_idleEmployee);
 
+// PM Dashboard Routes
+apiRouter.get('/pmproducts', pmdashboardController.pmproductsection);
+apiRouter.get('/pmutilization', pmdashboardController.pmutilizationsection);
+apiRouter.get('/pmattendance', pmdashboardController.pmattendancesection);
+apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
 
-// PM Dashboard
-app.get('/pmproducts', pmdashboardController.pmproductsection);
-app.get('/pmutilization', pmdashboardController.pmutilizationsection);
-app.get('/pmattendance', pmdashboardController.pmattendancesection);
-app.get('/pmdashboard', pmdashboardController.pmdashboardsection);
-
+// Use `/api` as a common prefix
+app.use('/api', apiRouter);
 
 app.use(globalErrorHandler);
 
