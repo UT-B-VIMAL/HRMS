@@ -7,6 +7,7 @@ const productController= require('./controllers/productController');
 const taskController = require('./controllers/taskController');
 const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
+const pmdashboardController = require('./controllers/pmController');
 
 const app = express();
 app.use(bodyParser);
@@ -40,6 +41,14 @@ app.get('/subtask', subtaskController.getAllSubTasks);
 
 //Idle Employee
 app.get('/idleEmployee', idleEmployeeController.get_idleEmployee);
+
+
+// PM Dashboard
+app.get('/pmproducts', pmdashboardController.pmproductsection);
+app.get('/pmutilization', pmdashboardController.pmutilizationsection);
+app.get('/pmattendance', pmdashboardController.pmattendancesection);
+app.get('/pmdashboard', pmdashboardController.pmdashboardsection);
+
 
 app.use(globalErrorHandler);
 
