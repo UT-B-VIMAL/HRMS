@@ -1,4 +1,4 @@
-const { createSubTask, updateSubTask, deleteSubTask, getSubTask,getAllSubTasks } = require('../api/subtask/subtaskService');
+const { createSubTask, updateSubTask, deleteSubTask, getSubTask,getAllSubTasks } = require('../api/functions/subtaskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 const { createSubTaskSchema ,updateSubTaskSchema } = require("../validators/subtaskValidator");
