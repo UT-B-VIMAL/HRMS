@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const pmdashboardController = require('../controllers/pm/pmController');
 
 router.post('/user', userController.createUser);
 router.put('/user/:id', userController.updateUser);
