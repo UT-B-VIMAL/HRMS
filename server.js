@@ -1,6 +1,7 @@
 // server.js
 const express = require('express');
 const userRoutes = require('./routes/userRoutes');
+const userdashboardRoutes = require('./routes/pmdashboardRoutes');
 const bodyParser = require('./middleware/bodyParser');
 const globalErrorHandler = require('./middleware/errorHandler');
 
@@ -10,6 +11,7 @@ app.use(bodyParser);
 
 
 app.use('/api/users', userRoutes);
+app.use('/api/pmdashboard', userdashboardRoutes);
 
 
 app.use(globalErrorHandler);
