@@ -1,5 +1,5 @@
-const { fetchProducts, fetchUtilization, fetchAttendance, fetchPmdatas } = require('../../api/pm/pmdashboardService');
-const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const { fetchProducts, fetchUtilization, fetchAttendance, fetchPmdatas } = require('../api/functions/pmdashboardFunction');
+const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 exports.pmproductsection = async (req, res) => {
   try {
