@@ -1,26 +1,38 @@
-// controllers/userController.js
-const { fetchProducts } = require('../../api/pm/pmdashboardService');
+const { fetchProducts, fetchUtilization, fetchAttendance, fetchPmdatas } = require('../../api/pm/pmdashboardService');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 
-exports.pmdashboardsection = async (req, res) => {
+exports.pmproductsection = async (req, res) => {
   try {
-    const payload = req.body;
-    const { request_type, action } = payload;
-
-    if (request_type === 'pmdashboard') {
-      switch (action) {
-        case 'fetchproduct':
-          return await fetchProducts(payload, res);
-        default:
-          return errorResponse(res, null, 'Invalid Action Type', 400);
-      }
-
-      
-    } else {
-      return errorResponse(res, null, 'Invalid Request Type', 400);
-    }
+    return await fetchProducts(req.body, res);
   } catch (error) {
-    console.error("Error during processing:", error);
+    console.error("Error during pmproductsection processing:", error.message);
     return errorResponse(res, null, 'Internal Server Error', 500);
   }
 };
+
+exports.pmutilizationsection = async (req, res) => {
+  try {
+    return await fetchUtilization(req.body, res);
+  } catch (error) {
+    console.error("Error during pmutilizationsection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.pmattendancesection = async (req, res) => {
+  try {
+    return await fetchAttendance(req.body, res);
+  } catch (error) {
+    console.error("Error during pmattendancesection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.pmdashboardsection = async (req, res) => {
+  try {
+    return await fetchPmdatas(req.body, res);
+  } catch (error) {
+    console.error("Error during pmdashboardsection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+
+// Add other sections as needed

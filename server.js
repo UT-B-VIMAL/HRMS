@@ -9,6 +9,7 @@ const productRoutes = require("./routes/productRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const teamsRoutes = require("./routes/teamRoutes");
 const designationRoutes = require("./routes/designationRoutes");
+const pmdashboardRoutes = require("./routes/pmdashboardRoutes");
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api/", designationRoutes);
 app.use("/api/", taskRoutes);
 app.use("/api/", subtaskRoutes);
 app.use('/api/', userRoutes);
+app.use('/api/', pmdashboardRoutes);
 
 app.use(globalErrorHandler);
 
