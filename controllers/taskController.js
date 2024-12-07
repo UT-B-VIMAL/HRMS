@@ -1,4 +1,4 @@
-const { createTask, updateTask, deleteTask, getTask, getAllTasks } = require('../api/task/taskService');
+const { createTask, updateTask, deleteTask, getTask, getAllTasks } = require('../api/functions/taskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const { createTaskSchema, updateTaskSchema } = require("../validators/taskValidator");
 

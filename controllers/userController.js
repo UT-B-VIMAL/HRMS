@@ -4,7 +4,7 @@ const {
   deleteUser, 
   getUser, 
   getAllUsers 
-} = require('../api/user/userService');
+} = require('../api/functions/userFunction');
 
 const { 
   successResponse, 
