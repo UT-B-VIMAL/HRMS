@@ -9,6 +9,7 @@ const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
 const pmdashboardController = require('./controllers/pmController');
 const productivityController = require('./controllers/productivityController');
+const tldashboardController = require('./controllers/tldashboardController');
 
 
 const app = express();
@@ -51,6 +52,9 @@ apiRouter.get('/pmutilization', pmdashboardController.pmutilizationsection);
 apiRouter.get('/pmattendance', pmdashboardController.pmattendancesection);
 apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
 apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
+
+// TL Dashboard Routes
+apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
