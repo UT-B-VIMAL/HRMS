@@ -48,6 +48,7 @@ apiRouter.get('/pmproducts', pmdashboardController.pmproductsection);
 apiRouter.get('/pmutilization', pmdashboardController.pmutilizationsection);
 apiRouter.get('/pmattendance', pmdashboardController.pmattendancesection);
 apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
+apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
