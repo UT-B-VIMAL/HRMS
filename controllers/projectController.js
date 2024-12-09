@@ -1,9 +1,9 @@
-const db = require("../../config/db");
+const db = require("../config/db");
 const {
   successResponse,
   errorResponse,
-} = require("../../helpers/responseHelper");
-const { projectSchema } = require("../../validators/projectValidator");
+} = require("../helpers/responseHelper");
+const { projectSchema } = require("../validators/projectValidator");
 
 exports.insert = async (req, res) => {
   const { name, product } = req.body;
