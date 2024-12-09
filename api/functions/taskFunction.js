@@ -29,8 +29,7 @@ exports.createTask= async (payload, res) => {
         assigned_user_id, remark, reopen_status, description,
         team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
       ];
-      console.log('Query:', query);
-      console.log('Values:', values);
+
 
       const [result] = await db.query(query, values);
   

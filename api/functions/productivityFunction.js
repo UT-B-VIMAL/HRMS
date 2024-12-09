@@ -18,20 +18,22 @@ const convertSecondsToReadableTime = (seconds) => {
     return result.trim();
 };
 
+
+
 const getPagination = (page, perPage, totalRecords) => {
+    page = parseInt(page, 10);
     const totalPages = Math.ceil(totalRecords / perPage);
-    const rangeStart = (page - 1) * perPage + 1;
-    const rangeEnd = Math.min(page * perPage, totalRecords);
-    const rangeFrom = totalRecords > 0
-        ? `Showing ${rangeStart}-${rangeEnd} of ${totalRecords} entries`
-        : `Showing 0-0 of 0 entries`;
+    const nextPage = page < totalPages ? page + 1 : null
+    const prevPage = page > 1 ? page - 1 : null;
 
     return {
         total_records: totalRecords,
         total_pages: totalPages,
-        current_page: parseInt(page, 10),
+        current_page: page,
         per_page: perPage,
-        range_from: rangeFrom,
+        range_from: `Showing ${(page - 1) * perPage + 1}-${page * perPage} of ${totalRecords} entries`,
+        next_page: nextPage,
+        prev_page: prevPage,
     };
 };
 
