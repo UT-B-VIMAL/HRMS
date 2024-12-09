@@ -299,7 +299,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
       FROM products
       WHERE id = ?
     `;
-    const [productRows] = await db.promise().query(productQuery, [product_id]);
+    const [productRows] = await db.query(productQuery, [product_id]);
     const product = productRows[0] || { name: 'N/A', id: 'N/A' };
 
     // Build dynamic query for tasks and subtasks
@@ -358,7 +358,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
     }
 
     // Execute the query
-    const [taskRows] = await db.promise().query(tasksQuery, [product_id]);
+    const [taskRows] = await db.query(tasksQuery, [product_id]);
 
     // Helper function to validate subtask inclusion based on status
     const isValidSubtask = (subtask, status) => {

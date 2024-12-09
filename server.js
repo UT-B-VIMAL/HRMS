@@ -1,19 +1,22 @@
-// server.js
 const express = require("express");
+const https = require("https");
+const http = require("http");
+const fs = require("fs");
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
 const userController = require('./controllers/userController');
-const productController= require('./controllers/productController');
+const productController = require('./controllers/productController');
 const taskController = require('./controllers/taskController');
 const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
 const pmdashboardController = require('./controllers/pmController');
 const productivityController = require('./controllers/productivityController');
 const tldashboardController = require('./controllers/tldashboardController');
-const authController = require('./controllers/authController')
+const authController = require('./controllers/authController');
 
 const app = express();
 app.use(bodyParser);
+
 const apiRouter = express.Router();
 
 // User Routes
@@ -54,6 +57,7 @@ apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
 apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
+apiRouter.get('/pmlist', tldashboardController.tlattendancesection);
 apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
 
 // Productivity
@@ -69,7 +73,24 @@ app.use('/api', apiRouter);
 
 app.use(globalErrorHandler);
 
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+// Define the server configuration
+const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
+const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
+const PORT = isProduction ? 9000 : 3000;
+
+if (isProduction) {
+  // SSL Configuration for production
+  const options = {
+    key: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem"),
+    cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
+  };
+
+  https.createServer(options, app).listen(PORT, () => {
+    console.log(`Secure server is running on https://${DOMAIN}:${PORT}`);
+  });
+} else {
+  // Development server (non-SSL)
+  http.createServer(app).listen(PORT, () => {
+    console.log(`Development server is running on http://${DOMAIN}:${PORT}`);
+  });
+}

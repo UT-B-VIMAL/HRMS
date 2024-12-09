@@ -1,10 +1,10 @@
 const mysql = require('mysql2');
 
 const db = mysql.createConnection({
-    host: "localhost",
-    user:"root",
-    password: "",
-    database: "hrms",
+    host: "new-timesheet.crfjkk9fkpj5.ap-south-1.rds.amazonaws.com",
+    user:"admin",
+    password: "TimeSheet",
+    database: "hrms_backend",
 }).promise();
 
 db.connect((err) => {
