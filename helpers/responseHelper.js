@@ -25,7 +25,6 @@ const errorResponse = (res, error, message = 'An error occurred', statusCode = 5
     message,
     error,
   };
- // Send the pretty-printed JSON response
   res.status(statusCode).json(getResponse(response));
 };
 
