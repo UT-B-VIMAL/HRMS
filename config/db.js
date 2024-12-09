@@ -5,7 +5,7 @@ const db = mysql.createConnection({
     user:"admin",
     password: "TimeSheet",
     database: "hrms_backend",
-});
+}).promise();
 
 db.connect((err) => {
     if (err) {
