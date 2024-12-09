@@ -5,12 +5,12 @@ exports.fetchProducts = async (payload, res) => {
   try {
     // Step 1: Get products
     const productsQuery = "SELECT * FROM products";
-    const [products] = await db.promise().query(productsQuery);
+    const [products] = await db.query(productsQuery);
 
     const result = await Promise.all(
       products.map(async (product) => {
         const tasksQuery = "SELECT * FROM tasks WHERE product_id = ?";
-        const [tasks] = await db.promise().query(tasksQuery, [product.id]);
+        const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
         let completedItems = 0;
@@ -18,7 +18,7 @@ exports.fetchProducts = async (payload, res) => {
 
         for (const task of tasks) {
           const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ?";
-          const [subtasks] = await db.promise().query(subtasksQuery, [task.id]);
+          const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
             totalItems += subtasks.length;
@@ -44,7 +44,7 @@ exports.fetchProducts = async (payload, res) => {
         if (workingEmployees.size > 0) {
           const employeeDetailsQuery = "SELECT * FROM users WHERE id IN (?)";
           const [employees] = await db
-            .promise()
+            
             .query(employeeDetailsQuery, [Array.from(workingEmployees)]);
 
           employeeList = employees.map((user) => {
@@ -98,7 +98,7 @@ exports.fetchUtilization = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.promise().query(totalStrengthQuery);
+    const [totalStrengthData] = await db.query(totalStrengthQuery);
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -122,7 +122,7 @@ exports.fetchUtilization = async (payload, res) => {
       JOIN teams t ON u.team_id = t.id
       WHERE DATE(stut.start_time) = CURDATE()
     `;
-    const [workingEmployeesData] = await db.promise().query(workingEmployeesQuery);
+    const [workingEmployeesData] = await db.query(workingEmployeesQuery);
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -175,7 +175,7 @@ exports.fetchAttendance = async (payload, res) => {
   try {
     // Step 1: Get total strength of all users
     const totalStrengthQuery = `SELECT COUNT(*) AS total_strength FROM users`;
-    const [[{ total_strength: totalStrength }]] = await db.promise().query(totalStrengthQuery);
+    const [[{ total_strength: totalStrength }]] = await db.query(totalStrengthQuery);
 
     // Step 2: Calculate total absent employees
     const currentTime = new Date();
@@ -192,7 +192,7 @@ exports.fetchAttendance = async (payload, res) => {
           (day_type = 2 AND half_type = 2 AND ? >= ?)
         )
     `;
-    const [[{ total_absent: totalAbsentEmployees }]] = await db.promise().query(totalAbsentQuery, [
+    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(totalAbsentQuery, [
       currentTime,
       cutoffTime,
       currentTime,
@@ -221,7 +221,7 @@ exports.fetchAttendance = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE()
     `;
-    const [teamWiseAttendanceData] = await db.promise().query(teamWiseAttendanceQuery);
+    const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
       const { team_id, team_name, employee_id, employee_name, day_type, half_type } = row;
@@ -289,12 +289,12 @@ exports.fetchPmdatas = async (payload, res) => {
   try {
     // Step 1: Fetch products data
     const productsQuery = "SELECT * FROM products";
-    const [products] = await db.promise().query(productsQuery);
+    const [products] = await db.query(productsQuery);
 
     const productData = await Promise.all(
       products.map(async (product) => {
         const tasksQuery = "SELECT * FROM tasks WHERE product_id = ?";
-        const [tasks] = await db.promise().query(tasksQuery, [product.id]);
+        const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
         let completedItems = 0;
@@ -302,7 +302,7 @@ exports.fetchPmdatas = async (payload, res) => {
 
         for (const task of tasks) {
           const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ?";
-          const [subtasks] = await db.promise().query(subtasksQuery, [task.id]);
+          const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
             totalItems += subtasks.length;
@@ -328,7 +328,7 @@ exports.fetchPmdatas = async (payload, res) => {
         if (workingEmployees.size > 0) {
           const employeeDetailsQuery = "SELECT * FROM users WHERE id IN (?)";
           const [employees] = await db
-            .promise()
+            
             .query(employeeDetailsQuery, [Array.from(workingEmployees)]);
 
           employeeList = employees.map((user) => {
@@ -366,7 +366,7 @@ exports.fetchPmdatas = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.promise().query(totalStrengthQuery);
+    const [totalStrengthData] = await db.query(totalStrengthQuery);
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -389,7 +389,7 @@ exports.fetchPmdatas = async (payload, res) => {
       JOIN teams t ON u.team_id = t.id
       WHERE DATE(stut.start_time) = CURDATE()
     `;
-    const [workingEmployeesData] = await db.promise().query(workingEmployeesQuery);
+    const [workingEmployeesData] = await db.query(workingEmployeesQuery);
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -425,7 +425,7 @@ exports.fetchPmdatas = async (payload, res) => {
 
     // Step 3: Fetch attendance data
     const totalStrengthQueryAttendance = `SELECT COUNT(*) AS total_strength FROM users`;
-    const [[{ total_strength: totalStrengthAttendance }]] = await db.promise().query(totalStrengthQueryAttendance);
+    const [[{ total_strength: totalStrengthAttendance }]] = await db.query(totalStrengthQueryAttendance);
 
     const currentTime = new Date();
     const cutoffTime = new Date();
@@ -441,7 +441,7 @@ exports.fetchPmdatas = async (payload, res) => {
           (day_type = 2 AND half_type = 2 AND ? >= ?)
         )
     `;
-    const [[{ total_absent: totalAbsentEmployees }]] = await db.promise().query(totalAbsentQuery, [
+    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(totalAbsentQuery, [
       currentTime,
       cutoffTime,
       currentTime,
@@ -469,7 +469,7 @@ exports.fetchPmdatas = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE()
     `;
-    const [teamWiseAttendanceData] = await db.promise().query(teamWiseAttendanceQuery);
+    const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
       const { team_id, team_name, employee_id, employee_name, day_type, half_type } = row;

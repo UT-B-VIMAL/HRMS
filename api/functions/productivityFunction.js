@@ -99,15 +99,15 @@ exports.getTeamwiseProductivity = async (req, res) => {
         }
 
         // Execute both queries concurrently
-        const [result] = await db.promise().query(query, values);
-        const [countResult] = await db.promise().query(countQuery, countValues);
+        const [result] = await db.query(query, values);
+        const [countResult] = await db.query(countQuery, countValues);
 
 
         const totalRecords = countResult[0].total_records;
         const totalPages = Math.ceil(totalRecords / perPage);
         const rangeFrom = `Showing ${(page - 1) * perPage + 1}-${Math.min(page * perPage, totalRecords)} of ${totalRecords} entries`;
 
-        const finalResult = result.map(row => {
+        const data = result.map(row => {
             const totalEstimatedSeconds = row.total_estimated_seconds_tasks + row.total_estimated_seconds_subtasks;
             const totalWorkedSeconds = row.total_worked_seconds_tasks + row.total_worked_seconds_subtasks;
             const totalExtendedSeconds = row.total_extended_seconds_tasks + row.total_extended_seconds_subtasks;
@@ -123,24 +123,17 @@ exports.getTeamwiseProductivity = async (req, res) => {
             };
         });
 
-        
-        if ( finalResult.length === 0) {
-            return successResponse(res, {
-                total_records: totalRecords,
-                total_pages: totalPages,
-                range_from: rangeFrom,
-                data: []
-            }, 'No Teamwise split found');
-        }
-        
-        return successResponse(res, {
+        pagination = {
             total_records: totalRecords,
             total_pages: totalPages,
-            current_page: parseInt(page),
-            per_page: parseInt(perPage),
+            current_page: parseInt(page, 10),
+            per_page: perPage,
             range_from: rangeFrom,
-            data:  finalResult
-        }, 'Idle employees retrieved successfully');
+        };
+        
+
+     successResponse(res, data, data.length === 0 ? 'No Tesmwise split found' : 'Tesmwise split retrieved  successfully', 200, pagination);
+        
     } catch (error) {
         console.error('Error:', error.message);
         res.status(500).json({ success: false, message: 'An error occurred', error: error.message });
@@ -148,5 +141,98 @@ exports.getTeamwiseProductivity = async (req, res) => {
 };
 
 
+
+exports.get_individualStatus = async (req, res) => {
+    try {
+      const { team_id, month, search, page = 1 } = req.query;
+      const limit = 10;
+      const offset = (page - 1) * limit;
+  
+      // Base SQL Query
+      let baseQuery = `
+        SELECT 
+          users.id,
+          users.name AS employee_name,
+          users.employee_id,
+          COUNT(tasks.id) AS assigned_tasks,
+          SUM(CASE WHEN tasks.status = 1 THEN 1 ELSE 0 END) AS ongoing_tasks,
+          SUM(CASE WHEN tasks.status = 3 THEN 1 ELSE 0 END) AS completed_tasks
+        FROM users
+        LEFT JOIN tasks ON tasks.user_id = users.id
+      `;
+  
+      // Count Query to get the total number of records
+      let countQuery = `
+        SELECT COUNT(DISTINCT users.id) AS total
+        FROM users
+        LEFT JOIN tasks ON tasks.user_id = users.id
+      `;
+  
+      // Dynamic filters based on request query parameters
+      let whereConditions = [];
+      if (team_id) whereConditions.push(`users.team_id = ?`);
+      if (month) whereConditions.push(`MONTH(tasks.created_at) = ?`);
+      if (search) {
+        whereConditions.push(`(users.name LIKE ? OR users.employee_id LIKE ?)`);
+      }
+  
+      const queryParams = [];
+      if (team_id) queryParams.push(team_id);
+      if (month) queryParams.push(month);
+      if (search) {
+        queryParams.push(`%${search}%`, `%${search}%`);
+      }
+  
+      // If any filters exist, append them to the base query
+      if (whereConditions.length > 0) {
+        const whereClause = ` WHERE ${whereConditions.join(' AND ')}`;
+        baseQuery += whereClause;
+        countQuery += whereClause;
+      }
+  
+      // Add pagination to the base query
+      baseQuery += ` GROUP BY users.id LIMIT ? OFFSET ?`;
+      queryParams.push(limit, offset);
+  
+      // Fetch the data
+      const [results] = await db.query(baseQuery, queryParams);
+  
+      // Fetch the total record count for pagination
+      const [countResult] = await db.query(countQuery, queryParams.slice(0, -2));
+      const totalRecords = countResult[0]?.total || 0;
+  
+      // Calculate pagination details
+      const totalPages = Math.ceil(totalRecords / limit);
+      const rangeStart = (page - 1) * limit + 1;
+      const rangeEnd = Math.min(page * limit, totalRecords);
+      const rangeFrom = totalRecords > 0
+        ? `Showing ${rangeStart}-${rangeEnd} of ${totalRecords} entries`
+        : `No entries to display`;
+  
+      // Map the result to the desired format
+      const data = results.map(user => ({
+        employee_name: user.employee_name,
+        employee_id: user.employee_id,
+        assigned_tasks: user.assigned_tasks || 0,
+        ongoing_tasks: user.ongoing_tasks || 0,
+        completed_tasks: user.completed_tasks || 0,
+      }));
+  
+      pagination = {
+        total_records: totalRecords,
+        total_pages: totalPages,
+        current_page: parseInt(page, 10),
+        per_page: limit,
+        range_from: rangeFrom,
+      };
+    
+
+      successResponse(res, data, data.length === 0 ? 'No Individual status found' : 'Individual status retrieved successfully', 200, pagination);
+    } catch (error) {
+      console.error('Error fetching individual status:', error);
+      return errorResponse(res, error.message, 'Server error', 500);
+    }
+  };
+  
 
 

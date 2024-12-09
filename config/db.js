@@ -5,7 +5,7 @@ const db = mysql.createConnection({
     user:"root",
     password: "",
     database: "hrms",
-});
+}).promise();
 
 db.connect((err) => {
     if (err) {
