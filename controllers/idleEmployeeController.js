@@ -6,7 +6,7 @@ const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 exports.get_idleEmployee = async (req, res) => {
     try {
-        await get_idleEmployee(res);
+        await get_idleEmployee(req,res);
     } catch (error) {
         return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
     }

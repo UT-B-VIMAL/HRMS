@@ -27,7 +27,7 @@ exports.insert = async (req, res) => {
 
   try {
     const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE name = ?";
-    const [checkResult] = await db.promise().query(checkQuery, [name]);
+    const [checkResult] = await db.query(checkQuery, [name]);
 
     if (checkResult[0].count > 0) {
       return errorResponse(
@@ -41,7 +41,7 @@ exports.insert = async (req, res) => {
     const query =
       "INSERT INTO teams (name, created_by, updated_by) VALUES (?, ?, ?)";
     const values = [name, created_by, updated_by];
-    const [result] = await db.promise().query(query, values);
+    const [result] = await db.query(query, values);
 
     // Return a success response
     return successResponse(
@@ -91,10 +91,10 @@ exports.getAll = async (req, res) => {
 
   try {
     // Execute the data query
-    const [result] = await db.promise().query(query, queryParams);
+    const [result] = await db.query(query, queryParams);
 
     // Execute the count query to get the total number of filtered records
-    const [countResult] = await db.promise().query(countQuery, queryParams);
+    const [countResult] = await db.query(countQuery, queryParams);
     const totalItems = countResult[0].total;
 
     // Calculate total pages
@@ -126,7 +126,7 @@ exports.find = async (req, res) => {
 
   try {
     const query = "SELECT * FROM teams WHERE id = ? AND delete_status = 0";
-    const [result] = await db.promise().query(query, [id]);
+    const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
       return errorResponse(res, "Team not found or deleted", "Not Found", 404);
@@ -158,7 +158,7 @@ exports.update = async (req, res) => {
   try {
     const checkQuery =
       "SELECT COUNT(*) as count FROM teams WHERE id = ? AND delete_status = 0";
-    const [checkResult] = await db.promise().query(checkQuery, [id]);
+    const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Team not found or deleted", "Not Found", 404);
@@ -167,7 +167,7 @@ exports.update = async (req, res) => {
     const query = "UPDATE teams SET name = ?, updated_by = ? WHERE id = ?";
     // const values = [name, req.user?.id, id];
     const values = [name, updated_by, id];
-    const [result] = await db.promise().query(query, values);
+    const [result] = await db.query(query, values);
 
     return successResponse(res, { id, name }, "Team Updated successfully", 200);
   } catch (error) {
@@ -181,7 +181,7 @@ exports.delete = async (req, res) => {
   try {
     const checkQuery =
       "SELECT COUNT(*) as count FROM teams WHERE id = ? AND delete_status = 0";
-    const [checkResult] = await db.promise().query(checkQuery, [id]);
+    const [checkResult] = await db.query(checkQuery, [id]);
     console.log(checkResult[0].count);
 
     const updated_by = 1;
@@ -207,7 +207,7 @@ exports.delete = async (req, res) => {
       "UPDATE teams SET delete_status = 1, updated_by = ? WHERE id = ?";
     //   const values = [req.user?.id, id];
     const values = [updated_by, id];
-    const [result] = await db.promise().query(query, values);
+    const [result] = await db.query(query, values);
     return successResponse(res, { id }, "Team deleted successfully", 200);
   } catch (error) {
     return errorResponse(res, error.message, "Error deleting team", 500);
