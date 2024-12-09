@@ -1,4 +1,4 @@
-onst mysql = require('mysql2');
+const mysql = require('mysql2');
 
 const db = mysql.createConnection({
     host: "new-timesheet.crfjkk9fkpj5.ap-south-1.rds.amazonaws.com",
