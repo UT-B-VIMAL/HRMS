@@ -65,7 +65,8 @@ apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProdu
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
 
 // Change password
-apiRouter.post('/change_password', authController.change_password);
+
+apiRouter.put('/change_password/:id',authController.change_password);
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
