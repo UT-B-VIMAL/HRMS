@@ -50,6 +50,7 @@ apiRouter.get('/pmproducts', pmdashboardController.pmproductsection);
 apiRouter.get('/pmutilization', pmdashboardController.pmutilizationsection);
 apiRouter.get('/pmattendance', pmdashboardController.pmattendancesection);
 apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
+apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
