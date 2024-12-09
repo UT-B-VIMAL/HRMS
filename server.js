@@ -1,9 +1,10 @@
-// server.js
 const express = require("express");
+const https = require("https");
+const fs = require("fs");
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
 const userController = require('./controllers/userController');
-const productController= require('./controllers/productController');
+const productController = require('./controllers/productController');
 const taskController = require('./controllers/taskController');
 const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
@@ -11,6 +12,7 @@ const pmdashboardController = require('./controllers/pmController');
 
 const app = express();
 app.use(bodyParser);
+
 const apiRouter = express.Router();
 
 // User Routes
@@ -54,7 +56,15 @@ app.use('/api', apiRouter);
 
 app.use(globalErrorHandler);
 
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// SSL Certificate setup (make sure to replace with your real paths)
+const options = {
+  key: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem"),
+  cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
+};
+
+const DOMAIN = "frontendnode.hrms.utwebapps.com";
+const PORT = 9000; 
+
+https.createServer(options, app).listen(PORT, () => {
+  console.log(`Secure server is running on https://${DOMAIN}:${PORT}`);
 });
