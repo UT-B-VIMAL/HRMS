@@ -58,6 +58,7 @@ apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
 apiRouter.get('/tlattendancelist', tldashboardController.tlattendancesection);
+apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
