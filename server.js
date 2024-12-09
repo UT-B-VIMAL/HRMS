@@ -11,6 +11,11 @@ const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
 const pmdashboardController = require('./controllers/pmController');
 const productivityController = require('./controllers/productivityController');
+const ratingController = require('./controllers/ratingController');
+const projectController = require('./controllers/projectController');
+const teamController = require('./controllers/teamController');
+const designationController = require('./controllers/designationController');
+
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
 
@@ -27,10 +32,33 @@ apiRouter.get('/user/:id', userController.getUser);
 apiRouter.get('/user', userController.getAllUsers);
 
 // Product Routes
-apiRouter.get('/products', productController.getAll);
-apiRouter.get('/products/:id', productController.find);
+apiRouter.post('/products', productController.insert);
 apiRouter.put('/products/:id', productController.update);
 apiRouter.delete('/products/:id', productController.delete);
+apiRouter.get('/products/:id', productController.find);
+apiRouter.get('/products', productController.getAll);
+
+// Project Routes
+apiRouter.post('/projects', projectController.insert);
+apiRouter.put('/projects/:id', projectController.update);
+apiRouter.delete('/projects/:id', projectController.delete);
+apiRouter.get('/projects/:id', projectController.find);
+apiRouter.get('/projects', projectController.getAll);
+
+// Team Routes
+apiRouter.post('/team', teamController.insert);
+apiRouter.put('/team/:id', teamController.update);
+apiRouter.delete('/team/:id', teamController.delete);
+apiRouter.get('/team/:id', teamController.find);
+apiRouter.get('/team', teamController.getAll);
+
+// Designation Routes
+apiRouter.post('/designations', designationController.insert);
+apiRouter.put('/designations/:id', designationController.update);
+apiRouter.delete('/designations/:id', designationController.delete);
+apiRouter.get('/designations/:id', designationController.find);
+apiRouter.get('/designations', designationController.getAll);
+
 
 // Task Routes
 apiRouter.post('/task', taskController.createTask);
@@ -63,6 +91,8 @@ apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
+apiRouter.get('/getAllRatings', ratingController.getAllRatings);
+apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
 
 // Change password
 

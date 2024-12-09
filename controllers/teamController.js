@@ -1,8 +1,8 @@
-const db = require("../../config/db");
+const db = require("../config/db");
 const {
   successResponse,
   errorResponse,
-} = require("../../helpers/responseHelper");
+} = require("../helpers/responseHelper");
 
 exports.insert = async (req, res) => {
   const payload = req.body;
