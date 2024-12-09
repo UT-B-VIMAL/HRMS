@@ -10,7 +10,8 @@ const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
 const pmdashboardController = require('./controllers/pmController');
 const productivityController = require('./controllers/productivityController');
-
+const tldashboardController = require('./controllers/tldashboardController');
+const authController = require('./controllers/authController')
 
 const app = express();
 app.use(bodyParser);
@@ -54,9 +55,16 @@ apiRouter.get('/pmattendance', pmdashboardController.pmattendancesection);
 apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
 apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
 
+// TL Dashboard Routes
+apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
+
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
+
+// Change password
+
+apiRouter.post('/change_password',authController.change_password);
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
