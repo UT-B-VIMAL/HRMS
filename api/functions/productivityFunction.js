@@ -24,7 +24,7 @@ const getPagination = (page, perPage, totalRecords) => {
     const rangeEnd = Math.min(page * perPage, totalRecords);
     const rangeFrom = totalRecords > 0
         ? `Showing ${rangeStart}-${rangeEnd} of ${totalRecords} entries`
-        : `No entries to display`;
+        : `Showing 0-0 of 0 entries`;
 
     return {
         total_records: totalRecords,
