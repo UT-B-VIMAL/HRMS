@@ -60,6 +60,7 @@ apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
 
+
 // Change password
 
 apiRouter.post('/change_password',authController.change_password);
