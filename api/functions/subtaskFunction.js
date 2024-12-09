@@ -58,7 +58,7 @@ exports.getSubTask = async (id, res) => {
   };
 
 // Show All Task
-exports.getSubAllTasks= async (res) => {
+exports.getAllSubTasks= async (res) => {
     try {
         const query = 'SELECT * FROM sub_tasks';
         const [rows] = await db.promise().query(query);
