@@ -37,9 +37,9 @@ exports.insert = async (req, res) => {
     const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ?";
     const checkProduct =
       "SELECT COUNT(*) as count FROM products WHERE id = ? and delete_status=0";
-    const [checkResult] = await db.promise().query(checkQuery, [name]);
+    const [checkResult] = await db.query(checkQuery, [name]);
     const [checkProductResults] = await db
-      .promise()
+      
       .query(checkProduct, [product]);
 
     if (checkResult[0].count > 0) {
@@ -58,7 +58,7 @@ exports.insert = async (req, res) => {
     const insertQuery =
       "INSERT INTO projects (name, product_id, created_by, updated_by) VALUES (?, ?, ?, ?)";
     const values = [name, product, created_by, updated_by];
-    const [result] = await db.promise().query(insertQuery, values);
+    const [result] = await db.query(insertQuery, values);
 
     // Return a success response
     return successResponse(
@@ -117,10 +117,10 @@ exports.getAll = async (req, res) => {
   queryParams.push(pageSize, offset);
 
   try {
-    const [result] = await db.promise().query(query, queryParams);
+    const [result] = await db.query(query, queryParams);
 
     // Execute the count query to get the total number of filtered records
-    const [countResult] = await db.promise().query(countQuery, queryParams);
+    const [countResult] = await db.query(countQuery, queryParams);
     const totalItems = countResult[0].total;
 
     const totalPages = Math.ceil(totalItems / pageSize);
@@ -151,7 +151,7 @@ exports.find = async (req, res) => {
   try {
     // Query to find the project by ID
     const query = "SELECT * FROM projects WHERE id = ? AND delete_status = 0";
-    const [result] = await db.promise().query(query, [id]);
+    const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
       return errorResponse(res, "Project not found", "Not Found", 404);
@@ -169,14 +169,14 @@ exports.delete = async (req, res) => {
   try {
     const checkQuery =
       "SELECT COUNT(*) as count FROM projects WHERE id = ? AND delete_status = 0";
-    const [checkResult] = await db.promise().query(checkQuery, [id]);
+    const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Project not found", "Not Found", 404);
     }
 
     const deleteQuery = "UPDATE projects SET delete_status = 1 WHERE id = ?";
-    await db.promise().query(deleteQuery, [id]);
+    await db.query(deleteQuery, [id]);
 
     return successResponse(res, {}, "Project deleted successfully", 200);
   } catch (error) {
@@ -211,7 +211,7 @@ exports.update = async (req, res) => {
   try {
     const checkQuery =
       "SELECT COUNT(*) as count FROM projects WHERE id = ? AND delete_status = 0";
-    const [checkResult] = await db.promise().query(checkQuery, [id]);
+    const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Project not found", "Not Found", 404);
@@ -220,7 +220,7 @@ exports.update = async (req, res) => {
     const checkProduct =
       "SELECT COUNT(*) as count FROM products WHERE id = ? AND delete_status = 0";
     const [checkProductResults] = await db
-      .promise()
+      
       .query(checkProduct, [product]);
 
     if (checkProductResults[0].count === 0) {
@@ -230,7 +230,7 @@ exports.update = async (req, res) => {
     const updateQuery =
       "UPDATE projects SET name = ?, product_id = ?, updated_by = ? WHERE id = ?";
     const values = [name, product, updated_by, id];
-    await db.promise().query(updateQuery, values);
+    await db.query(updateQuery, values);
 
     return successResponse(
       res,

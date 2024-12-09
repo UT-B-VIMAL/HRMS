@@ -28,7 +28,7 @@ exports.createUser = async (payload, res) => {
       created_by, updated_by, created_at, updated_at, deleted_at
     ];
 
-    const [result] = await db.promise().query(query, values);
+    const [result] = await db.query(query, values);
 
     return successResponse(res, { id: result.insertId, ...payload }, 'User created successfully', 201);
   } catch (error) {
@@ -42,7 +42,7 @@ exports.createUser = async (payload, res) => {
 exports.getUser = async (id, res) => {
   try {
     const query = 'SELECT * FROM users WHERE id = ?';
-    const [rows] = await db.promise().query(query, [id]);
+    const [rows] = await db.query(query, [id]);
 
     if (rows.length === 0) {
       return errorResponse(res, null, 'User not found', 204);
@@ -58,7 +58,7 @@ exports.getUser = async (id, res) => {
 exports.getAllUsers = async (res) => {
   try {
     const query = 'SELECT * FROM users WHERE deleted_at IS NULL';
-    const [rows] = await db.promise().query(query);
+    const [rows] = await db.query(query);
 
     if (rows.length === 0) {
       return errorResponse(res, null, 'No users found', 204);
@@ -100,7 +100,7 @@ exports.updateUser = async (id, payload, res) => {
       values.splice(5, 0, hashedPassword); // Insert the hashed password at the correct index
     }
 
-    const [result] = await db.promise().query(query, values);
+    const [result] = await db.query(query, values);
 
     if (result.affectedRows === 0) {
       return errorResponse(res, null, 'User not found', 204);
@@ -116,7 +116,7 @@ exports.updateUser = async (id, payload, res) => {
 exports.deleteUser = async (id, res) => {
   try {
     const query = `UPDATE users SET deleted_at = NOW() WHERE id = ?`;
-    const [result] = await db.promise().query(query, [id]);
+    const [result] = await db.query(query, [id]);
 
     if (result.affectedRows === 0) {
       return errorResponse(res, null, 'User not found', 204);

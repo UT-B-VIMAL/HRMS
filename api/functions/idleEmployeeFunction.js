@@ -65,8 +65,8 @@ exports.get_idleEmployee = async (req, res) => {
         }
 
         // Execute both queries concurrently
-        const [rows] = await db.promise().query(query, queryParams);
-        const [countResult] = await db.promise().query(countQuery, queryParams);
+        const [rows] = await db.query(query, queryParams);
+        const [countResult] = await db.query(countQuery, queryParams);
 
         const totalRecords = countResult[0].total_records;
         const totalPages = Math.ceil(totalRecords / perPage);

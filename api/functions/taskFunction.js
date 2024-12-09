@@ -32,7 +32,7 @@ exports.createTask= async (payload, res) => {
       console.log('Query:', query);
       console.log('Values:', values);
 
-      const [result] = await db.promise().query(query, values);
+      const [result] = await db.query(query, values);
   
       return successResponse(res, { id: result.insertId, ...payload }, 'Task added successfully', 201);
     } catch (error) {
@@ -45,7 +45,7 @@ exports.createTask= async (payload, res) => {
 exports.getTask = async (id, res) => {
     try {
       const query = 'SELECT * FROM tasks WHERE id = ?';
-      const [rows] = await db.promise().query(query, [id]);
+      const [rows] = await db.query(query, [id]);
   
       if (rows.length === 0) {
         return errorResponse(res, null, 'Task not found', 204);
@@ -61,7 +61,7 @@ exports.getTask = async (id, res) => {
 exports.getAllTasks= async (res) => {
     try {
         const query = 'SELECT * FROM tasks';
-        const [rows] = await db.promise().query(query);
+        const [rows] = await db.query(query);
 
         if (rows.length === 0) {
             return errorResponse(res, null, 'No tasks found', 204);
@@ -104,7 +104,7 @@ exports.updateTask = async (id, payload, res) => {
             team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at, id,
         ];
 
-        const [result] = await db.promise().query(query, values);
+        const [result] = await db.query(query, values);
 
         if (result.affectedRows === 0) {
             return errorResponse(res, null, 'Task not found', 204);
@@ -121,7 +121,7 @@ exports.updateTask = async (id, payload, res) => {
 exports.deleteTask = async (id, res) => {
   try {
     const query = 'DELETE FROM tasks WHERE id = ?';
-    const [result] = await db.promise().query(query, [id]);
+    const [result] = await db.query(query, [id]);
 
     if (result.affectedRows === 0) {
       return errorResponse(res, null, 'Task not found', 204);

@@ -7,14 +7,16 @@ const getResponse = (response) => {
   };
 };
 
-const successResponse = (res, data, message = 'Request successful', statusCode = 200) => {
+const successResponse = (res, data, message = 'Request successful', statusCode = 200, pagination = null) => {
   const response = {
     statusCode,
     success: true,
     message,
     data,
   };
-
+  if (pagination) {
+    response.pagination = pagination;
+  }
   res.status(statusCode).json(getResponse(response)); 
 };
 

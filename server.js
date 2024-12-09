@@ -53,7 +53,7 @@ apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
-// apiRouter.get('/individual_status', productivityController.get_individualProductivity);
+apiRouter.get('/individual_status', productivityController.get_individualProductivity);
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
