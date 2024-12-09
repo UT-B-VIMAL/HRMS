@@ -2,14 +2,14 @@ const { StatusCodes } = require('http-status-codes');
 
 const getResponse = (response) => {
   return {
-    statusCode: response.statusCode || StatusCodes.OK,
+    status: response.status || StatusCodes.OK,
     ...response,
   };
 };
 
-const successResponse = (res, data, message = 'Request successful', statusCode = 200, pagination = null) => {
+const successResponse = (res, data, message = 'Request successful', status = 200, pagination = null) => {
   const response = {
-    statusCode,
+    status,
     success: true,
     message,
     data,
@@ -17,17 +17,17 @@ const successResponse = (res, data, message = 'Request successful', statusCode =
   if (pagination) {
     response.pagination = pagination;
   }
-  res.status(statusCode).json(getResponse(response)); 
+  res.status(status).json(getResponse(response)); 
 };
 
-const errorResponse = (res, error, message = 'An error occurred', statusCode = 500) => {
+const errorResponse = (res, error, message = 'An error occurred', status = 500) => {
   const response = {
-    statusCode,
+    status,
     success: false,
     message,
     error,
   };
-  res.status(statusCode).json(getResponse(response));
+  res.status(status).json(getResponse(response));
 };
 
 module.exports = { successResponse, errorResponse, getResponse };
