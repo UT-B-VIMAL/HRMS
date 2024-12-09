@@ -1,5 +1,6 @@
 const express = require("express");
 const https = require("https");
+const http = require("http");
 const fs = require("fs");
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
@@ -11,7 +12,7 @@ const idleEmployeeController = require('./controllers/idleEmployeeController');
 const pmdashboardController = require('./controllers/pmController');
 const productivityController = require('./controllers/productivityController');
 const tldashboardController = require('./controllers/tldashboardController');
-const authController = require('./controllers/authController')
+const authController = require('./controllers/authController');
 
 const app = express();
 app.use(bodyParser);
@@ -62,25 +63,32 @@ apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
 
-
 // Change password
-
-apiRouter.post('/change_password',authController.change_password);
+apiRouter.post('/change_password', authController.change_password);
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
 
 app.use(globalErrorHandler);
 
-// SSL Certificate setup (make sure to replace with your real paths)
-const options = {
-  key: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem"),
-  cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
-};
+// Define the server configuration
+const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
+const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
+const PORT = isProduction ? 9000 : 3000;
 
-const DOMAIN = "frontendnode.hrms.utwebapps.com";
-const PORT = 9000; 
+if (isProduction) {
+  // SSL Configuration for production
+  const options = {
+    key: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem"),
+    cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
+  };
 
-https.createServer(options, app).listen(PORT, () => {
-  console.log(`Secure server is running on https://${DOMAIN}:${PORT}`);
-});
+  https.createServer(options, app).listen(PORT, () => {
+    console.log(`Secure server is running on https://${DOMAIN}:${PORT}`);
+  });
+} else {
+  // Development server (non-SSL)
+  http.createServer(app).listen(PORT, () => {
+    console.log(`Development server is running on http://${DOMAIN}:${PORT}`);
+  });
+}
