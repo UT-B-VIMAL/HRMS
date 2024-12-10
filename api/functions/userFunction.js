@@ -69,7 +69,7 @@ exports.createUser = async (payload, res) => {
 exports.getUser = async (id, res) => {
   try {
     const query = 'SELECT * FROM users WHERE id = ?';
-    const [rows] = await db.promise().query(query, [id]);
+    const [rows] = await db.query(query, [id]);
 
     if (rows.length === 0) {
       return errorResponse(res, null, 'User not found', 204);
@@ -85,7 +85,7 @@ exports.getUser = async (id, res) => {
 exports.getAllUsers = async (res) => {
   try {
     const query = 'SELECT * FROM users WHERE deleted_at IS NULL';
-    const [rows] = await db.promise().query(query);
+    const [rows] = await db.query(query);
 
     if (rows.length === 0) {
       return errorResponse(res, null, 'No users found', 204);
@@ -128,7 +128,7 @@ exports.updateUser = async (id, payload, res) => {
       values.splice(5, 0, hashedPassword); 
     }
 
-    const [result] = await db.promise().query(query, values);
+    const [result] = await db.query(query, values);
 
     if (result.affectedRows === 0) {
       return errorResponse(res, null, 'User not found', 204);

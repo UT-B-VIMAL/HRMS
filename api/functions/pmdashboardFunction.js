@@ -5,12 +5,12 @@ exports.fetchProducts = async (payload, res) => {
   try {
     // Step 1: Get products
     const productsQuery = "SELECT * FROM products";
-    const [products] = await db.promise().query(productsQuery);
+    const [products] = await db.query(productsQuery);
 
     const result = await Promise.all(
       products.map(async (product) => {
         const tasksQuery = "SELECT * FROM tasks WHERE product_id = ?";
-        const [tasks] = await db.promise().query(tasksQuery, [product.id]);
+        const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
         let completedItems = 0;
@@ -18,7 +18,7 @@ exports.fetchProducts = async (payload, res) => {
 
         for (const task of tasks) {
           const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ?";
-          const [subtasks] = await db.promise().query(subtasksQuery, [task.id]);
+          const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
             totalItems += subtasks.length;
@@ -44,7 +44,7 @@ exports.fetchProducts = async (payload, res) => {
         if (workingEmployees.size > 0) {
           const employeeDetailsQuery = "SELECT * FROM users WHERE id IN (?)";
           const [employees] = await db
-            .promise()
+            
             .query(employeeDetailsQuery, [Array.from(workingEmployees)]);
 
           employeeList = employees.map((user) => {
@@ -98,7 +98,7 @@ exports.fetchUtilization = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.promise().query(totalStrengthQuery);
+    const [totalStrengthData] = await db.query(totalStrengthQuery);
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -122,7 +122,7 @@ exports.fetchUtilization = async (payload, res) => {
       JOIN teams t ON u.team_id = t.id
       WHERE DATE(stut.start_time) = CURDATE()
     `;
-    const [workingEmployeesData] = await db.promise().query(workingEmployeesQuery);
+    const [workingEmployeesData] = await db.query(workingEmployeesQuery);
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -175,7 +175,7 @@ exports.fetchAttendance = async (payload, res) => {
   try {
     // Step 1: Get total strength of all users
     const totalStrengthQuery = `SELECT COUNT(*) AS total_strength FROM users`;
-    const [[{ total_strength: totalStrength }]] = await db.promise().query(totalStrengthQuery);
+    const [[{ total_strength: totalStrength }]] = await db.query(totalStrengthQuery);
 
     // Step 2: Calculate total absent employees
     const currentTime = new Date();
@@ -192,7 +192,7 @@ exports.fetchAttendance = async (payload, res) => {
           (day_type = 2 AND half_type = 2 AND ? >= ?)
         )
     `;
-    const [[{ total_absent: totalAbsentEmployees }]] = await db.promise().query(totalAbsentQuery, [
+    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(totalAbsentQuery, [
       currentTime,
       cutoffTime,
       currentTime,
@@ -221,7 +221,7 @@ exports.fetchAttendance = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE()
     `;
-    const [teamWiseAttendanceData] = await db.promise().query(teamWiseAttendanceQuery);
+    const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
       const { team_id, team_name, employee_id, employee_name, day_type, half_type } = row;
@@ -285,16 +285,266 @@ exports.fetchAttendance = async (payload, res) => {
     return errorResponse(res, error.message, "Error fetching attendance data", 500);
   }
 };
+exports.fetchPmviewproductdata = async (req, res) => {
+  try {
+    const { product_id, project_id, team_id, date, search } = req.query;
+
+    if (!product_id) {
+      return errorResponse(res, null, 'Product ID is required', 400);
+    }
+
+    // Build dynamic SQL query for product details
+    const productQuery = `
+      SELECT id, name
+      FROM products
+      WHERE id = ?
+    `;
+    const [productRows] = await db.query(productQuery, [product_id]);
+    const product = productRows[0] || { name: 'N/A', id: 'N/A' };
+
+    // Build dynamic query for tasks and subtasks
+    let tasksQuery = `
+      SELECT 
+        t.id AS task_id,
+        t.name AS task_name,
+        t.status AS task_status,
+        t.active_status AS task_active_status,
+        t.created_at AS task_date,
+        t.priority AS task_priority,
+        t.estimated_hours AS task_estimation_hours,
+        t.description AS task_description,
+        s.id AS subtask_id,
+        s.name AS subtask_name,
+        s.status AS subtask_status,
+        s.active_status AS subtask_active_status,
+        s.estimated_hours AS subtask_estimation_hours,
+        s.description AS subtask_description,
+        te.name AS team_name,
+        u.name AS employee_name,
+        p.name AS project_name
+      FROM tasks t
+      LEFT JOIN sub_tasks s ON t.id = s.task_id
+      LEFT JOIN teams te ON t.team_id = te.id
+      LEFT JOIN users u ON t.user_id = u.id
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.product_id = ?
+    `;
+
+    // Filter by project_id if provided
+    if (project_id) {
+      tasksQuery += ` AND t.project_id = ${db.escape(project_id)}`;
+    }
+
+    // Filter by team_id if provided
+    if (team_id) {
+      tasksQuery += ` AND t.team_id = ${db.escape(team_id)}`;
+    }
+
+    // Filter by date if provided (assuming date format as 'YYYY-MM-DD')
+    if (date) {
+      tasksQuery += ` AND DATE(t.created_at) = ${db.escape(date)}`;
+    }
+
+    // Filter by search if provided (search across user, project, team, subtask name)
+    if (search) {
+      tasksQuery += `
+        AND (
+          u.name LIKE ${db.escape('%' + search + '%')} OR
+          p.name LIKE ${db.escape('%' + search + '%')} OR
+          te.name LIKE ${db.escape('%' + search + '%')} OR
+          s.name LIKE ${db.escape('%' + search + '%')}
+        )
+      `;
+    }
+
+    // Execute the query
+    const [taskRows] = await db.query(tasksQuery, [product_id]);
+
+    // Helper function to validate subtask inclusion based on status
+    const isValidSubtask = (subtask, status) => {
+      switch (status) {
+        case 'Pending':
+          return subtask.active_status === 1 && subtask.status === 0;
+        case 'In Progress':
+          return subtask.active_status === 1 && subtask.status === 1;
+        case 'In Review':
+          return subtask.active_status === 1 && subtask.status === 2;
+        case 'On Hold':
+          return subtask.active_status === 0;
+        case 'Done':
+          return subtask.active_status === 1 && subtask.status === 3;
+        default:
+          return false;
+      }
+    };
+
+    // Helper function to format tasks and subtasks
+    const formatTask = (task, subtasks, status) => {
+      const validSubtasks = [];
+      let totalSubtasks = 0;
+      let completedSubtasks = 0;
+
+      // Collect and validate subtask details
+      subtasks.forEach((subtask) => {
+        if (isValidSubtask(subtask, status)) {
+          validSubtasks.push({
+            SubtaskId: subtask.id || 'N/A',
+            SubtaskName: subtask.name || 'N/A',
+            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
+            SubtaskDescription: subtask.description || 'N/A',
+            SubtaskActiveStatus: subtask.active_status || 'N/A',
+            SubtaskStatus: subtask.status || 'N/A',
+          });
+        }
+        totalSubtasks++;
+        if (subtask.status === 3) {
+          completedSubtasks++;
+        }
+      });
+
+      // Calculate completion percentage
+      const completionPercentage =
+        totalSubtasks > 0
+          ? Math.round((completedSubtasks / totalSubtasks) * 100)
+          : task.status === 3
+          ? 100
+          : 0;
+
+      // Return the formatted task object
+      return {
+        Date: task.date ? new Date(task.date).toISOString().split('T')[0] : 'N/A',
+        Team: task.team_name || 'N/A',
+        EmployeeName: task.employee_name || 'N/A',
+        Priority: task.priority || 'N/A',
+        ProjectName: task.project_name || 'N/A',
+        TaskName: task.name || 'N/A',
+        TaskId: task.id || 'N/A',
+        TotalSubtaskCount: totalSubtasks,
+        CompletedSubtaskCount: completedSubtasks,
+        EstimationHours: task.estimation_hours || 'N/A',
+        Description: task.description || 'N/A',
+        Subtasks: validSubtasks,
+        CompletionPercentage: completionPercentage,
+        Status: status,
+      };
+    };
+
+    // Group tasks by status
+    const groupedTasks = {
+      'Pending': [],
+      'In Progress': [],
+      'In Review': [],
+      'On Hold': [],
+      'Done': [],
+    };
+
+    // Track added task IDs for each section
+    const addedTaskIds = {
+      'Pending': [],
+      'In Progress': [],
+      'In Review': [],
+      'On Hold': [],
+      'Done': [],
+    };
+
+    // Process each row and categorize tasks
+    taskRows.forEach((row) => {
+      const task = {
+        id: row.task_id,
+        name: row.task_name,
+        status: row.task_status,
+        active_status: row.task_active_status,
+        priority: row.task_priority,
+        date: row.task_date,
+        estimation_hours: row.task_estimation_hours,
+        description: row.task_description,
+        team_name: row.team_name,
+        employee_name: row.employee_name,
+        project_name: row.project_name,
+      };
+
+      const subtask = row.subtask_id
+        ? {
+            id: row.subtask_id,
+            name: row.subtask_name,
+            status: row.subtask_status,
+            active_status: row.subtask_active_status,
+            estimated_hours: row.subtask_estimation_hours,
+            description: row.subtask_description,
+          }
+        : null;
+
+      const category = Object.keys(groupedTasks).find((status) =>
+        isValidSubtask(subtask || task, status)
+      );
+
+      // Only add task if it hasn't been added to that category already
+      if (category) {
+        const existingTaskIndex = groupedTasks[category].findIndex(t => t.TaskId === task.id);
+
+        if (existingTaskIndex === -1) {
+          // Task does not exist in the section, so push the task with its subtask
+          groupedTasks[category].push(formatTask(task, subtask ? [subtask] : [], category));
+        } else {
+          // Task exists, so add the subtask to the existing task
+          groupedTasks[category][existingTaskIndex].Subtasks.push({
+            SubtaskId: subtask.id || 'N/A',
+            SubtaskName: subtask.name || 'N/A',
+            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
+            SubtaskDescription: subtask.description || 'N/A',
+            SubtaskActiveStatus: subtask.active_status || 'N/A',
+            SubtaskStatus: subtask.status || 'N/A',
+          });
+        }
+      }
+    });
+
+    // Prepare the response
+    const result = {
+      PendingTasks: groupedTasks['Pending'],
+      InProgressTasks: groupedTasks['In Progress'],
+      InReviewTasks: groupedTasks['In Review'],
+      OnHoldTasks: groupedTasks['On Hold'],
+      DoneTasks: groupedTasks['Done'],
+      TodoCount: groupedTasks['Pending'].length,
+      InProgressCount: groupedTasks['In Progress'].length,
+      InReviewCount: groupedTasks['In Review'].length,
+      OnHoldCount: groupedTasks['On Hold'].length,
+      DoneCount: groupedTasks['Done'].length,
+      OverallCompletionPercentage:
+        groupedTasks['Done'].length > 0
+          ? Math.round(
+              (groupedTasks.Done.length / 
+                (groupedTasks.Pending.length + 
+                  groupedTasks['In Progress'].length + 
+                  groupedTasks['In Review'].length + 
+                  groupedTasks['On Hold'].length + 
+                  groupedTasks.Done.length)) *
+                100
+            )
+          : 0,
+      productname: product.name,
+      productid: product.id,
+    };
+
+    return successResponse(res, result, 'Product details retrieved successfully', 200);
+
+  } catch (error) {
+    console.error('Error fetching product details:', error);
+    return errorResponse(res, error.message, 'Error fetching product details', 500);
+  }
+};
+
 exports.fetchPmdatas = async (payload, res) => {
   try {
     // Step 1: Fetch products data
     const productsQuery = "SELECT * FROM products";
-    const [products] = await db.promise().query(productsQuery);
+    const [products] = await db.query(productsQuery);
 
     const productData = await Promise.all(
       products.map(async (product) => {
         const tasksQuery = "SELECT * FROM tasks WHERE product_id = ?";
-        const [tasks] = await db.promise().query(tasksQuery, [product.id]);
+        const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
         let completedItems = 0;
@@ -302,7 +552,7 @@ exports.fetchPmdatas = async (payload, res) => {
 
         for (const task of tasks) {
           const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ?";
-          const [subtasks] = await db.promise().query(subtasksQuery, [task.id]);
+          const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
             totalItems += subtasks.length;
@@ -328,7 +578,7 @@ exports.fetchPmdatas = async (payload, res) => {
         if (workingEmployees.size > 0) {
           const employeeDetailsQuery = "SELECT * FROM users WHERE id IN (?)";
           const [employees] = await db
-            .promise()
+            
             .query(employeeDetailsQuery, [Array.from(workingEmployees)]);
 
           employeeList = employees.map((user) => {
@@ -366,7 +616,7 @@ exports.fetchPmdatas = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.promise().query(totalStrengthQuery);
+    const [totalStrengthData] = await db.query(totalStrengthQuery);
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -389,7 +639,7 @@ exports.fetchPmdatas = async (payload, res) => {
       JOIN teams t ON u.team_id = t.id
       WHERE DATE(stut.start_time) = CURDATE()
     `;
-    const [workingEmployeesData] = await db.promise().query(workingEmployeesQuery);
+    const [workingEmployeesData] = await db.query(workingEmployeesQuery);
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -425,7 +675,7 @@ exports.fetchPmdatas = async (payload, res) => {
 
     // Step 3: Fetch attendance data
     const totalStrengthQueryAttendance = `SELECT COUNT(*) AS total_strength FROM users`;
-    const [[{ total_strength: totalStrengthAttendance }]] = await db.promise().query(totalStrengthQueryAttendance);
+    const [[{ total_strength: totalStrengthAttendance }]] = await db.query(totalStrengthQueryAttendance);
 
     const currentTime = new Date();
     const cutoffTime = new Date();
@@ -441,7 +691,7 @@ exports.fetchPmdatas = async (payload, res) => {
           (day_type = 2 AND half_type = 2 AND ? >= ?)
         )
     `;
-    const [[{ total_absent: totalAbsentEmployees }]] = await db.promise().query(totalAbsentQuery, [
+    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(totalAbsentQuery, [
       currentTime,
       cutoffTime,
       currentTime,
@@ -469,7 +719,7 @@ exports.fetchPmdatas = async (payload, res) => {
       LEFT JOIN users u ON t.id = u.team_id
       LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE()
     `;
-    const [teamWiseAttendanceData] = await db.promise().query(teamWiseAttendanceQuery);
+    const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
       const { team_id, team_name, employee_id, employee_name, day_type, half_type } = row;
