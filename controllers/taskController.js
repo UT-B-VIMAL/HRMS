@@ -1,4 +1,4 @@
-const { createTask, updateTask, deleteTask, getTask, getAllTasks } = require('../api/functions/taskFunction');
+const { createTask, updateTask, deleteTask, getTask, getAllTasks,addTaskComment } = require('../api/functions/taskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const { createTaskSchema, updateTaskSchema } = require("../validators/taskValidator");
 
@@ -74,8 +74,21 @@ const taskController = {
     } catch (error) {
       return errorResponse(res, error.message, 'Error retrieving tasks', 500);
     }
+  },
+  
+
+  taskComments: async (req, res) => {
+    try {
+      const payload = req.body;
+      await addTaskComment(payload, res);
+    } catch (error) {
+      return errorResponse(res, error.message, 'Error retrieving task comments', 500);
+    }
   }
+
 };
+
+
 
 module.exports = taskController;
 
