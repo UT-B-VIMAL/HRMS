@@ -19,6 +19,7 @@ const designationController = require('./controllers/designationController');
 
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
+const attendanceController = require('./controllers/attendanceController');
 
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
@@ -120,8 +121,14 @@ apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
+
+//Rating
 apiRouter.get('/getAllRatings', ratingController.getAllRatings);
 apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
+
+//Attendance
+apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
+
 
 // Change password
 
