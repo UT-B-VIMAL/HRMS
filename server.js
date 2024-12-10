@@ -98,6 +98,12 @@ apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
 
 apiRouter.put('/change_password/:id',authController.change_password);
 
+
+// Comments
+apiRouter.post('/task_comments',taskController. taskComments);
+
+
+
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
 
