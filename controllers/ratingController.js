@@ -17,7 +17,7 @@ exports.getAllRatings = async (req, res) => {
   let query = `
     SELECT 
       users.id,
-      users.name,
+      users.first_name,
       users.employee_id,
       teams.name AS team_name,
       COALESCE(ratings.rating, 0) AS rating,
@@ -44,7 +44,7 @@ exports.getAllRatings = async (req, res) => {
     const searchWildcard = `%${search.trim()}%`;
     query += `
       AND (
-        users.name LIKE ? 
+        users.first_name LIKE ? 
         OR users.employee_id LIKE ? 
         OR teams.name LIKE ?
       )
