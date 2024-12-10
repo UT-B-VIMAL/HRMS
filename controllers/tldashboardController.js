@@ -1,4 +1,4 @@
-const { fetchAttendance } = require('../api/functions/tldashboardFunction');
+const { fetchAttendance, fetchTlrating, fetchTLproducts, fetchTLresourceallotment, fetchTLdatas } = require('../api/functions/tldashboardFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 exports.tlattendancesection = async (req, res) => {
@@ -6,6 +6,38 @@ exports.tlattendancesection = async (req, res) => {
     return await fetchAttendance(req, res);
   } catch (error) {
     console.error("Error during tlattendancesection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.tlratingsection = async (req, res) => {
+  try {
+    return await fetchTlrating(req, res);
+  } catch (error) {
+    console.error("Error during tlratingsection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.tlproductsection = async (req, res) => {
+  try {
+    return await fetchTLproducts(req, res);
+  } catch (error) {
+    console.error("Error during tlproductsection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.tlresourceallotmentsection = async (req, res) => {
+  try {
+    return await fetchTLresourceallotment(req, res);
+  } catch (error) {
+    console.error("Error during tlresourceallotmentsection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.tldashboardsection = async (req, res) => {
+  try {
+    return await fetchTLdatas(req, res);
+  } catch (error) {
+    console.error("Error during tldashboardsection processing:", error.message);
     return errorResponse(res, null, 'Internal Server Error', 500);
   }
 };
