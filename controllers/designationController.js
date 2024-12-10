@@ -106,10 +106,14 @@ exports.getAll = async (req, res) => {
 
     // Execute the count query to get the total number of filtered records
     const [countResult] = await db.query(countQuery, queryParams);
-    const totalItems = countResult[0].total;
+    const total_records = countResult[0].total;
 
     // Calculate total pages
-    const totalPages = Math.ceil(totalItems / pageSize);
+    const total_pages = Math.ceil(total_records / pageSize);
+    const rangeFrom = `Showing ${(page - 1) * pageSize + 1}-${Math.min(
+      page * pageSize,
+      total_records
+    )} of ${total_records} entries`;
 
     // Return paginated data with search results and total filtered records
     return successResponse(
@@ -117,11 +121,13 @@ exports.getAll = async (req, res) => {
       {
         data: result,
         pagination: {
-          page: pageNum,
-          size: pageSize,
-          totalItems,
-          totalFilteredRecords: totalItems, // Add filtered records key
-          totalPages,
+          total_records,
+          total_pages,
+          current_page: pageNum,
+          per_page: pageSize,
+          range_from: rangeFrom,
+          next_page:3,
+          prev_page:1
         },
       },
       "Designation fetched successfully",
