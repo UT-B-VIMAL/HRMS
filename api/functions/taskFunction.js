@@ -107,22 +107,28 @@ exports.getTask = async (id, res) => {
   try {
     // Task query
     const taskQuery = `
-    SELECT t.*, 
-          te.name AS team_name, 
-          owner.name AS owner_name,
-          assignee.name AS assignee_name,
-          p.name AS product_name,
-          pj.name AS project_name
-    FROM tasks t
-    LEFT JOIN teams te ON t.team_id = te.id
-    LEFT JOIN users owner ON t.user_id = owner.id 
-    LEFT JOIN users assignee ON t.assigned_user_id = assignee.id 
-    LEFT JOIN products p ON t.product_id = p.id 
-    LEFT JOIN projects pj ON t.project_id = pj.id 
-    WHERE t.id = ?;
+SELECT 
+  t.*, 
+  te.name AS team_name, 
+  COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
+  COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
+  p.name AS product_name, 
+  pj.name AS project_name 
+FROM tasks t 
+LEFT JOIN teams te ON t.team_id = te.id 
+LEFT JOIN users owner ON t.user_id = owner.id 
+LEFT JOIN users assignee ON t.assigned_user_id = assignee.id 
+LEFT JOIN products p ON t.product_id = p.id 
+LEFT JOIN projects pj ON t.project_id = pj.id 
+WHERE t.id = ?;
+
+
     `;
     const [task] = await db.query(taskQuery, [id]);
 
+
+    console.log(task);
+    
     if (!task) {
       return errorResponse(res, "Task not found", "Error retrieving task", 404);
     }
@@ -131,7 +137,7 @@ exports.getTask = async (id, res) => {
     const subtasksQuery = `
     SELECT 
         st.*, 
-        u.name AS assignee_name, 
+        COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
         t.name AS task_name, 
         p.name AS project_name
     FROM sub_tasks st
@@ -146,7 +152,8 @@ exports.getTask = async (id, res) => {
 
     // // Histories query
     const historiesQuery = `
-      SELECT h.*, u.name as updated_by, s.description as status_description
+      SELECT h.*, COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,  
+      s.description as status_description
       FROM task_histories h
       LEFT JOIN users u ON h.updated_by = u.id
       LEFT JOIN task_status_flags s ON h.status_flag = s.id
@@ -157,7 +164,7 @@ exports.getTask = async (id, res) => {
 
     // // Comments query
     const commentsQuery = `
-    SELECT c.*, u.name as updated_by
+    SELECT c.*,  COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
     FROM task_comments c
     LEFT JOIN users u ON c.updated_by = u.id
     WHERE c.task_id = ? AND c.subtask_id IS NULL
