@@ -5,6 +5,23 @@ const {
 } = require("../helpers/responseHelper");
 const { projectSchema } = require("../validators/projectValidator");
 
+const getPagination = (page, perPage, totalRecords) => {
+  page = parseInt(page, 10);
+  const totalPages = Math.ceil(totalRecords / perPage);
+  const nextPage = page < totalPages ? page + 1 : null
+  const prevPage = page > 1 ? page - 1 : null;
+
+  return {
+      total_records: totalRecords,
+      total_pages: totalPages,
+      current_page: page,
+      per_page: perPage,
+      range_from: `Showing ${(page - 1) * perPage + 1}-${page * perPage} of ${totalRecords} entries`,
+      next_page: nextPage,
+      prev_page: prevPage,
+  };
+};
+
 exports.insert = async (req, res) => {
   const { name, product } = req.body;
 
@@ -117,29 +134,16 @@ exports.getAll = async (req, res) => {
   queryParams.push(pageSize, offset);
 
   try {
-    const [result] = await db.query(query, queryParams);
+    const [rows] = await db.query(query, queryParams);
 
     // Execute the count query to get the total number of filtered records
     const [countResult] = await db.query(countQuery, queryParams);
-    const totalItems = countResult[0].total;
+    const total_records = countResult[0].total;
 
-    const totalPages = Math.ceil(totalItems / pageSize);
-
-    return successResponse(
-      res,
-      {
-        data: result,
-        pagination: {
-          page: pageNum,
-          size: pageSize,
-          totalItems,
-          totalFilteredRecords: totalItems, // Add filtered records key
-          totalPages,
-        },
-      },
-      "Projects fetched successfully",
-      200
-    );
+    const pagination = getPagination(pageNum, pageSize, total_records);
+  
+    successResponse(res, rows, rows.length === 0 ? 'No Projects found' : 'Project fetched successfully', 200,  pagination);
+    // Return paginated data with search results and total filtered records
   } catch (error) {
     return errorResponse(res, error.message, "Error fetching Projects", 500);
   }
@@ -157,9 +161,9 @@ exports.find = async (req, res) => {
       return errorResponse(res, "Project not found", "Not Found", 404);
     }
 
-    return successResponse(res, result[0], "Project found successfully", 200);
+    return successResponse(res, result[0], "Project retreived successfully", 200);
   } catch (error) {
-    return errorResponse(res, error.message, "Error fetching project", 500);
+    return errorResponse(res, error.message, "Error retreiving project", 500);
   }
 };
 
@@ -174,7 +178,19 @@ exports.delete = async (req, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Project not found", "Not Found", 404);
     }
+    const checkReferencesQuery = `SELECT COUNT(*) as count FROM tasks WHERE product_id = ?`;
+    const [checkReferencesResult] = await db
+      
+      .query(checkReferencesQuery, [id]);
 
+    if (checkReferencesResult[0].count > 0) {
+      return errorResponse(
+        res,
+        `Project is referenced in the tasks table and cannot be deleted`,
+        "Reference Error",
+        400
+      );
+    }
     const deleteQuery = "UPDATE projects SET delete_status = 1 WHERE id = ?";
     await db.query(deleteQuery, [id]);
 
