@@ -2,6 +2,7 @@ const express = require("express");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
+const cors = require('cors');
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
 const userController = require('./controllers/userController');
@@ -21,16 +22,35 @@ const authController = require('./controllers/authController');
 const attendanceController = require('./controllers/attendanceController');
 
 const app = express();
+const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
+const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
+const PORT = isProduction ? 9000 : 3000;
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost', 
+      'http://frontend.utwebapps.com', 
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
+};
+
+
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(bodyParser);
 
-const cors = require('cors');
-
 // Allow requests from localhost:5173
-app.use(cors({
-  origin: 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+
 
 const apiRouter = express.Router();
 
@@ -119,10 +139,6 @@ app.use('/api', apiRouter);
 
 app.use(globalErrorHandler);
 
-// Define the server configuration
-const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
-const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
-const PORT = isProduction ? 9000 : 3000;
 
 if (isProduction) {
   // SSL Configuration for production
