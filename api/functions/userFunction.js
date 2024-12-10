@@ -82,20 +82,75 @@ exports.getUser = async (id, res) => {
 };
 
 // Get All Users
-exports.getAllUsers = async (res) => {
+const getPagination = (page, perPage, totalRecords) => {
+  page = parseInt(page, 10);
+  const totalPages = Math.ceil(totalRecords / perPage);
+  const nextPage = page < totalPages ? page + 1 : null;
+  const prevPage = page > 1 ? page - 1 : null;
+
+  return {
+      total_records: totalRecords,
+      total_pages: totalPages,
+      current_page: page,
+      per_page: perPage,
+      range_from: `Showing ${(page - 1) * perPage + 1}-${Math.min(page * perPage, totalRecords)} of ${totalRecords} entries`,
+      next_page: nextPage,
+      prev_page: prevPage,
+  };
+};
+
+exports.getAllUsers = async (req, res) => {
   try {
-    const query = 'SELECT * FROM users WHERE deleted_at IS NULL';
-    const [rows] = await db.query(query);
+    const { search = '', page = 1, perPage = 10 } = req.query; // Default values for query parameters
+    const offset = (page - 1) * perPage;
 
-    if (rows.length === 0) {
-      return errorResponse(res, null, 'No users found', 204);
-    }
+    // Query to fetch paginated data
+    let query = `
+      SELECT 
+        id, first_name, last_name, keycloak_id, employee_id, email, phone,
+        email_verified_at, password, team_id, role_id, designation_id 
+      FROM users 
+      WHERE deleted_at IS NULL
+      ${search ? 'AND (first_name LIKE ? OR email LIKE ?)' : ''}
+      LIMIT ? OFFSET ?
+    `;
 
-    return successResponse(res, rows, 'Users retrieved successfully');
+    // Query to count total records
+    let countQuery = `
+      SELECT COUNT(*) AS total_records 
+      FROM users 
+      WHERE deleted_at IS NULL
+      ${search ? 'AND (first_name LIKE ? OR email LIKE ?)' : ''}
+    `;
+
+    // Prepare query values
+    const values = search ? [`%${search}%`, `%${search}%`, parseInt(perPage), parseInt(offset)] : [parseInt(perPage), parseInt(offset)];
+    const countValues = search ? [`%${search}%`, `%${search}%`] : [];
+
+    // Execute queries
+    const [rows] = await db.query(query, values);
+    const [countResult] = await db.query(countQuery, countValues);
+
+    // Get total records and pagination details
+    const totalRecords = countResult[0].total_records;
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    // Add serial numbers to each row
+    const data = rows.map((row, index) => ({
+      s_no: offset + index + 1, // Calculate serial number
+      ...row, // Include all user data
+    }));
+
+    // Send success response
+    successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
   } catch (error) {
+    console.error('Error retrieving users:', error.message);
+    // Send error response
     return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
+
+
 
 // Update User
 exports.updateUser = async (id, payload, res) => {
