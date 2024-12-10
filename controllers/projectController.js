@@ -142,7 +142,7 @@ exports.getAll = async (req, res) => {
 
     const pagination = getPagination(pageNum, pageSize, total_records);
   
-    successResponse(res, rows, rows.length === 0 ? 'No Products found' : 'Products fetched successfully', 200,  pagination);
+    successResponse(res, rows, rows.length === 0 ? 'No Projects found' : 'Project fetched successfully', 200,  pagination);
     // Return paginated data with search results and total filtered records
   } catch (error) {
     return errorResponse(res, error.message, "Error fetching Projects", 500);
@@ -178,7 +178,19 @@ exports.delete = async (req, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Project not found", "Not Found", 404);
     }
+    const checkReferencesQuery = `SELECT COUNT(*) as count FROM tasks WHERE product_id = ?`;
+    const [checkReferencesResult] = await db
+      
+      .query(checkReferencesQuery, [id]);
 
+    if (checkReferencesResult[0].count > 0) {
+      return errorResponse(
+        res,
+        `Project is referenced in the tasks table and cannot be deleted`,
+        "Reference Error",
+        400
+      );
+    }
     const deleteQuery = "UPDATE projects SET delete_status = 1 WHERE id = ?";
     await db.query(deleteQuery, [id]);
 

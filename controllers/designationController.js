@@ -248,7 +248,19 @@ exports.delete = async (req, res) => {
         404
       );
     }
+    const checkReferencesQuery = `SELECT COUNT(*) as count FROM users WHERE designation_id = ?`;
+    const [checkReferencesResult] = await db
+      
+      .query(checkReferencesQuery, [id]);
 
+    if (checkReferencesResult[0].count > 0) {
+      return errorResponse(
+        res,
+        `Designation is referenced in the User table and cannot be deleted`,
+        "Reference Error",
+        400
+      );
+    }
     const query =
       "UPDATE designations SET delete_status = 1, updated_by = ? WHERE id = ?";
     //   const values = [req.user?.id, id];
