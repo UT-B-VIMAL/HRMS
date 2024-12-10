@@ -2,6 +2,7 @@ const express = require("express");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
+const cors = require('cors');
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
 const userController = require('./controllers/userController');
@@ -11,11 +12,45 @@ const subtaskController = require('./controllers/subtaskcontroller');
 const idleEmployeeController = require('./controllers/idleEmployeeController');
 const pmdashboardController = require('./controllers/pmController');
 const productivityController = require('./controllers/productivityController');
+const ratingController = require('./controllers/ratingController');
+const projectController = require('./controllers/projectController');
+const teamController = require('./controllers/teamController');
+const designationController = require('./controllers/designationController');
+
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
+const attendanceController = require('./controllers/attendanceController');
 
 const app = express();
+const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
+const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
+const PORT = isProduction ? 9000 : 3000;
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost', 
+      'http://frontend.utwebapps.com', 
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
+};
+
+
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(bodyParser);
+
+// Allow requests from localhost:5173
+
 
 const apiRouter = express.Router();
 
@@ -27,10 +62,33 @@ apiRouter.get('/user/:id', userController.getUser);
 apiRouter.get('/user', userController.getAllUsers);
 
 // Product Routes
-apiRouter.get('/products', productController.getAll);
-apiRouter.get('/products/:id', productController.find);
+apiRouter.post('/products', productController.insert);
 apiRouter.put('/products/:id', productController.update);
 apiRouter.delete('/products/:id', productController.delete);
+apiRouter.get('/products/:id', productController.find);
+apiRouter.get('/products', productController.getAll);
+
+// Project Routes
+apiRouter.post('/projects', projectController.insert);
+apiRouter.put('/projects/:id', projectController.update);
+apiRouter.delete('/projects/:id', projectController.delete);
+apiRouter.get('/projects/:id', projectController.find);
+apiRouter.get('/projects', projectController.getAll);
+
+// Team Routes
+apiRouter.post('/team', teamController.insert);
+apiRouter.put('/team/:id', teamController.update);
+apiRouter.delete('/team/:id', teamController.delete);
+apiRouter.get('/team/:id', teamController.find);
+apiRouter.get('/team', teamController.getAll);
+
+// Designation Routes
+apiRouter.post('/designations', designationController.insert);
+apiRouter.put('/designations/:id', designationController.update);
+apiRouter.delete('/designations/:id', designationController.delete);
+apiRouter.get('/designations/:id', designationController.find);
+apiRouter.get('/designations', designationController.getAll);
+
 
 // Task Routes
 apiRouter.post('/task', taskController.createTask);
@@ -67,19 +125,29 @@ apiRouter.get('/tldashboard', tldashboardController.tldashboardsection);
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
 
+//Rating
+apiRouter.get('/getAllRatings', ratingController.getAllRatings);
+apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
+
+//Attendance
+apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
+
+
 // Change password
 
 apiRouter.put('/change_password/:id',authController.change_password);
+
+
+// Comments
+apiRouter.post('/task_comments',taskController. taskComments);
+
+
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
 
 app.use(globalErrorHandler);
 
-// Define the server configuration
-const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
-const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
-const PORT = isProduction ? 9000 : 3000;
 
 if (isProduction) {
   // SSL Configuration for production

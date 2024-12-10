@@ -75,7 +75,7 @@ exports.getUser = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
   try {
-      await getAllUsers(res);
+      await getAllUsers(req,res);
   } catch (error) {
       return errorResponse(res, error.message, 'Error retrieving users', 500);
   }

@@ -1,12 +1,12 @@
 const Joi = require('joi');
 
 const UserSchema = Joi.object({
-  name: Joi.string().min(3).max(100).required().messages({
-    'string.base': 'Name must be a string',
-    'string.empty': 'Name is required',
-    'string.min': 'Name must be at least 3 characters long',
-    'string.max': 'Name must be less than 100 characters',
-    'any.required': 'Name is required',
+  first_name: Joi.string().min(3).max(100).required().messages({
+    'string.base': 'Fisrt Name must be a string',
+    'string.empty': 'Fisrt Name is required',
+    'string.min': 'Fisrt Name must be at least 3 characters long',
+    'string.max': 'Fisrt Name must be less than 100 characters',
+    'any.required': 'Fisrt Name is required',
   }),
 
   employee_id: Joi.number().integer().required().messages({
