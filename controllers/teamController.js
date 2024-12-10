@@ -4,6 +4,23 @@ const {
   errorResponse,
 } = require("../helpers/responseHelper");
 
+const getPagination = (page, perPage, totalRecords) => {
+  page = parseInt(page, 10);
+  const totalPages = Math.ceil(totalRecords / perPage);
+  const nextPage = page < totalPages ? page + 1 : null
+  const prevPage = page > 1 ? page - 1 : null;
+
+  return {
+      total_records: totalRecords,
+      total_pages: totalPages,
+      current_page: page,
+      per_page: perPage,
+      range_from: `Showing ${(page - 1) * perPage + 1}-${page * perPage} of ${totalRecords} entries`,
+      next_page: nextPage,
+      prev_page: prevPage,
+  };
+};
+
 exports.insert = async (req, res) => {
   const payload = req.body;
   const { name } = payload;
@@ -91,7 +108,7 @@ exports.getAll = async (req, res) => {
 
   try {
     // Execute the data query
-    const [result] = await db.query(query, queryParams);
+    const [rows] = await db.query(query, queryParams);
 
     // Execute the count query to get the total number of filtered records
     const [countResult] = await db.query(countQuery, queryParams);
@@ -99,30 +116,10 @@ exports.getAll = async (req, res) => {
     // Calculate total pages
     const total_records = countResult[0].total;
 
-    // Calculate total pages
-    const total_pages = Math.ceil(total_records / pageSize);
-    const rangeFrom = `Showing ${(page - 1) * pageSize + 1}-${Math.min(
-      page * pageSize,
-      total_records
-    )} of ${total_records} entries`;
-    // Return paginated data with search results and total filtered records
-    return successResponse(
-      res,
-      {
-        data: result,
-        pagination: {
-          total_records,
-          total_pages,
-          current_page: pageNum,
-          per_page: pageSize,
-          range_from: rangeFrom,
-          next_page:3,
-          prev_page:1
-        },
-      },
-      "Teams fetched successfully",
-      200
-    );
+    const pagination = getPagination(pageNum, pageSize, total_records);
+  
+    successResponse(res, rows, rows.length === 0 ? 'No Teams found' : 'Teams fetched successfully', 200,  pagination);
+
   } catch (error) {
     return errorResponse(res, error.message, "Error fetching Teams", 500);
   }
