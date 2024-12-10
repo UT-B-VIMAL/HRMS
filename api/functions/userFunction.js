@@ -1,36 +1,63 @@
 const bcrypt = require('bcryptjs');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const { createUserInKeycloak,deleteUserInKeycloak } = require("../functions/keycloakFunction");
 
 // Create User
 exports.createUser = async (payload, res) => {
   const {
-    name, employee_id, email, phone, email_verified_at,
+    first_name,last_name, employee_id, email, phone, email_verified_at,
     password, team_id, role_id, designation_id, remember_token,
     created_by, updated_by, created_at, updated_at, deleted_at
   } = payload;
 
   try {
-    // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(password, 10);  // 10 is the saltRounds (higher is more secure)
+    const hashedPassword = await bcrypt.hash(password, 10); 
+    const roleName = await getRoleName(role_id);
 
     const query = `
       INSERT INTO users (
-        name, employee_id, email, phone, email_verified_at,
+        first_name,last_name, employee_id, email, phone, email_verified_at,
         password, team_id, role_id, designation_id, remember_token,
         created_by, updated_by, deleted_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
+      ) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
     `;
 
     const values = [
-      name, employee_id, email, phone, email_verified_at,
+      first_name,last_name, employee_id, email, phone, email_verified_at,
       hashedPassword, team_id, role_id, designation_id, remember_token,
       created_by, updated_by, created_at, updated_at, deleted_at
     ];
 
     const [result] = await db.promise().query(query, values);
 
-    return successResponse(res, { id: result.insertId, ...payload }, 'User created successfully', 201);
+    const keycloakUserData = {
+      username: first_name,
+      email: email,
+      firstName: first_name, 
+      lastName: last_name,
+      enabled: true,
+      emailVerified: true,
+      credentials: [
+        {
+          type: "password",
+          value: password,
+          temporary: false
+        }
+      ]
+    };
+
+    const userId = await createUserInKeycloak(keycloakUserData);
+
+    const updateQuery = `UPDATE users SET keycloak_id = ? WHERE id = ?`;
+    const updateValues = [userId, result.insertId];
+  
+    await db.promise().query(updateQuery, updateValues);
+    if (userId) {
+      return successResponse(res, { id: result.insertId, ...payload, keycloakUserId: userId }, 'User created successfully', 201);
+    } else {
+      return errorResponse(res, "Failed to create user in Keycloak", 'Error creating user in Keycloak', 500);
+    }
   } catch (error) {
     console.error('Error creating user:', error.message);
     return errorResponse(res, error.message, 'Error creating user', 500);
@@ -87,17 +114,18 @@ exports.updateUser = async (id, payload, res) => {
       WHERE id = ?
     `;
 
+    const roleName = await getRoleName(role_id);
+
     let values = [
       name, employee_id, email, phone, email_verified_at,
       team_id, role_id, designation_id, remember_token,
       created_by, updated_by, created_at, updated_at, deleted_at, id
     ];
 
-    // If a new password is provided, hash it before saving
     if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
-      query = query.replace('password = ?,', 'password = ?,'); // Include password in the query
-      values.splice(5, 0, hashedPassword); // Insert the hashed password at the correct index
+      const hashedPassword = await bcrypt.hash(password, 10); 
+      query = query.replace('password = ?,', 'password = ?,'); 
+      values.splice(5, 0, hashedPassword); 
     }
 
     const [result] = await db.promise().query(query, values);
@@ -115,15 +143,35 @@ exports.updateUser = async (id, payload, res) => {
 // Delete User
 exports.deleteUser = async (id, res) => {
   try {
-    const query = `UPDATE users SET deleted_at = NOW() WHERE id = ?`;
-    const [result] = await db.promise().query(query, [id]);
+    const selectQuery = `SELECT keycloak_id FROM users WHERE id = ?`;
+    const [rows] = await db.promise().query(selectQuery, [id]);
+
+    if (rows.length === 0 || !rows[0].keycloak_id) {
+      return errorResponse(res, null, 'User not found or Keycloak ID missing', 404);
+    }
+
+    const keycloakId = rows[0].keycloak_id;
+
+    const updateQuery = `UPDATE users SET deleted_at = NOW() WHERE id = ?`;
+    const [result] = await db.promise().query(updateQuery, [id]);
 
     if (result.affectedRows === 0) {
       return errorResponse(res, null, 'User not found', 204);
     }
 
+    await deleteUserInKeycloak(keycloakId);
+
     return successResponse(res, null, 'User deleted successfully');
   } catch (error) {
+    console.error('Error deleting user:', error.message);
     return errorResponse(res, error.message, 'Error deleting user', 500);
   }
+};
+
+
+const getRoleName = async (roleId) => {
+  const query = "SELECT name FROM roles WHERE id = ?";
+  const values = [roleId];
+  const [result] = await db.promise().query(query, values);
+  return result.length > 0 ? result[0].name : null;
 };
