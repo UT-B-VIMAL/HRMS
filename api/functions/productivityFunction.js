@@ -47,7 +47,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
             SELECT 
                 u.id AS user_id, 
                 u.employee_id, 
-                u.name AS user_name, 
+                COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS user_name, 
                 u.email AS user_email,
                 IFNULL(SUM(TIME_TO_SEC(t.estimated_hours)), 0) AS total_estimated_seconds_tasks,
                 IFNULL(SUM(TIME_TO_SEC(t.total_hours_worked)), 0) AS total_worked_seconds_tasks,
@@ -71,7 +71,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
             WHERE 
                 u.deleted_at IS NULL
                 ${team_id ? `AND u.team_id = ?` : ''}
-                ${search ? `AND (u.name LIKE ? OR u.email LIKE ?)` : ''}
+                 ${search ? `AND (u.first_name LIKE ?  OR u.email LIKE ?)` : ''}
             GROUP BY 
                 u.id
             LIMIT ? OFFSET ?
@@ -103,7 +103,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
                 ${month ? `AND MONTH(st.created_at) = ?` : ''}
             WHERE u.deleted_at IS NULL
                 ${team_id ? `AND u.team_id = ?` : ''}
-                ${search ? `AND (u.name LIKE ? OR u.email LIKE ?)` : ''}
+            ${search ? `AND (u.first_name LIKE ?  OR u.email LIKE ?)` : ''}
         `;
 
         const countValues = [];
@@ -157,7 +157,7 @@ exports.get_individualStatus = async (req, res) => {
         let baseQuery = `
             SELECT 
                 users.id,
-                users.name AS employee_name,
+                COALESCE(CONCAT(COALESCE(users.first_name, ''), ' ', COALESCE(NULLIF(users.last_name, ''), '')), 'Unknown User') AS employee_name, 
                 users.employee_id,
                 COUNT(tasks.id) AS assigned_tasks,
                 SUM(CASE WHEN tasks.status = 1 THEN 1 ELSE 0 END) AS ongoing_tasks,
@@ -177,7 +177,7 @@ exports.get_individualStatus = async (req, res) => {
         if (team_id) whereConditions.push(`users.team_id = ?`);
         if (month) whereConditions.push(`MONTH(tasks.created_at) = ?`);
         if (search) {
-            whereConditions.push(`(users.name LIKE ? OR users.employee_id LIKE ?)`); 
+            whereConditions.push(`(users.first_name LIKE ? OR users.employee_id LIKE ?)`); 
         }
 
         const queryParams = [];
