@@ -29,7 +29,7 @@ exports.createUser = async (payload, res) => {
       created_by, updated_by, created_at, updated_at, deleted_at
     ];
 
-    const [result] = await db.promise().query(query, values);
+    const [result] = await db.query(query, values);
 
     const keycloakUserData = {
       username: first_name,
@@ -52,7 +52,7 @@ exports.createUser = async (payload, res) => {
     const updateQuery = `UPDATE users SET keycloak_id = ? WHERE id = ?`;
     const updateValues = [userId, result.insertId];
   
-    await db.promise().query(updateQuery, updateValues);
+    await db.query(updateQuery, updateValues);
     if (userId) {
       return successResponse(res, { id: result.insertId, ...payload, keycloakUserId: userId }, 'User created successfully', 201);
     } else {
@@ -100,7 +100,7 @@ exports.getAllUsers = async (res) => {
 // Update User
 exports.updateUser = async (id, payload, res) => {
   const {
-    name, employee_id, email, phone, email_verified_at,
+    first_name,last_name, employee_id, email, phone, email_verified_at,
     password, team_id, role_id, designation_id, remember_token,
     created_by, updated_by, created_at, updated_at, deleted_at
   } = payload;
@@ -108,7 +108,7 @@ exports.updateUser = async (id, payload, res) => {
   try {
     let query = `
       UPDATE users SET
-        name = ?, employee_id = ?, email = ?, phone = ?, email_verified_at = ?,
+        first_name = ?,last_name = ?, employee_id = ?, email = ?, phone = ?, email_verified_at = ?,
         team_id = ?, role_id = ?, designation_id = ?, remember_token = ?,
         created_by = ?, updated_by = ?, created_at = ?, updated_at = ?, deleted_at = ?
       WHERE id = ?
@@ -117,7 +117,7 @@ exports.updateUser = async (id, payload, res) => {
     const roleName = await getRoleName(role_id);
 
     let values = [
-      name, employee_id, email, phone, email_verified_at,
+      first_name,last_name, employee_id, email, phone, email_verified_at,
       team_id, role_id, designation_id, remember_token,
       created_by, updated_by, created_at, updated_at, deleted_at, id
     ];
@@ -144,7 +144,7 @@ exports.updateUser = async (id, payload, res) => {
 exports.deleteUser = async (id, res) => {
   try {
     const selectQuery = `SELECT keycloak_id FROM users WHERE id = ?`;
-    const [rows] = await db.promise().query(selectQuery, [id]);
+    const [rows] = await db.query(selectQuery, [id]);
 
     if (rows.length === 0 || !rows[0].keycloak_id) {
       return errorResponse(res, null, 'User not found or Keycloak ID missing', 404);
@@ -153,7 +153,7 @@ exports.deleteUser = async (id, res) => {
     const keycloakId = rows[0].keycloak_id;
 
     const updateQuery = `UPDATE users SET deleted_at = NOW() WHERE id = ?`;
-    const [result] = await db.promise().query(updateQuery, [id]);
+    const [result] = await db.query(updateQuery, [id]);
 
     if (result.affectedRows === 0) {
       return errorResponse(res, null, 'User not found', 204);
@@ -172,6 +172,6 @@ exports.deleteUser = async (id, res) => {
 const getRoleName = async (roleId) => {
   const query = "SELECT name FROM roles WHERE id = ?";
   const values = [roleId];
-  const [result] = await db.promise().query(query, values);
+  const [result] = await db.query(query, values);
   return result.length > 0 ? result[0].name : null;
 };
