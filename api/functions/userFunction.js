@@ -155,45 +155,77 @@ exports.getAllUsers = async (req, res) => {
 // Update User
 exports.updateUser = async (id, payload, res) => {
   const {
-    first_name,last_name, employee_id, email, phone, email_verified_at,
-    password, team_id, role_id, designation_id, remember_token,
-    created_by, updated_by, created_at, updated_at, deleted_at
+    first_name,
+    last_name,
+    employee_id,
+    email,
+    phone,
+    email_verified_at,
+    password,
+    team_id,
+    role_id,
+    designation_id,
+    remember_token,
+    created_by,
+    updated_by,
+    created_at,
+    updated_at,
+    deleted_at,
   } = payload;
 
   try {
     let query = `
       UPDATE users SET
-        first_name = ?,last_name = ?, employee_id = ?, email = ?, phone = ?, email_verified_at = ?,
+        first_name = ?, last_name = ?, employee_id = ?, email = ?, phone = ?, email_verified_at = ?,
         team_id = ?, role_id = ?, designation_id = ?, remember_token = ?,
         created_by = ?, updated_by = ?, created_at = ?, updated_at = ?, deleted_at = ?
       WHERE id = ?
     `;
 
-    const roleName = await getRoleName(role_id);
-
     let values = [
-      first_name,last_name, employee_id, email, phone, email_verified_at,
-      team_id, role_id, designation_id, remember_token,
-      created_by, updated_by, created_at, updated_at, deleted_at, id
+      first_name,
+      last_name,
+      employee_id,
+      email,
+      phone,
+      email_verified_at,
+      team_id,
+      role_id,
+      designation_id,
+      remember_token,
+      created_by,
+      updated_by,
+      created_at,
+      updated_at,
+      deleted_at,
+      id,
     ];
 
     if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10); 
-      query = query.replace('password = ?,', 'password = ?,'); 
-      values.splice(5, 0, hashedPassword); 
+      const hashedPassword = await bcrypt.hash(password, 10);
+      query = query.replace(
+        'first_name = ?,',
+        'first_name = ?, password = ?,'
+      ); // Update query to include password field
+      values.splice(5, 0, hashedPassword); // Insert hashed password at the correct position
     }
 
+    // Execute the update query
     const [result] = await db.query(query, values);
 
     if (result.affectedRows === 0) {
-      return errorResponse(res, null, 'User not found', 204);
+      // No user was updated
+      return errorResponse(res, null, 'User not found or no changes made', 404);
     }
 
+    // Return success response with updated user data
     return successResponse(res, { id, ...payload }, 'User updated successfully');
   } catch (error) {
+    // Return error response in case of exception
     return errorResponse(res, error.message, 'Error updating user', 500);
   }
 };
+
 
 // Delete User
 exports.deleteUser = async (id, res) => {

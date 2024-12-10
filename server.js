@@ -22,6 +22,15 @@ const authController = require('./controllers/authController');
 const app = express();
 app.use(bodyParser);
 
+const cors = require('cors');
+
+// Allow requests from localhost:5173
+app.use(cors({
+  origin: 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 const apiRouter = express.Router();
 
 // User Routes
