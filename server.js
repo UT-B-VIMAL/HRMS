@@ -74,6 +74,7 @@ apiRouter.put('/projects/:id', projectController.update);
 apiRouter.delete('/projects/:id', projectController.delete);
 apiRouter.get('/projects/:id', projectController.find);
 apiRouter.get('/projects', projectController.getAll);
+apiRouter.get('/project_request', projectController.project_request);
 
 // Team Routes
 apiRouter.post('/team', teamController.insert);

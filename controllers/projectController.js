@@ -4,6 +4,8 @@ const {
   errorResponse,
 } = require("../helpers/responseHelper");
 const { projectSchema } = require("../validators/projectValidator");
+const { projectRequest} = require('../api/functions/projectFunction');
+
 
 const getPagination = (page, perPage, totalRecords) => {
   page = parseInt(page, 10);
@@ -257,4 +259,13 @@ exports.update = async (req, res) => {
   } catch (error) {
     return errorResponse(res, error.message, "Error updating project", 500);
   }
+  
+};
+
+exports.project_request = async (req, res) => {
+  try {
+    await projectRequest(req,res);
+} catch (error) {
+    return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
+}
 };
