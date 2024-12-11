@@ -125,7 +125,7 @@ exports.getAllTeams = async (queryParams, res) => {
   const { search, page = 1, perPage = 10 } = queryParams;
   const offset = (page - 1) * perPage;
 
-  let query = "SELECT * FROM teams WHERE delete_status = 0";
+  let query = "SELECT * FROM teams WHERE delete_status = 0 ORDER BY `created_at` DESC";
   let countQuery = "SELECT COUNT(*) AS total FROM teams WHERE delete_status = 0";
   const queryParamsArray = [];
 
