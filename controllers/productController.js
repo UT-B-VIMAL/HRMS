@@ -3,7 +3,7 @@ const {
   updateProduct, 
   deleteProduct, 
   getProduct, 
-  getAllProducts 
+  getAllProducts
 } = require('../api/functions/productFunction');
 const {errorResponse}  = require('../helpers/responseHelper');
 
