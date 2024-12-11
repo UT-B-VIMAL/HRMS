@@ -1,4 +1,4 @@
-const { fetchAttendance, fetchTlrating, fetchTLproducts, fetchTLresourceallotment, fetchTLdatas } = require('../api/functions/tldashboardFunction');
+const { fetchAttendance, fetchTlrating, fetchTLproducts, fetchTLresourceallotment, fetchTLdatas, fetchTlviewproductdata } = require('../api/functions/tldashboardFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 exports.tlattendancesection = async (req, res) => {
@@ -42,7 +42,21 @@ exports.tldashboardsection = async (req, res) => {
   }
 };
 
+exports.tlviewproductsection = async (req, res) => {
+  try {
+    const { product_id } = req.query;  // Accessing ID from query params
+    if (!product_id) {
+      return errorResponse(res, null, 'Product ID is required', 400);
+    }
 
+    // Call the function to fetch product data
+    return await fetchTlviewproductdata(req, res);
+  } catch (error) {
+    // Log and return an error response
+    console.error("Error during pmviewproductsection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
 
 // Add other sections as needed
 
