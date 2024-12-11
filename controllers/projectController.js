@@ -269,3 +269,5 @@ exports.project_request = async (req, res) => {
     return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
 }
 };
+
+module.exports = projectController;

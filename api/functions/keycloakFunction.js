@@ -25,30 +25,66 @@ async function getAdminToken() {
   }
 }
 
+async function loginToKeycloak(username, password) {
+  try {
+    const response = await axios.post(
+      `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
+      new URLSearchParams({
+        grant_type: 'password',
+        client_id: keycloakConfig.clientId,
+        client_secret: keycloakConfig.clientSecret, 
+        username: username,  
+        password: password   
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+    return response.data.access_token; 
+  } catch (error) {
+    console.error("Error during login:", error.response?.data || error.message);
+    throw error;
+  }
+}
+
 async function createUserInKeycloak(userData) {
   try {
     const token = await getAdminToken();
+    
+    const { roleName, ...userWithoutRole } = userData;
+    
     const response = await axios.post(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users`,
-      userData,
+      userWithoutRole, 
       { headers: { Authorization: `Bearer ${token}` } }
     );
     
-    // Extract user ID from the location header
     const userId = response.headers.location ? response.headers.location.split('/').pop() : null;
     if (!userId) {
       throw new Error('Failed to retrieve user ID after creation');
     }
 
+    if (roleName) {
+      try {
+        const roleres = await assignRoleToUser(userId, roleName);
+        console.log("Role assigned successfully");
+        response['roleresponse'] = roleres;
+      } catch (roleError) {
+        console.error("Error assigning role:", roleError.message);
+        response['roleresponse'] = roleError.message;
+      }
+    }
+
     return userId;
-  } catch (error) {
+  }  catch (error) {
     if (error.response) {
+      console.error("Error creating user:", error.response.data);
       return error.response.data;
     } else {
       throw new Error('Error creating user in Keycloak: ' + error.message);
     }
   }
 }
+
+
 
 async function editUserInKeycloak(userId, userData) {
   try {
@@ -68,16 +104,27 @@ async function editUserInKeycloak(userId, userData) {
 async function deleteUserInKeycloak(userId) {
   try {
     const token = await getAdminToken();
-    await axios.delete(
+    const response = await axios.delete(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    console.log(`User ${userId} deleted successfully.`);
+    if (response.status === 204) {
+      console.log(`User ${userId} deleted successfully.`);
+    } else {
+      console.log('Unexpected response:', response.data);
+    }
   } catch (error) {
-    console.error("Error deleting user in Keycloak:", error.response.data);
+    if (error.response?.status === 404) {
+      console.error("User not found in Keycloak.");
+    } else if (error.response?.status === 409) {
+      console.error("Conflict occurred while deleting the user.");
+    } else {
+      console.error("Error deleting user in Keycloak:", error.response?.data || error.message);
+    }
     throw error;
   }
 }
+
 
 async function listUsers() {
   try {
