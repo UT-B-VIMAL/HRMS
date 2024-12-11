@@ -153,8 +153,8 @@ exports.getProject = async (id, res) => {
 
 // Get All Projects
 exports.getAllProjects = async (queryParams, res) => {
-  const { search, page = 1, size = 10 } = queryParams;
-  const offset = (page - 1) * size;
+  const { search, page = 1, perPage = 10 } = queryParams;
+  const offset = (page - 1) * perPage;
 
   let query = `SELECT 
         projects.*, 
@@ -177,16 +177,19 @@ exports.getAllProjects = async (queryParams, res) => {
     queryParamsArray.push(`%${search.trim()}%`, `%${search.trim()}%`); // Add search term for both fields
   }
   query += " LIMIT ? OFFSET ?";
-  queryParamsArray.push(parseInt(size, 10), parseInt(offset, 10));
+  queryParamsArray.push(parseInt(perPage, 10), parseInt(offset, 10));
 
   try {
     const [rows] = await db.query(query, queryParamsArray);
     const [countResult] = await db.query(countQuery, queryParamsArray);
     const totalRecords = countResult[0].total;
+    const rowsWithSerialNo = rows.map((row, index) => ({
+        s_no: offset + index + 1, // Calculate the serial number
+        ...row,
+      }));
+    const pagination = getPagination(page, perPage, totalRecords);
 
-    const pagination = getPagination(page, size, totalRecords);
-
-    return successResponse(res, rows, rows.length === 0 ? 'No projects found' : 'Projects fetched successfully', 200, pagination);
+    return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No projects found' : 'Projects fetched successfully', 200, pagination);
   } catch (error) {
     console.error('Error fetching all projects:', error.message);
     return errorResponse(res, error.message, 'Error fetching all projects', 500);

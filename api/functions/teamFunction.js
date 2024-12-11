@@ -122,8 +122,8 @@ exports.getTeam = async (id, res) => {
 
 // Get All Teams
 exports.getAllTeams = async (queryParams, res) => {
-  const { search, page = 1, size = 10 } = queryParams;
-  const offset = (page - 1) * size;
+  const { search, page = 1, perPage = 10 } = queryParams;
+  const offset = (page - 1) * perPage;
 
   let query = "SELECT * FROM teams WHERE delete_status = 0";
   let countQuery = "SELECT COUNT(*) AS total FROM teams WHERE delete_status = 0";
@@ -136,16 +136,19 @@ exports.getAllTeams = async (queryParams, res) => {
   }
 
   query += " LIMIT ? OFFSET ?";
-  queryParamsArray.push(parseInt(size, 10), parseInt(offset, 10));
+  queryParamsArray.push(parseInt(perPage, 10), parseInt(offset, 10));
 
   try {
     const [rows] = await db.query(query, queryParamsArray);
     const [countResult] = await db.query(countQuery, queryParamsArray);
     const totalRecords = countResult[0].total;
+    const rowsWithSerialNo = rows.map((row, index) => ({
+        s_no: offset + index + 1, // Calculate the serial number
+        ...row,
+      }));
+    const pagination = getPagination(page, perPage, totalRecords);
 
-    const pagination = getPagination(page, size, totalRecords);
-
-    return successResponse(res, rows, rows.length === 0 ? 'No teams found' : 'Teams fetched successfully', 200, pagination);
+    return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No teams found' : 'Teams fetched successfully', 200, pagination);
   } catch (error) {
     console.error('Error fetching all teams:', error.message);
     return errorResponse(res, error.message, 'Error fetching all teams', 500);
