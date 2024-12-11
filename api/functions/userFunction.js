@@ -1,12 +1,12 @@
 const bcrypt = require('bcryptjs');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
-const { createUserInKeycloak,deleteUserInKeycloak } = require("../functions/keycloakFunction");
+const { createUserInKeycloak,deleteUserInKeycloak,editUserInKeycloak,loginToKeycloak } = require("../functions/keycloakFunction");
 
 // Create User
 exports.createUser = async (payload, res) => {
   const {
-    first_name,last_name, employee_id, email, phone, email_verified_at,
+    first_name,last_name, employee_id,role_name, email, phone, email_verified_at,
     password, team_id, role_id, designation_id, remember_token,
     created_by, updated_by, created_at, updated_at, deleted_at
   } = payload;
@@ -44,7 +44,8 @@ exports.createUser = async (payload, res) => {
           value: password,
           temporary: false
         }
-      ]
+      ],
+      roleName: role_name
     };
 
     const userId = await createUserInKeycloak(keycloakUserData);
@@ -123,11 +124,9 @@ exports.getAllUsers = async (req, res) => {
       ${search ? 'AND (first_name LIKE ? OR email LIKE ?)' : ''}
     `;
 
-    // Prepare query values
     const values = search ? [`%${search}%`, `%${search}%`, parseInt(perPage), parseInt(offset)] : [parseInt(perPage), parseInt(offset)];
     const countValues = search ? [`%${search}%`, `%${search}%`] : [];
 
-    // Execute queries
     const [rows] = await db.query(query, values);
     const [countResult] = await db.query(countQuery, countValues);
 
@@ -137,8 +136,8 @@ exports.getAllUsers = async (req, res) => {
 
     // Add serial numbers to each row
     const data = rows.map((row, index) => ({
-      s_no: offset + index + 1, // Calculate serial number
-      ...row, // Include all user data
+      s_no: offset + index + 1,
+      ...row,
     }));
 
     // Send success response
@@ -157,6 +156,7 @@ exports.updateUser = async (id, payload, res) => {
   const {
     first_name,
     last_name,
+    keycloak_id,
     employee_id,
     email,
     phone,
@@ -205,26 +205,33 @@ exports.updateUser = async (id, payload, res) => {
       const hashedPassword = await bcrypt.hash(password, 10);
       query = query.replace(
         'first_name = ?,',
-        'first_name = ?, password = ?,'
-      ); // Update query to include password field
-      values.splice(5, 0, hashedPassword); // Insert hashed password at the correct position
+        'first_name = ?, password = ?,' 
+      );
+      values.splice(5, 0, hashedPassword);  
     }
 
-    // Execute the update query
     const [result] = await db.query(query, values);
 
+    const userPayload = {
+      firstName: first_name, 
+      lastName: last_name,  
+      email: email,
+      ...(password && { credentials: [{ type: "password", value: password, temporary: false }] }) // Add password if provided
+    };
+
+    await editUserInKeycloak(keycloak_id, userPayload);
+
     if (result.affectedRows === 0) {
-      // No user was updated
       return errorResponse(res, null, 'User not found or no changes made', 404);
     }
 
-    // Return success response with updated user data
     return successResponse(res, { id, ...payload }, 'User updated successfully');
   } catch (error) {
-    // Return error response in case of exception
+    console.error(error);
     return errorResponse(res, error.message, 'Error updating user', 500);
   }
 };
+
 
 
 // Delete User
@@ -262,3 +269,4 @@ const getRoleName = async (roleId) => {
   const [result] = await db.query(query, values);
   return result.length > 0 ? result[0].name : null;
 };
+
