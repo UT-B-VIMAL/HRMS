@@ -9,19 +9,24 @@ const {
 const getPagination = (page, perPage, totalRecords) => {
     page = parseInt(page, 10);
     const totalPages = Math.ceil(totalRecords / perPage);
-    const nextPage = page < totalPages ? page + 1 : null
+    const nextPage = page < totalPages ? page + 1 : null;
     const prevPage = page > 1 ? page - 1 : null;
   
+    // Calculate range
+    const startRecord = (page - 1) * perPage + 1;
+    const endRecord = Math.min(page * perPage, totalRecords); // Ensure it doesn't exceed total records
+  
     return {
-        total_records: totalRecords,
-        total_pages: totalPages,
-        current_page: page,
-        per_page: perPage,
-        range_from: `Showing ${(page - 1) * perPage + 1}-${page * perPage} of ${totalRecords} entries`,
-        next_page: nextPage,
-        prev_page: prevPage,
+      total_records: totalRecords,
+      total_pages: totalPages,
+      current_page: page,
+      per_page: perPage,
+      range_from: `Showing ${startRecord}-${endRecord} of ${totalRecords} entries`,
+      next_page: nextPage,
+      prev_page: prevPage,
     };
   };
+  
 // Create Project
 exports.createProject = async (payload, res) => {
     const { name, product } = payload;
@@ -180,7 +185,7 @@ exports.getAllProjects = async (queryParams, res) => {
     countQuery += ` AND (projects.name LIKE ? OR products.name LIKE ?)`;
     queryParamsArray.push(`%${search.trim()}%`, `%${search.trim()}%`); // Add search term for both fields
   }
-  query += " LIMIT ? OFFSET ?";
+  query += " ORDER BY `created_at` DESC LIMIT ? OFFSET ?";
   queryParamsArray.push(parseInt(size, 10), parseInt(offset, 10));
 
   try {
