@@ -16,7 +16,7 @@ exports.getAttendanceList = async (req, res) => {
       let query = '';
       const authUser = 3;
   
-      if (status === 'Present') {
+      if (status === 'Present'){
         // Query for Present
         query = `
           SELECT 
