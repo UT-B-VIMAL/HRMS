@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const { successResponse, errorResponse } = require("../helpers/responseHelper");
 const moment = require('moment');
+const {attendanceSchema}=  require("../validators/AttendanceValidator")
 
 exports.getAttendanceList = async (req, res) => {
     try {
@@ -146,7 +147,69 @@ exports.getAttendanceList = async (req, res) => {
       return errorResponse(res, error.message, "Error fetching attendance data", 500);
     }
   };
-  
+
+
+// Controller function
+exports.store = async (req, res) => {
+
+  // Validate the request data
+  const { error, value } = attendanceSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({ errors: error.details.map((err) => err.message) });
+  }
+
+  const { ids, date, attendanceType, statusFilter, halfDay } = value;
+
+  try {
+    for (const id of ids) {
+      // Check if record exists
+      const existingRecord = await db.raw(
+        `SELECT * FROM employee_leave WHERE user_id = ? AND date = ?`,
+        [id, date]
+      );
+
+      if (existingRecord[0]?.length > 0) {
+        // Update record if it exists
+        await db.raw(
+          `UPDATE employee_leave 
+          SET day_type = ?, half_type = ?, updated_by = ? 
+          WHERE user_id = ? AND date = ?`,
+          [attendanceType, halfDay, req.user.id, id, date]
+        );
+      } else {
+        // Insert a new record if it does not exist
+        await db.raw(
+          `INSERT INTO employee_leave (user_id, date, day_type, half_type, updated_by) 
+          VALUES (?, ?, ?, ?, ?)`,
+          [id, date, attendanceType, halfDay, req.user.id]
+        );
+      }
+
+      // Specific logic for Present status with half-day
+      if (statusFilter === "Present" && attendanceType === 2) {
+        const newHalfType = halfDay === 1 ? 2 : 1;
+        await db.raw(
+          `UPDATE employee_leave SET half_type = ? WHERE user_id = ? AND date = ?`,
+          [newHalfType, id, date]
+        );
+      }
+    }
+
+    // Handle deletion for Present status and full-day attendance
+    if (statusFilter === "Present" && attendanceType === 1) {
+      for (const id of ids) {
+        await db.raw(`DELETE FROM employee_leave WHERE user_id = ? AND date = ?`, [id, date]);
+      }
+    }
+
+    return res.status(200).json({ success: "Successfully Submitted" });
+  } catch (error) {
+    console.error("Error processing attendance:", error);
+    return res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+
   
 
 
