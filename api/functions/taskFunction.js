@@ -107,20 +107,21 @@ exports.getTask = async (id, res) => {
   try {
     // Task query
     const taskQuery = `
-SELECT 
-  t.*, 
-  te.name AS team_name, 
-  COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
-  COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
-  p.name AS product_name, 
-  pj.name AS project_name 
-FROM tasks t 
-LEFT JOIN teams te ON t.team_id = te.id 
-LEFT JOIN users owner ON t.user_id = owner.id 
-LEFT JOIN users assignee ON t.assigned_user_id = assignee.id 
-LEFT JOIN products p ON t.product_id = p.id 
-LEFT JOIN projects pj ON t.project_id = pj.id 
-WHERE t.id = ?;
+    SELECT 
+      t.*, 
+      te.name AS team_name, 
+      COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
+      COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
+      p.name AS product_name, 
+      pj.name AS project_name 
+    FROM tasks t 
+    LEFT JOIN teams te ON t.team_id = te.id 
+    LEFT JOIN users owner ON t.user_id = owner.id 
+    LEFT JOIN users assignee ON t.assigned_user_id = assignee.id 
+    LEFT JOIN products p ON t.product_id = p.id 
+    LEFT JOIN projects pj ON t.project_id = pj.id 
+    WHERE t.id = ?
+    AND t.deleted_at IS NULL;
 
 
     `;
@@ -129,7 +130,7 @@ WHERE t.id = ?;
 
     console.log(task);
     
-    if (!task) {
+    if (!task || task.length === 0) {
       return errorResponse(res, "Task not found", "Error retrieving task", 404);
     }
 
@@ -145,6 +146,7 @@ WHERE t.id = ?;
     LEFT JOIN tasks t ON st.task_id = t.id 
     LEFT JOIN projects p ON t.project_id = p.id 
     WHERE st.task_id = ? 
+    AND st.deleted_at IS NULL
     ORDER BY st.id DESC;
 
     `;
@@ -158,6 +160,7 @@ WHERE t.id = ?;
       LEFT JOIN users u ON h.updated_by = u.id
       LEFT JOIN task_status_flags s ON h.status_flag = s.id
       WHERE h.task_id = ?
+       AND h.deleted_at IS NULL
       ORDER BY h.id DESC;
     `;
     const histories = await db.query(historiesQuery, [id]);
@@ -168,6 +171,7 @@ WHERE t.id = ?;
     FROM task_comments c
     LEFT JOIN users u ON c.updated_by = u.id
     WHERE c.task_id = ? AND c.subtask_id IS NULL
+    AND c.deleted_at IS NULL
     ORDER BY c.id DESC;
   `;
 
@@ -374,7 +378,7 @@ exports.updateTask = async (id, payload, res) => {
 // Delete Task
 exports.deleteTask = async (id, res) => {
   try {
-    const query = "DELETE FROM tasks WHERE id = ?";
+    const query = "UPDATE FROM tasks SET deleted_at = NOW() WHERE id = ?";
     const [result] = await db.query(query, [id]);
 
     if (result.affectedRows === 0) {

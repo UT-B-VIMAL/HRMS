@@ -1,5 +1,5 @@
 const db = require('../../config/db'); 
-const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const { successResponse, errorResponse,getPagination } = require('../../helpers/responseHelper');
 const moment = require('moment');
 
 
@@ -10,7 +10,9 @@ exports.get_idleEmployee = async (req, res) => {
 
         // Base query to get idle employees
         let query = `
-            SELECT id, employee_id, name, team_id, role_id 
+            SELECT id, employee_id,   
+           COALESCE(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(NULLIF(last_name, ''), '')), '') AS user_name, 
+           team_id, role_id 
             FROM users 
             WHERE NOT EXISTS (
                 SELECT 1 
@@ -64,41 +66,22 @@ exports.get_idleEmployee = async (req, res) => {
             queryParams.push(team_id); // Ensure we add the same team_id to the count query
         }
 
-        // Execute both queries concurrently
-        const [rows] = await db.query(query, queryParams);
+        const [result] = await db.query(query, queryParams);
         const [countResult] = await db.query(countQuery, queryParams);
 
         const totalRecords = countResult[0].total_records;
-        const totalPages = Math.ceil(totalRecords / perPage);
-        const rangeFrom = `Showing ${(page - 1) * perPage + 1}-${Math.min(page * perPage, totalRecords)} of ${totalRecords} entries`;
 
-        // If no idle employees are found
-        if (rows.length === 0) {
-            return successResponse(res, {
-                total_records: totalRecords,
-                total_pages: totalPages,
-                range_from: rangeFrom,
-                data: []
-            }, 'No idle employees found');
-        }
+        // Calculate pagination (ensure `getPagination` function exists and works)
+        const pagination = getPagination(page, perPage, totalRecords);
+        
+        // Add serial number to the result
+        const data = result.map((row, index) => ({
+            s_no: (page - 1) * perPage + index + 1, // Serial number calculation based on page and perPage
+            ...row, // Spread the rest of the row data
+        }));
 
-        // return successResponse(res, {
-        //     total_records: totalRecords,
-        //     total_pages: totalPages,
-        //     current_page: parseInt(page),
-        //     per_page: parseInt(perPage),
-        //     range_from: rangeFrom,
-        //     data: rows 
-        // }, 'Idle employees retrieved successfully');
-        res.json({ 
-            success: true, 
-            total_records: totalRecords, 
-            total_pages: totalPages, 
-            range_from: rangeFrom, 
-            currentPage: parseInt(page), 
-            perPage: parseInt(perPage), 
-            data:  rows 
-        });
+        successResponse(res, data, data.length === 0 ? 'No idle employees found' : 'Idle employees retrieved successfully', 200, pagination);
+
     } catch (error) {
         console.error('Caught Error:', error);
         return errorResponse(res, error.message || 'An unknown error occurred', 'Error retrieving idle employees', 500);
