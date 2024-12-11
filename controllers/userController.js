@@ -80,3 +80,4 @@ exports.getAllUsers = async (req, res) => {
       return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
+
