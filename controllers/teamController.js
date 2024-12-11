@@ -23,7 +23,7 @@ const teamController = {
   updateTeam: async (req, res) => {
     try {
       const { id } = req.params;
-    
+      const payload = req.body;
       await updateTeam(id, payload, res);
 
     } catch (error) {

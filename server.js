@@ -69,11 +69,12 @@ apiRouter.get('/products/:id', productController.getProduct);
 apiRouter.get('/products', productController.getAllProducts);
 
 // Project Routes
-apiRouter.post('/projects', projectController.createProject);
-apiRouter.put('/projects/:id', projectController.updateProject);
-apiRouter.delete('/projects/:id', projectController.deleteProject);
-apiRouter.get('/projects/:id', projectController.getProject);
-apiRouter.get('/projects', projectController.getAllProjects);
+apiRouter.post('/projects', projectController.insert);
+apiRouter.put('/projects/:id', projectController.update);
+apiRouter.delete('/projects/:id', projectController.delete);
+apiRouter.get('/projects/:id', projectController.find);
+apiRouter.get('/projects', projectController.getAll);
+apiRouter.get('/project_request', projectController.project_request);
 
 // Team Routes
 apiRouter.post('/team', teamController.createTeam);
