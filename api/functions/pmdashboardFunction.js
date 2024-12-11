@@ -14,7 +14,7 @@ exports.fetchProducts = async (payload, res) => {
 
         let totalItems = 0;
         let completedItems = 0;
-        let workingEmployees = new Set(); 
+        let workingEmployees = new Set();
 
         for (const task of tasks) {
           const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ?";
@@ -42,21 +42,26 @@ exports.fetchProducts = async (payload, res) => {
 
         let employeeList = [];
         if (workingEmployees.size > 0) {
-          const employeeDetailsQuery = "SELECT * FROM users WHERE id IN (?)";
-          const [employees] = await db
-            
-            .query(employeeDetailsQuery, [Array.from(workingEmployees)]);
+          const employeeDetailsQuery = `
+            SELECT id, 
+                   COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
+            FROM users 
+            WHERE id IN (?)
+          `;
+          const [employees] = await db.query(employeeDetailsQuery, [
+            Array.from(workingEmployees),
+          ]);
 
           employeeList = employees.map((user) => {
-            const words = user.name ? user.name.split(" ") : [];
+            const nameParts = user.full_name ? user.full_name.split(" ") : [];
             const initials =
-              words.length > 1
-                ? words.map((word) => word[0].toUpperCase()).join("")
-                : (words[0] || "").slice(0, 2).toUpperCase();
+              nameParts.length > 1
+                ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
+                : (nameParts[0] || "").slice(0, 2).toUpperCase();
 
             return {
-              employee_name: user.name || "N/A",
-              employee_id: user.employee_id || "N/A",
+              employee_name: user.full_name || "N/A",
+              employee_id: user.id || "N/A",
               initials: initials,
             };
           });
@@ -86,6 +91,7 @@ exports.fetchProducts = async (payload, res) => {
     return errorResponse(res, error.message, "Error fetching products", 500);
   }
 };
+
 exports.fetchUtilization = async (payload, res) => {
   try {
     // Step 1: Get total strength grouped by team, including team name
@@ -113,7 +119,7 @@ exports.fetchUtilization = async (payload, res) => {
     const workingEmployeesQuery = `
       SELECT 
         u.id AS user_id,
-        u.name AS employee_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         u.employee_id AS employee_id,
         u.team_id AS team_id,
         t.name AS team_name
@@ -214,7 +220,7 @@ exports.fetchAttendance = async (payload, res) => {
         t.id AS team_id,
         t.name AS team_name,
         u.id AS employee_id,
-        u.name AS employee_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         el.day_type,
         el.half_type 
       FROM teams t
@@ -320,7 +326,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         s.estimated_hours AS subtask_estimation_hours,
         s.description AS subtask_description,
         te.name AS team_name,
-        u.name AS employee_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         p.name AS project_name
       FROM tasks t
       LEFT JOIN sub_tasks s ON t.id = s.task_id
@@ -576,21 +582,26 @@ exports.fetchPmdatas = async (payload, res) => {
 
         let employeeList = [];
         if (workingEmployees.size > 0) {
-          const employeeDetailsQuery = "SELECT * FROM users WHERE id IN (?)";
-          const [employees] = await db
-            
-            .query(employeeDetailsQuery, [Array.from(workingEmployees)]);
+          const employeeDetailsQuery = `
+            SELECT id, 
+                   COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
+            FROM users 
+            WHERE id IN (?)
+          `;
+          const [employees] = await db.query(employeeDetailsQuery, [
+            Array.from(workingEmployees),
+          ]);
 
           employeeList = employees.map((user) => {
-            const words = user.name ? user.name.split(" ") : [];
+            const nameParts = user.full_name ? user.full_name.split(" ") : [];
             const initials =
-              words.length > 1
-                ? words.map((word) => word[0].toUpperCase()).join("")
-                : (words[0] || "").slice(0, 2).toUpperCase();
+              nameParts.length > 1
+                ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
+                : (nameParts[0] || "").slice(0, 2).toUpperCase();
 
             return {
-              employee_name: user.name || "N/A",
-              employee_id: user.employee_id || "N/A",
+              employee_name: user.full_name || "N/A",
+              employee_id: user.id || "N/A",
               initials: initials,
             };
           });
@@ -630,7 +641,7 @@ exports.fetchPmdatas = async (payload, res) => {
     const workingEmployeesQuery = `
       SELECT 
         u.id AS user_id,
-        u.name AS employee_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         u.employee_id AS employee_id,
         u.team_id AS team_id,
         t.name AS team_name
@@ -712,7 +723,7 @@ exports.fetchPmdatas = async (payload, res) => {
         t.id AS team_id,
         t.name AS team_name,
         u.id AS employee_id,
-        u.name AS employee_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         el.day_type,
         el.half_type 
       FROM teams t

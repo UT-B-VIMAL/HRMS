@@ -115,8 +115,11 @@ apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
 apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
-apiRouter.get('/pmlist', tldashboardController.tlattendancesection);
 apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
+apiRouter.get('/tlrating', tldashboardController.tlratingsection);
+apiRouter.get('/tlproducts', tldashboardController.tlproductsection);
+apiRouter.get('/tlresourceallotment', tldashboardController.tlresourceallotmentsection);
+apiRouter.get('/tldashboard', tldashboardController.tldashboardsection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
@@ -133,6 +136,12 @@ apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
 // Change password
 
 apiRouter.put('/change_password/:id',authController.change_password);
+
+
+// Comments
+apiRouter.post('/task_comments',taskController. taskComments);
+
+
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
