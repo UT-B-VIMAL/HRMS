@@ -51,7 +51,7 @@ async function createUserInKeycloak(userData) {
     
     const { roleName, ...userWithoutRole } = userData;
     
-\    const response = await axios.post(
+    const response = await axios.post(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users`,
       userWithoutRole, 
       { headers: { Authorization: `Bearer ${token}` } }
