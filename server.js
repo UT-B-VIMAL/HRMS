@@ -2,6 +2,7 @@ const express = require("express");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
+const cors = require('cors');
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
 const userController = require('./controllers/userController');
@@ -18,18 +19,38 @@ const designationController = require('./controllers/designationController');
 
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
+const attendanceController = require('./controllers/attendanceController');
 
 const app = express();
+const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
+const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
+const PORT = isProduction ? 9000 : 3000;
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost', 
+      'http://frontend.utwebapps.com', 
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
+};
+
+
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(bodyParser);
 
-const cors = require('cors');
-
 // Allow requests from localhost:5173
-app.use(cors({
-  origin: 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+
 
 const apiRouter = express.Router();
 
@@ -41,32 +62,32 @@ apiRouter.get('/user/:id', userController.getUser);
 apiRouter.get('/user', userController.getAllUsers);
 
 // Product Routes
-apiRouter.post('/products', productController.insert);
-apiRouter.put('/products/:id', productController.update);
-apiRouter.delete('/products/:id', productController.delete);
-apiRouter.get('/products/:id', productController.find);
-apiRouter.get('/products', productController.getAll);
+apiRouter.post('/products', productController.createProduct);
+apiRouter.put('/products/:id', productController.updateProduct);
+apiRouter.delete('/products/:id', productController.deleteProduct);
+apiRouter.get('/products/:id', productController.getProduct);
+apiRouter.get('/products', productController.getAllProducts);
 
 // Project Routes
-apiRouter.post('/projects', projectController.insert);
-apiRouter.put('/projects/:id', projectController.update);
-apiRouter.delete('/projects/:id', projectController.delete);
-apiRouter.get('/projects/:id', projectController.find);
-apiRouter.get('/projects', projectController.getAll);
+apiRouter.post('/projects', projectController.createProject);
+apiRouter.put('/projects/:id', projectController.updateProject);
+apiRouter.delete('/projects/:id', projectController.deleteProject);
+apiRouter.get('/projects/:id', projectController.getProject);
+apiRouter.get('/projects', projectController.getAllProjects);
 
 // Team Routes
-apiRouter.post('/team', teamController.insert);
-apiRouter.put('/team/:id', teamController.update);
-apiRouter.delete('/team/:id', teamController.delete);
-apiRouter.get('/team/:id', teamController.find);
-apiRouter.get('/team', teamController.getAll);
+apiRouter.post('/team', teamController.createTeam);
+apiRouter.put('/team/:id', teamController.updateTeam);
+apiRouter.delete('/team/:id', teamController.deleteTeam);
+apiRouter.get('/team/:id', teamController.getTeam);
+apiRouter.get('/team', teamController.getAllTeams);
 
 // Designation Routes
-apiRouter.post('/designations', designationController.insert);
-apiRouter.put('/designations/:id', designationController.update);
-apiRouter.delete('/designations/:id', designationController.delete);
-apiRouter.get('/designations/:id', designationController.find);
-apiRouter.get('/designations', designationController.getAll);
+apiRouter.post('/designations', designationController.createDesignation);
+apiRouter.put('/designations/:id', designationController.updateDesignation);
+apiRouter.delete('/designations/:id', designationController.deleteDesignation);
+apiRouter.get('/designations/:id', designationController.getDesignation);
+apiRouter.get('/designations', designationController.getAllDesignations);
 
 
 // Task Routes
@@ -83,6 +104,7 @@ apiRouter.delete('/subtask/:id', subtaskController.deleteSubTask);
 apiRouter.get('/subtask/:id', subtaskController.getSubTask);
 apiRouter.get('/subtask', subtaskController.getAllSubTasks);
 
+
 // Idle Employee Route
 apiRouter.get('/idleEmployee', idleEmployeeController.get_idleEmployee);
 
@@ -94,28 +116,39 @@ apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
 apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
-apiRouter.get('/pmlist', tldashboardController.tlattendancesection);
 apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
+apiRouter.get('/tlrating', tldashboardController.tlratingsection);
+apiRouter.get('/tlproducts', tldashboardController.tlproductsection);
+apiRouter.get('/tlresourceallotment', tldashboardController.tlresourceallotmentsection);
+apiRouter.get('/tldashboard', tldashboardController.tldashboardsection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
+
+//Rating
 apiRouter.get('/getAllRatings', ratingController.getAllRatings);
 apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
+
+//Attendance
+apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
+
 
 // Change password
 
 apiRouter.put('/change_password/:id',authController.change_password);
+
+
+// Comments
+apiRouter.post('/task_comments',taskController. taskComments);
+
+
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
 
 app.use(globalErrorHandler);
 
-// Define the server configuration
-const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
-const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
-const PORT = isProduction ? 9000 : 3000;
 
 if (isProduction) {
   // SSL Configuration for production
