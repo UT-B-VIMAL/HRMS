@@ -23,8 +23,9 @@ const getPagination = (page, perPage, totalRecords) => {
       prev_page: prevPage,
   };
 };
+const projectController = {
 
-exports.insert = async (req, res) => {
+insert : async (req, res) => {
   const { name, product } = req.body;
 
   const { error } = projectSchema.validate(
@@ -96,9 +97,9 @@ exports.insert = async (req, res) => {
     // Handle server errors
     return errorResponse(res, error.message, "Error inserting project", 500);
   }
-};
+},
 
-exports.getAll = async (req, res) => {
+getAll : async (req, res) => {
   const { search, page = 1, size = 10 } = req.body;
 
   const pageNum = parseInt(page, 10);
@@ -149,9 +150,9 @@ exports.getAll = async (req, res) => {
   } catch (error) {
     return errorResponse(res, error.message, "Error fetching Projects", 500);
   }
-};
+},
 
-exports.find = async (req, res) => {
+find : async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -167,9 +168,9 @@ exports.find = async (req, res) => {
   } catch (error) {
     return errorResponse(res, error.message, "Error retreiving project", 500);
   }
-};
+},
 
-exports.delete = async (req, res) => {
+delete : async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -200,8 +201,9 @@ exports.delete = async (req, res) => {
   } catch (error) {
     return errorResponse(res, error.message, "Error deleting project", 500);
   }
-};
-exports.update = async (req, res) => {
+},
+
+update : async (req, res) => {
   const { id } = req.params;
   const { name, product } = req.body;
 
@@ -260,13 +262,14 @@ exports.update = async (req, res) => {
     return errorResponse(res, error.message, "Error updating project", 500);
   }
   
-};
+},
 
-exports.project_request = async (req, res) => {
+project_request : async (req, res) => {
   try {
     await projectRequest(req,res);
 } catch (error) {
     return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
+}
 }
 };
 
