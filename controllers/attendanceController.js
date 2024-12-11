@@ -14,41 +14,16 @@ exports.getAttendanceList = async (req, res) => {
   
       let query = '';
       const authUser = 3;
-      let queryParams=[];
+  
       if (status === 'Present') {
         // Query for Present
         query = `
           SELECT 
             users.id,
-            users.first_name,
+            users.name,
             users.employee_id,
             teams.reporting_user_id,
-            
-            'Full Day' AS day_type,
-            'N/A' AS half_type
-          FROM 
-            users
-          LEFT JOIN 
-            teams ON users.team_id = teams.id
-          WHERE 
-            users.role_id != 2 
-            AND teams.reporting_user_id = ?
-            AND users.id != ?
-            AND NOT EXISTS (
-              SELECT 1 
-              FROM employee_leave
-              WHERE employee_leave.user_id = users.id
-                AND DATE(employee_leave.date) = CURDATE()
-            )
-          
-          UNION ALL
-          
-          SELECT 
-            users.id,
-            users.first_name,
-            users.employee_id,
-            teams.reporting_user_id,
-            
+            employee_leave.date,
             CASE 
                 WHEN employee_leave.day_type = 1 THEN 'Full Day'
                 WHEN employee_leave.day_type = 2 THEN 'Half Day'
@@ -60,23 +35,24 @@ exports.getAttendanceList = async (req, res) => {
                 ELSE 'Unknown'
             END AS half_type
           FROM 
-            employee_leave
-          JOIN 
-            users ON employee_leave.user_id = users.id
-          JOIN 
-            teams ON users.team_id = teams.id
+            users
+          LEFT JOIN 
+            teams ON users.team_id = teams.id 
+          LEFT JOIN 
+            employee_leave ON users.id = employee_leave.user_id 
+            AND employee_leave.day_type != 1
+            AND DATE(employee_leave.date)
           WHERE 
             users.role_id != 2 
             AND teams.reporting_user_id = ? 
             AND users.id != ?
         `;
-        queryParams = [authUser, authUser, authUser, authUser];
       } else if (status === 'Absent') {
         // Query for Absent
         query = `
         SELECT 
           users.id,
-          users.first_name,
+          users.name,
           users.employee_id,
           teams.reporting_user_id,
           employee_leave.date,
@@ -102,12 +78,11 @@ exports.getAttendanceList = async (req, res) => {
           AND users.id != ? 
           
       `;
-     queryParams = [authUser, authUser];
-
       } else {
         return errorResponse(res, "Invalid status provided", "Error fetching data", 400);
       }
   
+      const queryParams = [authUser, authUser];
 
     //   if (date) {
     //     if (!moment(date, 'YYYY-MM-DD', true).isValid()) {
@@ -122,7 +97,7 @@ exports.getAttendanceList = async (req, res) => {
       // Apply search filter if provided
       if (search) {
         query += `
-          AND (users.first_name LIKE ? OR users.employee_id LIKE ?)
+          AND (users.name LIKE ? OR users.employee_id LIKE ?)
         `;
         queryParams.push(`%${search}%`, `%${search}%`);
       }
