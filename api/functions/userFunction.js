@@ -147,58 +147,51 @@ exports.updateUser = async (id, payload, res) => {
     employee_id,
     email,
     phone,
-    email_verified_at,
     password,
     team_id,
     role_id,
     designation_id,
-    remember_token,
     created_by = 1,
     updated_by = 1,
-    created_at,
-    updated_at,
+    updated_at = new Date(),
     deleted_at,
   } = payload;
 
   try {
+    // Update query without updating created_at, deleted_at, remember_token, email_verified_at
     let query = `
       UPDATE users SET
-        first_name = ?, last_name = ?, employee_id = ?, email = ?, phone = ?, email_verified_at = ?,
-        team_id = ?, role_id = ?, designation_id = ?, remember_token = ?,
-        created_by = ?, updated_by = ?, created_at = 1, updated_at = 1, deleted_at = ?
+        first_name = ?, last_name = ?, employee_id = ?, email = ?, phone = ?,
+        team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = ? 
       WHERE id = ?
     `;
 
+    // Values for the update, excluding the fields that should not be updated
     let values = [
       first_name,
       last_name,
       employee_id,
       email,
       phone,
-      email_verified_at,
       team_id,
       role_id,
       designation_id,
-      remember_token,
-      created_by,
       updated_by,
-      created_at,
       updated_at,
-      deleted_at,
       id,
     ];
 
+    // If password is provided, hash it and modify the query to update it
     if (password) {
       const hashedPassword = await bcrypt.hash(password, 10);
-      query = query.replace(
-        'first_name = ?,',
-        'first_name = ?, password = ?,' 
-      );
-      values.splice(5, 0, hashedPassword);  
+      query = query.replace('first_name = ?,', 'first_name = ?, password = ?,');
+      values.splice(5, 0, hashedPassword);  // Insert hashed password at the correct index
     }
 
+    // Execute the update query
     const [result] = await db.query(query, values);
 
+    // Prepare Keycloak user payload
     const userPayload = {
       firstName: first_name, 
       lastName: last_name,  
@@ -206,8 +199,10 @@ exports.updateUser = async (id, payload, res) => {
       ...(password && { credentials: [{ type: "password", value: password, temporary: false }] }) // Add password if provided
     };
 
+    // Update user details in Keycloak
     await editUserInKeycloak(keycloak_id, userPayload);
 
+    // Check if any row was affected (i.e., if the user was found and updated)
     if (result.affectedRows === 0) {
       return errorResponse(res, null, 'User not found or no changes made', 404);
     }
@@ -218,6 +213,7 @@ exports.updateUser = async (id, payload, res) => {
     return errorResponse(res, error.message, 'Error updating user', 500);
   }
 };
+
 
 
 
