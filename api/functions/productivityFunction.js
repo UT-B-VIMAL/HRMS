@@ -1,5 +1,5 @@
 const db = require('../../config/db'); 
-const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const { successResponse, errorResponse ,getPagination} = require('../../helpers/responseHelper');
 const moment = require('moment');
 
 
@@ -16,25 +16,6 @@ const convertSecondsToReadableTime = (seconds) => {
     if (remainingSeconds > 0 || minutes === 0) result += `${remainingSeconds}s`;
 
     return result.trim();
-};
-
-
-
-const getPagination = (page, perPage, totalRecords) => {
-    page = parseInt(page, 10);
-    const totalPages = Math.ceil(totalRecords / perPage);
-    const nextPage = page < totalPages ? page + 1 : null
-    const prevPage = page > 1 ? page - 1 : null;
-
-    return {
-        total_records: totalRecords,
-        total_pages: totalPages,
-        current_page: page,
-        per_page: perPage,
-        range_from: `Showing ${(page - 1) * perPage + 1}-${page * perPage} of ${totalRecords} entries`,
-        next_page: nextPage,
-        prev_page: prevPage,
-    };
 };
 
 exports.getTeamwiseProductivity = async (req, res) => {
@@ -121,14 +102,18 @@ exports.getTeamwiseProductivity = async (req, res) => {
         const [countResult] = await db.query(countQuery, countValues);
 
         const totalRecords = countResult[0].total_records;
+      
+
         const pagination = getPagination(page, perPage, totalRecords);
 
-        const data = result.map(row => {
+        const data = result.map((row, index) => {
+            
             const totalEstimatedSeconds = row.total_estimated_seconds_tasks + row.total_estimated_seconds_subtasks;
             const totalWorkedSeconds = row.total_worked_seconds_tasks + row.total_worked_seconds_subtasks;
             const totalExtendedSeconds = row.total_extended_seconds_tasks + row.total_extended_seconds_subtasks;
 
             return {
+                s_no: offset + index + 1,
                 user_id: row.user_id,
                 employee_id: row.employee_id,
                 user_name: row.user_name,
