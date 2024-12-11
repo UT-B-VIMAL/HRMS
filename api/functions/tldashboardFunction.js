@@ -10,7 +10,7 @@ exports.fetchAttendance = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return res.status(400).json({ message: "user_id is required" });
+      return errorResponse(res, null, 'User ID is required', 400);
     }
 
     // Fetch team IDs for the reporting user
@@ -125,7 +125,7 @@ exports.fetchTlrating = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return res.status(400).json({ message: "user_id is required" });
+      return errorResponse(res, null, 'User ID is required', 400);
     }
 
     // Fetch team IDs
@@ -208,7 +208,7 @@ exports.fetchTLproducts = async (req, res) => {
       const { user_id } = req.query;
   
       if (!user_id) {
-        return res.status(400).json({ message: 'user_id is required' });
+        return errorResponse(res, null, 'User ID is required', 400);
       }
   
       // Fetch team IDs
@@ -316,7 +316,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return res.status(400).json({ message: 'user_id is required' });
+      return errorResponse(res, null, 'User ID is required', 400);
     }
 
     // Fetch team IDs
@@ -452,7 +452,7 @@ exports.fetchTLdatas = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return res.status(400).json({ message: "user_id is required" });
+      return errorResponse(res, null, 'User ID is required', 400);
     }
 
     // Fetch team IDs for the reporting user
@@ -717,6 +717,267 @@ exports.fetchTLdatas = async (req, res) => {
   }
 };
 
+exports.fetchTlviewproductdata = async (req, res) => {
+  try {
+    const { user_id, product_id, project_id, date, search } = req.query;
+
+    if (!product_id) {
+      return errorResponse(res, null, 'Product ID is required', 400);
+    }
+    if (!user_id) {
+      return errorResponse(res, null, 'User ID is required', 400);
+    }
+
+    // Fetch team IDs for the reporting user
+    const [teamResult] = await db.query("SELECT id FROM teams WHERE reporting_user_id = ?", [user_id]);
+
+    if (teamResult.length === 0) {
+      return res.status(404).json({ message: "No teams found for the given user_id" });
+    }
+
+    const teamIds = teamResult.map((team) => team.id);
+
+    // Build dynamic SQL query for product details
+    const productQuery = `
+      SELECT id, name
+      FROM products
+      WHERE id = ?
+    `;
+    const [productRows] = await db.query(productQuery, [product_id]);
+    const product = productRows[0] || { name: 'N/A', id: 'N/A' };
+
+    // Build dynamic query for tasks and subtasks
+    // Build dynamic query for tasks and subtasks
+let tasksQuery = `
+SELECT 
+  t.id AS task_id,
+  t.name AS task_name,
+  t.status AS task_status,
+  t.active_status AS task_active_status,
+  t.created_at AS task_date,
+  t.priority AS task_priority,
+  t.estimated_hours AS task_estimation_hours,
+  t.description AS task_description,
+  s.id AS subtask_id,
+  s.name AS subtask_name,
+  s.status AS subtask_status,
+  s.active_status AS subtask_active_status,
+  s.estimated_hours AS subtask_estimation_hours,
+  s.description AS subtask_description,
+  te.name AS team_name,
+  COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
+  p.name AS project_name
+FROM tasks t
+LEFT JOIN sub_tasks s ON t.id = s.task_id
+LEFT JOIN teams te ON t.team_id = te.id
+LEFT JOIN users u ON t.user_id = u.id
+LEFT JOIN projects p ON t.project_id = p.id
+WHERE t.product_id = ?
+`;
+
+// Filter by team_ids based on reporting_user_id
+if (teamIds.length > 0) {
+tasksQuery += ` AND t.team_id IN (${teamIds.map((id) => db.escape(id)).join(',')})`;
+}
+
+// Add other filters as necessary
+if (project_id) {
+tasksQuery += ` AND t.project_id = ${db.escape(project_id)}`;
+}
+if (date) {
+tasksQuery += ` AND DATE(t.created_at) = ${db.escape(date)}`;
+}
+if (search) {
+  tasksQuery += `
+    AND (
+      COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ${db.escape('%' + search + '%')} OR
+      p.name LIKE ${db.escape('%' + search + '%')} OR
+      te.name LIKE ${db.escape('%' + search + '%')} OR
+      s.name LIKE ${db.escape('%' + search + '%')}
+    )
+  `;
+}
+
+
+
+
+    // Execute the query
+    const [taskRows] = await db.query(tasksQuery, [product_id]);
+
+    // Helper function to validate subtask inclusion based on status
+    const isValidSubtask = (subtask, status) => {
+      switch (status) {
+        case 'Pending':
+          return subtask.active_status === 1 && subtask.status === 0;
+        case 'In Progress':
+          return subtask.active_status === 1 && subtask.status === 1;
+        case 'In Review':
+          return subtask.active_status === 1 && subtask.status === 2;
+        case 'On Hold':
+          return subtask.active_status === 0;
+        case 'Done':
+          return subtask.active_status === 1 && subtask.status === 3;
+        default:
+          return false;
+      }
+    };
+
+    // Helper function to format tasks and subtasks
+    const formatTask = (task, subtasks, status) => {
+      const validSubtasks = [];
+      let totalSubtasks = 0;
+      let completedSubtasks = 0;
+
+      // Collect and validate subtask details
+      subtasks.forEach((subtask) => {
+        if (isValidSubtask(subtask, status)) {
+          validSubtasks.push({
+            SubtaskId: subtask.id || 'N/A',
+            SubtaskName: subtask.name || 'N/A',
+            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
+            SubtaskDescription: subtask.description || 'N/A',
+            SubtaskActiveStatus: subtask.active_status || 'N/A',
+            SubtaskStatus: subtask.status || 'N/A',
+          });
+        }
+        totalSubtasks++;
+        if (subtask.status === 3) {
+          completedSubtasks++;
+        }
+      });
+
+      // Calculate completion percentage
+      const completionPercentage =
+        totalSubtasks > 0
+          ? Math.round((completedSubtasks / totalSubtasks) * 100)
+          : task.status === 3
+          ? 100
+          : 0;
+
+      // Return the formatted task object
+      return {
+        Date: task.date ? new Date(task.date).toISOString().split('T')[0] : 'N/A',
+        Team: task.team_name || 'N/A',
+        EmployeeName: task.employee_name || 'N/A',
+        Priority: task.priority || 'N/A',
+        ProjectName: task.project_name || 'N/A',
+        TaskName: task.name || 'N/A',
+        TaskId: task.id || 'N/A',
+        TotalSubtaskCount: totalSubtasks,
+        CompletedSubtaskCount: completedSubtasks,
+        EstimationHours: task.estimation_hours || 'N/A',
+        Description: task.description || 'N/A',
+        Subtasks: validSubtasks,
+        CompletionPercentage: completionPercentage,
+        Status: status,
+      };
+    };
+
+    // Group tasks by status
+    const groupedTasks = {
+      'Pending': [],
+      'In Progress': [],
+      'In Review': [],
+      'On Hold': [],
+      'Done': [],
+    };
+
+    // Track added task IDs for each section
+    const addedTaskIds = {
+      'Pending': [],
+      'In Progress': [],
+      'In Review': [],
+      'On Hold': [],
+      'Done': [],
+    };
+
+    // Process each row and categorize tasks
+    taskRows.forEach((row) => {
+      const task = {
+        id: row.task_id,
+        name: row.task_name,
+        status: row.task_status,
+        active_status: row.task_active_status,
+        priority: row.task_priority,
+        date: row.task_date,
+        estimation_hours: row.task_estimation_hours,
+        description: row.task_description,
+        team_name: row.team_name,
+        employee_name: row.employee_name,
+        project_name: row.project_name,
+      };
+
+      const subtask = row.subtask_id
+        ? {
+            id: row.subtask_id,
+            name: row.subtask_name,
+            status: row.subtask_status,
+            active_status: row.subtask_active_status,
+            estimated_hours: row.subtask_estimation_hours,
+            description: row.subtask_description,
+          }
+        : null;
+
+      const category = Object.keys(groupedTasks).find((status) =>
+        isValidSubtask(subtask || task, status)
+      );
+
+      // Only add task if it hasn't been added to that category already
+      if (category) {
+        const existingTaskIndex = groupedTasks[category].findIndex(t => t.TaskId === task.id);
+
+        if (existingTaskIndex === -1) {
+          // Task does not exist in the section, so push the task with its subtask
+          groupedTasks[category].push(formatTask(task, subtask ? [subtask] : [], category));
+        } else {
+          // Task exists, so add the subtask to the existing task
+          groupedTasks[category][existingTaskIndex].Subtasks.push({
+            SubtaskId: subtask.id || 'N/A',
+            SubtaskName: subtask.name || 'N/A',
+            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
+            SubtaskDescription: subtask.description || 'N/A',
+            SubtaskActiveStatus: subtask.active_status || 'N/A',
+            SubtaskStatus: subtask.status || 'N/A',
+          });
+        }
+      }
+    });
+
+    // Prepare the response
+    const result = {
+      PendingTasks: groupedTasks['Pending'],
+      InProgressTasks: groupedTasks['In Progress'],
+      InReviewTasks: groupedTasks['In Review'],
+      OnHoldTasks: groupedTasks['On Hold'],
+      DoneTasks: groupedTasks['Done'],
+      TodoCount: groupedTasks['Pending'].length,
+      InProgressCount: groupedTasks['In Progress'].length,
+      InReviewCount: groupedTasks['In Review'].length,
+      OnHoldCount: groupedTasks['On Hold'].length,
+      DoneCount: groupedTasks['Done'].length,
+      OverallCompletionPercentage:
+        groupedTasks['Done'].length > 0
+          ? Math.round(
+              (groupedTasks.Done.length / 
+                (groupedTasks.Pending.length + 
+                  groupedTasks['In Progress'].length + 
+                  groupedTasks['In Review'].length + 
+                  groupedTasks['On Hold'].length + 
+                  groupedTasks.Done.length)) *
+                100
+            )
+          : 0,
+      productname: product.name,
+      productid: product.id,
+    };
+
+    return successResponse(res, result, 'TL Product details retrieved successfully', 200);
+
+  } catch (error) {
+    console.error('Error fetching product details:', error);
+    return errorResponse(res, error.message, 'Error fetching product details', 500);
+  }
+};
 
 
 

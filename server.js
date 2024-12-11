@@ -121,6 +121,7 @@ apiRouter.get('/tlrating', tldashboardController.tlratingsection);
 apiRouter.get('/tlproducts', tldashboardController.tlproductsection);
 apiRouter.get('/tlresourceallotment', tldashboardController.tlresourceallotmentsection);
 apiRouter.get('/tldashboard', tldashboardController.tldashboardsection);
+apiRouter.get('/tlviewproduct', tldashboardController.tlviewproductsection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
