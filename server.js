@@ -62,32 +62,32 @@ apiRouter.get('/user/:id', userController.getUser);
 apiRouter.get('/user', userController.getAllUsers);
 
 // Product Routes
-apiRouter.post('/products', productController.insert);
-apiRouter.put('/products/:id', productController.update);
-apiRouter.delete('/products/:id', productController.delete);
-apiRouter.get('/products/:id', productController.find);
-apiRouter.get('/products', productController.getAll);
+apiRouter.post('/products', productController.createProduct);
+apiRouter.put('/products/:id', productController.updateProduct);
+apiRouter.delete('/products/:id', productController.deleteProduct);
+apiRouter.get('/products/:id', productController.getProduct);
+apiRouter.get('/products', productController.getAllProducts);
 
 // Project Routes
-apiRouter.post('/projects', projectController.insert);
-apiRouter.put('/projects/:id', projectController.update);
-apiRouter.delete('/projects/:id', projectController.delete);
-apiRouter.get('/projects/:id', projectController.find);
-apiRouter.get('/projects', projectController.getAll);
+apiRouter.post('/projects', projectController.createProject);
+apiRouter.put('/projects/:id', projectController.updateProject);
+apiRouter.delete('/projects/:id', projectController.deleteProject);
+apiRouter.get('/projects/:id', projectController.getProject);
+apiRouter.get('/projects', projectController.getAllProjects);
 
 // Team Routes
-apiRouter.post('/team', teamController.insert);
-apiRouter.put('/team/:id', teamController.update);
-apiRouter.delete('/team/:id', teamController.delete);
-apiRouter.get('/team/:id', teamController.find);
-apiRouter.get('/team', teamController.getAll);
+apiRouter.post('/team', teamController.createTeam);
+apiRouter.put('/team/:id', teamController.updateTeam);
+apiRouter.delete('/team/:id', teamController.deleteTeam);
+apiRouter.get('/team/:id', teamController.getTeam);
+apiRouter.get('/team', teamController.getAllTeams);
 
 // Designation Routes
-apiRouter.post('/designations', designationController.insert);
-apiRouter.put('/designations/:id', designationController.update);
-apiRouter.delete('/designations/:id', designationController.delete);
-apiRouter.get('/designations/:id', designationController.find);
-apiRouter.get('/designations', designationController.getAll);
+apiRouter.post('/designations', designationController.createDesignation);
+apiRouter.put('/designations/:id', designationController.updateDesignation);
+apiRouter.delete('/designations/:id', designationController.deleteDesignation);
+apiRouter.get('/designations/:id', designationController.getDesignation);
+apiRouter.get('/designations', designationController.getAllDesignations);
 
 
 // Task Routes
