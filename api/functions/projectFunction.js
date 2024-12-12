@@ -4,6 +4,7 @@ const {
   successResponse,
   errorResponse,
 } = require("../../helpers/responseHelper");
+const {projectSchema}=require("../../validators/projectValidator")
 
 
 const getPagination = (page, perPage, totalRecords) => {
@@ -51,7 +52,7 @@ exports.createProject = async (payload, res) => {
       return errorResponse(res, "Project with this name already exists", "Duplicate Project Error", 400);
     }
     const checkProduct =
-    "SELECT COUNT(*) as count FROM products WHERE id = ? and delete_status=0";
+    "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
         return errorResponse(res, "Product Not Found", "Product Not Found", 404);
@@ -87,14 +88,14 @@ exports.updateProject = async (id, payload, res) => {
   }
 
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Project not found or deleted", "Not Found", 404);
     }
     const checkProduct =
-    "SELECT COUNT(*) as count FROM products WHERE id = ? and delete_status=0";
+    "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
         return errorResponse(res, "Product Not Found", "Product Not Found", 404);
@@ -114,7 +115,7 @@ exports.updateProject = async (id, payload, res) => {
 // Delete Project
 exports.deleteProject = async (id, res) => {
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -133,7 +134,7 @@ exports.deleteProject = async (id, res) => {
         400
       );
     }
-    const query = "UPDATE projects SET delete_status = 1 WHERE id = ?";
+    const query = "UPDATE projects SET deleted_at = NOW() WHERE id = ?";
     await db.query(query, [id]);
 
     return successResponse(res, { id }, 'Project deleted successfully', 200);
@@ -146,7 +147,7 @@ exports.deleteProject = async (id, res) => {
 // Get Single Project
 exports.getProject = async (id, res) => {
   try {
-    const query = "SELECT * FROM projects WHERE id = ? AND delete_status = 0";
+    const query = "SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL";
     const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
@@ -170,14 +171,14 @@ exports.getAllProjects = async (queryParams, res) => {
         products.name as product_name
       FROM projects
       LEFT JOIN products ON projects.product_id = products.id
-      WHERE projects.delete_status = 0
+      WHERE projects.deleted_at IS NULL
     `;
   let countQuery =  `
   SELECT 
     COUNT(*) AS total 
   FROM projects
   LEFT JOIN products ON projects.product_id = products.id
-  WHERE projects.delete_status = 0
+  WHERE projects.deleted_at IS NULL
 `;
   const queryParamsArray = [];
   if (search && search.trim() !== "") {
@@ -192,10 +193,13 @@ exports.getAllProjects = async (queryParams, res) => {
     const [rows] = await db.query(query, queryParamsArray);
     const [countResult] = await db.query(countQuery, queryParamsArray);
     const totalRecords = countResult[0].total;
-
+    const rowsWithSerialNo = rows.map((row, index) => ({
+        s_no: offset + index + 1, // Calculate the serial number
+        ...row,
+      }));
     const pagination = getPagination(page, size, totalRecords);
 
-    return successResponse(res, rows, rows.length === 0 ? 'No projects found' : 'Projects fetched successfully', 200, pagination);
+    return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No projects found' : 'Projects fetched successfully', 200, pagination);
   } catch (error) {
     console.error('Error fetching all projects:', error.message);
     return errorResponse(res, error.message, 'Error fetching all projects', 500);

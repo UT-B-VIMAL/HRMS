@@ -1,9 +1,9 @@
 module.exports = {
-    serverUrl: "http://localhost:8080",
+    serverUrl: "https://frontendnode.hrms.utwebapps.com:8443/",
     realm: "hrmsRealm",
     clientId: "hrmsClient",
-    clientSecret: "DWp7QzLAcAW6Waw41Ya38oiMjHvIxutb",
+    clientSecret: "M1Y0DpEE7v4klGdNkbzIBotwwNitYKzi",
     adminUsername: "admin",
-    adminPassword: "admin",
+    adminPassword: "admin@123",
   };
   
