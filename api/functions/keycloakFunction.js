@@ -25,43 +25,49 @@ async function getAdminToken() {
   }
 }
 
-async function loginToKeycloak(username, password) {
+async function signInUser(username, password) {
   try {
-    const response = await axios.post(
-      `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
-      new URLSearchParams({
-        grant_type: 'password',
-        client_id: keycloakConfig.clientId,
-        client_secret: keycloakConfig.clientSecret, 
-        username: username,  
-        password: password   
-      }),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-    );
-    return response.data.access_token; 
+      const response = await axios.post(
+          `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
+          new URLSearchParams({
+              grant_type: "password",
+              client_id: keycloakConfig.clientId,
+              client_secret: keycloakConfig.clientSecret,
+              username: username,
+              password: password,
+          }),
+          { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+
+      return response.data; // This contains access token, refresh token, etc.
   } catch (error) {
-    console.error("Error during login:", error.response?.data || error.message);
-    throw error;
+      console.error("Error signing in user:", error.response ? error.response.data : error.message);
+      throw error;
   }
 }
 
 async function createUserInKeycloak(userData) {
   try {
     const token = await getAdminToken();
-    
+
+    // Destructure and separate the roleName from the payload
     const { roleName, ...userWithoutRole } = userData;
-    
+
+    // Debug the payload
+    console.log("User Data Payload:", userWithoutRole);
+
     const response = await axios.post(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users`,
-      userWithoutRole, 
+      userWithoutRole,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    
+
     const userId = response.headers.location ? response.headers.location.split('/').pop() : null;
     if (!userId) {
       throw new Error('Failed to retrieve user ID after creation');
     }
 
+    // Assign role if roleName is provided
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
@@ -74,7 +80,7 @@ async function createUserInKeycloak(userData) {
     }
 
     return userId;
-  }  catch (error) {
+  } catch (error) {
     if (error.response) {
       console.error("Error creating user:", error.response.data);
       return error.response.data;
@@ -83,6 +89,7 @@ async function createUserInKeycloak(userData) {
     }
   }
 }
+
 
 
 
@@ -167,5 +174,6 @@ module.exports = {
   editUserInKeycloak,
   deleteUserInKeycloak,
   listUsers,
-  assignRoleToUser
+  assignRoleToUser,
+  signInUser
 };

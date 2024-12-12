@@ -5,6 +5,7 @@ const fs = require("fs");
 const cors = require('cors');
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
+const loginController = require('./controllers/loginController');
 const userController = require('./controllers/userController');
 const productController = require('./controllers/productController');
 const taskController = require('./controllers/taskController');
@@ -30,6 +31,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       'http://localhost:5173',
+      'http://localhost:81',
       'http://localhost', 
       'http://frontend.utwebapps.com', 
     ];
@@ -53,6 +55,9 @@ app.use(bodyParser);
 
 
 const apiRouter = express.Router();
+
+//login
+apiRouter.post('/login', loginController.login);
 
 // User Routes
 apiRouter.post('/user', userController.createUser);
@@ -97,6 +102,8 @@ apiRouter.put('/task/:id', taskController.updateTask);
 apiRouter.delete('/task/:id', taskController.deleteTask);
 apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
+apiRouter.put('/taskupdate/:id', taskController.updateDatas);
+
 
 // Subtask Routes
 apiRouter.post('/subtask', subtaskController.createSubTask);
