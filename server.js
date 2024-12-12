@@ -20,6 +20,7 @@ const designationController = require('./controllers/designationController');
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
 const attendanceController = require('./controllers/attendanceController');
+const empdashboardController = require('./controllers/empdashboardController');
 
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
@@ -123,6 +124,13 @@ apiRouter.get('/tlproducts', tldashboardController.tlproductsection);
 apiRouter.get('/tlresourceallotment', tldashboardController.tlresourceallotmentsection);
 apiRouter.get('/tldashboard', tldashboardController.tldashboardsection);
 apiRouter.get('/tlviewproduct', tldashboardController.tlviewproductsection);
+
+// Employee Dashboard Routes
+apiRouter.get('/emppendingtask', empdashboardController.emppendingtasksection);
+apiRouter.get('/empdailybreakdown', empdashboardController.empdailybreakdownsection);
+apiRouter.get('/empstatistics', empdashboardController.empstatisticssection);
+apiRouter.get('/empstatisticschart', empdashboardController.empstatisticschartsection);
+apiRouter.get('/empratings', empdashboardController.empratingsection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
