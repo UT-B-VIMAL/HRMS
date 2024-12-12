@@ -21,6 +21,8 @@ const designationController = require('./controllers/designationController');
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
 const attendanceController = require('./controllers/attendanceController');
+const commentsController = require('./controllers/commentsController');
+
 
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
@@ -150,7 +152,11 @@ apiRouter.put('/change_password/:id',authController.change_password);
 
 
 // Comments
-apiRouter.post('/task_comments',taskController. taskComments);
+apiRouter.post('/comments',commentsController. addComments);
+apiRouter.put('/comments/:id',commentsController. updateComments);
+apiRouter.delete('/comments/:id',commentsController. deleteComments);
+
+
 
 
 
