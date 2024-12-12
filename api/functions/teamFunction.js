@@ -4,19 +4,24 @@ const { successResponse, errorResponse } = require('../../helpers/responseHelper
 const getPagination = (page, perPage, totalRecords) => {
     page = parseInt(page, 10);
     const totalPages = Math.ceil(totalRecords / perPage);
-    const nextPage = page < totalPages ? page + 1 : null
+    const nextPage = page < totalPages ? page + 1 : null;
     const prevPage = page > 1 ? page - 1 : null;
   
+    // Calculate range
+    const startRecord = (page - 1) * perPage + 1;
+    const endRecord = Math.min(page * perPage, totalRecords); // Ensure it doesn't exceed total records
+  
     return {
-        total_records: totalRecords,
-        total_pages: totalPages,
-        current_page: page,
-        per_page: perPage,
-        range_from: `Showing ${(page - 1) * perPage + 1}-${page * perPage} of ${totalRecords} entries`,
-        next_page: nextPage,
-        prev_page: prevPage,
+      total_records: totalRecords,
+      total_pages: totalPages,
+      current_page: page,
+      per_page: perPage,
+      range_from: `Showing ${startRecord}-${endRecord} of ${totalRecords} entries`,
+      next_page: nextPage,
+      prev_page: prevPage,
     };
   };
+  
 // Create Team
 exports.createTeam = async (payload, res) => {
     const { name } = payload;
@@ -53,7 +58,7 @@ exports.updateTeam = async (id, payload, res) => {
     }
 
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -74,7 +79,7 @@ exports.updateTeam = async (id, payload, res) => {
 // Delete Team
 exports.deleteTeam = async (id, res) => {
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -93,7 +98,7 @@ exports.deleteTeam = async (id, res) => {
         400
       );
     }
-    const query = "UPDATE teams SET delete_status = 1 WHERE id = ?";
+    const query = "UPDATE teams SET deleted_at = NOW() WHERE id = ?";
     await db.query(query, [id]);
 
     return successResponse(res, { id }, 'Team deleted successfully', 200);
@@ -106,7 +111,7 @@ exports.deleteTeam = async (id, res) => {
 // Get Single Team
 exports.getTeam = async (id, res) => {
   try {
-    const query = "SELECT * FROM teams WHERE id = ? AND delete_status = 0";
+    const query = "SELECT * FROM teams WHERE id = ? AND deleted_at IS NULL";
     const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
@@ -122,11 +127,10 @@ exports.getTeam = async (id, res) => {
 
 // Get All Teams
 exports.getAllTeams = async (queryParams, res) => {
-  const { search, page = 1, perPage = 10 } = queryParams;
-  const offset = (page - 1) * perPage;
+  const { search, page , perPage = 10 } = queryParams;
 
-  let query = "SELECT * FROM teams WHERE delete_status = 0 ORDER BY `created_at` DESC";
-  let countQuery = "SELECT COUNT(*) AS total FROM teams WHERE delete_status = 0";
+  let query = "SELECT * FROM teams WHERE deleted_at IS NULL ";
+  let countQuery = "SELECT COUNT(*) AS total FROM teams WHERE deleted_at IS NULL";
   const queryParamsArray = [];
 
   if (search && search.trim() !== "") {
@@ -135,18 +139,26 @@ exports.getAllTeams = async (queryParams, res) => {
     queryParamsArray.push(`%${search.trim()}%`);
   }
 
-  query += " LIMIT ? OFFSET ?";
-  queryParamsArray.push(parseInt(perPage, 10), parseInt(offset, 10));
+  if (page && perPage) {
+    const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
+    query += " ORDER BY `created_at` DESC LIMIT ? OFFSET ?";
+    queryParamsArray.push(parseInt(perPage, 10), offset);
+  } else {
+    query += " ORDER BY `created_at` DESC"; // Default sorting
+  }
+
 
   try {
     const [rows] = await db.query(query, queryParamsArray);
     const [countResult] = await db.query(countQuery, queryParamsArray);
     const totalRecords = countResult[0].total;
     const rowsWithSerialNo = rows.map((row, index) => ({
-        s_no: offset + index + 1, // Calculate the serial number
+        s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
         ...row,
       }));
-    const pagination = getPagination(page, perPage, totalRecords);
+  
+      // Prepare pagination data
+      const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
 
     return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No teams found' : 'Teams fetched successfully', 200, pagination);
   } catch (error) {

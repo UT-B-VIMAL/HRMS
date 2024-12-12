@@ -1,15 +1,16 @@
 const Joi = require('joi');
 
-const UserSchema = Joi.object({
+const UserSchema = (isUpdate = false) => Joi.object({
   first_name: Joi.string().min(3).max(100).required().messages({
-    'string.base': 'Fisrt Name must be a string',
-    'string.empty': 'Fisrt Name is required',
-    'string.min': 'Fisrt Name must be at least 3 characters long',
-    'string.max': 'Fisrt Name must be less than 100 characters',
-    'any.required': 'Fisrt Name is required',
+    'string.base': 'First Name must be a string',
+    'string.empty': 'First Name is required',
+    'string.min': 'First Name must be at least 3 characters long',
+    'string.max': 'First Name must be less than 100 characters',
+    'any.required': 'First Name is required',
   }),
 
-  employee_id: Joi.number().integer().required().messages({
+  // Make employee_id optional for update
+  employee_id: isUpdate ? Joi.number().integer().optional() : Joi.number().integer().required().messages({
     'number.base': 'Employee ID must be a number',
     'number.integer': 'Employee ID must be an integer',
     'any.required': 'Employee ID is required',

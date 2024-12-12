@@ -5,6 +5,7 @@ const fs = require("fs");
 const cors = require('cors');
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
+const loginController = require('./controllers/loginController');
 const userController = require('./controllers/userController');
 const productController = require('./controllers/productController');
 const taskController = require('./controllers/taskController');
@@ -31,6 +32,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       'http://localhost:5173',
+      'http://localhost:81',
       'http://localhost', 
       'http://frontend.utwebapps.com', 
     ];
@@ -55,6 +57,9 @@ app.use(bodyParser);
 
 const apiRouter = express.Router();
 
+//login
+apiRouter.post('/login', loginController.login);
+
 // User Routes
 apiRouter.post('/user', userController.createUser);
 apiRouter.put('/user/:id', userController.updateUser);
@@ -70,11 +75,11 @@ apiRouter.get('/products/:id', productController.getProduct);
 apiRouter.get('/products', productController.getAllProducts);
 
 // Project Routes
-apiRouter.post('/projects', projectController.insert);
-apiRouter.put('/projects/:id', projectController.update);
-apiRouter.delete('/projects/:id', projectController.delete);
-apiRouter.get('/projects/:id', projectController.find);
-apiRouter.get('/projects', projectController.getAll);
+apiRouter.post('/projects', projectController.createProject);
+apiRouter.put('/projects/:id', projectController.updateProject);
+apiRouter.delete('/projects/:id', projectController.deleteProject);
+apiRouter.get('/projects/:id', projectController.getProject);
+apiRouter.get('/projects', projectController.getAllProjects);
 apiRouter.get('/project_request', projectController.project_request);
 
 // Team Routes
@@ -98,6 +103,8 @@ apiRouter.put('/task/:id', taskController.updateTask);
 apiRouter.delete('/task/:id', taskController.deleteTask);
 apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
+apiRouter.put('/taskupdate/:id', taskController.updateDatas);
+
 
 // Subtask Routes
 apiRouter.post('/subtask', subtaskController.createSubTask);
@@ -142,6 +149,7 @@ apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
 
 //Attendance
 apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
+apiRouter.post('/updateAttendance', attendanceController.updateAttendance);
 
 
 // Change password

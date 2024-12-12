@@ -1,6 +1,7 @@
-const { createTask, updateTask, deleteTask, getTask, getAllTasks,addTaskComment } = require('../api/functions/taskFunction');
+const { createTask, updateTask, deleteTask, getTask, getAllTasks,addTaskComment,updateTaskData } = require('../api/functions/taskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
-const { createTaskSchema, updateTaskSchema } = require("../validators/taskValidator");
+const { createTaskSchema, updateTaskSchema,updateTaskDataSchema } = require("../validators/taskValidator");
+const Joi = require('joi');
 
 const taskController = {
   createTask: async (req, res) => {
@@ -27,9 +28,39 @@ const taskController = {
 
   updateTask: async (req, res) => {
     try {
+      const { id } = req.params; 
+      const payload = req.body; 
+  
+      const idValidation = Joi.string().required().validate(id);
+      if (idValidation.error) {
+        return errorResponse(res, { id: 'Task ID is required and must be valid' }, 'Validation Error', 403);
+      }
+  
+      const { error } = updateTaskSchema.validate(payload, { abortEarly: false });
+      if (error) {
+        const errorMessages = error.details.reduce((acc, err) => {
+          acc[err.path[0]] = err.message;
+          return acc;
+        }, {});
+        return errorResponse(res, errorMessages, "Validation Error", 403);
+      }
+  
+      // Call the updateTask function
+      await updateTask(id, payload, res);
+  
+    } catch (error) {
+      return errorResponse(res, error.message, 'Error updating task', 500);
+    }
+  },
+  
+
+
+
+  updateDatas:async(req,res)=>{
+    try {
       const { id } = req.params;
       const payload = req.body;
-      const { error } = updateTaskSchema.validate(payload, { abortEarly: false });
+      const { error } = updateTaskDataSchema.validate(payload, { abortEarly: false });
 
       if (error) {
         const errorMessages = error.details.reduce((acc, err) => {
@@ -40,7 +71,7 @@ const taskController = {
         return errorResponse(res, errorMessages, "Validation Error", 403);
       }
 
-      await updateTask(id, payload, res);
+      await updateTaskData(id, payload, res);
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error updating task', 500);
