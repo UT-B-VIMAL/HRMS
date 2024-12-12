@@ -4,12 +4,12 @@ const { successResponse, errorResponse } = require("../../helpers/responseHelper
 exports.fetchProducts = async (payload, res) => {
   try {
     // Step 1: Get products
-    const productsQuery = "SELECT * FROM products";
+    const productsQuery = "SELECT * FROM products WHERE deleted_at IS NULL";
     const [products] = await db.query(productsQuery);
 
     const result = await Promise.all(
       products.map(async (product) => {
-        const tasksQuery = "SELECT * FROM tasks WHERE product_id = ?";
+        const tasksQuery = "SELECT * FROM tasks WHERE product_id = ? AND deleted_at IS NULL";
         const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
@@ -17,7 +17,7 @@ exports.fetchProducts = async (payload, res) => {
         let workingEmployees = new Set();
 
         for (const task of tasks) {
-          const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ?";
+          const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
           const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
@@ -46,7 +46,7 @@ exports.fetchProducts = async (payload, res) => {
             SELECT id, 
                    COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
             FROM users 
-            WHERE id IN (?)
+            WHERE id IN (?) AND deleted_at IS NULL
           `;
           const [employees] = await db.query(employeeDetailsQuery, [
             Array.from(workingEmployees),
@@ -101,7 +101,7 @@ exports.fetchUtilization = async (payload, res) => {
         t.name AS team_name, 
         COUNT(u.id) AS total_strength 
       FROM teams t
-      LEFT JOIN users u ON t.id = u.team_id
+      LEFT JOIN users u ON t.id = u.team_id WHERE t.deleted_at IS NULL AND u.deleted_at IS NULL
       GROUP BY t.id
     `;
     const [totalStrengthData] = await db.query(totalStrengthQuery);
@@ -126,7 +126,7 @@ exports.fetchUtilization = async (payload, res) => {
       FROM sub_tasks_user_timeline stut
       JOIN users u ON stut.user_id = u.id
       JOIN teams t ON u.team_id = t.id
-      WHERE DATE(stut.start_time) = CURDATE()
+      WHERE DATE(stut.start_time) = CURDATE() AND u.deleted_at IS NULL AND t.deleted_at IS NULL
     `;
     const [workingEmployeesData] = await db.query(workingEmployeesQuery);
 
@@ -180,7 +180,7 @@ exports.fetchUtilization = async (payload, res) => {
 exports.fetchAttendance = async (payload, res) => {
   try {
     // Step 1: Get total strength of all users
-    const totalStrengthQuery = `SELECT COUNT(*) AS total_strength FROM users`;
+    const totalStrengthQuery = `SELECT COUNT(*) AS total_strength FROM users WHERE deleted_at IS NULL`;
     const [[{ total_strength: totalStrength }]] = await db.query(totalStrengthQuery);
 
     // Step 2: Calculate total absent employees
@@ -190,8 +190,8 @@ exports.fetchAttendance = async (payload, res) => {
 
     const totalAbsentQuery = `
       SELECT COUNT(*) AS total_absent 
-      FROM employee_leave 
-      WHERE DATE(date) = CURDATE() 
+      FROM employee_leave WHERE deleted_at IS NULL
+      AND DATE(date) = CURDATE() 
         AND (
           day_type = 1 OR 
           (day_type = 2 AND half_type = 1 AND ? < ?) OR 
@@ -225,7 +225,7 @@ exports.fetchAttendance = async (payload, res) => {
         el.half_type 
       FROM teams t
       LEFT JOIN users u ON t.id = u.team_id
-      LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE()
+      LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE() AND t.deleted_at IS NULL AND u.deleted_at IS NULL AND el.deleted_at IS NULL
     `;
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
@@ -303,7 +303,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
     const productQuery = `
       SELECT id, name
       FROM products
-      WHERE id = ?
+      WHERE id = ? AND deleted_at IS NULL
     `;
     const [productRows] = await db.query(productQuery, [product_id]);
     const product = productRows[0] || { name: 'N/A', id: 'N/A' };
@@ -333,7 +333,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
       LEFT JOIN teams te ON t.team_id = te.id
       LEFT JOIN users u ON t.user_id = u.id
       LEFT JOIN projects p ON t.project_id = p.id
-      WHERE t.product_id = ?
+      WHERE t.product_id = ? AND t.deleted_at IS NULL AND s.deleted_at IS NULL AND te.deleted_at IS NULL AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `;
 
     // Filter by project_id if provided
@@ -355,7 +355,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
     if (search) {
       tasksQuery += `
         AND (
-          u.name LIKE ${db.escape('%' + search + '%')} OR
+          COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ${db.escape('%' + search + '%')} OR
           p.name LIKE ${db.escape('%' + search + '%')} OR
           te.name LIKE ${db.escape('%' + search + '%')} OR
           s.name LIKE ${db.escape('%' + search + '%')}
@@ -544,12 +544,12 @@ exports.fetchPmviewproductdata = async (req, res) => {
 exports.fetchPmdatas = async (payload, res) => {
   try {
     // Step 1: Fetch products data
-    const productsQuery = "SELECT * FROM products";
+    const productsQuery = "SELECT * FROM products WHERE deleted_at IS NULL";
     const [products] = await db.query(productsQuery);
 
     const productData = await Promise.all(
       products.map(async (product) => {
-        const tasksQuery = "SELECT * FROM tasks WHERE product_id = ?";
+        const tasksQuery = "SELECT * FROM tasks WHERE product_id = ? AND deleted_at IS NULL";
         const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
@@ -557,7 +557,7 @@ exports.fetchPmdatas = async (payload, res) => {
         let workingEmployees = new Set();
 
         for (const task of tasks) {
-          const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ?";
+          const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
           const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
@@ -586,7 +586,7 @@ exports.fetchPmdatas = async (payload, res) => {
             SELECT id, 
                    COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
             FROM users 
-            WHERE id IN (?)
+            WHERE id IN (?) AND deleted_at IS NULL
           `;
           const [employees] = await db.query(employeeDetailsQuery, [
             Array.from(workingEmployees),
@@ -623,8 +623,8 @@ exports.fetchPmdatas = async (payload, res) => {
         t.id AS team_id, 
         t.name AS team_name, 
         COUNT(u.id) AS total_strength 
-      FROM teams t
-      LEFT JOIN users u ON t.id = u.team_id
+      FROM teams t 
+      LEFT JOIN users u ON t.id = u.team_id WHERE t.deleted_at IS NULL AND u.deleted_at IS NULL
       GROUP BY t.id
     `;
     const [totalStrengthData] = await db.query(totalStrengthQuery);
@@ -648,7 +648,7 @@ exports.fetchPmdatas = async (payload, res) => {
       FROM sub_tasks_user_timeline stut
       JOIN users u ON stut.user_id = u.id
       JOIN teams t ON u.team_id = t.id
-      WHERE DATE(stut.start_time) = CURDATE()
+      WHERE DATE(stut.start_time) = CURDATE() AND u.deleted_at IS NULL AND t.deleted_at IS NULL AND stut.deleted_at IS NULL
     `;
     const [workingEmployeesData] = await db.query(workingEmployeesQuery);
 
@@ -685,7 +685,7 @@ exports.fetchPmdatas = async (payload, res) => {
     });
 
     // Step 3: Fetch attendance data
-    const totalStrengthQueryAttendance = `SELECT COUNT(*) AS total_strength FROM users`;
+    const totalStrengthQueryAttendance = `SELECT COUNT(*) AS total_strength FROM users WHERE deleted_at IS NULL`;
     const [[{ total_strength: totalStrengthAttendance }]] = await db.query(totalStrengthQueryAttendance);
 
     const currentTime = new Date();
@@ -695,7 +695,8 @@ exports.fetchPmdatas = async (payload, res) => {
     const totalAbsentQuery = `
       SELECT COUNT(*) AS total_absent 
       FROM employee_leave 
-      WHERE DATE(date) = CURDATE() 
+      WHERE deleted_at IS NULL
+      AND DATE(date) = CURDATE() 
         AND (
           day_type = 1 OR 
           (day_type = 2 AND half_type = 1 AND ? < ?) OR 
@@ -728,7 +729,7 @@ exports.fetchPmdatas = async (payload, res) => {
         el.half_type 
       FROM teams t
       LEFT JOIN users u ON t.id = u.team_id
-      LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE()
+      LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE() AND t.deleted_at IS NULL AND u.deleted_at IS NULL AND el.deleted_at IS NULL
     `;
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
