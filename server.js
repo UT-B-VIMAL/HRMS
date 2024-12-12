@@ -134,6 +134,7 @@ apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
 
 //Attendance
 apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
+apiRouter.post('/updateAttendance', attendanceController.updateAttendance);
 
 
 // Change password
