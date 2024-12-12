@@ -58,7 +58,7 @@ exports.updateTeam = async (id, payload, res) => {
     }
 
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -79,7 +79,7 @@ exports.updateTeam = async (id, payload, res) => {
 // Delete Team
 exports.deleteTeam = async (id, res) => {
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -98,7 +98,7 @@ exports.deleteTeam = async (id, res) => {
         400
       );
     }
-    const query = "UPDATE teams SET delete_status = 1 WHERE id = ?";
+    const query = "UPDATE teams SET deleted_at = NOW() WHERE id = ?";
     await db.query(query, [id]);
 
     return successResponse(res, { id }, 'Team deleted successfully', 200);
@@ -111,7 +111,7 @@ exports.deleteTeam = async (id, res) => {
 // Get Single Team
 exports.getTeam = async (id, res) => {
   try {
-    const query = "SELECT * FROM teams WHERE id = ? AND delete_status = 0";
+    const query = "SELECT * FROM teams WHERE id = ? AND deleted_at IS NULL";
     const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
@@ -130,8 +130,8 @@ exports.getAllTeams = async (queryParams, res) => {
   const { search, page = 1, perPage = 10 } = queryParams;
   const offset = (page - 1) * perPage;
 
-  let query = "SELECT * FROM teams WHERE delete_status = 0 ";
-  let countQuery = "SELECT COUNT(*) AS total FROM teams WHERE delete_status = 0";
+  let query = "SELECT * FROM teams WHERE deleted_at IS NULL ";
+  let countQuery = "SELECT COUNT(*) AS total FROM teams WHERE deleted_at IS NULL";
   const queryParamsArray = [];
 
   if (search && search.trim() !== "") {
