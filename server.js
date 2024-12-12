@@ -31,6 +31,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       'http://localhost:5173',
+      'http://localhost:81',
       'http://localhost', 
       'http://frontend.utwebapps.com', 
     ];
