@@ -1,5 +1,6 @@
 const axios = require('axios');
 const keycloakConfig = require('../../config/keycloak');
+const db = require('../../config/db');
 
 async function getAdminToken() {
   try {
@@ -39,7 +40,19 @@ async function signInUser(username, password) {
           { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
 
-      return response.data; // This contains access token, refresh token, etc.
+      const user = await getUserByEmployeeId(username);  // You'll implement this function to query your DB
+
+      if (user) {
+        // Return the response from Keycloak along with the additional user information
+        return {
+          keycloak_id: user.keycloak_id,
+          id: user.id,
+          access_token: response.data.access_token,
+          refresh_token: response.data.refresh_token
+        };
+      } else {
+        throw new Error('User not found in the database');
+      }
   } catch (error) {
       console.error("Error signing in user:", error.response ? error.response.data : error.message);
       throw error;
@@ -50,10 +63,8 @@ async function createUserInKeycloak(userData) {
   try {
     const token = await getAdminToken();
 
-    // Destructure and separate the roleName from the payload
     const { roleName, ...userWithoutRole } = userData;
 
-    // Debug the payload
     console.log("User Data Payload:", userWithoutRole);
 
     const response = await axios.post(
@@ -67,7 +78,6 @@ async function createUserInKeycloak(userData) {
       throw new Error('Failed to retrieve user ID after creation');
     }
 
-    // Assign role if roleName is provided
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
@@ -82,13 +92,20 @@ async function createUserInKeycloak(userData) {
     return userId;
   } catch (error) {
     if (error.response) {
-      console.error("Error creating user:", error.response.data);
-      return error.response.data;
+      console.error("Error creating user in Keycloak:", error.response.data);
+
+      return {
+        status: error.response.status || 500,
+        message: error.response.data.error_description || "Unknown Keycloak error",
+        error: error.response.data.error || "Unknown error",
+      };
     } else {
+      console.error("General error in Keycloak user creation:", error.message);
       throw new Error('Error creating user in Keycloak: ' + error.message);
     }
   }
 }
+
 
 
 
@@ -151,23 +168,41 @@ async function listUsers() {
 async function assignRoleToUser(userId, roleName) {
   try {
     const token = await getAdminToken();
-    // Get the role ID by name
     const rolesResponse = await axios.get(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/roles/${roleName}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const role = rolesResponse.data;
-    // Assign the role to the user
    return await axios.post(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
       [role],
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    console.log(`Role ${roleName} assigned to user ${userId}`);
+    
   } catch (error) {
     return ({ error: "Failed to create user or assign role", details: error.response.data });
   }
 }
+
+async function getUserByEmployeeId(employeeId) {
+  
+  const query = "SELECT id, keycloak_id FROM users WHERE employee_id = ?";
+  const params = [employeeId];
+
+  try {
+    const [rows] = await db.execute(query, params);  // Use your DB query method here (e.g., mysql2, sequelize)
+    
+    if (rows.length > 0) {
+      return rows[0];  // Return the first user that matches the employee_id
+    } else {
+      return null;  // No user found with that employee_id
+    }
+  } catch (error) {
+    console.error("Error querying database for user:", error.message);
+    throw error;
+  }
+}
+
 
 module.exports = {
   createUserInKeycloak,

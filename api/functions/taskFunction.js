@@ -703,40 +703,7 @@ exports.deleteTask = async (id, res) => {
   }
 };
 
-// add task and subtask Comments
-exports.addTaskComment = async (payload, res) => {
-  const { task_id, subtask_id, user_id, comments, updated_by } = payload;
 
-  try {
-    const validSubtaskId = subtask_id || null;
-
-    const query = `
-          INSERT INTO task_comments (task_id, subtask_id, user_id, comments, updated_by)
-          VALUES (?, ?, ?, ?, ?)
-      `;
-
-    const values = [task_id, validSubtaskId, user_id, comments, updated_by];
-
-    const [result] = await db.query(query, values);
-
-    if (!result || result.length === 0) {
-      return errorResponse(res, null, "No task comment found", 204);
-    }
-
-    return successResponse(
-      res,
-      { id: result.insertId, ...payload },
-      "Task comment added successfully"
-    );
-  } catch (error) {
-    return errorResponse(
-      res,
-      error.message,
-      "Error inserting task comment",
-      500
-    );
-  }
-};
 const convertToSeconds = (timeString) => {
   const [hours, minutes, seconds] = timeString.split(':').map(Number);
   return (hours * 3600) + (minutes * 60) + (seconds || 0);
