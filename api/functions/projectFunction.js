@@ -163,8 +163,7 @@ exports.getProject = async (id, res) => {
 
 // Get All Projects
 exports.getAllProjects = async (queryParams, res) => {
-  const { search, page = 1, size = 10 } = queryParams;
-  const offset = (page - 1) * size;
+  const { search, page , perPage = 10 } = queryParams;
 
   let query = `SELECT 
         projects.*, 
@@ -186,18 +185,24 @@ exports.getAllProjects = async (queryParams, res) => {
     countQuery += ` AND (projects.name LIKE ? OR products.name LIKE ?)`;
     queryParamsArray.push(`%${search.trim()}%`, `%${search.trim()}%`); // Add search term for both fields
   }
-  query += " ORDER BY `created_at` DESC LIMIT ? OFFSET ?";
-  queryParamsArray.push(parseInt(size, 10), parseInt(offset, 10));
+  if (page && perPage) {
+    const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
+    query += " ORDER BY `created_at` DESC LIMIT ? OFFSET ?";
+    queryParamsArray.push(parseInt(perPage, 10), offset);
+  } else {
+    query += " ORDER BY `created_at` DESC"; // Default sorting
+  }
 
   try {
     const [rows] = await db.query(query, queryParamsArray);
     const [countResult] = await db.query(countQuery, queryParamsArray);
     const totalRecords = countResult[0].total;
     const rowsWithSerialNo = rows.map((row, index) => ({
-        s_no: offset + index + 1, // Calculate the serial number
+        s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
         ...row,
-      }));
-    const pagination = getPagination(page, size, totalRecords);
+    }));
+  
+    const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
 
     return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No projects found' : 'Projects fetched successfully', 200, pagination);
   } catch (error) {

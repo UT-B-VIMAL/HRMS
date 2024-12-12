@@ -31,6 +31,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       'http://localhost:5173',
+      'http://localhost:81',
       'http://localhost', 
       'http://frontend.utwebapps.com', 
     ];
@@ -101,6 +102,8 @@ apiRouter.put('/task/:id', taskController.updateTask);
 apiRouter.delete('/task/:id', taskController.deleteTask);
 apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
+apiRouter.put('/taskupdate/:id', taskController.updateDatas);
+
 
 // Subtask Routes
 apiRouter.post('/subtask', subtaskController.createSubTask);
