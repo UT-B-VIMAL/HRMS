@@ -38,11 +38,7 @@ const validationshems = {
   }).unknown(true),
 
   updateTaskSchema: Joi.object({
-    task_id: Joi.number().integer().required().messages({
-      'number.base': 'Task ID must be a number',
-      'number.integer': 'Task ID must be an integer',
-      'any.required': 'Task ID is required',
-    }),
+ 
     name: Joi.string().required().messages({
       'string.empty': 'Subtask name is required',
       'any.required': 'Subtask name is required',
@@ -58,6 +54,11 @@ const validationshems = {
       'date.base': 'End date must be a valid date',
       'date.greater': 'End date must be greater than the start date',
     }),
+  }).unknown(true),
+
+  updateTaskDataSchema: Joi.object({
+
+   
   }).unknown(true),
 };
 
