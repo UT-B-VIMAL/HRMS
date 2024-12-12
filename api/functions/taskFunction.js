@@ -704,3 +704,245 @@ exports.deleteTask = async (id, res) => {
 };
 
 
+const convertToSeconds = (timeString) => {
+  const [hours, minutes, seconds] = timeString.split(':').map(Number);
+  return (hours * 3600) + (minutes * 60) + (seconds || 0);
+};
+
+const calculateTimeLeft = (estimatedHours, totalHoursWorked, timeDifference) => {
+  const estimatedInSeconds = convertToSeconds(estimatedHours || '00:00:00');
+  const workedInSeconds = convertToSeconds(totalHoursWorked || '00:00:00');
+  const remainingSeconds = Math.max(0, estimatedInSeconds - workedInSeconds - timeDifference);
+  return new Date(remainingSeconds * 1000).toISOString().substr(11, 8);
+};
+
+const lastActiveTask = async (userId) => {
+  try {
+    const query = `
+        SELECT stut.*, s.name as subtask_name, s.estimated_hours as subtask_estimated_hours,
+               s.total_hours_worked as subtask_total_hours_worked, t.name as task_name,
+               t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked
+        FROM SubTaskUserTimelines stut
+        LEFT JOIN Subtasks s ON stut.subtask_id = s.id
+        LEFT JOIN Tasks t ON stut.task_id = t.id
+        WHERE stut.user_id = ? AND stut.end_time IS NULL
+        ORDER BY stut.start_time DESC
+        LIMIT 1;
+    `;
+
+    // Use db.query for mysql2 promises and destructure result
+    const [lastActiveTaskRows] = await db.query(query, [userId]);
+
+    // If no active task is found, return null
+    if (lastActiveTaskRows.length === 0) return null;
+
+    const task = lastActiveTaskRows[0];
+    const lastStartTime = moment(task.start_time);
+    const now = moment();
+    const timeDifference = now.diff(lastStartTime, 'seconds'); // Calculate the difference in seconds
+
+    // Calculate the time left based on whether it's a subtask or task
+    const timeLeft = calculateTimeLeft(
+        task.subtask_id ? task.subtask_estimated_hours : task.task_estimated_hours,
+        task.subtask_id ? task.subtask_total_hours_worked : task.task_total_hours_worked,
+        timeDifference
+    );
+
+    // Add time left to the task or subtask object
+    if (task.subtask_id) {
+        task.subtask_time_left = timeLeft;
+    } else {
+        task.task_time_left = timeLeft;
+    }
+
+    return task;
+  } catch (err) {
+    console.error('Error fetching last active task:', err.message);
+    return null;
+  }
+};
+
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+  };
+
+exports.getTaskList = async (req, res) => {
+  const authUser = { id: 61, role_id: 4 }; // Sample authenticated user
+  const searchTerm = req.search ? `%${req.search}%` : null;
+
+  try {
+    // Fetch teams that the authenticated user reports to
+    const [teamIds] = await db.query(
+      `SELECT id FROM teams WHERE reporting_user_id = ?`,
+      [authUser.id]
+    );
+
+    const teamIdsList = teamIds.map((team) => team.id);
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    // Role-based task filtering
+    if (authUser.role_id === 3) {
+      whereConditions.push('t.team_id IN (?)');
+      queryParams.push(teamIdsList.length ? teamIdsList : undefined);
+    }
+
+    if (authUser.role_id === 4) {
+      whereConditions.push('(t.user_id = ? OR s.user_id = ?)');
+      queryParams.push(authUser.id, authUser.id);
+    }
+
+    // Dynamic filters (if provided in the request)
+    if (req.product_id) {
+      whereConditions.push('t.product_id = ?');
+      queryParams.push(req.product_id);
+    }
+
+    if (req.project_id) {
+      whereConditions.push('t.project_id = ?');
+      queryParams.push(req.project_id);
+    }
+
+    if (req.team_id) {
+      whereConditions.push('t.team_id = ?');
+      queryParams.push(req.team_id);
+    }
+
+    if (req.priority) {
+      whereConditions.push('t.priority = ?');
+      queryParams.push(req.priority);
+    }
+
+    if (searchTerm) {
+      whereConditions.push(`
+        (t.name LIKE ? OR s.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ?)
+      `);
+      queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    // Main query to fetch tasks with related subtasks
+    const tasksQuery = `
+      SELECT t.*, 
+             s.id AS subtask_id, s.name AS subtask_name, s.estimated_hours AS subtask_estimated_hours, 
+             s.total_hours_worked AS subtask_total_hours_worked, s.status AS subtask_status, s.task_id,
+             s.reopen_status AS subtask_reopen_status, s.active_status AS subtask_active_status,
+             p.name AS product_name, pr.name AS project_name, u.first_name AS user_name, tm.name AS team_name
+      FROM tasks t
+      LEFT JOIN sub_tasks s ON s.task_id = t.id
+      LEFT JOIN products p ON t.product_id = p.id
+      LEFT JOIN projects pr ON t.project_id = pr.id
+      LEFT JOIN users u ON t.user_id = u.id
+      LEFT JOIN teams tm ON u.team_id = tm.id
+      ${whereConditions.length ? 'WHERE ' + whereConditions.join(' AND ') : ''}
+      ORDER BY t.updated_at DESC
+    `;
+
+    // Execute the query to get tasks
+    const [tasks] = await db.query(tasksQuery, queryParams);
+
+    // Group tasks based on task status and subtask status (if subtasks exist)
+    const groups = {
+      'To-Do': [],
+      'On-Hold': [],
+      'Pending-Approval': [],
+      'Reopen': [],
+      'In-Progress': [],
+      'Done': []
+    };
+
+ 
+
+
+    tasks.forEach((task) => {
+      const estimatedSeconds = convertToSeconds(task.estimated_hours || '00:00:00');
+      const workedSeconds = convertToSeconds(task.total_hours_worked || '00:00:00');
+      const remainingSeconds = estimatedSeconds - workedSeconds;
+      const timeLeftFormatted = remainingSeconds > 0 ? formatTime(remainingSeconds) : '00:00:00';
+    
+      // Prepare task details object
+      const taskDetails = {
+        name: task.name,
+        task_id: task.id,
+        product_name: task.product_name || 'N/A',
+        project_name: task.project_name || 'N/A',
+        priority: task.priority,
+        estimated_hours: task.estimated_hours,
+        time_left: timeLeftFormatted,
+        assignee: task.user_name || '',
+        team: task.team_name || ''
+      };
+  
+        // There are subtasks, group based on subtask status
+        const subtaskDetails = [];
+        
+        // Check for subtasks related to this task
+        tasks.forEach((subtask) => {
+          console.log(subtask)
+          if (subtask.task_id === task.id) {
+            const subtaskStatusGroup = subtask.status === 0
+              ? 'To-Do'
+              : subtask.status === 1
+              ? 'On-Hold'
+              : subtask.status === 2
+              ? 'Pending-Approval'
+              : subtask.status === 3
+              ? 'Reopen'
+              : subtask.status === 4
+              ? 'In-Progress'
+              : 'Done';
+    
+            subtaskDetails.push({
+              subtask_id: subtask.id,
+              subtask_name: subtask.subtask_name,
+              subtask_estimated_hours: subtask.estimated_hours,
+              subtask_total_hours_worked: subtask.total_hours_worked,
+              subtask_status: subtaskStatusGroup,
+              subtask_reopen_status: subtask.reopen_status,
+              subtask_active_status: subtask.active_status
+            });
+          }
+        });
+        if (!task.subtask_id) {
+       
+          // No subtasks exist, group based on task status
+          const taskStatusGroup = task.status === 0
+            ? 'To-Do'
+            : task.status === 1
+            ? 'On-Hold'
+            : task.status === 2
+            ? 'Pending-Approval'
+            : task.status === 3
+            ? 'Reopen'
+            : task.status === 4
+            ? 'In-Progress'
+            : 'Done';
+      
+          groups[taskStatusGroup].push({ task_details: taskDetails });
+        } 
+    console.log(subtaskDetails)
+        // If subtasks exist, group the task by subtask status
+        if (subtaskDetails.length > 0) {
+          subtaskDetails.forEach((subtask) => {
+            const subtaskStatusGroup = subtask.subtask_status;
+            groups[subtaskStatusGroup].push({
+              task_details: taskDetails,
+              subtask_details: subtask
+            });
+          });
+        }
+     
+    });
+    
+    // Return grouped tasks in response
+    res.json({groups });
+    
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error fetching tasks');
+  }
+};
+
