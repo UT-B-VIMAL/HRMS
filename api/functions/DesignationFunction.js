@@ -57,7 +57,7 @@ exports.updateDesignation = async (id, payload, res) => {
     );
   }
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM designations WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM designations WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -78,7 +78,7 @@ exports.updateDesignation = async (id, payload, res) => {
 // Delete Designation
 exports.deleteDesignation = async (id, res) => {
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM designations WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM designations WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -97,7 +97,7 @@ exports.deleteDesignation = async (id, res) => {
         400
       );
     }
-    const query = "UPDATE designations SET delete_status = 1 WHERE id = ?";
+    const query = "UPDATE designations SET deleted_at = NOW() WHERE id = ?";
     await db.query(query, [id]);
 
     return successResponse(res, { id }, 'Designation deleted successfully', 200);
@@ -110,7 +110,7 @@ exports.deleteDesignation = async (id, res) => {
 // Get Single Designation
 exports.getDesignation = async (id, res) => {
   try {
-    const query = "SELECT * FROM designations WHERE id = ? AND delete_status = 0";
+    const query = "SELECT * FROM designations WHERE id = ? AND deleted_at IS NULL";
     const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
@@ -129,8 +129,8 @@ exports.getAllDesignations = async (queryParams, res) => {
   const { search, page = 1, perPage = 10 } = queryParams;
   const offset = (page - 1) * perPage;
 
-  let query = "SELECT * FROM designations WHERE delete_status = 0";
-  let countQuery = "SELECT COUNT(*) AS total FROM designations WHERE delete_status = 0";
+  let query = "SELECT * FROM designations WHERE deleted_at IS NULL";
+  let countQuery = "SELECT COUNT(*) AS total FROM designations WHERE deleted_at IS NULL";
   const queryParamsArray = [];
 
   if (search && search.trim() !== "") {
