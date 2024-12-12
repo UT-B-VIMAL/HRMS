@@ -58,7 +58,7 @@ exports.updateProduct = async (id, payload, res) => {
     );
   }
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM products WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM products WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -79,7 +79,7 @@ exports.updateProduct = async (id, payload, res) => {
 // Delete Product
 exports.deleteProduct = async (id, res) => {
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM products WHERE id = ? AND delete_status = 0";
+    const checkQuery = "SELECT COUNT(*) as count FROM products WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
@@ -98,7 +98,7 @@ exports.deleteProduct = async (id, res) => {
         400
       );
     }
-    const query = "UPDATE products SET delete_status = 1 WHERE id = ?";
+    const query = "UPDATE products SET deleted_at = NOW() WHERE id = ?";
     await db.query(query, [id]);
 
     return successResponse(res, { id }, 'Product deleted successfully', 200);
@@ -111,7 +111,7 @@ exports.deleteProduct = async (id, res) => {
 // Get Single Product
 exports.getProduct = async (id, res) => {
   try {
-    const query = "SELECT * FROM products WHERE id = ? AND delete_status = 0";
+    const query = "SELECT * FROM products WHERE id = ? AND deleted_at IS NULL";
     const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
@@ -130,8 +130,8 @@ exports.getAllProducts = async (queryParams, res) => {
   const { search, page = 1, perPage = 10 } = queryParams;
   const offset = (page - 1) * perPage;
 
-  let query = "SELECT * FROM products WHERE delete_status = 0";
-  let countQuery = "SELECT COUNT(*) AS total FROM products WHERE delete_status = 0";
+  let query = "SELECT * FROM products WHERE deleted_at IS NULL";
+  let countQuery = "SELECT COUNT(*) AS total FROM products WHERE  deleted_at IS NULL";
   const queryParamsArray = [];
 
   if (search && search.trim() !== "") {
