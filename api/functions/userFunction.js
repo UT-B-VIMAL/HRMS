@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const getPagination = require('../../helpers/pagination');
-const { createUserInKeycloak,deleteUserInKeycloak,editUserInKeycloak } = require("../functions/keycloakFunction");
+const { createUserInKeycloak, deleteUserInKeycloak, editUserInKeycloak } = require("../functions/keycloakFunction");
 
 // Create User
 exports.createUser = async (payload, res) => {
@@ -13,28 +13,30 @@ exports.createUser = async (payload, res) => {
   } = payload;
 
   try {
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Insert the user into the database
     const query = `
-      INSERT INTO users (
-        first_name, last_name, employee_id, email, phone,
-        password, team_id, role_id, designation_id,
-        created_by, updated_by, deleted_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `;
+  INSERT INTO users (
+    first_name, last_name, employee_id, email, phone,
+    password, team_id, role_id, designation_id,
+    created_by, updated_by, deleted_at, created_at, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
+`;
 
     const values = [
       first_name, last_name, employee_id, email, phone,
       hashedPassword, team_id, role_id, designation_id,
-      created_by, updated_by, deleted_at, created_at, updated_at
+      created_by, updated_by
     ];
+    const [result] = await db.query(query, values);
 
-    const [result] = await db.query(query, values); 
-
+    // Prepare Keycloak user data
     const keycloakUserData = {
       username: employee_id,
       email: email,
-      firstName: first_name, 
+      firstName: first_name,
       lastName: last_name,
       enabled: true,
       emailVerified: true,
@@ -48,23 +50,29 @@ exports.createUser = async (payload, res) => {
       roleName: role_name
     };
 
+    // Create the user in Keycloak
     const userId = await createUserInKeycloak(keycloakUserData);
 
+    // If Keycloak user creation fails
     if (!userId) {
       return errorResponse(res, "Failed to create user in Keycloak", 'Error creating user in Keycloak', 500);
     }
 
+    // Update the user in the database with the Keycloak ID
     const updateQuery = `UPDATE users SET keycloak_id = ? WHERE id = ?`;
     const updateValues = [userId, result.insertId];
-    await db.query(updateQuery, updateValues);
+    await db.query(updateQuery, updateValues); // Execute the update query
 
+    // Respond with success
     return successResponse(res, { id: result.insertId, ...payload, keycloakUserId: userId }, 'User created successfully', 201);
 
   } catch (error) {
+    // Handle errors and respond accordingly
     console.error('Error creating user:', error.message);
     return errorResponse(res, error.message, 'Error creating user', 500);
   }
 };
+
 
 
 
@@ -87,7 +95,7 @@ exports.getUser = async (id, res) => {
 // Get All Users
 exports.getAllUsers = async (req, res) => {
   try {
-    const { search = '', page = 1, perPage = 10 } = req.query; 
+    const { search = '', page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
     let query = `
@@ -135,7 +143,7 @@ exports.updateUser = async (id, payload, res) => {
   const {
     first_name,
     last_name,
-    employee_id,
+    keycloak_id,
     email,
     phone,
     password,
@@ -147,17 +155,22 @@ exports.updateUser = async (id, payload, res) => {
   } = payload;
 
   try {
+    // Check if the user exists
+    const [user] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
+    if (user.length === 0) {
+      return errorResponse(res, null, 'User not found', 404);
+    }
+
     let query = `
       UPDATE users SET
-        first_name = ?, last_name = ?, employee_id = ?, email = ?, phone = ?,
-        team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = ? 
+        first_name = ?, last_name = ?, email = ?, phone = ?,
+        team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = NOW() 
       WHERE id = ?
     `;
 
     let values = [
       first_name,
       last_name,
-      employee_id,
       email,
       phone,
       team_id,
@@ -167,34 +180,47 @@ exports.updateUser = async (id, payload, res) => {
       updated_at,
       id,
     ];
+    
+
 
     if (password) {
       const hashedPassword = await bcrypt.hash(password, 10);
       query = query.replace('first_name = ?,', 'first_name = ?, password = ?,');
-      values.splice(5, 0, hashedPassword);  
+
+      // Insert the hashed password at the correct position in values
+      values.splice(5, 0, hashedPassword);
     }
 
-    const [result] = await db.query(query, values);
+  
 
+    // Execute the update query
+    const result = await db.query(query, values);
+
+    console.log('Result:', result);  // Log the result of the query
+
+    // if (result.affectedRows === 0) {
+    //   return errorResponse(res, null, 'User not found or no changes made', 404);
+    // }
+
+    // Prepare the payload for Keycloak
     const userPayload = {
-      firstName: first_name, 
-      lastName: last_name,  
+      firstName: first_name,
+      lastName: last_name,
       email: email,
       ...(password && { credentials: [{ type: "password", value: password, temporary: false }] })
     };
 
+    // Update user in Keycloak
     await editUserInKeycloak(keycloak_id, userPayload);
-
-    if (result.affectedRows === 0) {
-      return errorResponse(res, null, 'User not found or no changes made', 404);
-    }
 
     return successResponse(res, { id, ...payload }, 'User updated successfully');
   } catch (error) {
-    console.error(error);
+    console.error('Error:', error.message);
     return errorResponse(res, error.message, 'Error updating user', 500);
   }
 };
+
+
 
 
 
