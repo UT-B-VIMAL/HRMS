@@ -25,23 +25,24 @@ async function getAdminToken() {
   }
 }
 
-async function loginToKeycloak(username, password) {
+async function signInUser(username, password) {
   try {
-    const response = await axios.post(
-      `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
-      new URLSearchParams({
-        grant_type: 'password',
-        client_id: keycloakConfig.clientId,
-        client_secret: keycloakConfig.clientSecret, 
-        username: username,  
-        password: password   
-      }),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-    );
-    return response.data.access_token; 
+      const response = await axios.post(
+          `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
+          new URLSearchParams({
+              grant_type: "password",
+              client_id: keycloakConfig.clientId,
+              client_secret: keycloakConfig.clientSecret,
+              username: username,
+              password: password,
+          }),
+          { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+
+      return response.data; // This contains access token, refresh token, etc.
   } catch (error) {
-    console.error("Error during login:", error.response?.data || error.message);
-    throw error;
+      console.error("Error signing in user:", error.response ? error.response.data : error.message);
+      throw error;
   }
 }
 
@@ -167,5 +168,6 @@ module.exports = {
   editUserInKeycloak,
   deleteUserInKeycloak,
   listUsers,
-  assignRoleToUser
+  assignRoleToUser,
+  signInUser
 };
