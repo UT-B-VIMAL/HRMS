@@ -594,6 +594,7 @@ exports.updateTaskData = async (id, payload, res) => {
   // Define the field mapping for database column names
   const fieldMapping = {
     owner_id: 'user_id',
+    due_date:'end_date',
 
   };
 
