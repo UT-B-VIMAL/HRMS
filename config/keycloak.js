@@ -4,6 +4,6 @@ module.exports = {
     clientId: "hrmsClient",
     clientSecret: "M1Y0DpEE7v4klGdNkbzIBotwwNitYKzi",
     adminUsername: "admin",
-    adminPassword: "admin@123",
+    adminPassword: "admin",
   };
   
