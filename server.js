@@ -21,6 +21,7 @@ const designationController = require('./controllers/designationController');
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
 const attendanceController = require('./controllers/attendanceController');
+const commonController = require("./controllers/commonController");
 
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
@@ -103,6 +104,7 @@ apiRouter.delete('/task/:id', taskController.deleteTask);
 apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id', taskController.updateDatas);
+apiRouter.get('/getTaskDatas', taskController.getTaskDatas);
 
 
 // Subtask Routes
@@ -152,6 +154,9 @@ apiRouter.put('/change_password/:id',authController.change_password);
 // Comments
 apiRouter.post('/task_comments',taskController. taskComments);
 
+
+//common
+apiRouter.get('/getDropDownList',commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix
