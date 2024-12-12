@@ -5,6 +5,7 @@ const fs = require("fs");
 const cors = require('cors');
 const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
+const loginController = require('./controllers/loginController');
 const userController = require('./controllers/userController');
 const productController = require('./controllers/productController');
 const taskController = require('./controllers/taskController');
@@ -53,6 +54,9 @@ app.use(bodyParser);
 
 
 const apiRouter = express.Router();
+
+//login
+apiRouter.post('/login', loginController.login);
 
 // User Routes
 apiRouter.post('/user', userController.createUser);
