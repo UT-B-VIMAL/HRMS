@@ -157,50 +157,51 @@ exports.updateUser = async (id, payload, res) => {
   try {
     // Check if the user exists
     const [user] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
-    if (user.length === 0) {
-      return errorResponse(res, null, 'User not found', 404);
-    }
+  if (user.length === 0) {
+    console.log('User not found for ID:', id);
+    return errorResponse(res, null, 'User not found', 404);
+  }
 
-    let query = `
+  let query = `
+    UPDATE users SET
+      first_name = ?, last_name = ?, email = ?, phone = ?,
+      team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = NOW() 
+    WHERE id = ?
+  `;
+
+
+  let values = [
+    first_name,
+    last_name,
+    email,
+    phone,
+    team_id,
+    role_id,
+    designation_id,
+    updated_by,
+    id,
+  ];
+
+  if (password) {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    query = `
       UPDATE users SET
-        first_name = ?, last_name = ?, email = ?, phone = ?,
+        first_name = ?, last_name = ?, password = ?, email = ?, phone = ?,
         team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = NOW() 
       WHERE id = ?
     `;
+    values.splice(2, 0, hashedPassword);
+  }
 
-    let values = [
-      first_name,
-      last_name,
-      email,
-      phone,
-      team_id,
-      role_id,
-      designation_id,
-      updated_by,
-      updated_at,
-      id,
-    ];
-    
+  console.log('Update query:', query);
+  console.log('Values:', values);
 
+  const result = await db.query(query, values);
+  console.log('Query result:', result);
 
-    if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      query = query.replace('first_name = ?,', 'first_name = ?, password = ?,');
-
-      // Insert the hashed password at the correct position in values
-      values.splice(5, 0, hashedPassword);
-    }
-
-  
-
-    // Execute the update query
-    const result = await db.query(query, values);
-
-    console.log('Result:', result);  // Log the result of the query
-
-    // if (result.affectedRows === 0) {
-    //   return errorResponse(res, null, 'User not found or no changes made', 404);
-    // }
+  if (result.affectedRows === 0) {
+    return errorResponse(res, null, 'No rows were updated. Please check the provided ID.', 404);
+  }
 
     // Prepare the payload for Keycloak
     const userPayload = {

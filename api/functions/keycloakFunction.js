@@ -168,19 +168,17 @@ async function listUsers() {
 async function assignRoleToUser(userId, roleName) {
   try {
     const token = await getAdminToken();
-    // Get the role ID by name
     const rolesResponse = await axios.get(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/roles/${roleName}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const role = rolesResponse.data;
-    // Assign the role to the user
    return await axios.post(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
       [role],
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    console.log(`Role ${roleName} assigned to user ${userId}`);
+    
   } catch (error) {
     return ({ error: "Failed to create user or assign role", details: error.response.data });
   }
