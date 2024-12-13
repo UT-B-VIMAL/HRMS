@@ -1,6 +1,5 @@
 const Joi = require('joi');
 
-// Define all schemas in a single const
 const validationshems = {
   createTaskSchema: Joi.object({
     product_id: Joi.number().integer().required().messages({
@@ -58,7 +57,6 @@ const validationshems = {
 
   updateTaskDataSchema: Joi.object({
 
-   
   }).unknown(true),
   updateTimelineShema : Joi.object({
     id: Joi.number().required().messages({

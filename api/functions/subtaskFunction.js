@@ -172,21 +172,29 @@ exports.getSubTask = async (id, res) => {
 
 
 // Show All Task
-exports.getAllSubTasks= async (res) => {
-    try {
-        const query = 'SELECT * FROM sub_tasks';
-        const [rows] = await db.query(query);
+exports.getAllSubTasks = async (req,res) => {
+  try {
+    const { task_id } = req.query;
+    
+    let query = 'SELECT * FROM sub_tasks WHERE deleted_at IS NULL';
+    const queryParams = [];
 
-        if (rows.length === 0) {
-            return errorResponse(res, null, 'No subtasks found', 204);
-        }
-
-        return successResponse(res, rows, 'SubTasks retrieved successfully');
-    } catch (error) {
-        return errorResponse(res, error.message, 'Error retrieving subtasks', 500);
+    if (task_id) {
+      query += ' AND task_id = ?';
+      queryParams.push(task_id);
     }
-};
 
+    const [rows] = await db.query(query, queryParams);
+
+    if (rows.length === 0) {
+      return errorResponse(res, null, task_id ? 'No subtasks found for this task' : 'No subtasks found', 404);
+    }
+
+    return successResponse(res, rows, 'SubTasks retrieved successfully');
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error retrieving subtasks', 500);
+  }
+};
 
 
 // Update Task
@@ -234,7 +242,7 @@ exports.updateSubTask = async (id, payload, res) => {
 // Delete Task
 exports.deleteSubTask = async (id, res) => {
   try {
-    const query = 'UPDATE FROM sub_tasks SET deleted_at = NOW() WHERE id = ?';
+    const query = 'UPDATE sub_tasks SET deleted_at = NOW() WHERE id = ?';
     const [result] = await db.query(query, [id]);
 
     if (result.affectedRows === 0) {
@@ -244,6 +252,134 @@ exports.deleteSubTask = async (id, res) => {
     return successResponse(res, null, 'SubTask deleted successfully');
   } catch (error) {
     return errorResponse(res, error.message, 'Error deleting subtask', 500);
+  }
+};
+
+exports.updatesubTaskData = async (id, payload, res) => {
+  const {
+    status,
+    assigned_user_id,
+    team_id,
+    owner_id,
+    estimated_hours,
+    start_date,
+    due_date,
+    priority,
+    updated_by,
+    updated_at,
+  } = payload;
+
+  // Define the mapping of fields to status_flag values
+  const statusFlagMapping = {
+    status: 1,
+    owner_id: 2,
+    estimated_hours: 3,
+    due_date: 4,
+    start_date: 5,
+    description: 6,
+    assigned_user_id: 9,
+    team_id: 10,
+    priority: 11,
+    updated_by: 12,
+  };
+
+  console.log([id]);
+
+  // Define the field mapping for database column names
+  const fieldMapping = {
+    owner_id: 'user_id',
+    due_date:'end_date',
+
+  };
+
+  try {
+
+    if (assigned_user_id) {
+      const [assigned_user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
+      if (assigned_user.length === 0) {
+        return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
+      }
+    }
+
+    if (owner_id) {
+      const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [owner_id]);
+      if (user.length === 0) {
+        return errorResponse(res, null, 'Owner not found or has been deleted', 404);
+      }
+    }
+
+    if (team_id) {
+      const [team] = await db.query('SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL', [team_id]);
+      if (team.length === 0) {
+        return errorResponse(res, null, 'Team not found or has been deleted', 404);
+      }
+    }
+    const [tasks] = await db.query(
+      'SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL',
+      [id]
+    );
+    const currentTask = tasks[0]; 
+
+    if (!currentTask) {
+      return errorResponse(res, null, 'SubTask not found or has been deleted', 404);
+    }
+
+    const updateFields = [];
+    const updateValues = [];
+
+    for (const key in payload) {
+      if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
+        const fieldName = fieldMapping[key] || key; 
+        updateFields.push(`${fieldName} = ?`);
+        updateValues.push(payload[key]);
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return errorResponse(res, null, 'No fields to update', 400);
+    }
+    updateValues.push(id);
+
+    const updateQuery = `UPDATE sub_tasks SET ${updateFields.join(', ')} WHERE id = ?`;
+    const [updateResult] = await db.query(updateQuery, updateValues);
+
+    if (updateResult.affectedRows === 0) {
+      return errorResponse(res, null, 'SubTask not updated', 400);
+    }
+
+    const taskHistoryEntries = [];
+    for (const key in payload) {
+      if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
+        const flag = statusFlagMapping[key] || null;
+        taskHistoryEntries.push([
+          currentTask[key],
+          payload[key], 
+          currentTask.task_id,
+          id, 
+          `Changed ${key}`, 
+          updated_by, 
+          flag, 
+          new Date(), 
+          new Date(), 
+          null, 
+        ]);
+      }
+    }
+
+    // Insert task history entries into the task_histories table
+    if (taskHistoryEntries.length > 0) {
+      const historyQuery = `
+        INSERT INTO task_histories (
+          old_data, new_data, task_id, subtask_id, text,
+          updated_by, status_flag, created_at, updated_at, deleted_at
+        ) VALUES ?;
+      `;
+      await db.query(historyQuery, [taskHistoryEntries]);
+    }
+
+    return successResponse(res, { id, ...payload }, 'Task updated successfully');
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error updating task', 500);
   }
 };
 

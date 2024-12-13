@@ -7,7 +7,7 @@ const { createUserInKeycloak, deleteUserInKeycloak, editUserInKeycloak } = requi
 // Create User
 exports.createUser = async (payload, res) => {
   const {
-    first_name, last_name, employee_id, role_name, email, phone,
+    first_name, last_name, employee_id, email, phone,
     password, team_id, role_id, designation_id,
     created_by = 1, updated_by = 1, created_at = new Date(), updated_at = new Date(), deleted_at = null
   } = payload;
@@ -31,6 +31,7 @@ exports.createUser = async (payload, res) => {
       created_by, updated_by
     ];
     const [result] = await db.query(query, values);
+    const roleName = await getRoleName(role_id);
 
     // Prepare Keycloak user data
     const keycloakUserData = {
@@ -47,7 +48,7 @@ exports.createUser = async (payload, res) => {
           temporary: false
         }
       ],
-      roleName: role_name
+      roleName: roleName
     };
 
     // Create the user in Keycloak
@@ -197,7 +198,7 @@ exports.updateUser = async (id, payload, res) => {
   console.log('Values:', values);
 
   const result = await db.query(query, values);
-  console.log('Query result:', result);
+  const roleName = await getRoleName(role_id);
 
   if (result.affectedRows === 0) {
     return errorResponse(res, null, 'No rows were updated. Please check the provided ID.', 404);
@@ -208,7 +209,8 @@ exports.updateUser = async (id, payload, res) => {
       firstName: first_name,
       lastName: last_name,
       email: email,
-      ...(password && { credentials: [{ type: "password", value: password, temporary: false }] })
+      ...(password && { credentials: [{ type: "password", value: password, temporary: false }] ,
+        roleName: roleName})
     };
 
     // Update user in Keycloak
@@ -259,6 +261,6 @@ const getRoleName = async (roleId) => {
   const query = "SELECT name FROM roles WHERE id = ?";
   const values = [roleId];
   const [result] = await db.query(query, values);
-  return result.length > 0 ? result[0].name : null;
+  return result.length > 0 ? result[0].role : null;
 };
 
