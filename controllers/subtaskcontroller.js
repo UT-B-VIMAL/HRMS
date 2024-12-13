@@ -66,7 +66,7 @@ exports.getSubTask = async (req, res) => {
 
 exports.getAllSubTasks = async (req, res) => {
     try {
-        await getAllSubTasks(res);
+        await getAllSubTasks(req,res);
     } catch (error) {
         return errorResponse(res, error.message, 'Error retrieving tasks', 500);
     }
