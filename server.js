@@ -117,6 +117,8 @@ apiRouter.put('/subtask/:id', subtaskController.updateSubTask);
 apiRouter.delete('/subtask/:id', subtaskController.deleteSubTask);
 apiRouter.get('/subtask/:id', subtaskController.getSubTask);
 apiRouter.get('/subtask', subtaskController.getAllSubTasks);
+apiRouter.put('/subtaskupdate/:id', subtaskController.updateDatas);
+
 
 
 // Idle Employee Route

@@ -691,11 +691,18 @@ exports.updateTaskData = async (id, payload, res) => {
 
 exports.deleteTask = async (id, res) => {
   try {
-    const query = "UPDATE FROM tasks SET deleted_at = NOW() WHERE id = ?";
+    const subtaskQuery = 'SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL';
+    const [subtaskResult] = await db.query(subtaskQuery, [id]);
+
+    if (subtaskResult[0].subtaskCount > 0) {
+      return errorResponse(res, null, "Task has associated subtasks and cannot be deleted", 400);
+    }
+
+    const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
     const [result] = await db.query(query, [id]);
 
     if (result.affectedRows === 0) {
-      return errorResponse(res, null, "Task not found", 204);
+      return errorResponse(res, null, "Task not found", 404);
     }
 
     return successResponse(res, null, "Task deleted successfully");
@@ -703,6 +710,7 @@ exports.deleteTask = async (id, res) => {
     return errorResponse(res, error.message, "Error deleting task", 500);
   }
 };
+
 
 
 const convertToSeconds = (timeString) => {
