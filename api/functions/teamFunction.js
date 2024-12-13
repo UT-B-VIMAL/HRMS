@@ -54,7 +54,6 @@ const { name ,user_id } = payload;
     if (checkResult[0].count > 0) {
       return errorResponse(res, "Team with this name already exists", "Duplicate Team Error", 400);
     }
-    const updated_by =user_id;
     const query = "INSERT INTO teams (name, created_by, updated_by) VALUES (?, ?, ?)";
     const values = [name, user_id, user_id];
     const [result] = await db.query(query, values);
@@ -70,7 +69,7 @@ const { name ,user_id } = payload;
 exports.updateTeam = async (id, payload, res) => {
     const { name ,user_id } = payload;
     const { error } = teamSchema.validate(
-      { name, created_by },
+      { name, user_id },
       { abortEarly: false }
     );
     if (error) {
