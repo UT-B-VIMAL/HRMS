@@ -1,7 +1,7 @@
 const Joi = require('joi');
 
-// Validation schema for creating a task
-const createSubTaskSchema = Joi.object({
+const validationshems = {
+ createSubTaskSchema : Joi.object({
   product_id: Joi.number().integer().required().messages({
     'number.base': 'Product ID must be a number',
     'number.integer': 'Product ID must be an integer',
@@ -35,18 +35,10 @@ const createSubTaskSchema = Joi.object({
     'date.greater': 'End date must be greater than the start date',
     'any.required': 'End date is required',
   }),
-  // status: Joi.string().valid('pending', 'in-progress', 'completed').required().messages({
-  //   'any.only': 'Status must be one of the following: pending, in-progress, completed',
-  //   'any.required': 'Status is required',
-  // }),
-  // priority: Joi.string().valid('low', 'medium', 'high').required().messages({
-  //   'any.only': 'Priority must be one of the following: low, medium, high',
-  //   'any.required': 'Priority is required',
-  // }),
-});
+}).unknown(true),
 
 // Validation schema for updating a task
-const updateSubTaskSchema = Joi.object({
+updateSubTaskSchema : Joi.object({
   name: Joi.string().min(3).optional().messages({
     'string.empty': 'Task name is required',
     'string.min': 'Task name must be at least 3 characters long',
@@ -62,7 +54,12 @@ const updateSubTaskSchema = Joi.object({
     'date.base': 'End date must be a valid date',
     'date.greater': 'End date must be greater than the start date',
   }),
+}).unknown(true),
 
-});
+updatesubTaskDataSchema: Joi.object({
+}).unknown(true),
 
-module.exports = { createSubTaskSchema, updateSubTaskSchema };
+
+};
+
+module.exports = validationshems;
