@@ -31,6 +31,13 @@ const ratingSchema = Joi.object({
       "any.required": "The 'user_id' field is required.",
       "number.base": "The 'user_id' field must be a valid integer.",
     }),
+    updated_by: Joi.number()
+    .integer()
+    .required()
+    .messages({
+      "any.required": "The 'user_id' field is required.",
+      "number.base": "The 'user_id' field must be a valid integer.",
+    }),
 });
 
 module.exports = { ratingSchema };
