@@ -21,6 +21,7 @@ const designationController = require('./controllers/designationController');
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
 const attendanceController = require('./controllers/attendanceController');
+const commonController = require("./controllers/commonController");
 const empdashboardController = require('./controllers/empdashboardController');
 const commentsController = require('./controllers/commentsController');
 
@@ -107,6 +108,7 @@ apiRouter.delete('/task/:id', taskController.deleteTask);
 apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id', taskController.updateDatas);
+apiRouter.get('/getTaskDatas', taskController.getTaskDatas);
 
 
 // Subtask Routes
@@ -167,6 +169,9 @@ apiRouter.delete('/comments/:id',commentsController. deleteComments);
 
 
 
+
+//common
+apiRouter.get('/getDropDownList',commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix
