@@ -187,7 +187,7 @@ exports.getAllSubTasks = async (req,res) => {
     const [rows] = await db.query(query, queryParams);
 
     if (rows.length === 0) {
-      return errorResponse(res, null, task_id ? 'No subtasks found for this task' : 'No subtasks found', 204);
+      return errorResponse(res, null, task_id ? 'No subtasks found for this task' : 'No subtasks found', 404);
     }
 
     return successResponse(res, rows, 'SubTasks retrieved successfully');
@@ -195,8 +195,6 @@ exports.getAllSubTasks = async (req,res) => {
     return errorResponse(res, error.message, 'Error retrieving subtasks', 500);
   }
 };
-
-
 
 
 // Update Task
