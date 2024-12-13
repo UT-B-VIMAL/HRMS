@@ -11,6 +11,10 @@ const projectSchema = Joi.object({
     "number.integer": "Product ID must be an integer",
     "any.required": "Product ID is required",
   }),
+  user_id: Joi.number().integer().required().messages({
+    'number.base': 'User Id must be a valid user ID',
+    'any.required': 'User Id field is required'
+  })
 });
 
 module.exports = { projectSchema };

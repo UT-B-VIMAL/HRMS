@@ -1,3 +1,4 @@
+const Joi = require('joi');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 // const getPagination = require('../../helpers/paginationHelper');
@@ -21,13 +22,30 @@ const getPagination = (page, perPage, totalRecords) => {
       prev_page: prevPage,
     };
   };
-  
+
+  const productSchema = Joi.object({
+    name: Joi.string().max(100).required().messages({
+      'string.empty': 'Product name is required',
+      'string.max': 'Product name must not exceed 100 characters'
+    }),
+    user_id: Joi.number().integer().required().messages({
+      'number.base': 'User Id must be a valid user ID',
+      'any.required': 'User Id field is required'
+    })
+  });
 // Create Product
 exports.createProduct = async (payload, res) => {
-    const { name } = payload;
-    if (!name) {
-      return errorResponse(res,"Product name is required","Validation Error",400
-      );
+    const { name ,user_id } = payload;
+    const { error } = productSchema.validate(
+      { name, user_id },
+      { abortEarly: false }
+    );
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 400);
     }
   try {
     const checkQuery = "SELECT COUNT(*) as count FROM products WHERE name = ?";
@@ -36,10 +54,8 @@ exports.createProduct = async (payload, res) => {
     if (checkResult[0].count > 0) {
       return errorResponse(res, "Product with this name already exists", "Duplicate Product Error", 400);
     }
-    const created_by =1;
-    const updated_by =created_by;
     const query = "INSERT INTO products (name, created_by, updated_by) VALUES (?, ?, ?)";
-    const values = [name, created_by, updated_by];
+    const values = [name, user_id, user_id];
     const [result] = await db.query(query, values);
 
     return successResponse(res, { id: result.insertId, name }, 'Product added successfully', 201);
@@ -52,11 +68,18 @@ exports.createProduct = async (payload, res) => {
 // Update Product
 exports.updateProduct = async (id, payload, res) => {
 
-  const { name } = payload;
-  if (!name) {
-    return errorResponse(res,"Product name is required","Validation Error",400
+    const { name ,user_id } = payload;
+    const { error } = productSchema.validate(
+      { name, user_id },
+      { abortEarly: false }
     );
-  }
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 400);
+    }
   try {
     const checkQuery = "SELECT COUNT(*) as count FROM products WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
@@ -64,9 +87,8 @@ exports.updateProduct = async (id, payload, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Product not found or deleted", "Not Found", 404);
     }
-    const updated_by=1;
     const query = "UPDATE products SET name = ?, updated_by = ? WHERE id = ?";
-    const values = [name, updated_by, id];
+    const values = [name, user_id, id];
     await db.query(query, values);
 
     return successResponse(res, { id, name }, 'Product updated successfully', 200);
@@ -141,10 +163,10 @@ exports.getAllProducts = async (queryParams, res) => {
 
   if (page && perPage) {
     const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
-    query += " ORDER BY `created_at` DESC LIMIT ? OFFSET ?";
+    query += " ORDER BY `id` DESC LIMIT ? OFFSET ?";
     queryParamsArray.push(parseInt(perPage, 10), offset);
   } else {
-    query += " ORDER BY `created_at` DESC"; // Default sorting
+    query += " ORDER BY `id` DESC"; // Default sorting
   }
 
   try {

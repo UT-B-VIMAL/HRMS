@@ -4,7 +4,8 @@ const {
   deleteProject, 
   getProject, 
   getAllProjects,
-  projectRequest
+  projectRequest,
+  projectStatus
 } = require('../api/functions/projectFunction');
 const {errorResponse}  = require('../helpers/responseHelper');
 
@@ -63,6 +64,13 @@ const projectController = {
   },
 
 
+project_status: async (req, res) => {
+  try {
+    await projectStatus(req,res);
+} catch (error) {
+    return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
+}
+},
 project_request: async (req, res) => {
   try {
     await projectRequest(req,res);

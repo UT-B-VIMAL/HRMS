@@ -1,4 +1,4 @@
-const { createTask, updateTask, deleteTask, getTask, getAllTasks,addTaskComment,updateTaskData } = require('../api/functions/taskFunction');
+const { createTask, updateTask, deleteTask, getTask, getAllTasks,updateTaskData,getTaskList } = require('../api/functions/taskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const { createTaskSchema, updateTaskSchema,updateTaskDataSchema } = require("../validators/taskValidator");
 const Joi = require('joi');
@@ -60,8 +60,12 @@ const taskController = {
     try {
       const { id } = req.params;
       const payload = req.body;
+      const idValidation = Joi.string().required().validate(id);
+      if (idValidation.error) {
+        return errorResponse(res, { id: 'Task ID is required and must be valid' }, 'Validation Error', 403);
+      }
+  
       const { error } = updateTaskDataSchema.validate(payload, { abortEarly: false });
-
       if (error) {
         const errorMessages = error.details.reduce((acc, err) => {
           acc[err.path[0]] = err.message;
@@ -108,15 +112,16 @@ const taskController = {
   },
   
 
-  taskComments: async (req, res) => {
-    try {
-      const payload = req.body;
-      await addTaskComment(payload, res);
-    } catch (error) {
-      return errorResponse(res, error.message, 'Error retrieving task comments', 500);
-    }
-  }
 
+  getTaskDatas: async (req, res) => {
+    try {
+      const queryParams = req.query;
+      await getTaskList(queryParams, res);
+
+    } catch (error) {
+      return errorResponse(res, error.message, 'Error fetching task', 500);
+    }
+  },
 };
 
 

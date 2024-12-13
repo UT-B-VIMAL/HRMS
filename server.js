@@ -22,6 +22,10 @@ const RoleController = require("./controllers/roleController");
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
 const attendanceController = require('./controllers/attendanceController');
+const commonController = require("./controllers/commonController");
+const empdashboardController = require('./controllers/empdashboardController');
+const commentsController = require('./controllers/commentsController');
+
 
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
@@ -80,6 +84,7 @@ apiRouter.put('/projects/:id', projectController.updateProject);
 apiRouter.delete('/projects/:id', projectController.deleteProject);
 apiRouter.get('/projects/:id', projectController.getProject);
 apiRouter.get('/projects', projectController.getAllProjects);
+apiRouter.get('/project_status', projectController.project_status);
 apiRouter.get('/project_request', projectController.project_request);
 
 // Team Routes
@@ -104,6 +109,7 @@ apiRouter.delete('/task/:id', taskController.deleteTask);
 apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id', taskController.updateDatas);
+apiRouter.get('/getTaskDatas', taskController.getTaskDatas);
 
 
 // Subtask Routes
@@ -112,6 +118,8 @@ apiRouter.put('/subtask/:id', subtaskController.updateSubTask);
 apiRouter.delete('/subtask/:id', subtaskController.deleteSubTask);
 apiRouter.get('/subtask/:id', subtaskController.getSubTask);
 apiRouter.get('/subtask', subtaskController.getAllSubTasks);
+apiRouter.put('/subtaskupdate/:id', subtaskController.updateDatas);
+
 
 
 // Idle Employee Route
@@ -132,6 +140,13 @@ apiRouter.get('/tlresourceallotment', tldashboardController.tlresourceallotments
 apiRouter.get('/tldashboard', tldashboardController.tldashboardsection);
 apiRouter.get('/tlviewproduct', tldashboardController.tlviewproductsection);
 
+// Employee Dashboard Routes
+apiRouter.get('/emppendingtask', empdashboardController.emppendingtasksection);
+apiRouter.get('/empdailybreakdown', empdashboardController.empdailybreakdownsection);
+apiRouter.get('/empstatistics', empdashboardController.empstatisticssection);
+apiRouter.get('/empstatisticschart', empdashboardController.empstatisticschartsection);
+apiRouter.get('/empratings', empdashboardController.empratingsection);
+
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', productivityController.get_individualProductivity);
@@ -151,8 +166,15 @@ apiRouter.put('/change_password/:id',authController.change_password);
 
 
 // Comments
-apiRouter.post('/task_comments',taskController. taskComments);
+apiRouter.post('/comments',commentsController. addComments);
+apiRouter.put('/comments/:id',commentsController. updateComments);
+apiRouter.delete('/comments/:id',commentsController. deleteComments);
 
+
+
+
+//common
+apiRouter.get('/getDropDownList',commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix
