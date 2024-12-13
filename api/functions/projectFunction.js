@@ -3,31 +3,11 @@ const db = require("../../config/db");
 const {
   successResponse,
   errorResponse,
+  getPagination
 } = require("../../helpers/responseHelper");
-const {projectSchema}=require("../../validators/projectValidator")
+const { projectSchema } = require("../../validators/projectValidator");
 
 
-const getPagination = (page, perPage, totalRecords) => {
-    page = parseInt(page, 10);
-    const totalPages = Math.ceil(totalRecords / perPage);
-    const nextPage = page < totalPages ? page + 1 : null;
-    const prevPage = page > 1 ? page - 1 : null;
-  
-    // Calculate range
-    const startRecord = (page - 1) * perPage + 1;
-    const endRecord = Math.min(page * perPage, totalRecords); // Ensure it doesn't exceed total records
-  
-    return {
-      total_records: totalRecords,
-      total_pages: totalPages,
-      current_page: page,
-      per_page: perPage,
-      range_from: `Showing ${startRecord}-${endRecord} of ${totalRecords} entries`,
-      next_page: nextPage,
-      prev_page: prevPage,
-    };
-  };
-  
 // Create Project
 exports.createProject = async (payload, res) => {
     const { name, product,user_id } = payload;
@@ -44,15 +24,19 @@ exports.createProject = async (payload, res) => {
     return errorResponse(res, errorMessages, "Validation Error", 400);
   }
   try {
-
     const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ?";
     const [checkResult] = await db.query(checkQuery, [name]);
 
     if (checkResult[0].count > 0) {
-      return errorResponse(res, "Project with this name already exists", "Duplicate Project Error", 400);
+      return errorResponse(
+        res,
+        "Project with this name already exists",
+        "Duplicate Project Error",
+        400
+      );
     }
     const checkProduct =
-    "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
+      "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
         return errorResponse(res, "Product Not Found", "Product Not Found", 404);
@@ -62,10 +46,15 @@ exports.createProject = async (payload, res) => {
     const values = [name, product, user_id, user_id];
     const [result] = await db.query(query, values);
 
-    return successResponse(res, { id: result.insertId, name }, 'Project added successfully', 201);
+    return successResponse(
+      res,
+      { id: result.insertId, name },
+      "Project added successfully",
+      201
+    );
   } catch (error) {
-    console.error('Error inserting project:', error.message);
-    return errorResponse(res, error.message, 'Error inserting project', 500);
+    console.error("Error inserting project:", error.message);
+    return errorResponse(res, error.message, "Error inserting project", 500);
   }
 };
 
@@ -86,14 +75,20 @@ exports.updateProject = async (id, payload, res) => {
   }
 
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL";
+    const checkQuery =
+      "SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
-      return errorResponse(res, "Project not found or deleted", "Not Found", 404);
+      return errorResponse(
+        res,
+        "Project not found or deleted",
+        "Not Found",
+        404
+      );
     }
     const checkProduct =
-    "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
+      "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
         return errorResponse(res, "Product Not Found", "Product Not Found", 404);
@@ -102,26 +97,35 @@ exports.updateProject = async (id, payload, res) => {
     const values = [name, product, user_id, id];
     await db.query(query, values);
 
-    return successResponse(res, { id, name }, 'Project updated successfully', 200);
+    return successResponse(
+      res,
+      { id, name },
+      "Project updated successfully",
+      200
+    );
   } catch (error) {
-    console.error('Error updating project:', error.message);
-    return errorResponse(res, error.message, 'Error updating project', 500);
+    console.error("Error updating project:", error.message);
+    return errorResponse(res, error.message, "Error updating project", 500);
   }
 };
 
 // Delete Project
 exports.deleteProject = async (id, res) => {
   try {
-    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL";
+    const checkQuery =
+      "SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 
     if (checkResult[0].count === 0) {
-      return errorResponse(res, "Project not found or already deleted", "Not Found", 404);
+      return errorResponse(
+        res,
+        "Project not found or already deleted",
+        "Not Found",
+        404
+      );
     }
     const checkReferencesQuery = `SELECT COUNT(*) as count FROM tasks WHERE project_id = ?`;
-    const [checkReferencesResult] = await db
-      
-      .query(checkReferencesQuery, [id]);
+    const [checkReferencesResult] = await db.query(checkReferencesQuery, [id]);
 
     if (checkReferencesResult[0].count > 0) {
       return errorResponse(
@@ -134,10 +138,10 @@ exports.deleteProject = async (id, res) => {
     const query = "UPDATE projects SET deleted_at = NOW() WHERE id = ?";
     await db.query(query, [id]);
 
-    return successResponse(res, { id }, 'Project deleted successfully', 200);
+    return successResponse(res, { id }, "Project deleted successfully", 200);
   } catch (error) {
-    console.error('Error deleting project:', error.message);
-    return errorResponse(res, error.message, 'Error deleting project', 500);
+    console.error("Error deleting project:", error.message);
+    return errorResponse(res, error.message, "Error deleting project", 500);
   }
 };
 
@@ -148,19 +152,24 @@ exports.getProject = async (id, res) => {
     const [result] = await db.query(query, [id]);
 
     if (result.length === 0) {
-      return errorResponse(res, "Project not found or deleted", "Not Found", 404);
+      return errorResponse(
+        res,
+        "Project not found or deleted",
+        "Not Found",
+        404
+      );
     }
 
-    return successResponse(res, result[0], 'Project fetched successfully', 200);
+    return successResponse(res, result[0], "Project fetched successfully", 200);
   } catch (error) {
-    console.error('Error fetching project:', error.message);
-    return errorResponse(res, error.message, 'Error fetching project', 500);
+    console.error("Error fetching project:", error.message);
+    return errorResponse(res, error.message, "Error fetching project", 500);
   }
 };
 
 // Get All Projects
 exports.getAllProjects = async (queryParams, res) => {
-  const { search, page , perPage = 10 } = queryParams;
+  const { search, page, perPage = 10 } = queryParams;
 
   let query = `SELECT 
         projects.*, 
@@ -169,7 +178,7 @@ exports.getAllProjects = async (queryParams, res) => {
       LEFT JOIN products ON projects.product_id = products.id
       WHERE projects.deleted_at IS NULL
     `;
-  let countQuery =  `
+  let countQuery = `
   SELECT 
     COUNT(*) AS total 
   FROM projects
@@ -195,240 +204,469 @@ exports.getAllProjects = async (queryParams, res) => {
     const [countResult] = await db.query(countQuery, queryParamsArray);
     const totalRecords = countResult[0].total;
     const rowsWithSerialNo = rows.map((row, index) => ({
-        s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
-        ...row,
+      s_no:
+        page && perPage
+          ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1
+          : index + 1,
+      ...row,
     }));
-  
-    const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
 
-    return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No projects found' : 'Projects fetched successfully', 200, pagination);
+    const pagination =
+      page && perPage ? getPagination(page, perPage, totalRecords) : null;
+
+    return successResponse(
+      res,
+      rowsWithSerialNo,
+      rowsWithSerialNo.length === 0
+        ? "No projects found"
+        : "Projects fetched successfully",
+      200,
+      pagination
+    );
   } catch (error) {
-    console.error('Error fetching all projects:', error.message);
-    return errorResponse(res, error.message, 'Error fetching all projects', 500);
+    console.error("Error fetching all projects:", error.message);
+    return errorResponse(
+      res,
+      error.message,
+      "Error fetching all projects",
+      500
+    );
+  }
+};
+exports.projectStatus = async (req, res) => {
+  try {
+    const {
+      product_id,
+      project_id,
+      user_id,
+      date,
+      status = 0,
+      search,
+    } = req.query;
+
+    let query = `
+        SELECT 
+          t.id AS task_id,
+          t.name AS task_name,
+          t.estimated_hours AS task_estimated_hours,
+          t.total_hours_worked AS task_total_hours_worked,
+          t.updated_at AS task_updated_at,
+          tsut.start_time AS task_start_time,
+          tsut.end_time AS task_end_time,
+          u.id AS user_id,
+          u.first_name AS user_name,
+          u.employee_id AS employee_id,
+          p.id AS product_id,
+          p.name AS product_name,
+          pr.id AS project_id,
+          pr.name AS project_name,
+          st.id AS subtask_id,
+          st.name AS subtask_name,
+          st.estimated_hours AS subtask_estimated_hours,
+          st.total_hours_worked AS subtask_total_hours_worked,
+          st.updated_at AS subtask_updated_at,
+          tsut_sub.start_time AS subtask_start_time,
+          tsut_sub.end_time AS subtask_end_time,
+          DATE(t.created_at) AS task_date,
+          t.status AS task_status
+        FROM 
+          tasks t
+        LEFT JOIN 
+          users u ON u.id = t.user_id
+        LEFT JOIN 
+          products p ON p.id = t.product_id
+        LEFT JOIN 
+          projects pr ON pr.id = t.project_id
+        LEFT JOIN 
+          sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
+        LEFT JOIN 
+          sub_tasks_user_timeline tsut ON tsut.task_id = t.id AND tsut.deleted_at IS NULL
+        LEFT JOIN 
+          sub_tasks_user_timeline tsut_sub ON tsut_sub.subtask_id = st.id AND tsut_sub.deleted_at IS NULL
+        WHERE 
+          t.deleted_at IS NULL
+          ${product_id ? `AND (t.product_id = ? OR st.product_id = ?)` : ""}  
+          ${project_id ? `AND (t.project_id = ? OR st.project_id = ?)` : ""}  
+          ${user_id ? `AND t.user_id = ?` : ""}  
+          ${date ? `AND DATE(t.created_at) = ?` : ""}
+          ${status !== undefined ? `AND t.status = ?` : ""}  
+          ${search ? `AND (t.name LIKE ? OR st.name LIKE ?)` : ""}  
+      `;
+
+    const values = [];
+    if (product_id) {
+      values.push(product_id);
+      values.push(product_id);
+    }
+    if (project_id) {
+      values.push(project_id);
+      values.push(project_id);
+    }
+    if (user_id) values.push(user_id);
+    if (date) values.push(date);
+    if (status !== undefined) values.push(status);
+    if (search) {
+      const searchTerm = `%${search}%`;
+      values.push(searchTerm);
+      values.push(searchTerm);
+    }
+
+    const [result] = await db.execute(query, values);
+
+    const data = result.map((row) => {
+      const taskStartTime = row.task_start_time
+        ? moment(row.task_start_time).format("YYYY-MM-DD HH:mm:ss")
+        : "Not started";
+      const taskEndTime = row.task_end_time
+        ? moment(row.task_end_time).format("YYYY-MM-DD HH:mm:ss")
+        : "Not completed";
+
+      const subtaskStartTime = row.subtask_start_time
+        ? moment(row.subtask_start_time).format("YYYY-MM-DD HH:mm:ss")
+        : "Not started";
+      const subtaskEndTime = row.subtask_end_time
+        ? moment(row.subtask_end_time).format("YYYY-MM-DD HH:mm:ss")
+        : "Not completed";
+
+      return {
+        task_name: row.task_name || row.subtask_name,
+        task_start_time: taskStartTime,
+        task_end_time: taskEndTime,
+        subtask_start_time: subtaskStartTime,
+        subtask_end_time: subtaskEndTime,
+        estimated_time: row.task_estimated_hours || row.subtask_estimated_hours,
+        task_duration: row.task_updated_at
+          ? moment(row.task_updated_at).fromNow()
+          : "Not started",
+        user_id: row.user_id,
+        employee_id: row.employee_id,
+        assignee: row.user_name,
+        product_id: row.product_id,
+        product_name: row.product_name,
+        project_id: row.project_id,
+        project_name: row.project_name,
+        task_date: moment(row.task_date).format("YYYY-MM-DD"),
+        task_status:
+          row.task_status === 0
+            ? "TO DO"
+            : row.task_status === 1
+            ? "In Progress"
+            : "Done",
+      };
+    });
+
+    successResponse(
+      res,
+      data,
+      data.length === 0
+        ? "No tasks or subtasks found"
+        : "Tasks and subtasks retrieved successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Error fetching tasks and subtasks:", error);
+    return errorResponse(res, error.message, "Server error", 500);
+  }
+};
+
+exports.projectRequest = async (req, res) => {
+  try {
+    const { project_id, user_id, date, search, page = 1, perPage = 10 } = req.query;
+    const offset = (page - 1) * perPage;
+
+    const taskConditions = [];
+    const taskValues = [];
+
+    const subtaskConditions = [];
+    const subtaskValues = [];
+
+    // Task-specific filters
+    if (project_id) {
+      taskConditions.push("t.project_id = ?");
+      taskValues.push(project_id);
+    }
+    if (user_id) {
+      taskConditions.push("t.user_id = ?");
+      taskValues.push(user_id);
+    }
+    if (date) {
+      taskConditions.push("DATE(t.created_at) = ?");
+      taskValues.push(date);
+    }
+    if (search) {
+      const searchTerm = `%${search}%`;
+      taskConditions.push(
+        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
+      );
+      taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    // Subtask-specific filters
+    if (project_id) {
+      subtaskConditions.push("st.project_id = ?");
+      subtaskValues.push(project_id);
+    }
+    if (user_id) {
+      subtaskConditions.push("st.user_id = ?");
+      subtaskValues.push(user_id);
+    }
+    if (date) {
+      subtaskConditions.push("DATE(st.created_at) = ?");
+      subtaskValues.push(date);
+    }
+    if (search) {
+      const searchTerm = `%${search}%`;
+      subtaskConditions.push(
+        `(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
+      );
+      subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    const taskWhereClause =
+      taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
+    const subtaskWhereClause =
+      subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
+
+    // Query to fetch subtasks with status = 2
+    const subtasksQuery = `
+      SELECT 
+        pr.name AS project_name,
+        st.name AS name,
+        tm.name AS team_name,
+        DATE_FORMAT(st.created_at, '%Y-%m-%d') AS date,
+        r_assigned.name AS assigned_by_designation,
+        'Subtask' AS type,
+        t.id AS task_id,
+        st.id AS subtask_id,
+        st.user_id AS subtask_user_id
+      FROM 
+        sub_tasks st
+      LEFT JOIN 
+        tasks t ON t.id = st.task_id
+      LEFT JOIN 
+        users u ON u.id = st.user_id
+      LEFT JOIN 
+        projects pr ON pr.id = t.project_id
+      LEFT JOIN 
+        teams tm ON tm.id = u.team_id
+      LEFT JOIN 
+        users u_assigned ON u_assigned.id = t.assigned_user_id
+      LEFT JOIN 
+        roles r_assigned ON r_assigned.id = u_assigned.role_id
+      WHERE 
+        st.status = 2
+        AND st.deleted_at IS NULL
+        ${subtaskWhereClause}
+    `;
+
+    // Query to fetch tasks without subtasks
+    const tasksQuery = `
+      SELECT 
+        pr.name AS project_name,
+        t.name AS name,
+        tm.name AS team_name,
+        DATE_FORMAT(t.created_at, '%Y-%m-%d') AS date,
+        r_assigned.name AS assigned_by_designation,
+        'Task' AS type,
+        t.id AS task_id,
+        NULL AS subtask_id,
+        t.user_id AS task_user_id
+      FROM 
+        tasks t
+      LEFT JOIN 
+        users u ON u.id = t.user_id
+      LEFT JOIN 
+        projects pr ON pr.id = t.project_id
+      LEFT JOIN 
+        teams tm ON tm.id = u.team_id
+      LEFT JOIN 
+        users u_assigned ON u_assigned.id = t.assigned_user_id
+      LEFT JOIN 
+        roles r_assigned ON r_assigned.id = u_assigned.role_id
+      WHERE 
+        t.deleted_at IS NULL
+        AND t.status = 2
+        AND t.id NOT IN (SELECT task_id FROM sub_tasks)
+        ${taskWhereClause}
+    `;
+
+    // Execute both queries
+    const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+    const [tasks] = await db.query(tasksQuery, taskValues);
+
+    // Combine the results
+    const mergedResults = [...subtasks, ...tasks];
+
+    // Fetch assignee names and remove user_id
+    const processedData = await Promise.all(
+      mergedResults.map(async (item) => {
+        const assigneeUserId = item.subtask_id
+          ? item.subtask_user_id
+          : item.task_user_id;
+        const assigneeNameQuery = `SELECT COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS assignee_name FROM users WHERE id = ?`;
+        const [results] = await db.query(assigneeNameQuery, [assigneeUserId]);
+        item.assignee_name = results[0] ? results[0].assignee_name : "Unknown";
+        delete item.user_id;
+        return item;
+      })
+    );
+
+    // Pagination logic
+    const totalRecords = processedData.length;
+    const paginatedData = processedData.slice(offset, offset + parseInt(perPage));
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    // Add serial numbers to the paginated data
+    const data = paginatedData.map((row, index) => ({
+      s_no: offset + index + 1,
+      ...row,
+    }));
+
+    successResponse(
+      res,
+      data,
+      data.length === 0 ? "No tasks or subtasks found" : "Tasks and subtasks retrieved successfully",
+      200,
+      pagination
+    );
+  } catch (error) {
+    console.error("Error fetching tasks and subtasks:", error);
+    return errorResponse(res, error.message, "Server error", 500);
   }
 };
 
 
-exports.projectStatus = async (req, res) => {
-    try {
-      const { product_id, project_id, user_id, date, status = 0, search } = req.query;
-  
-      let query = `
-        SELECT 
-          t.id AS task_id,
-          t.name AS task_name,
-          t.estimated_hours AS task_estimated_hours,
-          t.total_hours_worked AS task_total_hours_worked,
-          t.updated_at AS task_updated_at,
-          tsut.start_time AS task_start_time,
-          tsut.end_time AS task_end_time,
-          u.id AS user_id,
-          u.first_name AS user_name,
-          u.employee_id AS employee_id,
-          p.id AS product_id,
-          p.name AS product_name,
-          pr.id AS project_id,
-          pr.name AS project_name,
-          st.id AS subtask_id,
-          st.name AS subtask_name,
-          st.estimated_hours AS subtask_estimated_hours,
-          st.total_hours_worked AS subtask_total_hours_worked,
-          st.updated_at AS subtask_updated_at,
-          tsut_sub.start_time AS subtask_start_time,
-          tsut_sub.end_time AS subtask_end_time,
-          DATE(t.created_at) AS task_date,
-          t.status AS task_status
-        FROM 
-          tasks t
-        LEFT JOIN 
-          users u ON u.id = t.user_id
-        LEFT JOIN 
-          products p ON p.id = t.product_id
-        LEFT JOIN 
-          projects pr ON pr.id = t.project_id
-        LEFT JOIN 
-          sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-        LEFT JOIN 
-          sub_tasks_user_timeline tsut ON tsut.task_id = t.id AND tsut.deleted_at IS NULL
-        LEFT JOIN 
-          sub_tasks_user_timeline tsut_sub ON tsut_sub.subtask_id = st.id AND tsut_sub.deleted_at IS NULL
-        WHERE 
-          t.deleted_at IS NULL
-          ${product_id ? `AND (t.product_id = ? OR st.product_id = ?)` : ""}  
-          ${project_id ? `AND (t.project_id = ? OR st.project_id = ?)` : ""}  
-          ${user_id ? `AND t.user_id = ?` : ""}  
-          ${date ? `AND DATE(t.created_at) = ?` : ""}
-          ${status !== undefined ? `AND t.status = ?` : ""}  
-          ${search ? `AND (t.name LIKE ? OR st.name LIKE ?)` : ""}  
-      `;
-  
-      const values = [];
-      if (product_id) {
-        values.push(product_id);  
-        values.push(product_id); 
-      }
-      if (project_id) {
-        values.push(project_id);  
-        values.push(project_id); 
-      }
-      if (user_id) values.push(user_id);  
-      if (date) values.push(date);
-      if (status !== undefined) values.push(status);
-      if (search) {
-        const searchTerm = `%${search}%`; 
-        values.push(searchTerm);  
-        values.push(searchTerm);  
-      }
-  
-      const [result] = await db.execute(query, values);
-  
-      const data = result.map((row) => {
-        const taskStartTime = row.task_start_time ? moment(row.task_start_time).format("YYYY-MM-DD HH:mm:ss") : "Not started";
-        const taskEndTime = row.task_end_time ? moment(row.task_end_time).format("YYYY-MM-DD HH:mm:ss") : "Not completed";
-        
-        const subtaskStartTime = row.subtask_start_time ? moment(row.subtask_start_time).format("YYYY-MM-DD HH:mm:ss") : "Not started";
-        const subtaskEndTime = row.subtask_end_time ? moment(row.subtask_end_time).format("YYYY-MM-DD HH:mm:ss") : "Not completed";
-  
-        return {
-          task_name: row.task_name || row.subtask_name,  
-          task_start_time: taskStartTime,
-          task_end_time: taskEndTime,
-          subtask_start_time: subtaskStartTime,
-          subtask_end_time: subtaskEndTime,
-          estimated_time: row.task_estimated_hours || row.subtask_estimated_hours,
-          task_duration: row.task_updated_at ? moment(row.task_updated_at).fromNow() : "Not started",
-          user_id: row.user_id,
-          employee_id: row.employee_id,
-          assignee: row.user_name,
-          product_id: row.product_id,
-          product_name: row.product_name,
-          project_id: row.project_id,
-          project_name: row.project_name,
-          task_date: moment(row.task_date).format("YYYY-MM-DD"),
-          task_status: row.task_status === 0 ? 'TO DO' : row.task_status === 1 ? 'In Progress' : 'Done',
-        };
-      });
-  
-      successResponse(
+exports.getRequestupdate = async (req, res) => {
+  try {
+    const { type, id } = req.query;
+
+    // Validate type and id
+    if (!type) {
+      return errorResponse(res, null, 'Type is required', 400);
+    }
+    if (!id) {
+      return errorResponse(res, null, 'ID is required', 400);
+    }
+
+    let result;
+
+    // Handle task or subtask based on type
+    if (type === 'task') {
+      const query = "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL";
+      [result] = await db.query(query, [id]);
+    } else if (type === 'subtask') {
+      const query = "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL";
+      [result] = await db.query(query, [id]);
+    } else {
+      return errorResponse(res, null, 'Invalid type. It should be either "task" or "subtask".', 400);
+    }
+
+    // If no result is found, return an error
+    if (result.length === 0) {
+      return errorResponse(
         res,
-        data,
-        data.length === 0 ? "No tasks or subtasks found" : "Tasks and subtasks retrieved successfully",
+        `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
+        "Not Found",
+        404
+      );
+    }
+
+    // Return the result if found
+    return successResponse(
+      res,
+      result[0],
+      `${type.charAt(0).toUpperCase() + type.slice(1)} fetched successfully`,
+      200
+    );
+  } catch (error) {
+    console.error("Error fetching project:", error.message);
+    return errorResponse(res, error.message, "Error fetching project", 500);
+  }
+};
+
+exports.getRequestchange = async (id, payload, res) => {
+  const { type, remark, rating, action } = payload;
+
+  if (!type || !action) {
+    return errorResponse(res, null, 'Type and action are required', 400);
+  }
+
+  const validType = ['task', 'subtask'];
+  if (!validType.includes(type)) {
+    return errorResponse(res, null, 'Invalid type. It should be either task or subtask.', 400);
+  }
+
+  const validActions = ['reopen', 'close'];
+  if (!validActions.includes(action)) {
+    return errorResponse(res, null, 'Invalid action. It should be either reopen or close.', 400);
+  }
+
+  try {
+    let table = '';
+    let updateQuery = '';
+    let statusToSet;
+    let reopenstatusToSet;
+
+    if (type === 'task' || type === 'subtask') {
+      table = type === 'task' ? 'tasks' : 'sub_tasks';
+
+      if (action === 'reopen') {
+        statusToSet = 0;
+        reopenstatusToSet = 1;
+      } else if (action === 'close') {
+        statusToSet = 3;
+        reopenstatusToSet = 0;
+      }
+
+      let fieldsToUpdate = ['status = ?', 'reopen_status = ?'];
+      let values = [statusToSet, reopenstatusToSet];
+
+      if (remark !== undefined) {
+        fieldsToUpdate.push('remark = ?');
+        values.push(remark);
+      }
+
+      if (rating !== undefined) {
+        fieldsToUpdate.push('rating = ?');
+        values.push(rating);
+      }
+
+      updateQuery = `
+        UPDATE ${table}
+        SET ${fieldsToUpdate.join(', ')}
+        WHERE id = ? AND deleted_at IS NULL
+      `;
+      
+      values.push(id);
+
+      const [updateResult] = await db.query(updateQuery, values);
+
+      if (updateResult.affectedRows === 0) {
+        return errorResponse(
+          res,
+          `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
+          'Not Found',
+          404
+        );
+      }
+
+      // Return success response
+      return successResponse(
+        res,
+        { id },
+        `Project request for ${type.charAt(0) + type.slice(1)} updated successfully`,
         200
       );
-    } catch (error) {
-      console.error("Error fetching tasks and subtasks:", error);
-      return errorResponse(res, error.message, "Server error", 500);
+    } else {
+      return errorResponse(res, null, 'Invalid type. It should be either "task" or "subtask".', 400);
     }
-  };
-exports.projectRequest = async (req, res) => {
-    try {
-      const { product_id, project_id, user_id, date, status = 0, search } = req.query;
-  
-      let query = `
-        SELECT 
-          t.id AS task_id,
-          t.name AS task_name,
-          t.estimated_hours AS task_estimated_hours,
-          t.total_hours_worked AS task_total_hours_worked,
-          t.updated_at AS task_updated_at,
-          tsut.start_time AS task_start_time,
-          tsut.end_time AS task_end_time,
-          u.id AS user_id,
-          u.first_name AS user_name,
-          u.employee_id AS employee_id,
-          p.id AS product_id,
-          p.name AS product_name,
-          pr.id AS project_id,
-          pr.name AS project_name,
-          st.id AS subtask_id,
-          st.name AS subtask_name,
-          st.estimated_hours AS subtask_estimated_hours,
-          st.total_hours_worked AS subtask_total_hours_worked,
-          st.updated_at AS subtask_updated_at,
-          tsut_sub.start_time AS subtask_start_time,
-          tsut_sub.end_time AS subtask_end_time,
-          DATE(t.created_at) AS task_date,
-          t.status AS task_status
-        FROM 
-          tasks t
-        LEFT JOIN 
-          users u ON u.id = t.user_id
-        LEFT JOIN 
-          products p ON p.id = t.product_id
-        LEFT JOIN 
-          projects pr ON pr.id = t.project_id
-        LEFT JOIN 
-          sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-        LEFT JOIN 
-          sub_tasks_user_timeline tsut ON tsut.task_id = t.id AND tsut.deleted_at IS NULL
-        LEFT JOIN 
-          sub_tasks_user_timeline tsut_sub ON tsut_sub.subtask_id = st.id AND tsut_sub.deleted_at IS NULL
-        WHERE 
-          t.deleted_at IS NULL
-          ${product_id ? `AND (t.product_id = ? OR st.product_id = ?)` : ""}  
-          ${project_id ? `AND (t.project_id = ? OR st.project_id = ?)` : ""}  
-          ${user_id ? `AND t.user_id = ?` : ""}  
-          ${date ? `AND DATE(t.created_at) = ?` : ""}
-          ${status !== undefined ? `AND t.status = ?` : ""}  
-          ${search ? `AND (t.name LIKE ? OR st.name LIKE ?)` : ""}  
-      `;
-  
-      const values = [];
-      if (product_id) {
-        values.push(product_id);  
-        values.push(product_id); 
-      }
-      if (project_id) {
-        values.push(project_id);  
-        values.push(project_id); 
-      }
-      if (user_id) values.push(user_id);  
-      if (date) values.push(date);
-      if (status !== undefined) values.push(status);
-      if (search) {
-        const searchTerm = `%${search}%`; 
-        values.push(searchTerm);  
-        values.push(searchTerm);  
-      }
-  
-      const [result] = await db.execute(query, values);
-  
-      const data = result.map((row) => {
-        const taskStartTime = row.task_start_time ? moment(row.task_start_time).format("YYYY-MM-DD HH:mm:ss") : "Not started";
-        const taskEndTime = row.task_end_time ? moment(row.task_end_time).format("YYYY-MM-DD HH:mm:ss") : "Not completed";
-        
-        const subtaskStartTime = row.subtask_start_time ? moment(row.subtask_start_time).format("YYYY-MM-DD HH:mm:ss") : "Not started";
-        const subtaskEndTime = row.subtask_end_time ? moment(row.subtask_end_time).format("YYYY-MM-DD HH:mm:ss") : "Not completed";
-  
-        return {
-          task_name: row.task_name || row.subtask_name,  
-          task_start_time: taskStartTime,
-          task_end_time: taskEndTime,
-          subtask_start_time: subtaskStartTime,
-          subtask_end_time: subtaskEndTime,
-          estimated_time: row.task_estimated_hours || row.subtask_estimated_hours,
-          task_duration: row.task_updated_at ? moment(row.task_updated_at).fromNow() : "Not started",
-          user_id: row.user_id,
-          employee_id: row.employee_id,
-          assignee: row.user_name,
-          product_id: row.product_id,
-          product_name: row.product_name,
-          project_id: row.project_id,
-          project_name: row.project_name,
-          task_date: moment(row.task_date).format("YYYY-MM-DD"),
-          task_status: row.task_status === 0 ? 'TO DO' : row.task_status === 1 ? 'In Progress' : 'Done',
-        };
-      });
-  
-      successResponse(
-        res,
-        data,
-        data.length === 0 ? "No tasks or subtasks found" : "Tasks and subtasks retrieved successfully",
-        200
-      );
-    } catch (error) {
-      console.error("Error fetching tasks and subtasks:", error);
-      return errorResponse(res, error.message, "Server error", 500);
-    }
-  };
-   
+  } catch (error) {
+    console.error('Error updating task or subtask:', error.message);
+    return errorResponse(res, error.message, 'Error updating task or subtask', 500);
+  }
+};
+
+
+
+
+

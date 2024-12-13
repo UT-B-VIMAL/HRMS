@@ -5,7 +5,9 @@ const {
   getProject, 
   getAllProjects,
   projectRequest,
-  projectStatus
+  projectStatus,
+  getRequestupdate,
+  getRequestchange
 } = require('../api/functions/projectFunction');
 const {errorResponse}  = require('../helpers/responseHelper');
 
@@ -75,7 +77,23 @@ project_request: async (req, res) => {
   try {
     await projectRequest(req,res);
 } catch (error) {
-    return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
+    return errorResponse(res, error.message, 'Error retrieving Project request', 500);
+}
+},
+project_requestupdate: async (req, res) => {
+  try {
+    await getRequestupdate(req,res);
+} catch (error) {
+    return errorResponse(res, error.message, 'Error retrieving task or subtask data', 500);
+}
+},
+project_requestchange: async (req, res) => {
+  try {
+        const { id } = req.params;
+        const payload = req.body;
+        await getRequestchange(id, payload, res);
+} catch (error) {
+    return errorResponse(res, error.message, 'Error updating task or subtask', 500);
 }
 },
 

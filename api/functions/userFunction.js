@@ -31,6 +31,7 @@ exports.createUser = async (payload, res) => {
       created_by, updated_by
     ];
     const [result] = await db.query(query, values);
+    
     const roleName = await getRoleName(role_id);
 
     // Prepare Keycloak user data
@@ -52,7 +53,7 @@ exports.createUser = async (payload, res) => {
     };
 
     // Create the user in Keycloak
-    const userId = await createUserInKeycloak(keycloakUserData);
+   const userId = await createUserInKeycloak(keycloakUserData);
 
     // If Keycloak user creation fails
     if (!userId) {
@@ -256,11 +257,24 @@ exports.deleteUser = async (id, res) => {
   }
 };
 
-
 const getRoleName = async (roleId) => {
-  const query = "SELECT name FROM roles WHERE id = ?";
-  const values = [roleId];
-  const [result] = await db.query(query, values);
-  return result.length > 0 ? result[0].role : null;
+  try {
+    const query = "SELECT role FROM roles WHERE id = ?"; // Select 'role' column
+    const values = [roleId];
+    const [result] = await db.query(query, values);
+
+    console.log("Query Result:", result); // Log the result for debugging
+
+    if (result.length === 0) {
+      console.log(`No role found for roleId: ${roleId}`);
+      return null;  // Or you can return a default role or throw an error
+    }
+
+    return result[0].role;
+  } catch (error) {
+    console.error('Error fetching role name:', error.message);
+    return null;  // Or handle error as needed
+  }
 };
+
 

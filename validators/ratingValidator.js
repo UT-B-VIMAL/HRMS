@@ -35,8 +35,8 @@ const ratingSchema = Joi.object({
     .integer()
     .required()
     .messages({
-      "any.required": "The 'user_id' field is required.",
-      "number.base": "The 'user_id' field must be a valid integer.",
+      "any.required": "The 'updated_by' field is required.",
+      "number.base": "The 'updated_by' field must be a valid integer.",
     }),
 });
 
