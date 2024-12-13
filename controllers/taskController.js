@@ -1,4 +1,4 @@
-const { createTask, updateTask, deleteTask, getTask, getAllTasks,updateTaskData,getTaskList,updateTaskTimeLine } = require('../api/functions/taskFunction');
+const { createTask, updateTask, deleteTask, getTask, getAllTasks,updateTaskData,getTaskList,updateTaskTimeLine,doneTaskList } = require('../api/functions/taskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const { createTaskSchema, updateTaskSchema,updateTaskDataSchema } = require("../validators/taskValidator");
 const Joi = require('joi');
@@ -122,6 +122,19 @@ const taskController = {
       return errorResponse(res, error.message, 'Error fetching task', 500);
     }
   },
+
+
+ doneTask:async (req, res) => {
+  try {
+    
+    await doneTaskList(req,res);
+
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error fetching task', 500);
+  }
+  },
+
+
   updateTaskTimeLineStatus: async (req, res) => {
     // try {
       await updateTaskTimeLine(req,res);
@@ -131,8 +144,6 @@ const taskController = {
     // }
   },
 };
-
-
 
 module.exports = taskController;
 
