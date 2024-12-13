@@ -5,7 +5,7 @@ const {attendanceValidator}=  require("../validators/AttendanceValidator")
 
 exports.getAttendanceList = async (req, res) => {
     try {
-      const { search, status, date, page = 1, size = 10 } = req.body;
+      const { search, status, date, page = 1, size = 10 } = req.query;
   
       // Ensure `page` and `size` are numbers and default values are handled
       const pageNum = Math.max(parseInt(page, 10), 1);
