@@ -86,6 +86,8 @@ apiRouter.get('/projects/:id', projectController.getProject);
 apiRouter.get('/projects', projectController.getAllProjects);
 apiRouter.get('/project_status', projectController.project_status);
 apiRouter.get('/project_request', projectController.project_request);
+apiRouter.get('/project_requestupdate', projectController.project_requestupdate);
+apiRouter.put('/project_requestchange/:id', projectController.project_requestchange);
 
 // Team Routes
 apiRouter.post('/team', teamController.createTeam);
