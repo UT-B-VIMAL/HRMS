@@ -50,3 +50,17 @@ exports.getAllData = async (payload, res) => {
             return errorResponse(res, err.message, 'Error fetching Data', 500);
     }
 };
+exports.getAuthUserDetails = async (res,authUserId) => {
+    try {
+      const authUserQuery = "SELECT * FROM users WHERE deleted_at IS NULL AND id = ?";
+      const [authUserDetails] = await db.query(authUserQuery, [authUserId]);
+  
+      if (!authUserDetails.length) {
+        return errorResponse(res,"Authenticated User Id not found", 'Authenticated User Id not found', 500);
+      }
+  
+      return authUserDetails[0]; // Return the first user object
+    } catch (error) {
+        return errorResponse(res, error.message, 'Error fetching USer', 500);
+    }
+  };

@@ -109,6 +109,7 @@ apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id', taskController.updateDatas);
 apiRouter.get('/getTaskDatas', taskController.getTaskDatas);
+apiRouter.post('/updateTaskTimeLineStatus', taskController.updateTaskTimeLineStatus);
 
 
 // Subtask Routes

@@ -3,6 +3,11 @@ const {
   successResponse,
   errorResponse,
 } = require("../../helpers/responseHelper");
+const {getAuthUserDetails} = require("../../api/functions/commonFunction")
+const moment = require('moment');
+const{
+  updateTimelineShema
+}  = require("../../validators/taskValidator")
 
 // Insert Task
 exports.createTask = async (payload, res) => {
@@ -706,10 +711,10 @@ exports.deleteTask = async (id, res) => {
 
 
 const convertToSeconds = (timeString) => {
-  const [hours, minutes, seconds] = timeString.split(':').map(Number);
-  return (hours * 3600) + (minutes * 60) + (seconds || 0);
-};
 
+const [hours, minutes, seconds] = timeString.split(':').map(Number);
+return hours * 3600 + minutes * 60 + seconds;
+}
 const calculateTimeLeft = (estimatedHours, totalHoursWorked, timeDifference) => {
   const estimatedInSeconds = convertToSeconds(estimatedHours || '00:00:00');
   const workedInSeconds = convertToSeconds(totalHoursWorked || '00:00:00');
@@ -738,6 +743,7 @@ const lastActiveTask = async (userId) => {
     if (lastActiveTaskRows.length === 0) return null;
 
     const task = lastActiveTaskRows[0];
+    
     const lastStartTime = moment(task.start_time);
     const now = moment();
     const timeDifference = now.diff(lastStartTime, 'seconds'); // Calculate the difference in seconds
@@ -771,14 +777,16 @@ const lastActiveTask = async (userId) => {
   };
 
   exports.getTaskList = async (queryParams, res) => {
-    const authUser = { id: 61, role_id: 2}; 
-    const {user_id,search,product_id,project_id,team_id,priority}=queryParams
+    const {user_id,search,product_id,project_id,project_dropdown,product_dropdown,team_id,priority}=queryParams;
+    const authUserDetails = await getAuthUserDetails(res,user_id);
+    console.log(authUserDetails.id);
+    console.log(authUserDetails.role_id);
+
     const searchTerm = search ? `%${search}%` : null;
-    //  const authuser = 
     try {
       const [teamIds] = await db.query(
         `SELECT id FROM teams WHERE reporting_user_id = ?`,
-        [authUser.id]
+        [authUserDetails.id]
       );
   
       const teamIdsList = teamIds.map((team) => team.id);
@@ -786,25 +794,27 @@ const lastActiveTask = async (userId) => {
       let whereConditions = [];
       let queryParams = [];
   
-      if (authUser.role_id === 3) {
+      if (authUserDetails.role_id === 3) {
         whereConditions.push('t.team_id IN (?)');
         queryParams.push(teamIdsList.length ? teamIdsList : undefined);
       }
   
-      if (authUser.role_id === 4) {
+      if (authUserDetails.role_id === 4) {
         whereConditions.push('(t.user_id = ? OR s.user_id = ?)');
-        queryParams.push(authUser.id, authUser.id);
+        queryParams.push(authUserDetails.id, authUserDetails.id);
       }
       if (product_id) {
         whereConditions.push('t.product_id = ?');
         queryParams.push(product_id);
       }
-  
-      if (project_id) {
-        whereConditions.push('t.project_id = ?');
-        queryParams.push(project_id);
+      if (product_dropdown) {
+        whereConditions.push('t.product_id IN (?)');
+        queryParams.push(product_dropdown.split(',')); 
       }
-  
+      if (project_dropdown) {
+        whereConditions.push('t.project_id IN (?)');
+        queryParams.push(project_dropdown.split(',')); 
+      }
       if (team_id) {
         whereConditions.push('t.team_id = ?');
         queryParams.push(team_id);
@@ -813,6 +823,10 @@ const lastActiveTask = async (userId) => {
       if (priority) {
         whereConditions.push('t.priority = ?');
         queryParams.push(priority);
+      }
+      if (project_id) {
+        whereConditions.push('t.project_id = ?');
+        queryParams.push(project_id);
       }
   
       if (searchTerm) {
@@ -875,6 +889,8 @@ const lastActiveTask = async (userId) => {
             task_details: {
               id: task.id,
               name: task.name,
+              product_id:task.product_id,
+              project_id:task.project_id,
               product_name: task.product_name || 'N/A',
               project_name: task.project_name || 'N/A',
               priority: task.priority,
@@ -882,6 +898,7 @@ const lastActiveTask = async (userId) => {
               team: task.team_name || '',
               task_status: groupByStatus(task.status),
               time_left: timeLeftFormatted,
+              type: task.subtask_id ? "subtask" : "task"
             },
             subtasks: []
           });
@@ -928,14 +945,147 @@ const lastActiveTask = async (userId) => {
           });
         }
       });
-      const activeTask = await lastActiveTask(authUser.id);
+      const activeTask = await lastActiveTask(authUserDetails.id);
       const data = { groups,activeTask};
       return successResponse(res, data, "Tasks retrieved successfully");
     } catch (error) {
       return errorResponse(res, error.message, 'Error fetching task', 500);
     }
   };
+  exports.updateTaskTimeLine = async (req, res) => {
+    try {
+        const {
+            id,
+            action,
+            type,
+            last_start_time,
+            timeline_id,
+            comment
+        } = req.body;
+      console.log(action);
+        const { error } = updateTimelineShema.validate(
+          req.body,
+          { abortEarly: false }
+        );
+        if (error) {
+          const errorMessages = error.details.reduce((acc, err) => {
+            acc[err.path[0]] = err.message;
+            return acc;
+          }, {});
+          return errorResponse(res, errorMessages, "Validation Error", 400);
+        }
+        const lastStartTime = moment(last_start_time);
+          let taskOrSubtask;
+          let taskId, subtaskId;
   
+          if (type === 'subtask') {
+              const [subtask] = await db.query('SELECT * FROM sub_tasks WHERE id = ?', [id]);
+              taskOrSubtask = subtask[0];
+              taskId = taskOrSubtask.task_id;
+              subtaskId = taskOrSubtask.id;
+          } else {
+              const [task] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+              taskOrSubtask = task[0];
+              taskId = taskOrSubtask.id;
+              subtaskId = null;
+          }
+          console.log(taskId)
+  
+          if (action === 'start') {
+              // Check if a record already exists in the sub_tasks_user_timeline table for the current task/subtask
+              const [existingSubtaskSublime] = await db.query('SELECT * FROM ?? WHERE active_status = 1 AND deleted_at IS NULL AND user_id = ?', [type === 'subtask' ? 'sub_tasks' : 'tasks',taskOrSubtask.user_id]);
+            console.log(existingSubtaskSublime)
+              if (existingSubtaskSublime.length>0) {
+                  return res.status(400).json({ message: 'Time Line is Already Started' });
+              }
+  
+              await db.query('UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?', [type === 'subtask' ? 'sub_tasks' : 'tasks', id]);
+              const [timeline] = await db.query('INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)', [
+                  taskOrSubtask.user_id,
+                  taskOrSubtask.product_id,
+                  taskOrSubtask.project_id,
+                  taskId,
+                  subtaskId,
+                  moment().format('YYYY-MM-DD HH:mm:ss')
+              ]);
+  
+          }
+  
+         else if (action === 'pause') {
+
+              const currentTime = moment();
+              const timeDifference = lastStartTime.diff(currentTime, 'seconds');
+              const newTotalHoursWorked = calculateNewWorkedTime(taskOrSubtask.total_hours_worked, timeDifference);
+  
+              await db.query('UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?', [
+                  type === 'subtask' ? 'sub_tasks' : 'tasks',
+                  newTotalHoursWorked,
+                  id
+              ]);
+  
+              await db.query('UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?', [
+                  moment().format('YYYY-MM-DD HH:mm:ss'),
+                  timeline_id
+              ]);
+          }
+  
+          else if (action === 'end') {
+              const currentTime = moment();
+              const timeDifference = currentTime.diff(lastStartTime, 'seconds');
+              const newTotalHoursWorked = calculateNewWorkedTime(taskOrSubtask.total_hours_worked, timeDifference);
+              const estimatedHours = taskOrSubtask.estimated_hours;
+  
+              const newTotalHoursWorkedSeconds = convertToSeconds(newTotalHoursWorked);
+              const estimatedHoursSeconds = convertToSeconds(estimatedHours);
+  
+              const remainingSeconds = estimatedHoursSeconds - newTotalHoursWorkedSeconds;
+              let extendedHours = "00:00:00";
+  
+              if (remainingSeconds < 0) {
+                  extendedHours = new Date(Math.abs(remainingSeconds) * 1000).toISOString().substr(11, 8);
+              }
+            
+              await db.query('UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?', [
+                  type === 'subtask' ? 'sub_tasks' : 'tasks',
+                  newTotalHoursWorked,
+                  extendedHours,
+                  comment,
+                  id
+              ]);
+  
+              await db.query('UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?', [
+                  moment().format('YYYY-MM-DD HH:mm:ss'),
+                  timeline_id
+              ]);
+  
+          }else{
+          return errorResponse(res, 'Invalid Type ', 400);
+        }
+        return successResponse(
+          res,
+          "Time updated successfully",
+          201
+        );
+       
+    } catch (error) {
+      return errorResponse(res, 'Error Updating Time', 400);
+    }
+};
+
+
+function calculateNewWorkedTime(worked, timeDifference) {
+    const workedInSeconds = convertToSeconds(worked);
+    const newTotalWorkedInSeconds = workedInSeconds + timeDifference;
+    return convertSecondsToHHMMSS(newTotalWorkedInSeconds);
+}
+
+
+function convertSecondsToHHMMSS(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return [hours, minutes, seconds].map(num => String(num).padStart(2, '0')).join(':');
+}
   
   
 

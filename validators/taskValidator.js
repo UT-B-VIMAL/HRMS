@@ -60,6 +60,41 @@ const validationshems = {
 
    
   }).unknown(true),
+  updateTimelineShema : Joi.object({
+    id: Joi.number().required().messages({
+      'any.required': 'Subtask ID is required.',
+      'number.base': 'Subtask ID must be a valid number.'
+  }),
+  status: Joi.number().optional(),
+  action: Joi.string().required().valid('start', 'pause', 'end').messages({
+      'any.required': 'Action is required.',
+      'any.only': 'Action must be one of start, pause, or end.'
+  }),
+  type: Joi.string().required().valid('subtask', 'task').messages({
+      'any.required': 'Type is required.',
+      'any.only': 'Type must be either subtask or task.'
+  }),
+  active_status: Joi.number().optional(),
+  last_start_time: Joi.date().when('action', {
+    is: Joi.valid('pause', 'end'),
+      then: Joi.required().messages({
+          'any.required': 'Last start time is required for ending a subtask.',
+      }),
+  }),
+  timeline_id: Joi.number().when('action', {
+    is: Joi.valid('pause', 'end'),
+      then: Joi.required().messages({
+          'any.required': 'Timeline ID is required for ending a subtask.'
+      }),
+  }),
+  comment: Joi.string().when('action', {
+      is: 'end',
+      then: Joi.required().messages({
+          'any.required': 'Comment is required for ending a subtask.'
+      }),
+  })
+})
 };
+
 
 module.exports = validationshems;
