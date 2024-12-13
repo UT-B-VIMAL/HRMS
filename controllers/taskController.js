@@ -111,7 +111,8 @@ const taskController = {
 
   getTaskDatas: async (req, res) => {
     try {
-      await getTaskList(req, res);
+      const queryParams = req.query;
+      await getTaskList(queryParams, res);
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error fetching task', 500);
