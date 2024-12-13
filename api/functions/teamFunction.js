@@ -163,10 +163,10 @@ exports.getAllTeams = async (queryParams, res) => {
 
   if (page && perPage) {
     const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
-    query += " ORDER BY `created_at` DESC LIMIT ? OFFSET ?";
+    query += " ORDER BY `id` DESC LIMIT ? OFFSET ?";
     queryParamsArray.push(parseInt(perPage, 10), offset);
   } else {
-    query += " ORDER BY `created_at` DESC"; // Default sorting
+    query += " ORDER BY `id` DESC"; // Default sorting
   }
 
 
