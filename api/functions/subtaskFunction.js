@@ -172,20 +172,30 @@ exports.getSubTask = async (id, res) => {
 
 
 // Show All Task
-exports.getAllSubTasks= async (res) => {
-    try {
-        const query = 'SELECT * FROM sub_tasks';
-        const [rows] = await db.query(query);
+exports.getAllSubTasks = async (req,res) => {
+  try {
+    const { task_id } = req.query;
+    
+    let query = 'SELECT * FROM sub_tasks WHERE deleted_at IS NULL';
+    const queryParams = [];
 
-        if (rows.length === 0) {
-            return errorResponse(res, null, 'No subtasks found', 204);
-        }
-
-        return successResponse(res, rows, 'SubTasks retrieved successfully');
-    } catch (error) {
-        return errorResponse(res, error.message, 'Error retrieving subtasks', 500);
+    if (task_id) {
+      query += ' AND task_id = ?';
+      queryParams.push(task_id);
     }
+
+    const [rows] = await db.query(query, queryParams);
+
+    if (rows.length === 0) {
+      return errorResponse(res, null, task_id ? 'No subtasks found for this task' : 'No subtasks found', 204);
+    }
+
+    return successResponse(res, rows, 'SubTasks retrieved successfully');
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error retrieving subtasks', 500);
+  }
 };
+
 
 
 
