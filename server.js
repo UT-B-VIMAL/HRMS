@@ -85,9 +85,9 @@ apiRouter.delete('/projects/:id', projectController.deleteProject);
 apiRouter.get('/projects/:id', projectController.getProject);
 apiRouter.get('/projects', projectController.getAllProjects);
 apiRouter.get('/project_status', projectController.project_status);
-apiRouter.get('/project_request', projectController.project_request);
-apiRouter.get('/project_requestupdate', projectController.project_requestupdate);
-apiRouter.put('/project_requestchange/:id', projectController.project_requestchange);
+apiRouter.get('/project_request',RoleController.checkRole(['pm','admin']), projectController.project_request);
+apiRouter.get('/project_requestupdate',RoleController.checkRole(['pm','admin']), projectController.project_requestupdate);
+apiRouter.put('/project_requestchange/:id',RoleController.checkRole(['pm','admin']), projectController.project_requestchange);
 
 // Team Routes
 apiRouter.post('/team', teamController.createTeam);
@@ -128,26 +128,26 @@ apiRouter.put('/subtaskupdate/:id', subtaskController.updateDatas);
 apiRouter.get('/idleEmployee', idleEmployeeController.get_idleEmployee);
 
 // PM Dashboard Routes
-apiRouter.get('/pmproducts', pmdashboardController.pmproductsection);
-apiRouter.get('/pmutilization', pmdashboardController.pmutilizationsection);
-apiRouter.get('/pmattendance', pmdashboardController.pmattendancesection);
-apiRouter.get('/pmdashboard', pmdashboardController.pmdashboardsection);
-apiRouter.get('/pmviewproduct', pmdashboardController.pmviewproductsection);
+apiRouter.get('/pmproducts',RoleController.checkRole(['pm','admin']), pmdashboardController.pmproductsection);
+apiRouter.get('/pmutilization',RoleController.checkRole(['pm','admin']), pmdashboardController.pmutilizationsection);
+apiRouter.get('/pmattendance',RoleController.checkRole(['pm','admin']), pmdashboardController.pmattendancesection);
+apiRouter.get('/pmdashboard',RoleController.checkRole(['pm','admin']), pmdashboardController.pmdashboardsection);
+apiRouter.get('/pmviewproduct',RoleController.checkRole(['pm','admin']), pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
-apiRouter.get('/tlattendance', tldashboardController.tlattendancesection);
-apiRouter.get('/tlrating', tldashboardController.tlratingsection);
-apiRouter.get('/tlproducts', tldashboardController.tlproductsection);
-apiRouter.get('/tlresourceallotment', tldashboardController.tlresourceallotmentsection);
-apiRouter.get('/tldashboard', tldashboardController.tldashboardsection);
-apiRouter.get('/tlviewproduct', tldashboardController.tlviewproductsection);
+apiRouter.get('/tlattendance',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlattendancesection);
+apiRouter.get('/tlrating',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlratingsection);
+apiRouter.get('/tlproducts',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlproductsection);
+apiRouter.get('/tlresourceallotment',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlresourceallotmentsection);
+apiRouter.get('/tldashboard',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tldashboardsection);
+apiRouter.get('/tlviewproduct',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlviewproductsection);
 
 // Employee Dashboard Routes
-apiRouter.get('/emppendingtask', empdashboardController.emppendingtasksection);
-apiRouter.get('/empdailybreakdown', empdashboardController.empdailybreakdownsection);
-apiRouter.get('/empstatistics', empdashboardController.empstatisticssection);
-apiRouter.get('/empstatisticschart', empdashboardController.empstatisticschartsection);
-apiRouter.get('/empratings', empdashboardController.empratingsection);
+apiRouter.get('/emppendingtask',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.emppendingtasksection);
+apiRouter.get('/empdailybreakdown',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empdailybreakdownsection);
+apiRouter.get('/empstatistics',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empstatisticssection);
+apiRouter.get('/empstatisticschart',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empstatisticschartsection);
+apiRouter.get('/empratings',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empratingsection);
 
 // Productivity
 apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);

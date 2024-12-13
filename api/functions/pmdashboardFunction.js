@@ -70,6 +70,7 @@ exports.fetchProducts = async (payload, res) => {
         return {
           product_id: product.id,
           product_name: product.name,
+          total_tasks: tasks.length,
           completed_percentage: completionPercentage,
           employee_count: workingEmployees.size,
           employees: employeeList,
@@ -610,6 +611,7 @@ exports.fetchPmdatas = async (payload, res) => {
         return {
           product_id: product.id,
           product_name: product.name,
+          total_tasks: tasks.length,
           completed_percentage: completionPercentage,
           employee_count: workingEmployees.size,
           employees: employeeList,
