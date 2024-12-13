@@ -106,7 +106,7 @@ exports.getAllRatings = async (queryParamsval, res) => {
 };
 
 exports.updateRating = async (payload, res) => {
-  const { average, rating, user_id } = payload;
+  const { average, rating, user_id,updated_by } = payload;
 
   const { error } = ratingSchema.validate(
     { average, rating, user_id },
@@ -122,7 +122,6 @@ exports.updateRating = async (payload, res) => {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const updated_by = 1;
   const checkUserQuery = "SELECT COUNT(*) as count FROM users WHERE id = ? AND deleted_status";
   const [checkUserResult] = await db.query(checkUserQuery, [user_id]);
   if (checkUserResult[0].count == 0) {

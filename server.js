@@ -17,6 +17,7 @@ const ratingController = require('./controllers/ratingController');
 const projectController = require('./controllers/projectController');
 const teamController = require('./controllers/teamController');
 const designationController = require('./controllers/designationController');
+const RoleController = require("./controllers/roleController");
 
 const tldashboardController = require('./controllers/tldashboardController');
 const authController = require('./controllers/authController');
@@ -64,11 +65,11 @@ const apiRouter = express.Router();
 apiRouter.post('/login', loginController.login);
 
 // User Routes
-apiRouter.post('/user', userController.createUser);
-apiRouter.put('/user/:id', userController.updateUser);
-apiRouter.delete('/user/:id', userController.deleteUser);
-apiRouter.get('/user/:id', userController.getUser);
-apiRouter.get('/user', userController.getAllUsers);
+apiRouter.post('/user',RoleController.checkRole(['tl','pm']), userController.createUser);
+apiRouter.put('/user/:id',RoleController.checkRole(['tl','pm']), userController.updateUser);
+apiRouter.delete('/user/:id',RoleController.checkRole(['tl','pm']), userController.deleteUser);
+apiRouter.get('/user/:id',RoleController.checkRole(['tl','pm']), userController.getUser);
+apiRouter.get('/user',RoleController.checkRole(['tl','pm']), userController.getAllUsers);
 
 // Product Routes
 apiRouter.post('/products', productController.createProduct);
@@ -119,6 +120,8 @@ apiRouter.put('/subtask/:id', subtaskController.updateSubTask);
 apiRouter.delete('/subtask/:id', subtaskController.deleteSubTask);
 apiRouter.get('/subtask/:id', subtaskController.getSubTask);
 apiRouter.get('/subtask', subtaskController.getAllSubTasks);
+apiRouter.put('/subtaskupdate/:id', subtaskController.updateDatas);
+
 
 
 // Idle Employee Route

@@ -60,8 +60,12 @@ const taskController = {
     try {
       const { id } = req.params;
       const payload = req.body;
+      const idValidation = Joi.string().required().validate(id);
+      if (idValidation.error) {
+        return errorResponse(res, { id: 'Task ID is required and must be valid' }, 'Validation Error', 403);
+      }
+  
       const { error } = updateTaskDataSchema.validate(payload, { abortEarly: false });
-
       if (error) {
         const errorMessages = error.details.reduce((acc, err) => {
           acc[err.path[0]] = err.message;
@@ -111,7 +115,8 @@ const taskController = {
 
   getTaskDatas: async (req, res) => {
     try {
-      await getTaskList(req, res);
+      const queryParams = req.query;
+      await getTaskList(queryParams, res);
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error fetching task', 500);

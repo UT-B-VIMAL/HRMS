@@ -10,7 +10,7 @@ const { projectSchema } = require("../../validators/projectValidator");
 
 // Create Project
 exports.createProject = async (payload, res) => {
-  const { name, product } = payload;
+    const { name, product,user_id } = payload;
 
   const { error } = projectSchema.validate(
     { name, product },
@@ -39,14 +39,11 @@ exports.createProject = async (payload, res) => {
       "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
-      return errorResponse(res, "Product Not Found", "Product Not Found", 404);
-    }
-
-    const created_by = 1;
-    const updated_by = created_by;
-    const query =
-      "INSERT INTO projects (name, product_id, created_by, updated_by) VALUES (?, ?, ?, ?)";
-    const values = [name, product, created_by, updated_by];
+        return errorResponse(res, "Product Not Found", "Product Not Found", 404);
+      }
+  
+    const query = "INSERT INTO projects (name, product_id, created_by, updated_by) VALUES (?, ?, ?, ?)";
+    const values = [name, product, user_id, user_id];
     const [result] = await db.query(query, values);
 
     return successResponse(
@@ -63,7 +60,7 @@ exports.createProject = async (payload, res) => {
 
 // Update Project
 exports.updateProject = async (id, payload, res) => {
-  const { name, product } = payload;
+    const { name, product,user_id } =payload;
 
   const { error } = projectSchema.validate(
     { name, product },
@@ -94,12 +91,10 @@ exports.updateProject = async (id, payload, res) => {
       "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
-      return errorResponse(res, "Product Not Found", "Product Not Found", 404);
-    }
-    const updated_by = 1;
-    const query =
-      "UPDATE projects SET name = ?, product_id = ?, updated_by = ? WHERE id = ?";
-    const values = [name, product, updated_by, id];
+        return errorResponse(res, "Product Not Found", "Product Not Found", 404);
+      }
+    const query = "UPDATE projects SET name = ?, product_id = ?, updated_by = ? WHERE id = ?";
+    const values = [name, product, user_id, id];
     await db.query(query, values);
 
     return successResponse(
@@ -198,10 +193,10 @@ exports.getAllProjects = async (queryParams, res) => {
   }
   if (page && perPage) {
     const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
-    query += " ORDER BY `created_at` DESC LIMIT ? OFFSET ?";
+    query += " ORDER BY `id` DESC LIMIT ? OFFSET ?";
     queryParamsArray.push(parseInt(perPage, 10), offset);
   } else {
-    query += " ORDER BY `created_at` DESC"; // Default sorting
+    query += " ORDER BY `id` DESC"; // Default sorting
   }
 
   try {
