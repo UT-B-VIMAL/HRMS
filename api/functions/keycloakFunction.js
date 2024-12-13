@@ -40,13 +40,16 @@ async function signInUser(username, password) {
           { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
 
-      const user = await getUserByEmployeeId(username);  // You'll implement this function to query your DB
+      const user = await getUserByEmployeeId(username);
+        
 
       if (user) {
-        // Return the response from Keycloak along with the additional user information
+        const role = await getRoleName(user.role_id);
         return {
           keycloak_id: user.keycloak_id,
-          id: user.id,
+          user_id: user.id,
+          role_id: user.role_id,
+          role_name: role,
           access_token: response.data.access_token,
           refresh_token: response.data.refresh_token
         };
@@ -113,11 +116,22 @@ async function createUserInKeycloak(userData) {
 async function editUserInKeycloak(userId, userData) {
   try {
     const token = await getAdminToken();
+    const { roleName, ...userWithoutRole } = userData;
     const response = await axios.put(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}`,
-      userData,
+      userWithoutRole,
       { headers: { Authorization: `Bearer ${token}` } }
     );
+    if (roleName) {
+      try {
+        const roleres = await assignRoleToUser(userId, roleName);
+        console.log("Role assigned successfully");
+        response['roleresponse'] = roleres;
+      } catch (roleError) {
+        console.error("Error assigning role:", roleError.message);
+        response['roleresponse'] = roleError.message;
+      }
+    }
     return response.data;
   } catch (error) {
     console.error("Error editing user in Keycloak:", error.response.data);
@@ -168,21 +182,46 @@ async function listUsers() {
 async function assignRoleToUser(userId, roleName) {
   try {
     const token = await getAdminToken();
-    const rolesResponse = await axios.get(
+    
+    // Get the role details
+    const roleResponse = await axios.get(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/roles/${roleName}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    const role = rolesResponse.data;
-   return await axios.post(
+    const role = roleResponse.data;
+
+    // Check if the user already has the role assigned
+    const assignedRolesResponse = await axios.get(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const assignedRoles = assignedRolesResponse.data;
+
+    const roleAlreadyAssigned = assignedRoles.some((assignedRole) => assignedRole.name === roleName);
+
+    // If the role is already assigned, unassign it
+    if (roleAlreadyAssigned) {
+      await axios.delete(
+        `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          data: [role],
+        }
+      );
+    }
+
+    // Assign the new role
+    return await axios.post(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
       [role],
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    
+
   } catch (error) {
-    return ({ error: "Failed to create user or assign role", details: error.response.data });
+    return { error: "Failed to assign or reassign role", details: error.response?.data || error.message };
   }
 }
+
 
 async function getUserByEmployeeId(employeeId) {
   
@@ -211,4 +250,11 @@ module.exports = {
   listUsers,
   assignRoleToUser,
   signInUser
+};
+
+const getRoleName = async (roleId) => {
+  const query = "SELECT name FROM roles WHERE id = ?";
+  const values = [roleId];
+  const [result] = await db.query(query, values);
+  return result.length > 0 ? result[0].role : null;
 };
