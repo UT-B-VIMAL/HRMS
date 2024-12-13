@@ -20,7 +20,6 @@ const designationController = require('./controllers/designationController');
 const RoleController = require("./controllers/roleController");
 
 const tldashboardController = require('./controllers/tldashboardController');
-const authController = require('./controllers/authController');
 const attendanceController = require('./controllers/attendanceController');
 const commonController = require("./controllers/commonController");
 const empdashboardController = require('./controllers/empdashboardController');
@@ -61,15 +60,17 @@ app.use(bodyParser);
 
 const apiRouter = express.Router();
 
-//login
+//authentication
 apiRouter.post('/login', loginController.login);
+apiRouter.post('/logout', loginController.logout);
+apiRouter.put('/change_password/:id',loginController.changePassword);
 
 // User Routes
-apiRouter.post('/user',RoleController.checkRole(['tl','pm']), userController.createUser);
-apiRouter.put('/user/:id',RoleController.checkRole(['tl','pm']), userController.updateUser);
-apiRouter.delete('/user/:id',RoleController.checkRole(['tl','pm']), userController.deleteUser);
-apiRouter.get('/user/:id',RoleController.checkRole(['tl','pm']), userController.getUser);
-apiRouter.get('/user',RoleController.checkRole(['tl','pm']), userController.getAllUsers);
+apiRouter.post('/user',RoleController.checkRole(['admin','tl','pm']), userController.createUser);
+apiRouter.put('/user/:id',RoleController.checkRole(['admin','tl','pm']), userController.updateUser);
+apiRouter.delete('/user/:id',RoleController.checkRole(['admin','tl','pm']), userController.deleteUser);
+apiRouter.get('/user/:id',RoleController.checkRole(['admin','tl','pm']), userController.getUser);
+apiRouter.get('/user',RoleController.checkRole(['admin','tl','pm']), userController.getAllUsers);
 
 // Product Routes
 apiRouter.post('/products', productController.createProduct);
@@ -112,6 +113,7 @@ apiRouter.get('/task/:id', taskController.getTask);
 apiRouter.get('/task', taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id', taskController.updateDatas);
 apiRouter.get('/getTaskDatas', taskController.getTaskDatas);
+apiRouter.get('/doneTask', taskController.doneTask);
 apiRouter.post('/updateTaskTimeLineStatus', taskController.updateTaskTimeLineStatus);
 
 
@@ -161,11 +163,6 @@ apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
 //Attendance
 apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
 apiRouter.post('/updateAttendance', attendanceController.updateAttendance);
-
-
-// Change password
-
-apiRouter.put('/change_password/:id',authController.change_password);
 
 
 // Comments
