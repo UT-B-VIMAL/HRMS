@@ -1,6 +1,8 @@
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
 const keycloakConfig = require('../../config/keycloak');
 const db = require('../../config/db');
+const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 
 async function getAdminToken() {
   try {
@@ -61,6 +63,63 @@ async function signInUser(username, password) {
       throw error;
   }
 }
+
+async function logoutUser(refreshToken) {
+  try {
+    const response = await axios.post(
+      `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/logout`,
+      new URLSearchParams({
+        client_id: keycloakConfig.clientId,
+        client_secret: keycloakConfig.clientSecret,
+        refresh_token: refreshToken,
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    // Return success message
+    return { message: "Logout successful", data: response.data };
+  } catch (error) {
+    console.error("Error logging out user:", error.response ? error.response.data : error.message);
+    throw new Error("Failed to log out the user.");
+  }
+}
+
+async function changePassword(id, payload, res) {
+  const { current_password, new_password } = payload;
+
+  try {
+    const query = `SELECT id, email, password, keycloak_id FROM users WHERE id = ?`;
+    const [user] = await db.query(query, [id]);
+
+    if (!user || user.length === 0) {
+      return errorResponse(res, null, 'User not found', 404);
+    }
+
+    const currentUser = user[0];
+
+    const isPasswordCorrect = await bcrypt.compare(current_password, currentUser.password);
+    if (!isPasswordCorrect) {
+      return errorResponse(res, null, 'The current password is incorrect', 400);
+    }
+
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+    const updateQuery = `UPDATE users SET password = ? WHERE id = ?`;
+    const [result] = await db.query(updateQuery, [hashedPassword, id]);
+
+    if (result.affectedRows === 0) {
+      return errorResponse(res, null, 'User not found or password not updated', 500);
+    }
+
+    await changePasswordInKeycloak(currentUser.keycloak_id, new_password);
+
+    return successResponse(res, { id, ...payload }, 'Password updated successfully');
+  } catch (error) {
+    console.error("Error updating password:", error);
+    return errorResponse(res, error.message, 'Error updating password', 500);
+  }
+}
+
+
 
 async function createUserInKeycloak(userData) {
   try {
@@ -182,40 +241,43 @@ async function listUsers() {
 async function assignRoleToUser(userId, roleName) {
   try {
     const token = await getAdminToken();
-    
-    // Get the role details
+
+    // Get the role to be assigned
     const roleResponse = await axios.get(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/roles/${roleName}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const role = roleResponse.data;
 
-    // Check if the user already has the role assigned
+    // Get currently assigned roles for the user
     const assignedRolesResponse = await axios.get(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const assignedRoles = assignedRolesResponse.data;
 
-    const roleAlreadyAssigned = assignedRoles.some((assignedRole) => assignedRole.name === roleName);
+    // Unassign any roles the user already has (if it's different from the new role)
+    const rolesToRemove = assignedRoles.filter((assignedRole) => assignedRole.name !== roleName);
 
-    // If the role is already assigned, unassign it
-    if (roleAlreadyAssigned) {
+    if (rolesToRemove.length > 0) {
+      // Remove all roles that are not the new role
       await axios.delete(
         `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          data: [role],
+          data: rolesToRemove,
         }
       );
     }
 
     // Assign the new role
-    return await axios.post(
+    await axios.post(
       `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/role-mappings/realm`,
       [role],
       { headers: { Authorization: `Bearer ${token}` } }
     );
+
+    return { message: 'Role assigned successfully' };
 
   } catch (error) {
     return { error: "Failed to assign or reassign role", details: error.response?.data || error.message };
@@ -223,9 +285,10 @@ async function assignRoleToUser(userId, roleName) {
 }
 
 
+
 async function getUserByEmployeeId(employeeId) {
   
-  const query = "SELECT id, keycloak_id FROM users WHERE employee_id = ?";
+  const query = "SELECT id, keycloak_id,role_id FROM users WHERE employee_id = ?";
   const params = [employeeId];
 
   try {
@@ -242,6 +305,47 @@ async function getUserByEmployeeId(employeeId) {
   }
 }
 
+const getRoleName = async (roleId) => {
+  const query = "SELECT role FROM roles WHERE id = ?"; // Select 'role' column
+  const values = [roleId];
+  const [result] = await db.query(query, values);
+
+
+  return result.length > 0 ? result[0].role : null; // Return 'role' from the result
+};
+
+
+async function changePasswordInKeycloak(userId, newPassword) {
+  try {
+    const token = await getAdminToken(); // Get admin token
+
+    const url = `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/reset-password`;
+
+    const payload = {
+      type: "password",
+      value: newPassword,
+      temporary: false, // Set temporary to false, meaning user doesn't have to change password on next login
+    };
+
+    // Make the PUT request to change the password in Keycloak
+    const response = await axios.put(url, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`, // Use the Bearer token for authentication
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("Password successfully updated in Keycloak:", response.data);
+  } catch (error) {
+    console.error("Error updating password in Keycloak:", error.response?.data || error.message);
+    throw new Error("Failed to update password in Keycloak");
+  }
+};
+
+
+
+
+
 
 module.exports = {
   createUserInKeycloak,
@@ -249,12 +353,9 @@ module.exports = {
   deleteUserInKeycloak,
   listUsers,
   assignRoleToUser,
-  signInUser
+  signInUser,
+  logoutUser,
+  changePassword
 };
 
-const getRoleName = async (roleId) => {
-  const query = "SELECT name FROM roles WHERE id = ?";
-  const values = [roleId];
-  const [result] = await db.query(query, values);
-  return result.length > 0 ? result[0].role : null;
-};
+
