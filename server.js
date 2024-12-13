@@ -83,6 +83,7 @@ apiRouter.put('/projects/:id', projectController.updateProject);
 apiRouter.delete('/projects/:id', projectController.deleteProject);
 apiRouter.get('/projects/:id', projectController.getProject);
 apiRouter.get('/projects', projectController.getAllProjects);
+apiRouter.get('/project_status', projectController.project_status);
 apiRouter.get('/project_request', projectController.project_request);
 
 // Team Routes
