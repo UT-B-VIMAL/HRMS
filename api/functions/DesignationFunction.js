@@ -1,3 +1,4 @@
+const Joi = require('joi');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 // const getPagination = require('../../helpers/paginationHelper');
@@ -21,14 +22,30 @@ const getPagination = (page, perPage, totalRecords) => {
       prev_page: prevPage,
     };
   };
-  
+  const designationSchema = Joi.object({
+    name: Joi.string().max(100).required().messages({
+      'string.empty': 'Designation name is required',
+      'string.max': 'Designation name must not exceed 100 characters'
+    }),
+    user_id: Joi.number().integer().required().messages({
+      'number.base': 'User Id must be a valid user ID',
+      'any.required': 'User Id field is required'
+    })
+  });
 // Create Designation
 exports.createDesignation = async (payload, res) => {
-  const { name} = payload;
-  if (!name) {
-    return errorResponse(res,"Designation name is required","Validation Error",400
+    const { name ,user_id } = payload;
+    const { error } = designationSchema.validate(
+      { name, user_id },
+      { abortEarly: false }
     );
-  }
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 400);
+    }
   try {
     const checkQuery = "SELECT COUNT(*) as count FROM designations WHERE name = ?";
     const [checkResult] = await db.query(checkQuery, [name]);
@@ -36,10 +53,8 @@ exports.createDesignation = async (payload, res) => {
     if (checkResult[0].count > 0) {
       return errorResponse(res, "Designation with this name already exists", "Duplicate Designation Error", 400);
     }
-    const created_by =1;
-    const updated_by =created_by;
     const query = "INSERT INTO designations (name, created_by, updated_by) VALUES (?, ?, ?)";
-    const values = [name, created_by, updated_by];
+    const values = [name, user_id, user_id];
     const [result] = await db.query(query, values);
 
     return successResponse(res, { id: result.insertId, name }, 'Designation added successfully', 201);
@@ -51,11 +66,18 @@ exports.createDesignation = async (payload, res) => {
 
 // Update Designation
 exports.updateDesignation = async (id, payload, res) => {
-  const { name } = payload;
-  if (!name) {
-    return errorResponse(res,"Designation name is required","Validation Error",400
+    const { name ,user_id } = payload;
+    const { error } = designationSchema.validate(
+      { name, user_id },
+      { abortEarly: false }
     );
-  }
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 400);
+    }
   try {
     const checkQuery = "SELECT COUNT(*) as count FROM designations WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
@@ -63,9 +85,8 @@ exports.updateDesignation = async (id, payload, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Designation not found or deleted", "Not Found", 404);
     }
-    const updated_by=1;
     const query = "UPDATE designations SET name = ?, updated_by = ? WHERE id = ?";
-    const values = [name, updated_by, id];
+    const values = [name, user_id, id];
     await db.query(query, values);
 
     return successResponse(res, { id, name }, 'Designation updated successfully', 200);

@@ -1,3 +1,4 @@
+const Joi = require('joi');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 // const getPagination = require('../../helpers/paginationHelper');
@@ -21,14 +22,31 @@ const getPagination = (page, perPage, totalRecords) => {
       prev_page: prevPage,
     };
   };
-  
+  const teamSchema = Joi.object({
+    name: Joi.string().max(100).required().messages({
+      'string.empty': 'Team name is required',
+      'string.max': 'Team name must not exceed 100 characters'
+    }),
+    user_id: Joi.number().integer().required().messages({
+      'number.base': 'User Id must be a valid user ID',
+      'any.required': 'User Id field is required'
+    })
+  });
+
 // Create Team
 exports.createTeam = async (payload, res) => {
-    const { name } = payload;
-    if (!name) {
-      return errorResponse(res,"Team name is required","Validation Error",400
-      );
-    }
+const { name ,user_id } = payload;
+  const { error } = teamSchema.validate(
+    { name, user_id },
+    { abortEarly: false }
+  );
+  if (error) {
+    const errorMessages = error.details.reduce((acc, err) => {
+      acc[err.path[0]] = err.message;
+      return acc;
+    }, {});
+    return errorResponse(res, errorMessages, "Validation Error", 400);
+  }
   try {
     const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE name = ?";
     const [checkResult] = await db.query(checkQuery, [name]);
@@ -36,10 +54,9 @@ exports.createTeam = async (payload, res) => {
     if (checkResult[0].count > 0) {
       return errorResponse(res, "Team with this name already exists", "Duplicate Team Error", 400);
     }
-    const created_by =1;
-    const updated_by =created_by;
+    const updated_by =user_id;
     const query = "INSERT INTO teams (name, created_by, updated_by) VALUES (?, ?, ?)";
-    const values = [name, created_by, updated_by];
+    const values = [name, user_id, user_id];
     const [result] = await db.query(query, values);
 
     return successResponse(res, { id: result.insertId, name }, 'Team added successfully', 201);
@@ -51,10 +68,17 @@ exports.createTeam = async (payload, res) => {
 
 // Update Team
 exports.updateTeam = async (id, payload, res) => {
-    const { name } = payload;
-    if (!name) {
-      return errorResponse(res,"Team name is required","Validation Error",400
-      );
+    const { name ,user_id } = payload;
+    const { error } = teamSchema.validate(
+      { name, created_by },
+      { abortEarly: false }
+    );
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 400);
     }
 
   try {
@@ -64,9 +88,8 @@ exports.updateTeam = async (id, payload, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Team not found or deleted", "Not Found", 404);
     }
-    const updated_by=1;
     const query = "UPDATE teams SET name = ?, updated_by = ? WHERE id = ?";
-    const values = [name, updated_by, id];
+    const values = [name, user_id, id];
     await db.query(query, values);
 
     return successResponse(res, { id, name }, 'Team updated successfully', 200);
