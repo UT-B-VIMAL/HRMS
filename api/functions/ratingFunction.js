@@ -60,8 +60,6 @@ exports.getAllRatings = async (queryParamsval, res) => {
   try {
     const [result] = await db.query(query, queryParams);
 
-    let countQuery = query.replace(" LIMIT ? OFFSET ?", "");
-    const [countResult] = await db.query(countQuery, queryParams);
     const totalRecords = result.length > 0 ? result.length : 0;
     const rowsWithSerialNo = result.map((row, index) => ({
         s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,

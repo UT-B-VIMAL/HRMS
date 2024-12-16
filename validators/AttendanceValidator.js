@@ -29,11 +29,34 @@ const attendanceValidator = Joi.object({
     }),
   statusFilter: Joi.string()
     .valid("Present", "Absent")
-    .required()
+    .required().empty('')
     .messages({
+    'string.base': 'The Status Filter must be a string',
       "any.required": "The Status Filter field is required",
       "any.only": "The Status Filter must be 'Present' or 'Absent'",
-    }),
+      'string.empty': 'The Status Filter cannot be empty',
+    }), 
+    updated_by: Joi.number().integer().required().messages({
+        'number.base': 'updated_by must be a valid user ID',
+        'any.required': ' updated_by field is required'
+      })
+
 }).with("halfDay", "attendanceType");
 
-module.exports = { attendanceValidator };
+const attendanceFetch = Joi.object({
+    status: Joi.string()
+    .valid("Present", "Absent")
+    .required().empty('')
+    .messages({
+    'string.base': 'The Status Filter must be a string',
+      "any.required": "The Status Filter field is required",
+      "any.only": "The Status Filter must be 'Present' or 'Absent'",
+      'string.empty': 'The Status Filter cannot be empty',
+    }),
+    user_id: Joi.number().integer().required().messages({
+        'number.base': 'User Id must be a valid user ID',
+        'any.required': 'User Id field is required'
+      })
+    });
+
+module.exports = { attendanceValidator ,attendanceFetch};
