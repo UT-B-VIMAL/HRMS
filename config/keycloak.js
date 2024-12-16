@@ -3,7 +3,7 @@ module.exports = {
     realm: "hrmsRealm",
     clientId: "hrmsClient",
     clientSecret: "M1Y0DpEE7v4klGdNkbzIBotwwNitYKzi",
-    adminUsername: "admin",
+    adminUsername: "nathishma.n@theunitytech.com",
     adminPassword: "admin",
   };
   
