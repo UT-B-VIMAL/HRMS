@@ -5,28 +5,14 @@ const {
   successResponse,
 } = require("../../helpers/responseHelper");
 
-const getPagination = (page, perPage, totalRecords) => {
-  const totalPages = Math.ceil(totalRecords / perPage);
-  return {
-    total_records: totalRecords,
-    total_pages: totalPages,
-    current_page: page,
-    per_page: perPage,
-    range_from: `Showing ${(page - 1) * perPage + 1}-${Math.min(
-      page * perPage,
-      totalRecords
-    )} of ${totalRecords} entries`,
-  };
-};
+const getPagination  = require("../../helpers/pagination");
+
+
 
 exports.getAllRatings = async (queryParamsval, res) => {
-  const { search, teamId, page = 1, size = 10 } = queryParamsval;
+  const { search, teamId, page = 1, perPage = 10 } = queryParamsval;
 
-  // Ensure page and size are numbers
-  const pageNum = Math.max(parseInt(page, 10), 1);
-  const pageSize = Math.max(parseInt(size, 10), 1);
-
-  const offset = (pageNum - 1) * pageSize;
+  const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -69,37 +55,21 @@ exports.getAllRatings = async (queryParamsval, res) => {
   }
 
   query += " LIMIT ? OFFSET ?";
-  queryParams.push(pageSize, offset);
+  queryParams.push(parseInt(perPage, 10), offset);
 
   try {
     const [result] = await db.query(query, queryParams);
 
-    let countQuery = query.replace(" LIMIT ? OFFSET ?", "");
-    const [countResult] = await db.query(countQuery, queryParams);
-    const total_records = countResult.length > 0 ? countResult.length : 0;
-
-    // Calculate total pages
-    const total_pages = Math.ceil(total_records / pageSize);
-    const rangeFrom = `Showing ${(page - 1) * pageSize + 1}-${Math.min(
-      page * pageSize,
-      total_records
-    )} of ${total_records} entries`;
+    const totalRecords = result.length > 0 ? result.length : 0;
+    const rowsWithSerialNo = result.map((row, index) => ({
+        s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
+        ...row,
+    }));
+   const pagination =getPagination(page, perPage, totalRecords);
+  
     // Return paginated data with results
-    return successResponse(
-      res,
-      {
-        data: result,
-        pagination: {
-          total_records,
-          total_pages,
-          current_page: pageNum,
-          per_page: pageSize,
-          range_from: rangeFrom,
-        },
-      },
-      "Ratings fetched successfully",
-      200
-    );
+    return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No Ratings found' : 'Ratings fetched successfully', 200, pagination);
+
   } catch (error) {
     return errorResponse(res, error.message, "Error fetching ratings", 500);
   }
@@ -109,7 +79,7 @@ exports.updateRating = async (payload, res) => {
   const { average, rating, user_id,updated_by } = payload;
 
   const { error } = ratingSchema.validate(
-    { average, rating, user_id },
+    { average, rating, user_id,updated_by },
     { abortEarly: false }
   );
   if (error) {
@@ -122,7 +92,7 @@ exports.updateRating = async (payload, res) => {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const checkUserQuery = "SELECT COUNT(*) as count FROM users WHERE id = ? AND deleted_status";
+  const checkUserQuery = "SELECT COUNT(*) as count FROM users WHERE id = ? AND deleted_at IS NULL";
   const [checkUserResult] = await db.query(checkUserQuery, [user_id]);
   if (checkUserResult[0].count == 0) {
     return errorResponse(res, "User not found or already deleted", "Not Found", 404);

@@ -2,7 +2,11 @@ const db = require("../../config/db");
 const {
   successResponse,
   errorResponse,
+  getPagination,
 } = require("../../helpers/responseHelper");
+const { getAuthUserDetails } = require("../../api/functions/commonFunction");
+const moment = require("moment");
+const { updateTimelineShema } = require("../../validators/taskValidator");
 
 // Insert Task
 exports.createTask = async (payload, res) => {
@@ -35,32 +39,70 @@ exports.createTask = async (payload, res) => {
   } = payload;
 
   try {
-
-    const [product] = await db.query('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL', [product_id]);
+    const [product] = await db.query(
+      "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+      [product_id]
+    );
     if (product.length === 0) {
-      return errorResponse(res, null, 'Product not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Product not found or has been deleted",
+        404
+      );
     }
 
-    const [project] = await db.query('SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL', [project_id]);
+    const [project] = await db.query(
+      "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
+      [project_id]
+    );
     if (project.length === 0) {
-      return errorResponse(res, null, 'Project not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Project not found or has been deleted",
+        404
+      );
     }
 
-    const [assigned_user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
+    const [assigned_user] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [assigned_user_id]
+    );
     if (assigned_user.length === 0) {
-      return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Assigned User not found or has been deleted",
+        404
+      );
     }
 
-    const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [user_id]);
+    const [user] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
     if (user.length === 0) {
-      return errorResponse(res, null, 'User not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "User not found or has been deleted",
+        404
+      );
     }
 
-    const [team] = await db.query('SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL', [team_id]);
+    const [team] = await db.query(
+      "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+      [team_id]
+    );
     if (team.length === 0) {
-      return errorResponse(res, null, 'Team not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Team not found or has been deleted",
+        404
+      );
     }
-
 
     const query = `
         INSERT INTO tasks (
@@ -154,9 +196,8 @@ exports.getTask = async (id, res) => {
     `;
     const [task] = await db.query(taskQuery, [id]);
 
-
     console.log(task);
-    
+
     if (!task || task.length === 0) {
       return errorResponse(res, "Task not found", "Error retrieving task", 404);
     }
@@ -347,30 +388,69 @@ exports.updateTask = async (id, payload, res) => {
   } = payload;
 
   try {
-
-    const [product] = await db.query('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL', [product_id]);
+    const [product] = await db.query(
+      "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+      [product_id]
+    );
     if (product.length === 0) {
-      return errorResponse(res, null, 'Product not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Product not found or has been deleted",
+        404
+      );
     }
 
-    const [project] = await db.query('SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL', [project_id]);
+    const [project] = await db.query(
+      "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
+      [project_id]
+    );
     if (project.length === 0) {
-      return errorResponse(res, null, 'Project not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Project not found or has been deleted",
+        404
+      );
     }
 
-    const [assigned_user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
+    const [assigned_user] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [assigned_user_id]
+    );
     if (assigned_user.length === 0) {
-      return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Assigned User not found or has been deleted",
+        404
+      );
     }
 
-    const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [user_id]);
+    const [user] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
     if (user.length === 0) {
-      return errorResponse(res, null, 'User not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "User not found or has been deleted",
+        404
+      );
     }
 
-    const [team] = await db.query('SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL', [team_id]);
+    const [team] = await db.query(
+      "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+      [team_id]
+    );
     if (team.length === 0) {
-      return errorResponse(res, null, 'Team not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Team not found or has been deleted",
+        404
+      );
     }
 
     const [currentTask] = await db.query(
@@ -413,31 +493,55 @@ exports.updateTask = async (id, payload, res) => {
     `;
 
     const values = [
-      product_id, product_id,
-      project_id, project_id,
-      user_id, user_id,
-      name, name,
-      estimated_hours, estimated_hours,
-      start_date, start_date,
-      end_date, end_date,
-      extended_status, extended_status,
-      extended_hours, extended_hours,
-      active_status, active_status,
-      status, status,
-      total_hours_worked, total_hours_worked,
-      rating, rating,
-      command, command,
-      assigned_user_id, assigned_user_id,
-      remark, remark,
-      reopen_status, reopen_status,
-      description, description,
-      team_id, team_id,
-      priority, priority,
-      created_by, created_by,
-      updated_by, updated_by,
-      deleted_at, deleted_at,
-      created_at, created_at,
-      id
+      product_id,
+      product_id,
+      project_id,
+      project_id,
+      user_id,
+      user_id,
+      name,
+      name,
+      estimated_hours,
+      estimated_hours,
+      start_date,
+      start_date,
+      end_date,
+      end_date,
+      extended_status,
+      extended_status,
+      extended_hours,
+      extended_hours,
+      active_status,
+      active_status,
+      status,
+      status,
+      total_hours_worked,
+      total_hours_worked,
+      rating,
+      rating,
+      command,
+      command,
+      assigned_user_id,
+      assigned_user_id,
+      remark,
+      remark,
+      reopen_status,
+      reopen_status,
+      description,
+      description,
+      team_id,
+      team_id,
+      priority,
+      priority,
+      created_by,
+      created_by,
+      updated_by,
+      updated_by,
+      deleted_at,
+      deleted_at,
+      created_at,
+      created_at,
+      id,
     ];
 
     const [result] = await db.query(query, values);
@@ -446,12 +550,15 @@ exports.updateTask = async (id, payload, res) => {
       return errorResponse(res, null, "No changes made to the task", 200);
     }
 
-    return successResponse(res, { id, ...payload }, "Task updated successfully");
+    return successResponse(
+      res,
+      { id, ...payload },
+      "Task updated successfully"
+    );
   } catch (error) {
     return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
-
 
 // exports.updateTaskData = async (id, payload, res) => {
 //   const {
@@ -558,7 +665,6 @@ exports.updateTask = async (id, payload, res) => {
 //   }
 // };
 
-
 // Delete Task
 
 exports.updateTaskData = async (id, payload, res) => {
@@ -593,41 +699,68 @@ exports.updateTaskData = async (id, payload, res) => {
 
   // Define the field mapping for database column names
   const fieldMapping = {
-    owner_id: 'user_id',
-    due_date:'end_date',
-
+    owner_id: "user_id",
+    due_date: "end_date",
   };
 
   try {
-
     if (assigned_user_id) {
-      const [assigned_user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
+      const [assigned_user] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [assigned_user_id]
+      );
       if (assigned_user.length === 0) {
-        return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
+        return errorResponse(
+          res,
+          null,
+          "Assigned User not found or has been deleted",
+          404
+        );
       }
     }
 
     if (owner_id) {
-      const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [owner_id]);
+      const [user] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [owner_id]
+      );
       if (user.length === 0) {
-        return errorResponse(res, null, 'Owner not found or has been deleted', 404);
+        return errorResponse(
+          res,
+          null,
+          "Owner not found or has been deleted",
+          404
+        );
       }
     }
 
     if (team_id) {
-      const [team] = await db.query('SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL', [team_id]);
+      const [team] = await db.query(
+        "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+        [team_id]
+      );
       if (team.length === 0) {
-        return errorResponse(res, null, 'Team not found or has been deleted', 404);
+        return errorResponse(
+          res,
+          null,
+          "Team not found or has been deleted",
+          404
+        );
       }
     }
     const [tasks] = await db.query(
-      'SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL',
+      "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
       [id]
     );
-    const currentTask = tasks[0]; 
+    const currentTask = tasks[0];
 
     if (!currentTask) {
-      return errorResponse(res, null, 'Task not found or has been deleted', 404);
+      return errorResponse(
+        res,
+        null,
+        "Task not found or has been deleted",
+        404
+      );
     }
 
     const updateFields = [];
@@ -635,22 +768,24 @@ exports.updateTaskData = async (id, payload, res) => {
 
     for (const key in payload) {
       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
-        const fieldName = fieldMapping[key] || key; 
+        const fieldName = fieldMapping[key] || key;
         updateFields.push(`${fieldName} = ?`);
         updateValues.push(payload[key]);
       }
     }
 
     if (updateFields.length === 0) {
-      return errorResponse(res, null, 'No fields to update', 400);
+      return errorResponse(res, null, "No fields to update", 400);
     }
     updateValues.push(id);
 
-    const updateQuery = `UPDATE tasks SET ${updateFields.join(', ')} WHERE id = ?`;
+    const updateQuery = `UPDATE tasks SET ${updateFields.join(
+      ", "
+    )} WHERE id = ?`;
     const [updateResult] = await db.query(updateQuery, updateValues);
 
     if (updateResult.affectedRows === 0) {
-      return errorResponse(res, null, 'Task not updated', 400);
+      return errorResponse(res, null, "Task not updated", 400);
     }
 
     const taskHistoryEntries = [];
@@ -659,15 +794,15 @@ exports.updateTaskData = async (id, payload, res) => {
         const flag = statusFlagMapping[key] || null;
         taskHistoryEntries.push([
           currentTask[key],
-          payload[key], 
-          id, 
+          payload[key],
+          id,
           null, // subtask_id (optional)
-          `Changed ${key}`, 
-          updated_by, 
-          flag, 
-          new Date(), 
-          new Date(), 
-          null, 
+          `Changed ${key}`,
+          updated_by,
+          flag,
+          new Date(),
+          new Date(),
+          null,
         ]);
       }
     }
@@ -683,19 +818,29 @@ exports.updateTaskData = async (id, payload, res) => {
       await db.query(historyQuery, [taskHistoryEntries]);
     }
 
-    return successResponse(res, { id, ...payload }, 'Task updated successfully');
+    return successResponse(
+      res,
+      { id, ...payload },
+      "Task updated successfully"
+    );
   } catch (error) {
-    return errorResponse(res, error.message, 'Error updating task', 500);
+    return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
 
 exports.deleteTask = async (id, res) => {
   try {
-    const subtaskQuery = 'SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL';
+    const subtaskQuery =
+      "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
     const [subtaskResult] = await db.query(subtaskQuery, [id]);
 
     if (subtaskResult[0].subtaskCount > 0) {
-      return errorResponse(res, null, "Task has associated subtasks and cannot be deleted", 400);
+      return errorResponse(
+        res,
+        null,
+        "Task has associated subtasks and cannot be deleted",
+        400
+      );
     }
 
     const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
@@ -711,17 +856,21 @@ exports.deleteTask = async (id, res) => {
   }
 };
 
-
-
 const convertToSeconds = (timeString) => {
-  const [hours, minutes, seconds] = timeString.split(':').map(Number);
-  return (hours * 3600) + (minutes * 60) + (seconds || 0);
+  const [hours, minutes, seconds] = timeString.split(":").map(Number);
+  return hours * 3600 + minutes * 60 + seconds;
 };
-
-const calculateTimeLeft = (estimatedHours, totalHoursWorked, timeDifference) => {
-  const estimatedInSeconds = convertToSeconds(estimatedHours || '00:00:00');
-  const workedInSeconds = convertToSeconds(totalHoursWorked || '00:00:00');
-  const remainingSeconds = Math.max(0, estimatedInSeconds - workedInSeconds - timeDifference);
+const calculateTimeLeft = (
+  estimatedHours,
+  totalHoursWorked,
+  timeDifference
+) => {
+  const estimatedInSeconds = convertToSeconds(estimatedHours || "00:00:00");
+  const workedInSeconds = convertToSeconds(totalHoursWorked || "00:00:00");
+  const remainingSeconds = Math.max(
+    0,
+    estimatedInSeconds - workedInSeconds - timeDifference
+  );
   return new Date(remainingSeconds * 1000).toISOString().substr(11, 8);
 };
 
@@ -746,91 +895,122 @@ const lastActiveTask = async (userId) => {
     if (lastActiveTaskRows.length === 0) return null;
 
     const task = lastActiveTaskRows[0];
+
     const lastStartTime = moment(task.start_time);
     const now = moment();
-    const timeDifference = now.diff(lastStartTime, 'seconds'); // Calculate the difference in seconds
+    const timeDifference = now.diff(lastStartTime, "seconds"); // Calculate the difference in seconds
 
     // Calculate the time left based on whether it's a subtask or task
     const timeLeft = calculateTimeLeft(
-        task.subtask_id ? task.subtask_estimated_hours : task.task_estimated_hours,
-        task.subtask_id ? task.subtask_total_hours_worked : task.task_total_hours_worked,
-        timeDifference
+      task.subtask_id
+        ? task.subtask_estimated_hours
+        : task.task_estimated_hours,
+      task.subtask_id
+        ? task.subtask_total_hours_worked
+        : task.task_total_hours_worked,
+      timeDifference
     );
 
     // Add time left to the task or subtask object
     if (task.subtask_id) {
-        task.subtask_time_left = timeLeft;
+      task.subtask_time_left = timeLeft;
     } else {
-        task.task_time_left = timeLeft;
+      task.task_time_left = timeLeft;
     }
 
     return task;
   } catch (err) {
-    console.error('Error fetching last active task:', err.message);
+    console.error("Error fetching last active task:", err.message);
     return null;
   }
 };
 
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
-  };
+const formatTime = (seconds) => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0"
+  )}:${String(remainingSeconds).padStart(2, "0")}`;
+};
 
-  exports.getTaskList = async (queryParams, res) => {
-    const authUser = { id: 61, role_id: 2}; 
-    const {user_id,search,product_id,project_id,team_id,priority}=queryParams
-    const searchTerm = search ? `%${search}%` : null;
-    //  const authuser = 
-    try {
-      const [teamIds] = await db.query(
-        `SELECT id FROM teams WHERE reporting_user_id = ?`,
-        [authUser.id]
-      );
-  
-      const teamIdsList = teamIds.map((team) => team.id);
-  
-      let whereConditions = [];
-      let queryParams = [];
-  
-      if (authUser.role_id === 3) {
-        whereConditions.push('t.team_id IN (?)');
-        queryParams.push(teamIdsList.length ? teamIdsList : undefined);
-      }
-  
-      if (authUser.role_id === 4) {
-        whereConditions.push('(t.user_id = ? OR s.user_id = ?)');
-        queryParams.push(authUser.id, authUser.id);
-      }
-      if (product_id) {
-        whereConditions.push('t.product_id = ?');
-        queryParams.push(product_id);
-      }
-  
-      if (project_id) {
-        whereConditions.push('t.project_id = ?');
-        queryParams.push(project_id);
-      }
-  
-      if (team_id) {
-        whereConditions.push('t.team_id = ?');
-        queryParams.push(team_id);
-      }
-  
-      if (priority) {
-        whereConditions.push('t.priority = ?');
-        queryParams.push(priority);
-      }
-  
-      if (searchTerm) {
-        whereConditions.push(`
+exports.getTaskList = async (queryParams, res) => {
+  const {
+    user_id,
+    search,
+    product_id,
+    project_id,
+    project_dropdown,
+    product_dropdown,
+    team_id,
+    priority,
+  } = queryParams;
+  const authUserDetails = await getAuthUserDetails(res, user_id);
+  console.log(authUserDetails.id);
+  console.log(authUserDetails.role_id);
+
+  const searchTerm = search ? `%${search}%` : null;
+  try {
+    const [teamIds] = await db.query(
+      `SELECT id FROM teams WHERE reporting_user_id = ?`,
+      [authUserDetails.id]
+    );
+
+    const teamIdsList = teamIds.map((team) => team.id);
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    if (authUserDetails.role_id === 3) {
+      whereConditions.push("t.team_id IN (?)");
+      queryParams.push(teamIdsList.length ? teamIdsList : undefined);
+    }
+
+    if (authUserDetails.role_id === 4) {
+      whereConditions.push("(t.user_id = ? OR s.user_id = ?)");
+      queryParams.push(authUserDetails.id, authUserDetails.id);
+    }
+    if (product_id) {
+      whereConditions.push("t.product_id = ?");
+      queryParams.push(product_id);
+    }
+    if (product_dropdown) {
+      whereConditions.push("t.product_id IN (?)");
+      queryParams.push(product_dropdown.split(","));
+    }
+    if (project_dropdown) {
+      whereConditions.push("t.project_id IN (?)");
+      queryParams.push(project_dropdown.split(","));
+    }
+    if (team_id) {
+      whereConditions.push("t.team_id = ?");
+      queryParams.push(team_id);
+    }
+
+    if (priority) {
+      whereConditions.push("t.priority = ?");
+      queryParams.push(priority);
+    }
+    if (project_id) {
+      whereConditions.push("t.project_id = ?");
+      queryParams.push(project_id);
+    }
+
+    if (searchTerm) {
+      whereConditions.push(`
           (t.name LIKE ? OR s.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR u.first_name LIKE ?)
         `);
-        queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm,searchTerm);
-      }
-  
-      const tasksQuery = `
+      queryParams.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
+    }
+
+    const tasksQuery = `
         SELECT t.*, 
                s.id AS subtask_id, s.name AS subtask_name, s.status AS subtask_status,
                p.name AS product_name, pr.name AS project_name, u.first_name AS user_name, tm.name AS team_name
@@ -840,110 +1020,604 @@ const lastActiveTask = async (userId) => {
         LEFT JOIN projects pr ON t.project_id = pr.id
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN teams tm ON u.team_id = tm.id
-        ${whereConditions.length ? 'WHERE ' + whereConditions.join(' AND ') : ''}
+        ${
+          whereConditions.length ? "WHERE " + whereConditions.join(" AND ") : ""
+        }
         ORDER BY t.updated_at DESC
       `;
-  
-      const [tasks] = await db.query(tasksQuery, queryParams);
-  
-      const groups = {
-        'To-Do': [],
-        'In-Progress': [],
-        'On-Hold': [],
-        'Pending-Approval': [],
-        'Reopen': [],
-        'Done': []
-      };
-  
-      const groupByStatus = (status) => {
-        return status === 0
-          ? 'To-Do'
-          : status === 1
-          ? 'On-Hold'
-          : status === 2
-          ? 'Pending-Approval'
-          : status === 3
-          ? 'Reopen'
-          : status === 4
-          ? 'In-Progress'
-          : 'Done';
-      };
-  
-      const taskMap = new Map();
-  
-      // Process tasks and subtasks
-      tasks.forEach((task) => {
-        const taskKey = task.id;
-        const estimatedSeconds = convertToSeconds(task.estimated_hours || '00:00:00');
-        const workedSeconds = convertToSeconds(task.total_hours_worked || '00:00:00');
-        const remainingSeconds = estimatedSeconds - workedSeconds;
-        const timeLeftFormatted = remainingSeconds > 0 ? formatTime(remainingSeconds) : '00:00:00';
-        if (!taskMap.has(taskKey)) {
-          taskMap.set(taskKey, {
-            task_details: {
-              id: task.id,
-              name: task.name,
-              product_name: task.product_name || 'N/A',
-              project_name: task.project_name || 'N/A',
-              priority: task.priority,
-              assignee: task.user_name || '',
-              team: task.team_name || '',
-              task_status: groupByStatus(task.status),
-              time_left: timeLeftFormatted,
-            },
-            subtasks: []
-          });
-        }
-  
-        if (task.subtask_id) {
-          taskMap.get(taskKey).subtasks.push({
-            subtask_id: task.subtask_id,
-            subtask_name: task.subtask_name,
-            subtask_status: groupByStatus(task.subtask_status),
-            subtask_estimated_hours: task.estimated_hours,
-            subtask_total_hours_worked: task.total_hours_worked,
-            subtask_reopen_status: task.reopen_status,
-            subtask_active_status: task.active_status
-          });
-        }
-      });
-  
-      // Group tasks
-      taskMap.forEach(({ task_details, subtasks }) => {
-        // If there are no subtasks, group the task by its own status
-        if (subtasks.length === 0) {
-          const statusGroup = groupByStatus(task_details.task_status);
-          groups[statusGroup].push({ task_details });
-        } else {
-          // Split subtasks by their status and add them to the respective groups
-          subtasks.forEach((subtask) => {
-            const subtaskGroup = subtask.subtask_status;
-            const group = groups[subtaskGroup];
-            const existingTask = group.find(
-              (g) => g.task_details.id === task_details.id
-            );
-      
-            if (existingTask) {
-              // If the task already exists in the group, append the subtask
-              existingTask.subtask_details.push(subtask);
-            } else {
-              // If the task doesn't exist in the group, create a new entry
-              group.push({
-                task_details,
-                subtask_details: [subtask]
-              });
-            }
-          });
-        }
-      });
-      const activeTask = await lastActiveTask(authUser.id);
-      const data = { groups,activeTask};
-      return successResponse(res, data, "Tasks retrieved successfully");
-    } catch (error) {
-      return errorResponse(res, error.message, 'Error fetching task', 500);
-    }
-  };
-  
-  
-  
 
+    const [tasks] = await db.query(tasksQuery, queryParams);
+
+    const groups = {
+      "To-Do": [],
+      "In-Progress": [],
+      "On-Hold": [],
+      "Pending-Approval": [],
+      Reopen: [],
+      Done: [],
+    };
+
+    const groupByStatus = (status) => {
+      return status === 0
+        ? "To-Do"
+        : status === 1
+        ? "On-Hold"
+        : status === 2
+        ? "Pending-Approval"
+        : status === 3
+        ? "Reopen"
+        : status === 4
+        ? "In-Progress"
+        : "Done";
+    };
+
+    const taskMap = new Map();
+
+    // Process tasks and subtasks
+    tasks.forEach((task) => {
+      const taskKey = task.id;
+      const estimatedSeconds = convertToSeconds(
+        task.estimated_hours || "00:00:00"
+      );
+      const workedSeconds = convertToSeconds(
+        task.total_hours_worked || "00:00:00"
+      );
+      const remainingSeconds = estimatedSeconds - workedSeconds;
+      const timeLeftFormatted =
+        remainingSeconds > 0 ? formatTime(remainingSeconds) : "00:00:00";
+      if (!taskMap.has(taskKey)) {
+        taskMap.set(taskKey, {
+          task_details: {
+            id: task.id,
+            name: task.name,
+            product_id: task.product_id,
+            project_id: task.project_id,
+            product_name: task.product_name || "N/A",
+            project_name: task.project_name || "N/A",
+            priority: task.priority,
+            assignee: task.user_name || "",
+            team: task.team_name || "",
+            task_status: groupByStatus(task.status),
+            time_left: timeLeftFormatted,
+            type: task.subtask_id ? "subtask" : "task",
+          },
+          subtasks: [],
+        });
+      }
+
+      if (task.subtask_id) {
+        taskMap.get(taskKey).subtasks.push({
+          subtask_id: task.subtask_id,
+          subtask_name: task.subtask_name,
+          subtask_status: groupByStatus(task.subtask_status),
+          subtask_estimated_hours: task.estimated_hours,
+          subtask_total_hours_worked: task.total_hours_worked,
+          subtask_reopen_status: task.reopen_status,
+          subtask_active_status: task.active_status,
+        });
+      }
+    });
+
+    // Group tasks
+    taskMap.forEach(({ task_details, subtasks }) => {
+      // If there are no subtasks, group the task by its own status
+      if (subtasks.length === 0) {
+        const statusGroup = groupByStatus(task_details.task_status);
+        groups[statusGroup].push({ task_details });
+      } else {
+        // Split subtasks by their status and add them to the respective groups
+        subtasks.forEach((subtask) => {
+          const subtaskGroup = subtask.subtask_status;
+          const group = groups[subtaskGroup];
+          const existingTask = group.find(
+            (g) => g.task_details.id === task_details.id
+          );
+
+          if (existingTask) {
+            // If the task already exists in the group, append the subtask
+            existingTask.subtask_details.push(subtask);
+          } else {
+            // If the task doesn't exist in the group, create a new entry
+            group.push({
+              task_details,
+              subtask_details: [subtask],
+            });
+          }
+        });
+      }
+    });
+    const activeTask = await lastActiveTask(authUserDetails.id);
+    const data = { groups, activeTask };
+    return successResponse(res, data, "Tasks retrieved successfully");
+  } catch (error) {
+    return errorResponse(res, error.message, "Error fetching task", 500);
+  }
+};
+
+// exports.doneTaskList = async (req, res) => {
+//   try {
+//     const { user_id, product_id, project_id, search, page = 1, perPage = 10  } = req.query;
+//     const offset = (page - 1) * perPage;
+//     let query = `
+//       SELECT
+//         t.id AS task_id,
+//         t.name AS task_name,
+//         t.rating AS task_rating,
+//         t.estimated_hours AS task_estimated_hours,
+//         t.total_hours_worked AS task_total_hours_worked,
+//         t.updated_at AS task_updated_at,
+//         tsut.start_time AS task_start_time,
+//         tsut.end_time AS task_end_time,
+//         u.id AS user_id,
+//         u.first_name AS user_name,
+//         u.employee_id AS employee_id,
+//         p.id AS product_id,
+//         p.name AS product_name,
+//         pr.id AS project_id,
+//         pr.name AS project_name,
+//         st.id AS subtask_id,
+//         st.name AS subtask_name,
+//         st.rating AS subtask_rating,
+//         st.estimated_hours AS subtask_estimated_hours,
+//         st.total_hours_worked AS subtask_total_hours_worked,
+//         st.updated_at AS subtask_updated_at,
+//         tsut_sub.start_time AS subtask_start_time,
+//         tsut_sub.end_time AS subtask_end_time,
+//         DATE(t.created_at) AS task_date,
+//         t.status AS task_status
+//       FROM
+//         tasks t
+//       LEFT JOIN
+//         users u ON u.id = t.user_id
+//       LEFT JOIN
+//         products p ON p.id = t.product_id
+//       LEFT JOIN
+//         projects pr ON pr.id = t.project_id
+//       LEFT JOIN
+//         sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
+//       LEFT JOIN
+//         sub_tasks_user_timeline tsut ON tsut.task_id = t.id AND tsut.deleted_at IS NULL
+//       LEFT JOIN
+//         sub_tasks_user_timeline tsut_sub ON tsut_sub.subtask_id = st.id AND tsut_sub.deleted_at IS NULL
+//       WHERE
+//         t.deleted_at IS NULL
+//         AND t.status = 3
+//         ${product_id ? `AND (t.product_id = ? OR st.product_id = ?)` : ""}
+//         ${project_id ? `AND (t.project_id = ? OR st.project_id = ?)` : ""}
+//         ${user_id ? `AND t.user_id = ?` : ""}
+//         ${search ? `AND (t.name LIKE ? OR st.name LIKE ?)` : ""}
+//       ORDER BY t.id, st.id
+
+//     `;
+
+//     const values = [];
+//     if (product_id) {
+//       values.push(product_id, product_id);
+//     }
+//     if (project_id) {
+//       values.push(project_id, project_id);
+//     }
+//     if (user_id) values.push(user_id);
+//     if (search) {
+//       const searchTerm = `%${search}%`;
+//       values.push(searchTerm, searchTerm);
+//     }
+
+//     const [result] = await db.execute(query, values);
+
+//     const groupedTasks = result.reduce((acc, row) => {
+//       if (!acc[row.task_id]) {
+//         acc[row.task_id] = {
+//           task_id: row.task_id,
+//           task_name: row.task_name,
+//           estimated_time: row.task_estimated_hours,
+//           task_duration: row.task_updated_at
+//             ? moment(row.task_updated_at).fromNow()
+//             : "Not started",
+//           user_id: row.user_id,
+//           employee_id: row.employee_id,
+//           product_id: row.product_id,
+//           product_name: row.product_name,
+//           project_id: row.project_id,
+//           project_name: row.project_name,
+//           rating: row.task_rating,
+//           subtasks: [],
+//         };
+//       }
+
+//       if (row.subtask_id) {
+//         acc[row.task_id].subtasks.push({
+//           subtask_id: row.subtask_id,
+//           subtask_name: row.subtask_name,
+//           estimated_time: row.subtask_estimated_hours,
+//           task_duration: row.subtask_updated_at
+//             ? moment(row.subtask_updated_at).fromNow()
+//             : "Not started",
+//           rating: row.subtask_rating,
+//         });
+//       }
+
+//       return acc;
+//     }, {});
+
+//     const data = Object.values(groupedTasks).flatMap((task) => {
+//       if (task.subtasks.length > 0) {
+//         return task.subtasks.map((subtask) => ({
+//           task_name: subtask.subtask_name,
+//           estimated_time: subtask.estimated_time,
+//           task_duration: subtask.task_duration,
+//           rating: subtask.rating,
+//           product_id: task.product_id,
+//           product_name: task.product_name,
+//           project_id: task.project_id,
+//           project_name: task.project_name,
+//         }));
+//       }
+
+//       return {
+//         task_name: task.task_name,
+//         estimated_time: task.estimated_time,
+//         task_duration: task.task_duration,
+//         rating: task.rating,
+//         product_id: task.product_id,
+//         product_name: task.product_name,
+//         project_id: task.project_id,
+//         project_name: task.project_name,
+//       };
+//     });
+
+//     successResponse(
+//       res,
+//       data,
+//       data.length === 0
+//         ? "No tasks or subtasks found"
+//         : "Tasks and subtasks retrieved successfully",
+//       200
+//     );
+//   } catch (error) {
+//     console.error("Error fetching tasks and subtasks:", error);
+//     return errorResponse(res, error.message, "Server error", 500);
+//   }
+// };
+exports.doneTaskList = async (req, res) => {
+  try {
+    const {
+      user_id,
+      product_id,
+      project_id,
+      search,
+      page = 1,
+      perPage = 10,
+    } = req.query;
+    const offset = (page - 1) * perPage;
+
+    const taskConditions = [];
+    const taskValues = [];
+
+    const subtaskConditions = [];
+    const subtaskValues = [];
+
+    // Task-specific filters
+    if (product_id) {
+      taskConditions.push("t.product_id = ?");
+      taskValues.push(product_id);
+    }
+    if (project_id) {
+      taskConditions.push("t.project_id = ?");
+      taskValues.push(project_id);
+    }
+    if (user_id) {
+      taskConditions.push("t.user_id = ?");
+      taskValues.push(user_id);
+    }
+
+    if (search) {
+      const searchTerm = `%${search}%`;
+      taskConditions.push(
+        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
+      );
+      taskValues.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
+    }
+
+    // Subtask-specific filters
+    if (product_id) {
+      subtaskConditions.push("st.product_id = ?");
+      subtaskValues.push(product_id);
+    }
+    if (project_id) {
+      subtaskConditions.push("st.project_id = ?");
+      subtaskValues.push(project_id);
+    }
+    if (user_id) {
+      subtaskConditions.push("st.user_id = ?");
+      subtaskValues.push(user_id);
+    }
+
+    if (search) {
+      const searchTerm = `%${search}%`;
+      subtaskConditions.push(
+        `(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
+      );
+      subtaskValues.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
+    }
+
+    const taskWhereClause =
+      taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
+    const subtaskWhereClause =
+      subtaskConditions.length > 0
+        ? `AND ${subtaskConditions.join(" AND ")}`
+        : "";
+
+    // Query to fetch subtasks with status = 2
+    const subtasksQuery = `
+      SELECT 
+        p.name AS product_name,
+        pr.name AS project_name,
+        t.name AS task_name,
+        st.name AS subtask_name,
+        st.estimated_hours AS estimated_time,
+        st.total_hours_worked AS time_taken,
+        st.rating AS subtask_rating,
+        tm.name AS team_name,
+        'Subtask' AS type,
+        t.id AS task_id,
+        st.id AS subtask_id,
+        st.user_id AS subtask_user_id
+      FROM 
+        sub_tasks st
+      LEFT JOIN 
+        tasks t ON t.id = st.task_id
+      LEFT JOIN 
+        users u ON u.id = st.user_id
+      LEFT JOIN 
+        products p ON p.id = t.product_id
+      LEFT JOIN 
+        projects pr ON pr.id = t.project_id
+      LEFT JOIN 
+        teams tm ON tm.id = u.team_id
+      LEFT JOIN 
+        users u_assigned ON u_assigned.id = t.assigned_user_id
+
+      WHERE 
+        st.status = 3
+        AND st.deleted_at IS NULL
+        ${subtaskWhereClause}
+    `;
+
+    // Query to fetch tasks without subtasks
+    const tasksQuery = `
+      SELECT 
+        p.name AS product_name,
+        pr.name AS project_name,
+        t.name AS task_name,
+        t.estimated_hours AS estimated_time,
+        t.total_hours_worked AS time_taken,
+        t.rating AS task_rating,
+        tm.name AS team_name,
+        'Task' AS type,
+        t.id AS task_id,
+        NULL AS subtask_id,
+        t.user_id AS task_user_id
+      FROM 
+        tasks t
+      LEFT JOIN 
+        users u ON u.id = t.user_id
+              LEFT JOIN 
+        products p ON p.id = t.product_id
+      LEFT JOIN 
+        projects pr ON pr.id = t.project_id
+      LEFT JOIN 
+        teams tm ON tm.id = u.team_id
+      LEFT JOIN 
+        users u_assigned ON u_assigned.id = t.assigned_user_id
+
+      WHERE 
+        t.deleted_at IS NULL
+        AND t.status = 3
+        AND t.id NOT IN (SELECT task_id FROM sub_tasks)
+        ${taskWhereClause}
+    `;
+
+    // Execute both queries
+    const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+    const [tasks] = await db.query(tasksQuery, taskValues);
+
+    // Combine the results
+    const mergedResults = [...subtasks, ...tasks];
+
+    // Fetch assignee names and remove user_id
+    const processedData = await Promise.all(
+      mergedResults.map(async (item) => {
+        const assigneeUserId = item.subtask_id
+          ? item.subtask_user_id
+          : item.task_user_id;
+        const assigneeNameQuery = `SELECT COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS assignee_name FROM users WHERE id = ?`;
+        const [results] = await db.query(assigneeNameQuery, [assigneeUserId]);
+        item.assignee_name = results[0] ? results[0].assignee_name : "Unknown";
+        delete item.user_id;
+        return item;
+      })
+    );
+
+    // Pagination logic
+    const totalRecords = processedData.length;
+    const paginatedData = processedData.slice(
+      offset,
+      offset + parseInt(perPage)
+    );
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    // Add serial numbers to the paginated data
+    const data = paginatedData.map((row, index) => ({
+      s_no: offset + index + 1,
+      ...row,
+    }));
+
+    successResponse(
+      res,
+      data,
+      data.length === 0
+        ? "No tasks or subtasks found"
+        : "Done Tasks and subtasks retrieved successfully",
+      200,
+      pagination
+    );
+  } catch (error) {
+    console.error("Error fetching tasks and subtasks:", error);
+    return errorResponse(res, error.message, "Server error", 500);
+  }
+};
+
+exports.updateTaskTimeLine = async (req, res) => {
+  try {
+    const { id, action, type, last_start_time, timeline_id, comment } =
+      req.body;
+    console.log(action);
+    const { error } = updateTimelineShema.validate(req.body, {
+      abortEarly: false,
+    });
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 400);
+    }
+    const lastStartTime = moment(last_start_time);
+    let taskOrSubtask;
+    let taskId, subtaskId;
+
+    if (type === "subtask") {
+      const [subtask] = await db.query("SELECT * FROM sub_tasks WHERE id = ?", [
+        id,
+      ]);
+      taskOrSubtask = subtask[0];
+      taskId = taskOrSubtask.task_id;
+      subtaskId = taskOrSubtask.id;
+    } else {
+      const [task] = await db.query("SELECT * FROM tasks WHERE id = ?", [id]);
+      taskOrSubtask = task[0];
+      taskId = taskOrSubtask.id;
+      subtaskId = null;
+    }
+    console.log(taskId);
+
+    if (action === "start") {
+      // Check if a record already exists in the sub_tasks_user_timeline table for the current task/subtask
+      const [existingSubtaskSublime] = await db.query(
+        "SELECT * FROM ?? WHERE active_status = 1 AND deleted_at IS NULL AND user_id = ?",
+        [type === "subtask" ? "sub_tasks" : "tasks", taskOrSubtask.user_id]
+      );
+      console.log(existingSubtaskSublime);
+      if (existingSubtaskSublime.length > 0) {
+        return res
+          .status(400)
+          .json({ message: "Time Line is Already Started" });
+      }
+
+      await db.query(
+        "UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?",
+        [type === "subtask" ? "sub_tasks" : "tasks", id]
+      );
+      const [timeline] = await db.query(
+        "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          taskOrSubtask.user_id,
+          taskOrSubtask.product_id,
+          taskOrSubtask.project_id,
+          taskId,
+          subtaskId,
+          moment().format("YYYY-MM-DD HH:mm:ss"),
+        ]
+      );
+    } else if (action === "pause") {
+      const currentTime = moment();
+      const timeDifference = lastStartTime.diff(currentTime, "seconds");
+      const newTotalHoursWorked = calculateNewWorkedTime(
+        taskOrSubtask.total_hours_worked,
+        timeDifference
+      );
+
+      await db.query(
+        "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?",
+        [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
+      );
+
+      await db.query(
+        "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
+        [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+      );
+    } else if (action === "end") {
+      const currentTime = moment();
+      const timeDifference = currentTime.diff(lastStartTime, "seconds");
+      const newTotalHoursWorked = calculateNewWorkedTime(
+        taskOrSubtask.total_hours_worked,
+        timeDifference
+      );
+      const estimatedHours = taskOrSubtask.estimated_hours;
+
+      const newTotalHoursWorkedSeconds = convertToSeconds(newTotalHoursWorked);
+      const estimatedHoursSeconds = convertToSeconds(estimatedHours);
+
+      const remainingSeconds =
+        estimatedHoursSeconds - newTotalHoursWorkedSeconds;
+      let extendedHours = "00:00:00";
+
+      if (remainingSeconds < 0) {
+        extendedHours = new Date(Math.abs(remainingSeconds) * 1000)
+          .toISOString()
+          .substr(11, 8);
+      }
+
+      await db.query(
+        "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?",
+        [
+          type === "subtask" ? "sub_tasks" : "tasks",
+          newTotalHoursWorked,
+          extendedHours,
+          comment,
+          id,
+        ]
+      );
+
+      await db.query(
+        "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
+        [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+      );
+    } else {
+      return errorResponse(res, "Invalid Type ", 400);
+    }
+    return successResponse(res, "Time updated successfully", 201);
+  } catch (error) {
+    return errorResponse(res, "Error Updating Time", 400);
+  }
+};
+
+function calculateNewWorkedTime(worked, timeDifference) {
+  const workedInSeconds = convertToSeconds(worked);
+  const newTotalWorkedInSeconds = workedInSeconds + timeDifference;
+  return convertSecondsToHHMMSS(newTotalWorkedInSeconds);
+}
+
+function convertSecondsToHHMMSS(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((num) => String(num).padStart(2, "0"))
+    .join(":");
+}

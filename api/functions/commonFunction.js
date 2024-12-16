@@ -19,6 +19,8 @@ exports.getAllData = async (payload, res) => {
         query = "SELECT id,name FROM tasks WHERE deleted_at IS NULL";
     }else if (type === "designations") {
         query = "SELECT id,name FROM designations WHERE deleted_at IS NULL";
+    }else if (type === "roles") {
+        query = "SELECT id,name FROM roles";
     } else {
         return res.status(400).json({
             message: "Invalid type provided",
@@ -35,7 +37,7 @@ exports.getAllData = async (payload, res) => {
         queryParams.push(id);
     }
 
-    query += " ORDER BY `created_at` DESC";
+    query += " ORDER BY `id` DESC";
 
     try {
         const [rows] = await db.query(query, queryParams);
@@ -50,3 +52,17 @@ exports.getAllData = async (payload, res) => {
             return errorResponse(res, err.message, 'Error fetching Data', 500);
     }
 };
+exports.getAuthUserDetails = async (res,authUserId) => {
+    try {
+      const authUserQuery = "SELECT * FROM users WHERE deleted_at IS NULL AND id = ?";
+      const [authUserDetails] = await db.query(authUserQuery, [authUserId]);
+  
+      if (!authUserDetails.length) {
+        return errorResponse(res,"Authenticated User Id not found", 'Authenticated User Id not found', 500);
+      }
+  
+      return authUserDetails[0]; // Return the first user object
+    } catch (error) {
+        return errorResponse(res, error.message, 'Error fetching USer', 500);
+    }
+  };
