@@ -19,6 +19,8 @@ exports.getAllData = async (payload, res) => {
         query = "SELECT id,name FROM tasks WHERE deleted_at IS NULL";
     }else if (type === "designations") {
         query = "SELECT id,name FROM designations WHERE deleted_at IS NULL";
+    }else if (type === "roles") {
+        query = "SELECT id,name FROM roles";
     } else {
         return res.status(400).json({
             message: "Invalid type provided",
