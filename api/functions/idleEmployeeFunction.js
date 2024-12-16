@@ -38,7 +38,7 @@ exports.get_idleEmployee = async (req, res) => {
         }
 
         // Add pagination to the query
-        query += ` LIMIT ? OFFSET ?`;
+        query += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
         queryParams.push(parseInt(perPage), parseInt(offset));
 
         // Query to get the total count of records for pagination, filtered by team_id if provided

@@ -344,7 +344,7 @@ exports.getTask = async (id, res) => {
 // Show All Task
 exports.getAllTasks = async (res) => {
   try {
-    const query = "SELECT * FROM tasks";
+    const query = "SELECT * FROM tasks ORDER BY id DESC";
     const [rows] = await db.query(query);
 
     if (rows.length === 0) {
