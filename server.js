@@ -73,36 +73,36 @@ apiRouter.get('/user/:id',RoleController.checkRole(['admin','tl','pm']), userCon
 apiRouter.get('/user',RoleController.checkRole(['admin','tl','pm']), userController.getAllUsers);
 
 // Product Routes
-apiRouter.post('/products', productController.createProduct);
-apiRouter.put('/products/:id', productController.updateProduct);
-apiRouter.delete('/products/:id', productController.deleteProduct);
-apiRouter.get('/products/:id', productController.getProduct);
-apiRouter.get('/products', productController.getAllProducts);
+apiRouter.post('/products',RoleController.checkRole(['pm','admin']), productController.createProduct);
+apiRouter.put('/products/:id',RoleController.checkRole(['pm','admin']), productController.updateProduct);
+apiRouter.delete('/products/:id',RoleController.checkRole(['pm','admin']), productController.deleteProduct);
+apiRouter.get('/products/:id',RoleController.checkRole(['pm','admin']), productController.getProduct);
+apiRouter.get('/products',RoleController.checkRole(['pm','admin']), productController.getAllProducts);
 
 // Project Routes
-apiRouter.post('/projects', projectController.createProject);
-apiRouter.put('/projects/:id', projectController.updateProject);
-apiRouter.delete('/projects/:id', projectController.deleteProject);
-apiRouter.get('/projects/:id', projectController.getProject);
-apiRouter.get('/projects', projectController.getAllProjects);
+apiRouter.post('/projects',RoleController.checkRole(['pm','admin']), projectController.createProject);
+apiRouter.put('/projects/:id',RoleController.checkRole(['pm','admin']), projectController.updateProject);
+apiRouter.delete('/projects/:id',RoleController.checkRole(['pm','admin']), projectController.deleteProject);
+apiRouter.get('/projects/:id',RoleController.checkRole(['pm','admin']), projectController.getProject);
+apiRouter.get('/projects',RoleController.checkRole(['pm','admin']), projectController.getAllProjects);
 apiRouter.get('/project_status', projectController.project_status);
 apiRouter.get('/project_request',RoleController.checkRole(['pm','admin']), projectController.project_request);
 apiRouter.get('/project_requestupdate',RoleController.checkRole(['pm','admin']), projectController.project_requestupdate);
 apiRouter.put('/project_requestchange/:id',RoleController.checkRole(['pm','admin']), projectController.project_requestchange);
 
 // Team Routes
-apiRouter.post('/team', teamController.createTeam);
-apiRouter.put('/team/:id', teamController.updateTeam);
-apiRouter.delete('/team/:id', teamController.deleteTeam);
-apiRouter.get('/team/:id', teamController.getTeam);
-apiRouter.get('/team', teamController.getAllTeams);
+apiRouter.post('/team',RoleController.checkRole(['pm','admin']), teamController.createTeam);
+apiRouter.put('/team/:id',RoleController.checkRole(['pm','admin']), teamController.updateTeam);
+apiRouter.delete('/team/:id',RoleController.checkRole(['pm','admin']), teamController.deleteTeam);
+apiRouter.get('/team/:id',RoleController.checkRole(['pm','admin']), teamController.getTeam);
+apiRouter.get('/team',RoleController.checkRole(['pm','admin']), teamController.getAllTeams);
 
 // Designation Routes
-apiRouter.post('/designations', designationController.createDesignation);
-apiRouter.put('/designations/:id', designationController.updateDesignation);
-apiRouter.delete('/designations/:id', designationController.deleteDesignation);
-apiRouter.get('/designations/:id', designationController.getDesignation);
-apiRouter.get('/designations', designationController.getAllDesignations);
+apiRouter.post('/designations',RoleController.checkRole(['pm','admin']), designationController.createDesignation);
+apiRouter.put('/designations/:id',RoleController.checkRole(['pm','admin']), designationController.updateDesignation);
+apiRouter.delete('/designations/:id',RoleController.checkRole(['pm','admin']), designationController.deleteDesignation);
+apiRouter.get('/designations/:id',RoleController.checkRole(['pm','admin']), designationController.getDesignation);
+apiRouter.get('/designations',RoleController.checkRole(['pm','admin']), designationController.getAllDesignations);
 
 
 // Task Routes
@@ -112,9 +112,9 @@ apiRouter.delete('/task/:id', RoleController.checkRole(['pm','admin']),taskContr
 apiRouter.get('/task/:id',RoleController.checkRole(['pm','admin']), taskController.getTask);
 apiRouter.get('/task', RoleController.checkRole(['pm','admin']),taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['pm','admin']), taskController.updateDatas);
-apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin']), taskController.getTaskDatas);
+apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
 apiRouter.get('/doneTask',RoleController.checkRole(['pm','admin']), taskController.doneTask);
-apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['pm','admin']), taskController.updateTaskTimeLineStatus);
+apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['pm','admin','tl','employee']), taskController.updateTaskTimeLineStatus);
 
 
 // Subtask Routes
@@ -157,12 +157,12 @@ apiRouter.get('/teamwise_productivity', RoleController.checkRole(['pm','admin'])
 apiRouter.get('/individual_status', RoleController.checkRole(['pm','admin']),productivityController.get_individualProductivity);
 
 //Rating
-apiRouter.get('/getAllRatings', ratingController.getAllRatings);
-apiRouter.post('/ratingUpdation', ratingController.ratingUpdation);
+apiRouter.get('/getAllRatings', RoleController.checkRole(['pm','admin']),ratingController.getAllRatings);
+apiRouter.post('/ratingUpdation', RoleController.checkRole(['pm','admin']), ratingController.ratingUpdation);
 
 //Attendance
-apiRouter.get('/getAttendanceList', attendanceController.getAttendanceList);
-apiRouter.post('/updateAttendance', attendanceController.updateAttendance);
+apiRouter.get('/getAttendanceList', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceList);
+apiRouter.post('/updateAttendance', RoleController.checkRole(['tl','admin']), attendanceController.updateAttendance);
 
 
 // Comments
@@ -174,7 +174,7 @@ apiRouter.delete('/comments/:id',RoleController.checkRole(['tl','pm','admin','em
 
 
 //common
-apiRouter.get('/getDropDownList',commonController.getDropDownList);
+apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin']),commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix

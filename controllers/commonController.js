@@ -10,7 +10,7 @@ const {
 
       await getAllData(payload, res);
     } catch (error) {
-      return errorResponse(res, error.message, 'Error fetching Data', 500);
+      return errorResponse(res, error.message, 'Error  fetching Data', 500);
     }
   },
 }
