@@ -37,7 +37,7 @@ exports.getAllData = async (payload, res) => {
         queryParams.push(id);
     }
 
-    query += " ORDER BY `created_at` DESC";
+    query += " ORDER BY `id` DESC";
 
     try {
         const [rows] = await db.query(query, queryParams);

@@ -107,6 +107,7 @@ exports.getAllUsers = async (req, res) => {
       FROM users 
       WHERE deleted_at IS NULL
       ${search ? 'AND (first_name LIKE ? OR email LIKE ?)' : ''}
+      ORDER BY id DESC
       LIMIT ? OFFSET ?
     `;
 

@@ -13,7 +13,7 @@ exports.createProject = async (payload, res) => {
     const { name, product,user_id } = payload;
 
   const { error } = projectSchema.validate(
-    { name, product },
+    { name, product,user_id },
     { abortEarly: false }
   );
   if (error) {
@@ -63,7 +63,7 @@ exports.updateProject = async (id, payload, res) => {
     const { name, product,user_id } =payload;
 
   const { error } = projectSchema.validate(
-    { name, product },
+    { name, product ,user_id},
     { abortEarly: false }
   );
   if (error) {
