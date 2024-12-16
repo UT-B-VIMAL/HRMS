@@ -33,6 +33,21 @@ const getPagination = (page, perPage, totalRecords) => {
     })
   });
 
+  const teamUpdateSchema = Joi.object({
+    name: Joi.string().max(100).required().messages({
+      'string.empty': 'Team name is required',
+      'string.max': 'Team name must not exceed 100 characters'
+    }),
+    user_id: Joi.number().integer().required().messages({
+      'number.base': 'User Id must be a valid user ID',
+      'any.required': 'User Id field is required'
+    }),
+    reporting_user_id: Joi.number().integer().required().messages({
+      'number.base': 'Reporting User Id must be a valid user ID',
+      'any.required': 'Reporting User Id field is required'
+    })
+  });
+
 // Create Team
 exports.createTeam = async (payload, res) => {
 const { name ,user_id } = payload;
@@ -67,9 +82,9 @@ const { name ,user_id } = payload;
 
 // Update Team
 exports.updateTeam = async (id, payload, res) => {
-    const { name ,user_id } = payload;
-    const { error } = teamSchema.validate(
-      { name, user_id },
+    const { name ,user_id,reporting_user_id} = payload;
+    const { error } = teamUpdateSchema.validate(
+      { name, user_id ,reporting_user_id},
       { abortEarly: false }
     );
     if (error) {
@@ -87,8 +102,8 @@ exports.updateTeam = async (id, payload, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Team not found or deleted", "Not Found", 404);
     }
-    const query = "UPDATE teams SET name = ?, updated_by = ? WHERE id = ?";
-    const values = [name, user_id, id];
+    const query = "UPDATE teams SET name = ?, updated_by = ?, reporting_user_id=? WHERE id = ?";
+    const values = [name, user_id,reporting_user_id, id];
     await db.query(query, values);
 
     return successResponse(res, { id, name }, 'Team updated successfully', 200);
