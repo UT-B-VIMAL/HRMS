@@ -37,7 +37,8 @@ const corsOptions = {
       'http://localhost:5173',
       'http://localhost:81',
       'http://localhost', 
-      'http://frontend.utwebapps.com', 
+      'http://frontend.utwebapps.com',
+      'https://main.detwo6merrv1m.amplifyapp.com' 
     ];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -106,29 +107,29 @@ apiRouter.get('/designations',RoleController.checkRole(['pm','admin']), designat
 
 
 // Task Routes
-apiRouter.post('/task', taskController.createTask);
-apiRouter.put('/task/:id', taskController.updateTask);
-apiRouter.delete('/task/:id', taskController.deleteTask);
-apiRouter.get('/task/:id', taskController.getTask);
-apiRouter.get('/task', taskController.getAllTasks);
-apiRouter.put('/taskupdate/:id', taskController.updateDatas);
+apiRouter.post('/task', RoleController.checkRole(['pm','admin']),taskController.createTask);
+apiRouter.put('/task/:id',RoleController.checkRole(['pm','admin']), taskController.updateTask);
+apiRouter.delete('/task/:id', RoleController.checkRole(['pm','admin']),taskController.deleteTask);
+apiRouter.get('/task/:id',RoleController.checkRole(['pm','admin']), taskController.getTask);
+apiRouter.get('/task', RoleController.checkRole(['pm','admin']),taskController.getAllTasks);
+apiRouter.put('/taskupdate/:id',RoleController.checkRole(['pm','admin']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
-apiRouter.get('/doneTask', taskController.doneTask);
+apiRouter.get('/doneTask',RoleController.checkRole(['pm','admin']), taskController.doneTask);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['pm','admin','tl','employee']), taskController.updateTaskTimeLineStatus);
 
 
 // Subtask Routes
-apiRouter.post('/subtask', subtaskController.createSubTask);
-apiRouter.put('/subtask/:id', subtaskController.updateSubTask);
-apiRouter.delete('/subtask/:id', subtaskController.deleteSubTask);
-apiRouter.get('/subtask/:id', subtaskController.getSubTask);
-apiRouter.get('/subtask', subtaskController.getAllSubTasks);
-apiRouter.put('/subtaskupdate/:id', subtaskController.updateDatas);
+apiRouter.post('/subtask', RoleController.checkRole(['pm','admin']),subtaskController.createSubTask);
+apiRouter.put('/subtask/:id',RoleController.checkRole(['pm','admin']), subtaskController.updateSubTask);
+apiRouter.delete('/subtask/:id', RoleController.checkRole(['pm','admin']),subtaskController.deleteSubTask);
+apiRouter.get('/subtask/:id', RoleController.checkRole(['pm','admin']),subtaskController.getSubTask);
+apiRouter.get('/subtask',RoleController.checkRole(['pm','admin']), subtaskController.getAllSubTasks);
+apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(['pm','admin']), subtaskController.updateDatas);
 
 
 
 // Idle Employee Route
-apiRouter.get('/idleEmployee', idleEmployeeController.get_idleEmployee);
+apiRouter.get('/idleEmployee', RoleController.checkRole(['tl','pm','admin']),idleEmployeeController.get_idleEmployee);
 
 // PM Dashboard Routes
 apiRouter.get('/pmproducts',RoleController.checkRole(['pm','admin']), pmdashboardController.pmproductsection);
@@ -153,8 +154,8 @@ apiRouter.get('/empstatisticschart',RoleController.checkRole(['tl','pm','admin',
 apiRouter.get('/empratings',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empratingsection);
 
 // Productivity
-apiRouter.get('/teamwise_productivity', productivityController.get_teamwiseProductivity);
-apiRouter.get('/individual_status', productivityController.get_individualProductivity);
+apiRouter.get('/teamwise_productivity', RoleController.checkRole(['pm','admin']),productivityController.get_teamwiseProductivity);
+apiRouter.get('/individual_status', RoleController.checkRole(['pm','admin']),productivityController.get_individualProductivity);
 
 //Rating
 apiRouter.get('/getAllRatings', RoleController.checkRole(['pm','admin']),ratingController.getAllRatings);
@@ -166,9 +167,9 @@ apiRouter.post('/updateAttendance', RoleController.checkRole(['tl','admin']), at
 
 
 // Comments
-apiRouter.post('/comments',commentsController. addComments);
-apiRouter.put('/comments/:id',commentsController. updateComments);
-apiRouter.delete('/comments/:id',commentsController. deleteComments);
+apiRouter.post('/comments',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. addComments);
+apiRouter.put('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. updateComments);
+apiRouter.delete('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. deleteComments);
 
 
 
