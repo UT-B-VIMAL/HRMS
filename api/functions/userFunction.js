@@ -9,7 +9,7 @@ exports.createUser = async (payload, res) => {
   const {
     first_name, last_name, employee_id, email, phone,
     password, team_id, role_id, designation_id,
-    created_by = 1, updated_by = 1, created_at = new Date(), updated_at = new Date(), deleted_at = null
+    created_by, created_at = new Date(), updated_at = new Date(), deleted_at = null
   } = payload;
 
   try {
@@ -22,13 +22,13 @@ exports.createUser = async (payload, res) => {
     first_name, last_name, employee_id, email, phone,
     password, team_id, role_id, designation_id,
     created_by, updated_by, deleted_at, created_at, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
 `;
 
     const values = [
       first_name, last_name, employee_id, email, phone,
       hashedPassword, team_id, role_id, designation_id,
-      created_by, updated_by
+      created_by
     ];
     const [result] = await db.query(query, values);
     
@@ -153,7 +153,7 @@ exports.updateUser = async (id, payload, res) => {
     team_id,
     role_id,
     designation_id,
-    updated_by = 1,
+    updated_by,
     updated_at = new Date(),
   } = payload;
 
