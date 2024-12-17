@@ -62,10 +62,7 @@ exports.getAllData = async (payload, res) => {
         return errorResponse(res, err.message, "Error fetching Data", 500);
     }
 };
-
-
-
-exports.getAuthUserDetails = async (res,authUserId) => {
+exports.getAuthUserDetails = async (authUserId) => {
     try {
       const authUserQuery = "SELECT * FROM users WHERE deleted_at IS NULL AND id = ?";
       const [authUserDetails] = await db.query(authUserQuery, [authUserId]);

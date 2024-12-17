@@ -1,4 +1,5 @@
 const db = require("../../config/db");
+const mysql = require('mysql2');
 const {
   successResponse,
   errorResponse,
@@ -860,19 +861,19 @@ const convertToSeconds = (timeString) => {
   const [hours, minutes, seconds] = timeString.split(":").map(Number);
   return hours * 3600 + minutes * 60 + seconds;
 };
-const calculateTimeLeft = (
-  estimatedHours,
-  totalHoursWorked,
-  timeDifference
-) => {
-  const estimatedInSeconds = convertToSeconds(estimatedHours || "00:00:00");
-  const workedInSeconds = convertToSeconds(totalHoursWorked || "00:00:00");
-  const remainingSeconds = Math.max(
-    0,
-    estimatedInSeconds - workedInSeconds - timeDifference
-  );
-  return new Date(remainingSeconds * 1000).toISOString().substr(11, 8);
-};
+// const calculateTimeLeft = (
+//   estimatedHours,
+//   totalHoursWorked,
+//   timeDifference
+// ) => {
+//   const estimatedInSeconds = convertToSeconds(estimatedHours || "00:00:00");
+//   const workedInSeconds = convertToSeconds(totalHoursWorked || "00:00:00");
+//   const remainingSeconds = Math.max(
+//     0,
+//     estimatedInSeconds - workedInSeconds - timeDifference
+//   );
+//   return new Date(remainingSeconds * 1000).toISOString().substr(11, 8);
+// };
 
 const lastActiveTask = async (userId) => {
   try {
@@ -936,72 +937,122 @@ const formatTime = (seconds) => {
 };
 
 exports.getTaskList = async (queryParams, res) => {
-  const {
-    user_id,
-    search,
-    product_id,
-    project_id,
-    project_dropdown,
-    product_dropdown,
-    team_id,
-    priority,
-  } = queryParams;
-  const authUserDetails = await getAuthUserDetails(res, user_id);
-  console.log(authUserDetails.id);
-  console.log(authUserDetails.role_id);
-
-  const searchTerm = search ? `%${search}%` : null;
   try {
-    const [teamIds] = await db.query(
-      `SELECT id FROM teams WHERE reporting_user_id = ?`,
-      [authUserDetails.id]
-    );
+    const {
+      user_id,
+      product_id,
+      project_id,
+      team_id,
+      priority,
+      search,
+      dropdown_products,
+      dropdown_projects
+    } = queryParams;
 
-    const teamIdsList = teamIds.map((team) => team.id);
-
-    let whereConditions = [];
-    let queryParams = [];
-
-    if (authUserDetails.role_id === 3) {
-      whereConditions.push("t.team_id IN (?)");
-      queryParams.push(teamIdsList.length ? teamIdsList : undefined);
+    if (!user_id) {
+      return errorResponse(res, "User ID is required", "Missing user_id in query parameters", 400);
     }
 
-    if (authUserDetails.role_id === 4) {
-      whereConditions.push("(t.user_id = ? OR s.user_id = ?)");
-      queryParams.push(authUserDetails.id, authUserDetails.id);
+    // Get user details
+    const userDetails = await getAuthUserDetails(user_id);
+    if (!userDetails) {
+      return errorResponse(res, "User not found", "Authenticated User Id not found", 500);
     }
+
+    const { role_id, team_id: userTeamId } = userDetails;
+
+    // Base query for tasks
+    let baseQuery = `
+      SELECT 
+        tasks.id AS task_id, 
+        tasks.name AS task_name,
+        tasks.priority,
+        tasks.estimated_hours,
+        tasks.total_hours_worked,
+        tasks.status AS task_status,
+        tasks.reopen_status,
+        tasks.active_status,
+        tasks.product_id,
+        tasks.project_id,
+        tasks.team_id,
+        projects.name AS project_name,
+        products.name AS product_name,
+        users.first_name AS assignee_name,
+        teams.name AS team_name
+      FROM tasks
+      LEFT JOIN projects ON tasks.project_id = projects.id
+      LEFT JOIN products ON tasks.product_id = products.id
+      LEFT JOIN users ON tasks.user_id = users.id
+      LEFT JOIN teams ON users.team_id = teams.id
+      WHERE 1=1
+    `;
+
+    const params = [];
+
+    // Role-based filtering
+    if (role_id === 3) {
+      baseQuery += ` AND tasks.team_id = ?`;
+      params.push(userTeamId);
+    }
+
+    if (role_id === 4) {
+      baseQuery += ` AND (
+        tasks.user_id = ? OR 
+        EXISTS (
+          SELECT 1 FROM sub_tasks 
+          WHERE sub_tasks.task_id = tasks.id AND sub_tasks.user_id = ?
+        )
+      )`;
+      params.push(user_id, user_id);
+    }
+
+    // Additional filters
     if (product_id) {
-      whereConditions.push("t.product_id = ?");
-      queryParams.push(product_id);
+      baseQuery += ` AND tasks.product_id = ?`;
+      params.push(product_id);
     }
-    if (product_dropdown) {
-      whereConditions.push("t.product_id IN (?)");
-      queryParams.push(product_dropdown.split(","));
+
+    if (project_id) {
+      baseQuery += ` AND tasks.project_id = ?`;
+      params.push(project_id);
     }
-    if (project_dropdown) {
-      whereConditions.push("t.project_id IN (?)");
-      queryParams.push(project_dropdown.split(","));
-    }
+
     if (team_id) {
-      whereConditions.push("t.team_id = ?");
-      queryParams.push(team_id);
+      baseQuery += ` AND tasks.team_id = ?`;
+      params.push(team_id);
     }
 
     if (priority) {
-      whereConditions.push("t.priority = ?");
-      queryParams.push(priority);
-    }
-    if (project_id) {
-      whereConditions.push("t.project_id = ?");
-      queryParams.push(project_id);
+      baseQuery += ` AND tasks.priority = ?`;
+      params.push(priority);
     }
 
-    if (searchTerm) {
-      whereConditions.push(`
-          (t.name LIKE ? OR s.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR u.first_name LIKE ?)
-        `);
-      queryParams.push(
+    if (dropdown_products && dropdown_products.length > 0) {
+      baseQuery += ` AND tasks.product_id IN (${dropdown_products.map(() => '?').join(',')})`;
+      params.push(...dropdown_products);
+    }
+
+    if (dropdown_projects && dropdown_projects.length > 0) {
+      baseQuery += ` AND tasks.project_id IN (${dropdown_projects.map(() => '?').join(',')})`;
+      params.push(...dropdown_projects);
+    }
+
+    if (search) {
+      const searchTerm = `%${search}%`;
+      baseQuery += `
+        AND (
+          tasks.name LIKE ? OR 
+          EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ?) OR 
+          projects.name LIKE ? OR 
+          products.name LIKE ? OR 
+          users.name LIKE ? OR 
+          teams.name LIKE ? OR 
+          tasks.priority LIKE ?
+        )
+      `;
+      params.push(
+        searchTerm,
+        searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
@@ -1010,129 +1061,140 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
-    const tasksQuery = `
-        SELECT t.*, 
-               s.id AS subtask_id, s.name AS subtask_name, s.status AS subtask_status,
-               p.name AS product_name, pr.name AS project_name, u.first_name AS user_name, tm.name AS team_name
-        FROM tasks t
-        LEFT JOIN sub_tasks s ON s.task_id = t.id
-        LEFT JOIN products p ON t.product_id = p.id
-        LEFT JOIN projects pr ON t.project_id = pr.id
-        LEFT JOIN users u ON t.user_id = u.id
-        LEFT JOIN teams tm ON u.team_id = tm.id
-        ${
-          whereConditions.length ? "WHERE " + whereConditions.join(" AND ") : ""
-        }
-        ORDER BY t.updated_at DESC
-      `;
+    // Execute the base query for tasks
+    const [tasks] = await db.query(baseQuery, params);
 
-    const [tasks] = await db.query(tasksQuery, queryParams);
+    // Fetch subtasks for tasks that have subtasks
+    const taskIds = tasks.map(task => task.task_id);
+    const [allSubtasks] = await db.query(`
+      SELECT 
+        id AS subtask_id, 
+        name AS subtask_name, 
+        task_id,
+        estimated_hours, 
+        total_hours_worked, 
+        status, 
+        reopen_status, 
+        active_status 
+      FROM sub_tasks
+      WHERE task_id IN (?)`, [taskIds]);
 
+    // Group subtasks by task_id
+    const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
+      if (!acc[subtask.task_id]) acc[subtask.task_id] = [];
+      acc[subtask.task_id].push(subtask);
+      return acc;
+    }, {});
+
+    // Define the task sections (groups)
     const groups = {
-      "To-Do": [],
-      "In-Progress": [],
-      "On-Hold": [],
-      "Pending-Approval": [],
-      Reopen: [],
-      Done: [],
+      'To-Do': [],
+      'On-Hold': [],
+      'Pending-Approval': [],
+      'Reopen': [],
+      'In-Progress': [],
+      'Done': []
     };
 
-    const groupByStatus = (status) => {
-      return status === 0
-        ? "To-Do"
-        : status === 1
-        ? "On-Hold"
-        : status === 2
-        ? "Pending-Approval"
-        : status === 3
-        ? "Reopen"
-        : status === 4
-        ? "In-Progress"
-        : "Done";
+    // Helper function to determine the status group
+    const getStatusGroup = (status, reopenStatus, activeStatus) => {
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+        return 'To-Do';
+      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+        return 'On-Hold';
+      } else if (status === 2 && reopenStatus === 0) {
+        return 'Pending-Approval';
+      } else if (reopenStatus === 1 && activeStatus === 0) {
+        return 'Reopen';
+      } else if (status === 1 && activeStatus === 1) {
+        return 'In-Progress';
+      } else if (status === 3) {
+        return 'Done';
+      }
+      return ''; // Default case if status doesn't match any known group
     };
 
-    const taskMap = new Map();
+    // Iterate through tasks and categorize
+    tasks.forEach(task => {
+      const taskDetails = {
+        task_id: task.task_id,
+        task_name: task.task_name,
+        project_name: task.project_name,
+        product_name: task.product_name,
+        priority: task.priority,
+        estimated_hours: task.estimated_hours,
+        assignee_name: task.assignee_name,
+        team_name: task.team_name
+      };
 
-    // Process tasks and subtasks
-    tasks.forEach((task) => {
-      const taskKey = task.id;
-      const estimatedSeconds = convertToSeconds(
-        task.estimated_hours || "00:00:00"
-      );
-      const workedSeconds = convertToSeconds(
-        task.total_hours_worked || "00:00:00"
-      );
-      const remainingSeconds = estimatedSeconds - workedSeconds;
-      const timeLeftFormatted =
-        remainingSeconds > 0 ? formatTime(remainingSeconds) : "00:00:00";
-      if (!taskMap.has(taskKey)) {
-        taskMap.set(taskKey, {
-          task_details: {
-            id: task.id,
-            name: task.name,
-            product_id: task.product_id,
-            project_id: task.project_id,
-            product_name: task.product_name || "N/A",
-            project_name: task.project_name || "N/A",
-            priority: task.priority,
-            assignee: task.user_name || "",
-            team: task.team_name || "",
-            task_status: groupByStatus(task.status),
-            time_left: timeLeftFormatted,
-            type: task.subtask_id ? "subtask" : "task",
-          },
-          subtasks: [],
-        });
-      }
+      const subtasks = subtasksByTaskId[task.task_id] || [];
+      const groupedSubtasks = {};
 
-      if (task.subtask_id) {
-        taskMap.get(taskKey).subtasks.push({
-          subtask_id: task.subtask_id,
-          subtask_name: task.subtask_name,
-          subtask_status: groupByStatus(task.subtask_status),
-          subtask_estimated_hours: task.estimated_hours,
-          subtask_total_hours_worked: task.total_hours_worked,
-          subtask_reopen_status: task.reopen_status,
-          subtask_active_status: task.active_status,
-        });
-      }
-    });
-
-    // Group tasks
-    taskMap.forEach(({ task_details, subtasks }) => {
-      // If there are no subtasks, group the task by its own status
-      if (subtasks.length === 0) {
-        const statusGroup = groupByStatus(task_details.task_status);
-        groups[statusGroup].push({ task_details });
-      } else {
-        // Split subtasks by their status and add them to the respective groups
-        subtasks.forEach((subtask) => {
-          const subtaskGroup = subtask.subtask_status;
-          const group = groups[subtaskGroup];
-          const existingTask = group.find(
-            (g) => g.task_details.id === task_details.id
-          );
-
-          if (existingTask) {
-            // If the task already exists in the group, append the subtask
-            existingTask.subtask_details.push(subtask);
-          } else {
-            // If the task doesn't exist in the group, create a new entry
-            group.push({
-              task_details,
-              subtask_details: [subtask],
+      // If the task has subtasks, group them by subtask status
+      if (subtasks.length > 0) {
+        subtasks.forEach(subtask => {
+          const group = getStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status);
+          if (group) {
+            if (!groupedSubtasks[group]) {
+              groupedSubtasks[group] = [];
+            }
+            groupedSubtasks[group].push({
+              subtask_id: subtask.subtask_id,
+              subtask_name: subtask.subtask_name,
+              estimated_hours: subtask.estimated_hours
             });
           }
         });
+      } else {
+        // If no subtasks, classify based on task status
+        const group = getStatusGroup(task.task_status, task.reopen_status, task.active_status);
+        if (group) {
+          groupedSubtasks[group] = [];
+        }
       }
+
+      // Add task to respective groups
+      Object.keys(groupedSubtasks).forEach(group => {
+        groups[group].push({
+          task_details: taskDetails,
+          subtask_details: groupedSubtasks[group]
+        });
+      });
     });
-    const activeTask = await lastActiveTask(authUserDetails.id);
-    const data = { groups, activeTask };
-    return successResponse(res, data, "Tasks retrieved successfully");
+    const lastActiveTaskData = await lastActiveTask(user_id);
+
+    const data = {
+      groups: groups,
+      taskCounts: Object.values(groups).map(group => group.length),
+      lastActiveTask: lastActiveTaskData,
+    };
+
+    return successResponse(
+      res,
+      data,
+      "Task datas retrieved successfully",
+      200
+    );
+
   } catch (error) {
-    return errorResponse(res, error.message, "Error fetching task", 500);
+    console.error(error);
+    return errorResponse(res, error.message, 'Error fetching task data', 500);
   }
 };
+
+
+
+
+
+// Utility function for calculating time left
+function calculateTimeLeft(estimatedHours, totalHoursWorked) {
+  const timeLeft = estimatedHours - totalHoursWorked;
+  return timeLeft > 0 ? `${timeLeft} hours left` : 'Completed';
+}
+
+
+
+
 
 // exports.doneTaskList = async (req, res) => {
 //   try {
