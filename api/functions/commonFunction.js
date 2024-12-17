@@ -23,7 +23,10 @@ exports.getAllData = async (payload, res) => {
         query = "SELECT id,name FROM roles";
     } else if (type === "owners") {
         query = "SELECT id,first_name as name FROM users WHERE deleted_at IS NULL And  role_id !=4";
-    } else {
+    }
+   else if (type === "assignee") {
+    query = "SELECT id,first_name as name FROM users WHERE deleted_at IS NULL";
+   }  else {
         return res.status(400).json({
             message: "Invalid type provided",
         });
@@ -34,8 +37,8 @@ exports.getAllData = async (payload, res) => {
         query += " AND product_id = ?";
         queryParams.push(id);
     }
-    if (type === "teams" && id) {
-        query += " AND reporting_user_id = ?";
+    if (type === "assignee" && id) {
+        query += " team_id = ?";
         queryParams.push(id);
     }
     if (type === "tasks" && id) {
