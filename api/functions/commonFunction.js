@@ -8,37 +8,36 @@ exports.getAllData = async (payload, res) => {
     let queryParams = [];
 
     if (type === "teams") {
-        query = "SELECT id,name FROM teams WHERE deleted_at IS NULL ";
+        query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
     } else if (type === "users") {
-        query = "SELECT id,first_name as name FROM users WHERE deleted_at IS NULL";
+        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL";
     } else if (type === "products") {
-        query = "SELECT id,name FROM products WHERE deleted_at IS NULL";
-    }  else if (type === "projects") {
-        query = "SELECT id,name FROM projects WHERE deleted_at IS NULL";
+        query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
+    } else if (type === "projects") {
+        query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
     } else if (type === "tasks") {
-        query = "SELECT id,name FROM tasks WHERE deleted_at IS NULL";
-    }else if (type === "designations") {
-        query = "SELECT id,name FROM designations WHERE deleted_at IS NULL";
-    }else if (type === "roles") {
-        query = "SELECT id,name FROM roles";
+        query = "SELECT id, name FROM tasks WHERE deleted_at IS NULL";
+    } else if (type === "designations") {
+        query = "SELECT id, name FROM designations WHERE deleted_at IS NULL";
+    } else if (type === "roles") {
+        query = "SELECT id, name FROM roles";
     } else if (type === "owners") {
-        query = "SELECT id,first_name as name FROM users WHERE deleted_at IS NULL And  role_id !=4";
-    }
-   else if (type === "assignee") {
-    query = "SELECT id,first_name as name FROM users WHERE deleted_at IS NULL";
-   }  else {
+        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL AND role_id != 4";
+    } else if (type === "assignee") {
+        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL";
+    } else {
         return res.status(400).json({
             message: "Invalid type provided",
         });
     }
 
-    // If an id is provided, add the WHERE clause to the query
+    // Append additional conditions based on `id`
     if (type === "projects" && id) {
         query += " AND product_id = ?";
         queryParams.push(id);
     }
     if (type === "assignee" && id) {
-        query += " team_id = ?";
+        query += " AND team_id = ?";
         queryParams.push(id);
     }
     if (type === "tasks" && id) {
@@ -54,13 +53,18 @@ exports.getAllData = async (payload, res) => {
         return successResponse(
             res,
             rows,
-            rows.length === 0 ? `${type.charAt(0).toUpperCase() + type.slice(1)} not found` : `${type.charAt(0).toUpperCase() + type.slice(1)} fetched successfully`,
-            200,
+            rows.length === 0
+                ? `${type.charAt(0).toUpperCase() + type.slice(1)} not found`
+                : `${type.charAt(0).toUpperCase() + type.slice(1)} fetched successfully`,
+            200
         );
     } catch (err) {
-            return errorResponse(res, err.message, 'Error fetching Data', 500);
+        return errorResponse(res, err.message, "Error fetching Data", 500);
     }
 };
+
+
+
 exports.getAuthUserDetails = async (res,authUserId) => {
     try {
       const authUserQuery = "SELECT * FROM users WHERE deleted_at IS NULL AND id = ?";
