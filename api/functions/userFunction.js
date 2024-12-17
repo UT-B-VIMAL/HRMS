@@ -17,7 +17,7 @@ exports.createUser = async (payload, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert the user into the database
-    const query = `
+    const query = `  
   INSERT INTO users (
     first_name, last_name, employee_id, email, phone,
     password, team_id, role_id, designation_id,
