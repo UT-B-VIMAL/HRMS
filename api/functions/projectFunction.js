@@ -690,6 +690,8 @@ exports.projectRequest = async (req, res) => {
         st.status = 2
         AND st.deleted_at IS NULL
         ${subtaskWhereClause}
+        ORDER BY 
+        st.id
     `;
 
     // Query to fetch tasks without subtasks
@@ -721,6 +723,8 @@ exports.projectRequest = async (req, res) => {
         AND t.status = 2
         AND t.id NOT IN (SELECT task_id FROM sub_tasks)
         ${taskWhereClause}
+        ORDER BY 
+        t.id
     `;
 
     // Execute both queries
@@ -818,10 +822,18 @@ exports.getRequestupdate = async (req, res) => {
 };
 
 exports.getRequestchange = async (id, payload, res) => {
-  const { type, remark, rating, action } = payload;
+  const { user_id,type, remark, rating, action } = payload;
 
-  if (!type || !action) {
-    return errorResponse(res, null, 'Type and action are required', 400);
+  const requiredFields = [
+    { key: 'type', message: 'Type is required' },
+    { key: 'action', message: 'Action is required' },
+    { key: 'user_id', message: 'User ID is required' },
+  ];
+
+  for (const field of requiredFields) {
+    if (!payload[field.key]) {
+      return errorResponse(res, null, field.message, 400);
+    }
   }
 
   const validType = ['task', 'subtask'];
@@ -851,8 +863,9 @@ exports.getRequestchange = async (id, payload, res) => {
         reopenstatusToSet = 0;
       }
 
-      let fieldsToUpdate = ['status = ?', 'reopen_status = ?'];
-      let values = [statusToSet, reopenstatusToSet];
+      let fieldsToUpdate = ['status = ?', 'reopen_status = ?', 'updated_by = ?', 'updated_at = ?'];
+      const updatedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      let values = [statusToSet, reopenstatusToSet, user_id, updatedAt];
 
       if (remark !== undefined) {
         fieldsToUpdate.push('remark = ?');
