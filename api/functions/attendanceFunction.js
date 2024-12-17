@@ -23,40 +23,58 @@ exports.getAttendance = async (req, res) => {
         }, {});
         return errorResponse(res, errorMessages, "Validation Error", 400);
       }
-        if (status === 'Present') {
+      if (status === 'Present') {
+        // Use today's date as default if `date` is not provided
+        const today = new Date().toISOString().slice(0, 10);
+        const dynamicDate = date || today; // If `date` is provided, use it; otherwise, use today's date
+      
         query = `
-        SELECT u.id AS user_id, u.first_name, u.employee_id,
-                el.day_type, el.date AS leave_date, CASE 
-                WHEN el.day_type = 1 THEN 'Full Day' 
-                WHEN el.day_type = 2 THEN 'Half Day' 
-                ELSE 'Unknown' 
-            END AS day_type,
-            el.date AS leave_date,
-            CASE 
-                WHEN el.half_type = 1 THEN 'First Half' 
-                WHEN el.half_type = 2 THEN 'Second Half' 
-                ELSE 'Unknown' 
-            END AS half_type
-        FROM users u
-        LEFT JOIN employee_leave el ON u.id = el.user_id AND el.day_type != 1  
-        LEFT JOIN teams t ON u.team_id = t.id  
-        WHERE t.reporting_user_id = ?  
-        AND u.id != ? AND u.role_id != 2
-        ${date ? 'AND (el.date = ? OR el.date IS NULL)' : ''}   
-        ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''}  
-        LIMIT ?, ?
+          SELECT 
+              u.id AS user_id, 
+              u.first_name, 
+              u.employee_id,
+              el.day_type, 
+              el.date AS leave_date, 
+              CASE 
+                  WHEN el.day_type = 1 THEN 'Full Day' 
+                  WHEN el.day_type = 2 THEN 'Half Day' 
+                  ELSE 'Unknown' 
+              END AS day_type,
+              CASE 
+                  WHEN el.half_type = 1 THEN 'First Half' 
+                  WHEN el.half_type = 2 THEN 'Second Half' 
+                  ELSE 'Unknown' 
+              END AS half_type
+          FROM 
+              users u
+          LEFT JOIN 
+              employee_leave el 
+              ON u.id = el.user_id AND el.day_type != 1  
+          LEFT JOIN 
+              teams t 
+              ON u.team_id = t.id  
+          WHERE 
+              t.reporting_user_id = ?  
+              AND u.id != ? 
+              AND u.role_id != 2
+              AND u.id NOT IN (
+                  SELECT user_id 
+                  FROM employee_leave 
+                  WHERE date = ?
+              )
+              ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''}  
+          LIMIT ?, ?
         `;
-
-        queryParams.push(user_id,user_id); // reporting_user_id condition
-
-        if (date) queryParams.push(date); // Apply date filter on employee_leave only
+      
+        queryParams.push(user_id, user_id); // reporting_user_id condition
+        queryParams.push(dynamicDate); // Use dynamicDate (either passed date or today's date)
+      
         if (search) {
-        queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or email)
+          queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or employee_id)
         }
-
+      
         queryParams.push((Number(page) - 1) * Number(perPage), Number(perPage)); // Pagination
-
-        } else if (status === 'Absent') {
+      }else if (status === 'Absent') {
         // Fetch records from the employee leave table only
         query = `SELECT  el.user_id,u.first_name, u.employee_id, 
                 el.date,  
