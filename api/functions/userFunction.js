@@ -18,17 +18,17 @@ exports.createUser = async (payload, res) => {
 
     // Insert the user into the database
     const query = `  
-  INSERT INTO users (
-    first_name, last_name, employee_id, email, phone,
-    password, team_id, role_id, designation_id,
-    created_by, updated_by, deleted_at, created_at, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
-`;
+      INSERT INTO users (
+        first_name, last_name, employee_id, email, phone,
+        password, team_id, role_id, designation_id,
+        created_by, deleted_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
 
     const values = [
       first_name, last_name, employee_id, email, phone,
       hashedPassword, team_id, role_id, designation_id,
-      created_by
+      created_by, deleted_at
     ];
     const [result] = await db.query(query, values);
     

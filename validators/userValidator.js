@@ -39,6 +39,22 @@ const UserSchema = (isUpdate = false) => Joi.object({
     'number.integer': 'Designation ID must be an integer',
     'any.required': 'Designation ID is required',
   }),
+  created_by: isUpdate
+    ? Joi.number().integer().optional()
+    : Joi.number().integer().required().messages({
+        'number.base': 'Created By must be a number',
+        'number.integer': 'Created By must be an integer',
+      }),
+
+  updated_by: isUpdate
+    ? Joi.number().integer().required().messages({
+        'number.base': 'Updated By must be a number',
+        'number.integer': 'Updated By must be an integer',
+      })
+    : Joi.number().integer().optional().messages({
+        'number.base': 'Updated By must be a number',
+        'number.integer': 'Updated By must be an integer',
+    }),
 
 }).unknown(true);
 

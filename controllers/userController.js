@@ -16,7 +16,7 @@ const UserSchema = require("../validators/userValidator");
 exports.createUser = async (req, res) => {
   try {
       const payload = req.body;
-      const { error } = UserSchema(true).validate(payload, { abortEarly: false });
+      const { error } = UserSchema(false).validate(payload, { abortEarly: false });
 
       if (error) {
           const errorMessages = error.details.reduce((acc, err) => {
