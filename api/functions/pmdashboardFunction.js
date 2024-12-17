@@ -54,17 +54,18 @@ exports.fetchProducts = async (payload, res) => {
 
           employeeList = employees.map((user) => {
             const nameParts = user.full_name ? user.full_name.split(" ") : [];
-            const initials =
-              nameParts.length > 1
-                ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
-                : (nameParts[0] || "").slice(0, 2).toUpperCase();
-
+            const firstInitial = nameParts[0] && nameParts[0][0] ? nameParts[0][0].toUpperCase() : "";
+            const secondInitial = nameParts[1] && nameParts[1][0] ? nameParts[1][0].toUpperCase() : "";
+          
+            const initials = firstInitial + secondInitial || (nameParts[0] || "").slice(0, 2).toUpperCase();
+          
             return {
               employee_name: user.full_name || "N/A",
               employee_id: user.id || "N/A",
               initials: initials,
             };
           });
+          
         }
 
         return {
@@ -595,17 +596,18 @@ exports.fetchPmdatas = async (payload, res) => {
 
           employeeList = employees.map((user) => {
             const nameParts = user.full_name ? user.full_name.split(" ") : [];
-            const initials =
-              nameParts.length > 1
-                ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
-                : (nameParts[0] || "").slice(0, 2).toUpperCase();
-
+            const firstInitial = nameParts[0] && nameParts[0][0] ? nameParts[0][0].toUpperCase() : "";
+            const secondInitial = nameParts[1] && nameParts[1][0] ? nameParts[1][0].toUpperCase() : "";
+          
+            const initials = firstInitial + secondInitial || (nameParts[0] || "").slice(0, 2).toUpperCase();
+          
             return {
               employee_name: user.full_name || "N/A",
               employee_id: user.id || "N/A",
               initials: initials,
             };
           });
+          
         }
 
         return {
