@@ -94,8 +94,10 @@ exports.fetchProducts = async (payload, res) => {
   }
 };
 
-exports.fetchUtilization = async (payload, res) => {
+exports.fetchUtilization = async (req, res) => {
   try {
+    const { team_id } = req.query;
+
     // Step 1: Get total strength grouped by team, including team name
     const totalStrengthQuery = `
       SELECT 
@@ -103,10 +105,12 @@ exports.fetchUtilization = async (payload, res) => {
         t.name AS team_name, 
         COUNT(u.id) AS total_strength 
       FROM teams t
-      LEFT JOIN users u ON t.id = u.team_id WHERE t.deleted_at IS NULL AND u.deleted_at IS NULL
+      LEFT JOIN users u ON t.id = u.team_id 
+      WHERE t.deleted_at IS NULL AND u.deleted_at IS NULL
+      ${team_id ? "AND t.id = ?" : ""}
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.query(totalStrengthQuery);
+    const [totalStrengthData] = await db.query(totalStrengthQuery, team_id ? [team_id] : []);
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -128,9 +132,12 @@ exports.fetchUtilization = async (payload, res) => {
       FROM sub_tasks_user_timeline stut
       JOIN users u ON stut.user_id = u.id
       JOIN teams t ON u.team_id = t.id
-      WHERE DATE(stut.start_time) = CURDATE() AND u.deleted_at IS NULL AND t.deleted_at IS NULL
+      WHERE DATE(stut.start_time) = CURDATE() 
+        AND u.deleted_at IS NULL 
+        AND t.deleted_at IS NULL
+        ${team_id ? "AND t.id = ?" : ""}
     `;
-    const [workingEmployeesData] = await db.query(workingEmployeesQuery);
+    const [workingEmployeesData] = await db.query(workingEmployeesQuery, team_id ? [team_id] : []);
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -179,6 +186,7 @@ exports.fetchUtilization = async (payload, res) => {
     return errorResponse(res, error.message, "Error fetching utilization data", 500);
   }
 };
+
 exports.fetchAttendance = async (payload, res) => {
   try {
     // Step 1: Get total strength of all users
@@ -543,7 +551,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
   }
 };
 
-exports.fetchPmdatas = async (payload, res) => {
+exports.fetchPmdatas = async (req, res) => {
   try {
     // Step 1: Fetch products data
     const productsQuery = "SELECT * FROM products WHERE deleted_at IS NULL";
@@ -622,16 +630,21 @@ exports.fetchPmdatas = async (payload, res) => {
     );
 
     // Step 2: Fetch utilization data
+    const { team_id } = req.query;
+
+    // Step 1: Get total strength grouped by team, including team name
     const totalStrengthQuery = `
       SELECT 
         t.id AS team_id, 
         t.name AS team_name, 
         COUNT(u.id) AS total_strength 
-      FROM teams t 
-      LEFT JOIN users u ON t.id = u.team_id WHERE t.deleted_at IS NULL AND u.deleted_at IS NULL
+      FROM teams t
+      LEFT JOIN users u ON t.id = u.team_id 
+      WHERE t.deleted_at IS NULL AND u.deleted_at IS NULL
+      ${team_id ? "AND t.id = ?" : ""}
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.query(totalStrengthQuery);
+    const [totalStrengthData] = await db.query(totalStrengthQuery, team_id ? [team_id] : []);
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -642,6 +655,7 @@ exports.fetchPmdatas = async (payload, res) => {
       return acc;
     }, {});
 
+    // Step 2: Get working employees grouped by team, including team name
     const workingEmployeesQuery = `
       SELECT 
         u.id AS user_id,
@@ -652,9 +666,12 @@ exports.fetchPmdatas = async (payload, res) => {
       FROM sub_tasks_user_timeline stut
       JOIN users u ON stut.user_id = u.id
       JOIN teams t ON u.team_id = t.id
-      WHERE DATE(stut.start_time) = CURDATE() AND u.deleted_at IS NULL AND t.deleted_at IS NULL AND stut.deleted_at IS NULL
+      WHERE DATE(stut.start_time) = CURDATE() 
+        AND u.deleted_at IS NULL 
+        AND t.deleted_at IS NULL
+        ${team_id ? "AND t.id = ?" : ""}
     `;
-    const [workingEmployeesData] = await db.query(workingEmployeesQuery);
+    const [workingEmployeesData] = await db.query(workingEmployeesQuery, team_id ? [team_id] : []);
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -672,6 +689,7 @@ exports.fetchPmdatas = async (payload, res) => {
       return acc;
     }, {});
 
+    // Step 3: Combine totalStrength and workingEmployees into utilization data
     const utilization = Object.keys(totalStrength).map((teamId) => {
       const team = totalStrength[teamId];
       const working = workingEmployees[teamId] || {

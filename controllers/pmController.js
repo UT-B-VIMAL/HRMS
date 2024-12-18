@@ -12,7 +12,7 @@ exports.pmproductsection = async (req, res) => {
 
 exports.pmutilizationsection = async (req, res) => {
   try {
-    return await fetchUtilization(req.body, res);
+    return await fetchUtilization(req, res);
   } catch (error) {
     console.error("Error during pmutilizationsection processing:", error.message);
     return errorResponse(res, null, 'Internal Server Error', 500);
@@ -28,7 +28,7 @@ exports.pmattendancesection = async (req, res) => {
 };
 exports.pmdashboardsection = async (req, res) => {
   try {
-    return await fetchPmdatas(req.body, res);
+    return await fetchPmdatas(req, res);
   } catch (error) {
     console.error("Error during pmdashboardsection processing:", error.message);
     return errorResponse(res, null, 'Internal Server Error', 500);
