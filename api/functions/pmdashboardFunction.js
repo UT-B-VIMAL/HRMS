@@ -174,6 +174,7 @@ exports.fetchUtilization = async (req, res) => {
       };
 
       return {
+        team_id: teamId,
         team_name: team.team_name,
         total_strength: team.total_strength,
         working_count: working.working_count,
@@ -727,6 +728,7 @@ exports.fetchPmdatas = async (req, res) => {
       };
 
       return {
+        team_id: teamId,
         team_name: team.team_name,
         total_strength: team.total_strength,
         working_count: working.working_count,
