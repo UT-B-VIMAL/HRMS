@@ -44,6 +44,13 @@ exports.getAllData = async (payload, res) => {
         query += " AND project_id = ?";
         queryParams.push(id);
     }
+    if (type === "teams" && id) {
+        const users=  await this.getAuthUserDetails(id,res);
+       if(users.role_id === 3) {
+            query += " AND reporting_user_id = ?";
+            queryParams.push(id);
+       }
+    }
 
     query += " ORDER BY `id` DESC";
 
