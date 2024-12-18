@@ -779,31 +779,36 @@ exports.getRequestupdate = async (req, res) => {
 
     // Validate type and id
     if (!type) {
-      return errorResponse(res, null, 'Type is required', 400);
+      return errorResponse(res, null, "Type is required", 400);
     }
     if (!id) {
-      return errorResponse(res, null, 'ID is required', 400);
+      return errorResponse(res, null, "ID is required", 400);
     }
 
-    let result;
+    let rows;
 
     // Handle task or subtask based on type
-    if (type === 'task') {
+    if (type === "task") {
       const query = "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL";
-      [result] = await db.query(query, [id]);
-    } else if (type === 'subtask') {
+      [rows] = await db.query(query, [id]);
+    } else if (type === "subtask") {
       const query = "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL";
-      [result] = await db.query(query, [id]);
+      [rows] = await db.query(query, [id]);
     } else {
-      return errorResponse(res, null, 'Invalid type. It should be either "task" or "subtask".', 400);
-    }
-
-    // If no result is found, return an error
-    if (result.length === 0) {
       return errorResponse(
         res,
+        null,
+        'Invalid type. It should be either "task" or "subtask".',
+        400
+      );
+    }
+
+    // If no rows are found, return an error
+    if (rows.length === 0) {
+      return errorResponse(
+        res,
+        null,
         `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
-        "Not Found",
         404
       );
     }
@@ -811,18 +816,19 @@ exports.getRequestupdate = async (req, res) => {
     // Return the result if found
     return successResponse(
       res,
-      result[0],
+      rows[0],
       `${type.charAt(0).toUpperCase() + type.slice(1)} fetched successfully`,
       200
     );
   } catch (error) {
-    console.error("Error fetching project:", error.message);
-    return errorResponse(res, error.message, "Error fetching project", 500);
+    console.error("Error fetching request update:", error.message);
+    return errorResponse(res, null, "Error fetching request update", 500);
   }
 };
 
+
 exports.getRequestchange = async (id, payload, res) => {
-  const { user_id,type, remark, rating, action } = payload;
+  const { user_id, type, remark, rating, action } = payload;
 
   const requiredFields = [
     { key: 'type', message: 'Type is required' },
@@ -836,6 +842,15 @@ exports.getRequestchange = async (id, payload, res) => {
     }
   }
 
+  const [userRows] = await db.query(
+    "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+    [user_id]
+  );
+
+  if (userRows.length === 0) {
+    return errorResponse(res, null, "User Not Found", 400);
+  }
+
   const validType = ['task', 'subtask'];
   if (!validType.includes(type)) {
     return errorResponse(res, null, 'Invalid type. It should be either task or subtask.', 400);
@@ -847,65 +862,74 @@ exports.getRequestchange = async (id, payload, res) => {
   }
 
   try {
-    let table = '';
-    let updateQuery = '';
-    let statusToSet;
-    let reopenstatusToSet;
+    // Validate if the task or subtask exists
+    const table = type === 'task' ? 'tasks' : 'sub_tasks';
+    const [idRows] = await db.query(
+      `SELECT id FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
+      [id]
+    );
 
-    if (type === 'task' || type === 'subtask') {
-      table = type === 'task' ? 'tasks' : 'sub_tasks';
-
-      if (action === 'reopen') {
-        statusToSet = 0;
-        reopenstatusToSet = 1;
-      } else if (action === 'close') {
-        statusToSet = 3;
-        reopenstatusToSet = 0;
-      }
-
-      let fieldsToUpdate = ['status = ?', 'reopen_status = ?', 'updated_by = ?', 'updated_at = ?'];
-      const updatedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      let values = [statusToSet, reopenstatusToSet, user_id, updatedAt];
-
-      if (remark !== undefined) {
-        fieldsToUpdate.push('remark = ?');
-        values.push(remark);
-      }
-
-      if (rating !== undefined) {
-        fieldsToUpdate.push('rating = ?');
-        values.push(rating);
-      }
-
-      updateQuery = `
-        UPDATE ${table}
-        SET ${fieldsToUpdate.join(', ')}
-        WHERE id = ? AND deleted_at IS NULL
-      `;
-      
-      values.push(id);
-
-      const [updateResult] = await db.query(updateQuery, values);
-
-      if (updateResult.affectedRows === 0) {
-        return errorResponse(
-          res,
-          `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
-          'Not Found',
-          404
-        );
-      }
-
-      // Return success response
-      return successResponse(
+    if (idRows.length === 0) {
+      return errorResponse(
         res,
-        { id },
-        `Project request for ${type.charAt(0) + type.slice(1)} updated successfully`,
-        200
+        null,
+        `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
+        404
       );
-    } else {
-      return errorResponse(res, null, 'Invalid type. It should be either "task" or "subtask".', 400);
     }
+
+    // Determine status values based on action
+    let statusToSet, reopenstatusToSet;
+
+    if (action === 'reopen') {
+      statusToSet = 0;
+      reopenstatusToSet = 1;
+    } else if (action === 'close') {
+      statusToSet = 3;
+      reopenstatusToSet = 0;
+    }
+
+    // Prepare fields and values for update
+    const fieldsToUpdate = ['status = ?', 'reopen_status = ?', 'updated_by = ?', 'updated_at = ?'];
+    const updatedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const values = [statusToSet, reopenstatusToSet, user_id, updatedAt];
+
+    if (remark !== undefined) {
+      fieldsToUpdate.push('remark = ?');
+      values.push(remark);
+    }
+
+    if (rating !== undefined) {
+      fieldsToUpdate.push('rating = ?');
+      values.push(rating);
+    }
+
+    // Construct and execute the update query
+    const updateQuery = `
+      UPDATE ${table}
+      SET ${fieldsToUpdate.join(', ')}
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+    values.push(id);
+
+    const [updateResult] = await db.query(updateQuery, values);
+
+    if (updateResult.affectedRows === 0) {
+      return errorResponse(
+        res,
+        null,
+        `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
+        404
+      );
+    }
+
+    // Return success response
+    return successResponse(
+      res,
+      { id },
+      `Project request for ${type.charAt(0).toUpperCase() + type.slice(1)} updated successfully`,
+      200
+    );
   } catch (error) {
     console.error('Error updating task or subtask:', error.message);
     return errorResponse(res, error.message, 'Error updating task or subtask', 500);
