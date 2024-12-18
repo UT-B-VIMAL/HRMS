@@ -41,8 +41,8 @@ exports.getAttendance = async (req, res) => {
                   ELSE 'Unknown' 
               END AS day_type,
               CASE 
-                  WHEN el.half_type = 1 THEN 'First Half' 
-                  WHEN el.half_type = 2 THEN 'Second Half' 
+                  WHEN el.half_type = 1 THEN 'Second Half' 
+                  WHEN el.half_type = 2 THEN 'First Half' 
                   ELSE 'Unknown' 
               END AS half_type
           FROM 
