@@ -122,7 +122,7 @@ exports.deleteTeam = async (id, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Team not found or already deleted", "Not Found", 404);
     }
-    const checkReferencesQuery = `SELECT COUNT(*) as count FROM users WHERE team_id = ?`;
+    const checkReferencesQuery = `SELECT COUNT(*) as count FROM users WHERE team_id = ? AND deleted_at IS NULL`;
     const [checkReferencesResult] = await db
       
       .query(checkReferencesQuery, [id]);
@@ -130,7 +130,7 @@ exports.deleteTeam = async (id, res) => {
     if (checkReferencesResult[0].count > 0) {
       return errorResponse(
         res,
-        `Team is referenced in the User table and cannot be deleted`,
+        `This Team is referenced in the User and cannot be deleted`,
         "Reference Error",
         400
       );

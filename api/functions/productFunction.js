@@ -107,7 +107,7 @@ exports.deleteProduct = async (id, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Product not found or already deleted", "Not Found", 404);
     }
-    const checkReferencesQuery = `SELECT COUNT(*) as count FROM projects WHERE product_id = ?`;
+    const checkReferencesQuery = `SELECT COUNT(*) as count FROM projects WHERE product_id = ? AND deleted_at IS NULL`;
     const [checkReferencesResult] = await db
       
       .query(checkReferencesQuery, [id]);
@@ -115,7 +115,7 @@ exports.deleteProduct = async (id, res) => {
     if (checkReferencesResult[0].count > 0) {
       return errorResponse(
         res,
-        `Product is referenced in the projects table and cannot be deleted`,
+        `This product is referenced in the Projects and cannot be deleted`,
         "Reference Error",
         400
       );
