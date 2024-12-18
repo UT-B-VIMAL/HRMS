@@ -124,13 +124,13 @@ exports.deleteProject = async (id, res) => {
         404
       );
     }
-    const checkReferencesQuery = `SELECT COUNT(*) as count FROM tasks WHERE project_id = ?`;
+    const checkReferencesQuery = `SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND deleted_at IS NULL`;
     const [checkReferencesResult] = await db.query(checkReferencesQuery, [id]);
 
     if (checkReferencesResult[0].count > 0) {
       return errorResponse(
         res,
-        `Project is referenced in the User table and cannot be deleted`,
+        `This project is referenced in the Tasks and cannot be deleted`,
         "Reference Error",
         400
       );
