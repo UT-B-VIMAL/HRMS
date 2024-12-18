@@ -950,14 +950,24 @@ exports.getTaskList = async (queryParams, res) => {
     } = queryParams;
 
     if (!user_id) {
-      return errorResponse(res, "User ID is required", "Missing user_id in query parameters", 400);
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Missing user_id in query parameters",
+        400
+      );
     }
 
     // Get user details
-    const userDetails = await getAuthUserDetails(user_id);
-    if (!userDetails) {
-      return errorResponse(res, "User not found", "Authenticated User Id not found", 500);
-    }
+    const userDetails = await getAuthUserDetails(user_id,res);
+   if (!userDetails) {
+  return errorResponse(
+    res,
+    "User not found",
+    "The provided user_id does not exist in the database",
+    404 // Use 404 for "Not Found" error
+  );
+}
 
     const { role_id, team_id: userTeamId } = userDetails;
 
@@ -1064,20 +1074,23 @@ exports.getTaskList = async (queryParams, res) => {
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
 
-    // Fetch subtasks for tasks that have subtasks
+    // Fetch subtasks only if tasks exist
     const taskIds = tasks.map(task => task.task_id);
-    const [allSubtasks] = await db.query(`
-      SELECT 
-        id AS subtask_id, 
-        name AS subtask_name, 
-        task_id,
-        estimated_hours, 
-        total_hours_worked, 
-        status, 
-        reopen_status, 
-        active_status 
-      FROM sub_tasks
-      WHERE task_id IN (?)`, [taskIds]);
+    let allSubtasks = [];
+    if (taskIds.length > 0) {
+      [allSubtasks] = await db.query(`
+        SELECT 
+          id AS subtask_id, 
+          name AS subtask_name, 
+          task_id,
+          estimated_hours, 
+          total_hours_worked, 
+          status, 
+          reopen_status, 
+          active_status 
+        FROM sub_tasks
+        WHERE task_id IN (?)`, [taskIds]);
+    }
 
     // Group subtasks by task_id
     const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
@@ -1111,7 +1124,7 @@ exports.getTaskList = async (queryParams, res) => {
       } else if (status === 3) {
         return 'Done';
       }
-      return ''; // Default case if status doesn't match any known group
+      return null; // Default case if status doesn't match any known group
     };
 
     // Iterate through tasks and categorize
@@ -1161,6 +1174,7 @@ exports.getTaskList = async (queryParams, res) => {
         });
       });
     });
+
     const lastActiveTaskData = await lastActiveTask(user_id);
 
     const data = {
@@ -1181,8 +1195,6 @@ exports.getTaskList = async (queryParams, res) => {
     return errorResponse(res, error.message, 'Error fetching task data', 500);
   }
 };
-
-
 
 
 
