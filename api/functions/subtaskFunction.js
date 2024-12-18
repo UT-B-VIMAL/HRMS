@@ -2,44 +2,47 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 
 // Insert Task
-exports.createSubTask= async (payload, res) => {
-    const {
-      product_id, project_id, user_id, name, estimated_hours,
-      start_date, end_date, extended_status, extended_hours,
-      active_status, status, total_hours_worked, rating, command,
-      assigned_user_id, remark, reopen_status, description,
-      team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-    } = payload;
-  
-    try {
-        const query = `
-        INSERT INTO sub_tasks (
-          product_id, project_id,task_id, user_id, name, estimated_hours,
-          start_date, end_date, extended_status, extended_hours,
-          active_status, status, total_hours_worked, rating, command,
-          assigned_user_id, remark, reopen_status, description,
-          team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?)
-      `;
-      
-      const values = [
-        product_id, project_id,task_id, user_id, name, estimated_hours,
-        start_date, end_date, extended_status, extended_hours,
-        active_status, status, total_hours_worked, rating, command,
-        assigned_user_id, remark, reopen_status, description,
-        team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-      ];
-      console.log('Query:', query);
-      console.log('Values:', values);
+exports.createSubTask = async (payload, res) => {
+  const { task_id, name, created_by } = payload;
 
-      const [result] = await db.query(query, values);
-  
-      return successResponse(res, { id: result.insertId, ...payload }, 'SubTask added successfully', 201);
-    } catch (error) {
-      console.error('Error inserting subtask:', error.message);
-      return errorResponse(res, error.message, 'Error inserting subtask', 500);
-    }
-  };
+  try {
+      // Retrieve `product_id` and `project_id` from the `tasks` table
+      const selectQuery = `
+          SELECT product_id, project_id 
+          FROM tasks 
+          WHERE deleted_at IS NULL AND id = ?
+      `;
+      const [taskResult] = await db.query(selectQuery, [task_id]);
+
+      if (taskResult.length === 0) {
+          return errorResponse(res, "Task not found or deleted", "Error creating subtask", 404);
+      }
+
+      const { product_id, project_id } = taskResult[0];
+
+      // Insert into `sub_tasks` table
+      const insertQuery = `
+          INSERT INTO sub_tasks (
+              product_id, project_id, task_id, name, created_by,updated_by ,deleted_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?,?, NULL, NOW(), NOW())
+      `;
+      const values = [product_id, project_id, task_id, name, created_by, created_by];
+console.log(values);
+
+      const [result] = await db.query(insertQuery, values);
+
+      // Return success response
+      return successResponse(
+          res,
+          { id: result.insertId, task_id, name, created_by },
+          "SubTask added successfully",
+          201
+      );
+  } catch (error) {
+      console.error("Error inserting subtask:", error.message);
+      return errorResponse(res, error.message, "Error inserting subtask", 500);
+  }
+};
 
 // Show Task
 exports.getSubTask = async (id, res) => {
