@@ -1,5 +1,8 @@
 const db = require("../../config/db");
-const { successResponse, errorResponse } = require("../../helpers/responseHelper");
+const {
+  successResponse,
+  errorResponse,
+} = require("../../helpers/responseHelper");
 
 exports.fetchAttendance = async (req, res) => {
   try {
@@ -10,17 +13,28 @@ exports.fetchAttendance = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return errorResponse(res, null, 'User ID is required', 400);
+      return errorResponse(res, null, "User ID is required", 400);
     }
 
     // Fetch team IDs for the reporting user
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    // Check if no rows are returned
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
+    }
     const [teamResult] = await db.query(
       "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
       [user_id]
     );
 
     if (teamResult.length === 0) {
-      return res.status(404).json({ message: "No teams found for the given user_id" });
+      return res
+        .status(404)
+        .json({ message: "No teams found for the given user_id" });
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -53,7 +67,8 @@ exports.fetchAttendance = async (req, res) => {
     );
 
     const absentEmployeeIds = absentEmployees.map((emp) => emp.user_id);
-    const absentEmployeeIdsCondition = absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
+    const absentEmployeeIdsCondition =
+      absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
     // Fetch present employees
     const [presentEmployees] = await db.query(
@@ -91,7 +106,8 @@ exports.fetchAttendance = async (req, res) => {
       const nameParts = employee.employee_name.split(" ");
       let initials = "";
       if (nameParts.length > 1) {
-        initials = nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase();
+        initials =
+          nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase();
       } else {
         initials = nameParts[0].slice(0, 2).toUpperCase();
       }
@@ -127,7 +143,16 @@ exports.fetchTlrating = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return errorResponse(res, null, 'User ID is required', 400);
+      return errorResponse(res, null, "User ID is required", 400);
+    }
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    // Check if no rows are returned
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
     }
 
     // Fetch team IDs
@@ -137,7 +162,9 @@ exports.fetchTlrating = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-      return res.status(404).json({ message: "No teams found for the given user_id" });
+      return res
+        .status(404)
+        .json({ message: "No teams found for the given user_id" });
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -164,13 +191,16 @@ exports.fetchTlrating = async (req, res) => {
 
     // Process team members
     const finalRatingResult = teamMembers.map((member) => {
-      const nameParts = member.full_name.split(' ');
+      const nameParts = member.full_name.split(" ");
       const initials =
         nameParts.length > 1
           ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
           : nameParts[0].slice(0, 2).toUpperCase();
 
-      const ratingRecord = ratingsMap.get(member.id) || { rating: 0, average: 0 };
+      const ratingRecord = ratingsMap.get(member.id) || {
+        rating: 0,
+        average: 0,
+      };
 
       return {
         employee_name: member.full_name,
@@ -207,119 +237,138 @@ exports.fetchTlrating = async (req, res) => {
 
 exports.fetchTLproducts = async (req, res) => {
   try {
-      const { user_id, product_id } = req.query;
+    const { user_id, product_id } = req.query;
 
-      if (!user_id) {
-          return errorResponse(res, null, 'User ID is required', 400);
-      }
+    if (!user_id) {
+      return errorResponse(res, null, "User ID is required", 400);
+    }
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
 
-      // Fetch team IDs
-      const [teamResult] = await db.query(
-          "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
-          [user_id]
-      );
-      if (teamResult.length === 0) {
-          return res.status(404).json({ message: 'No teams found for the given user_id' });
-      }
-      const teamIds = teamResult.map(team => team.id);
+    // Check if no rows are returned
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
+    }
 
-      // Fetch products (filtered by product_id if provided)
-      const productsQuery = product_id
-          ? "SELECT * FROM products WHERE id = ?"
-          : "SELECT * FROM products";
-      const [products] = await db.query(productsQuery, product_id ? [product_id] : []);
+    // Fetch team IDs
+    const [teamResult] = await db.query(
+      "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+    if (teamResult.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No teams found for the given user_id" });
+    }
+    const teamIds = teamResult.map((team) => team.id);
 
-      if (products.length === 0) {
-          return res.status(404).json({ message: 'No products found' });
-      }
+    // Fetch products (filtered by product_id if provided)
+    const productsQuery = product_id
+      ? "SELECT * FROM products WHERE id = ?"
+      : "SELECT * FROM products";
+    const [products] = await db.query(
+      productsQuery,
+      product_id ? [product_id] : []
+    );
 
-      const result = await Promise.all(
-          products.map(async (product) => {
-              // Fetch tasks associated with the product and team
-              const tasksQuery = `
+    if (products.length === 0) {
+      return res.status(404).json({ message: "No products found" });
+    }
+
+    const result = await Promise.all(
+      products.map(async (product) => {
+        // Fetch tasks associated with the product and team
+        const tasksQuery = `
                   SELECT * FROM tasks 
                   WHERE product_id = ? AND team_id IN (?) AND deleted_at IS NULL
               `;
-              const [tasks] = await db.query(tasksQuery, [product.id, teamIds]);
+        const [tasks] = await db.query(tasksQuery, [product.id, teamIds]);
 
-              let totalItems = 0;
-              let completedItems = 0;
-              let workingEmployees = new Set();
+        let totalItems = 0;
+        let completedItems = 0;
+        let workingEmployees = new Set();
 
-              for (const task of tasks) {
-                  // Fetch subtasks associated with the task
-                  const subtasksQuery = `
+        for (const task of tasks) {
+          // Fetch subtasks associated with the task
+          const subtasksQuery = `
                       SELECT * FROM sub_tasks 
                       WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
                   `;
-                  const [subtasks] = await db.query(subtasksQuery, [task.id, teamIds]);
+          const [subtasks] = await db.query(subtasksQuery, [task.id, teamIds]);
 
-                  if (subtasks.length > 0) {
-                      totalItems += subtasks.length;
-                      completedItems += subtasks.filter(subtask => subtask.status === 3).length;
+          if (subtasks.length > 0) {
+            totalItems += subtasks.length;
+            completedItems += subtasks.filter(
+              (subtask) => subtask.status === 3
+            ).length;
 
-                      subtasks.forEach(subtask => {
-                          if (subtask.user_id) workingEmployees.add(subtask.user_id);
-                      });
-                  } else {
-                      totalItems += 1;
-                      if (task.status === 3) completedItems += 1;
+            subtasks.forEach((subtask) => {
+              if (subtask.user_id) workingEmployees.add(subtask.user_id);
+            });
+          } else {
+            totalItems += 1;
+            if (task.status === 3) completedItems += 1;
 
-                      if (task.user_id) workingEmployees.add(task.user_id);
-                  }
-              }
+            if (task.user_id) workingEmployees.add(task.user_id);
+          }
+        }
 
-              const completionPercentage =
-                  totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+        const completionPercentage =
+          totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
-              // Fetch employee details for working employees
-              let employeeList = [];
-              if (workingEmployees.size > 0) {
-                  const employeeDetailsQuery = `
+        // Fetch employee details for working employees
+        let employeeList = [];
+        if (workingEmployees.size > 0) {
+          const employeeDetailsQuery = `
                       SELECT id, 
                              COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
                       FROM users 
                       WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
                   `;
-                  const [employees] = await db.query(employeeDetailsQuery, [Array.from(workingEmployees), teamIds]);
+          const [employees] = await db.query(employeeDetailsQuery, [
+            Array.from(workingEmployees),
+            teamIds,
+          ]);
 
-                  employeeList = employees.map(user => {
-                      const words = user.full_name ? user.full_name.split(" ") : [];
-                      const initials =
-                          words.length > 1
-                              ? words.map(word => word[0].toUpperCase()).join("")
-                              : (words[0] || "").slice(0, 2).toUpperCase();
+          employeeList = employees.map((user) => {
+            const words = user.full_name ? user.full_name.split(" ") : [];
+            const initials =
+              words.length > 1
+                ? words.map((word) => word[0].toUpperCase()).join("")
+                : (words[0] || "").slice(0, 2).toUpperCase();
 
-                      return {
-                          employee_name: user.full_name || "N/A",
-                          employee_id: user.id || "N/A",
-                          initials: initials,
-                      };
-                  });
-              }
+            return {
+              employee_name: user.full_name || "N/A",
+              employee_id: user.id || "N/A",
+              initials: initials,
+            };
+          });
+        }
 
-              return {
-                  product_id: product.id,
-                  product_name: product.name,
-                  completed_percentage: completionPercentage,
-                  employee_count: workingEmployees.size,
-                  employees: employeeList,
-              };
-          })
-      );
+        return {
+          product_id: product.id,
+          product_name: product.name,
+          completed_percentage: completionPercentage,
+          employee_count: workingEmployees.size,
+          employees: employeeList,
+        };
+      })
+    );
 
-      return successResponse(
-          res,
-          {
-              total_products: products.length,
-              product_data: result,
-          },
-          "Products retrieved successfully",
-          200
-      );
+    return successResponse(
+      res,
+      {
+        total_products: products.length,
+        product_data: result,
+      },
+      "Products retrieved successfully",
+      200
+    );
   } catch (error) {
-      console.error("Error fetching products:", error);
-      return errorResponse(res, error.message, "Error fetching products", 500);
+    console.error("Error fetching products:", error);
+    return errorResponse(res, error.message, "Error fetching products", 500);
   }
 };
 
@@ -328,35 +377,56 @@ exports.fetchTLresourceallotment = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return errorResponse(res, null, 'User ID is required', 400);
+      return errorResponse(res, null, "User ID is required", 400);
+    }
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    // Check if no rows are returned
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
     }
 
     // Fetch team IDs
-    const [teamResult] = await db.query("SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL", [user_id]);
+    const [teamResult] = await db.query(
+      "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
     if (teamResult.length === 0) {
-      return res.status(404).json({ message: 'No teams found for the given user_id' });
+      return res
+        .status(404)
+        .json({ message: "No teams found for the given user_id" });
     }
-    const teamIds = teamResult.map(team => team.id);
+    const teamIds = teamResult.map((team) => team.id);
 
     // Get the current date and handle employee leave logic
-    const today = new Date().toISOString().split('T')[0]; // Current date in YYYY-MM-DD format
-    const [absentEmployees] = await db.query(`
+    const today = new Date().toISOString().split("T")[0]; // Current date in YYYY-MM-DD format
+    const [absentEmployees] = await db.query(
+      `
       SELECT user_id 
       FROM employee_leave 
       WHERE date = ? AND user_id IN (SELECT id FROM users WHERE team_id IN (?) AND deleted_at IS NULL) AND deleted_at IS NULL
-    `, [today, teamIds]);
+    `,
+      [today, teamIds]
+    );
 
-    const absentEmployeeIds = absentEmployees.map(emp => emp.user_id);
+    const absentEmployeeIds = absentEmployees.map((emp) => emp.user_id);
 
     // If there are no absent employees, set absentEmployeeIds to a value that does not affect the query
-    const absentEmployeeCondition = absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : '';
+    const absentEmployeeCondition =
+      absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
     // Calculate total users (not absent)
-    const [totalUsers] = await db.query(`
+    const [totalUsers] = await db.query(
+      `
       SELECT COUNT(*) as total_count 
       FROM users 
       WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeCondition}
-    `, absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]);
+    `,
+      absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
+    );
 
     const totalCount = totalUsers[0].total_count;
 
@@ -366,30 +436,36 @@ exports.fetchTLresourceallotment = async (req, res) => {
     const allocatedEmployees = new Set();
 
     // Step 1: Get all tasks with subtasks
-    const [tasks] = await db.query(`
+    const [tasks] = await db.query(
+      `
       SELECT id, user_id
       FROM tasks
       WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeCondition} AND status != 3
-    `, absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]);
+    `,
+      absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
+    );
 
-    const taskIds = tasks.map(task => task.id);
+    const taskIds = tasks.map((task) => task.id);
 
     // Step 2: Get subtasks for the tasks
-    const [subtasks] = await db.query(`
+    const [subtasks] = await db.query(
+      `
       SELECT task_id, user_id
       FROM sub_tasks
       WHERE task_id IN (?) AND status != 3 AND deleted_at IS NULL
-    `, [taskIds]);
+    `,
+      [taskIds]
+    );
 
     const allocatedTaskUsers = new Set();
 
     // Step 3: Add users from subtasks first
-    subtasks.forEach(subtask => {
+    subtasks.forEach((subtask) => {
       allocatedTaskUsers.add(subtask.user_id);
     });
 
     // Step 4: If no subtasks, add users from the task itself
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       if (!allocatedTaskUsers.has(task.user_id)) {
         allocatedTaskUsers.add(task.user_id);
       }
@@ -397,43 +473,52 @@ exports.fetchTLresourceallotment = async (req, res) => {
 
     // Step 5: Get details of allocated users
     if (allocatedTaskUsers.size > 0) {
-      const [allocatedEmployeeDetailsData] = await db.query(`
+      const [allocatedEmployeeDetailsData] = await db.query(
+        `
         SELECT id, 
                COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
         FROM users 
         WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
-      `, [Array.from(allocatedTaskUsers), teamIds]);
+      `,
+        [Array.from(allocatedTaskUsers), teamIds]
+      );
 
-      allocatedEmployeeDetailsData.forEach(user => {
+      allocatedEmployeeDetailsData.forEach((user) => {
         employeeDetails.push({
           employee_name: user.employee_name,
-          status: 'Allocated', // These employees are allocated tasks/subtasks
+          status: "Allocated", // These employees are allocated tasks/subtasks
         });
       });
     }
 
     // Step 6: Get all users in the team (excluding absentees) and check for non-allocated employees
-    const [allEmployeesData] = await db.query(`
+    const [allEmployeesData] = await db.query(
+      `
       SELECT id, 
              COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
       FROM users 
       WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeCondition}
-    `, absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]);
+    `,
+      absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
+    );
 
     // Add non-allocated employees
-    allEmployeesData.forEach(user => {
+    allEmployeesData.forEach((user) => {
       if (!allocatedTaskUsers.has(user.id)) {
         employeeDetails.push({
           employee_name: user.employee_name,
-          status: 'Not Allocated', // These employees are not allocated any tasks
+          status: "Not Allocated", // These employees are not allocated any tasks
         });
       }
     });
 
     // Calculate percentages
-    allocatedCount = employeeDetails.filter(emp => emp.status === 'Allocated').length;
+    allocatedCount = employeeDetails.filter(
+      (emp) => emp.status === "Allocated"
+    ).length;
     const nonAllocatedCount = totalCount - allocatedCount;
-    const allocatedPercentage = totalCount > 0 ? Math.round((allocatedCount / totalCount) * 100) : 0;
+    const allocatedPercentage =
+      totalCount > 0 ? Math.round((allocatedCount / totalCount) * 100) : 0;
     const nonAllocatedPercentage = 100 - allocatedPercentage;
 
     const allottedData = {
@@ -441,7 +526,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
       Allocated: allocatedCount,
       nonAllocated: nonAllocatedCount,
       AllocatedPercentage: allocatedPercentage,
-      notAllocatedPercentage: nonAllocatedPercentage
+      notAllocatedPercentage: nonAllocatedPercentage,
     };
 
     return successResponse(
@@ -455,7 +540,12 @@ exports.fetchTLresourceallotment = async (req, res) => {
     );
   } catch (error) {
     console.error("Error fetching resource allocation data:", error);
-    return errorResponse(res, error.message, "Error fetching resource allocation data", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error fetching resource allocation data",
+      500
+    );
   }
 };
 
@@ -464,14 +554,27 @@ exports.fetchTLdatas = async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-      return errorResponse(res, null, 'User ID is required', 400);
+      return errorResponse(res, null, "User ID is required", 400);
     }
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
 
+    // Check if no rows are returned
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
+    }
     // Fetch team IDs for the reporting user
-    const [teamResult] = await db.query("SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL", [user_id]);
+    const [teamResult] = await db.query(
+      "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
 
     if (teamResult.length === 0) {
-      return res.status(404).json({ message: "No teams found for the given user_id" });
+      return res
+        .status(404)
+        .json({ message: "No teams found for the given user_id" });
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -483,11 +586,15 @@ exports.fetchTLdatas = async (req, res) => {
     const today = new Date().toISOString().split("T")[0];
 
     // Get total team strength
-    const [totalStrengthResult] = await db.query("SELECT COUNT(*) AS total_strength FROM users WHERE team_id IN (?) AND deleted_at IS NULL", [teamIds]);
+    const [totalStrengthResult] = await db.query(
+      "SELECT COUNT(*) AS total_strength FROM users WHERE team_id IN (?) AND deleted_at IS NULL",
+      [teamIds]
+    );
     const totalStrength = totalStrengthResult[0]?.total_strength || 0;
 
     // Fetch absent employees
-    const [absentEmployees] = await db.query(`
+    const [absentEmployees] = await db.query(
+      `
       SELECT e.user_id, 
              COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name, 
              'Absent' AS status
@@ -497,16 +604,22 @@ exports.fetchTLdatas = async (req, res) => {
         e.day_type = 1
         OR (e.day_type = 2 AND e.half_type = 1 AND ? < ?)
       ) AND u.team_id IN (?) AND u.deleted_at IS NULL AND e.deleted_at IS NULL
-    `, [today, currentTime, cutoffTime, teamIds]);
+    `,
+      [today, currentTime, cutoffTime, teamIds]
+    );
 
     const absentEmployeeIds = absentEmployees.map((emp) => emp.user_id);
-    const absentEmployeeIdsCondition = absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
+    const absentEmployeeIdsCondition =
+      absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
     // Fetch present employees
-    const [presentEmployees] = await db.query(`
+    const [presentEmployees] = await db.query(
+      `
       SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
       FROM users WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeIdsCondition}
-    `, absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]);
+    `,
+      absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
+    );
 
     // Combine attendance data
     const attendanceList = [
@@ -520,15 +633,20 @@ exports.fetchTLdatas = async (req, res) => {
 
     const totalAbsentEmployees = absentEmployees.length;
     const totalPresentEmployees = presentEmployees.length;
-    const presentPercentage = totalStrength ? Math.round((totalPresentEmployees / totalStrength) * 100) : 0;
-    const absentPercentage = totalStrength ? Math.round((totalAbsentEmployees / totalStrength) * 100) : 0;
+    const presentPercentage = totalStrength
+      ? Math.round((totalPresentEmployees / totalStrength) * 100)
+      : 0;
+    const absentPercentage = totalStrength
+      ? Math.round((totalAbsentEmployees / totalStrength) * 100)
+      : 0;
 
     // Add initials for each employee
     const attendanceWithInitials = attendanceList.map((employee) => {
       const nameParts = employee.employee_name.split(" ");
       let initials = "";
       if (nameParts.length > 1) {
-        initials = nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase();
+        initials =
+          nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase();
       } else {
         initials = nameParts[0].slice(0, 2).toUpperCase();
       }
@@ -537,10 +655,13 @@ exports.fetchTLdatas = async (req, res) => {
 
     // ========================= Fetch Team Ratings ========================
     const currentMonth = new Date().toISOString().slice(0, 7); // Format YYYY-MM
-    const [teamMembers] = await db.query(`
+    const [teamMembers] = await db.query(
+      `
       SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
       FROM users WHERE team_id IN (?) AND deleted_at IS NULL
-    `, [teamIds]);
+    `,
+      [teamIds]
+    );
 
     const [ratingsResult] = await db.query(
       "SELECT user_id, rating, average FROM ratings WHERE user_id IN (?) AND month = ?",
@@ -553,12 +674,16 @@ exports.fetchTLdatas = async (req, res) => {
     });
 
     const finalRatingResult = teamMembers.map((member) => {
-      const nameParts = member.full_name.split(' ');
-      const initials = nameParts.length > 1
-        ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
-        : nameParts[0].slice(0, 2).toUpperCase();
+      const nameParts = member.full_name.split(" ");
+      const initials =
+        nameParts.length > 1
+          ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
+          : nameParts[0].slice(0, 2).toUpperCase();
 
-      const ratingRecord = ratingsMap.get(member.id) || { rating: 0, average: 0 };
+      const ratingRecord = ratingsMap.get(member.id) || {
+        rating: 0,
+        average: 0,
+      };
       return {
         employee_name: member.full_name,
         employee_id: member.id,
@@ -570,83 +695,123 @@ exports.fetchTLdatas = async (req, res) => {
 
     // ========================= Fetch Products ========================
     const [products] = await db.query("SELECT * FROM products");
-    const productResults = await Promise.all(products.map(async (product) => {
-      const [tasks] = await db.query(`
+    const productResults = await Promise.all(
+      products.map(async (product) => {
+        const [tasks] = await db.query(
+          `
         SELECT * FROM tasks WHERE product_id = ? AND team_id IN (?) AND deleted_at IS NULL
-      `, [product.id, teamIds]);
+      `,
+          [product.id, teamIds]
+        );
 
-      let totalItems = 0;
-      let completedItems = 0;
-      let workingEmployees = new Set();
+        let totalItems = 0;
+        let completedItems = 0;
+        let workingEmployees = new Set();
 
-      for (const task of tasks) {
-        const [subtasks] = await db.query(`
+        for (const task of tasks) {
+          const [subtasks] = await db.query(
+            `
           SELECT * FROM sub_tasks WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
-        `, [task.id, teamIds]);
+        `,
+            [task.id, teamIds]
+          );
 
-        if (subtasks.length > 0) {
-          totalItems += subtasks.length;
-          completedItems += subtasks.filter(subtask => subtask.status === 3).length;
-          subtasks.forEach(subtask => {
-            if (subtask.user_id) workingEmployees.add(subtask.user_id);
-          });
-        } else {
-          totalItems += 1;
-          if (task.status === 3) completedItems += 1;
-          if (task.user_id) workingEmployees.add(task.user_id);
+          if (subtasks.length > 0) {
+            totalItems += subtasks.length;
+            completedItems += subtasks.filter(
+              (subtask) => subtask.status === 3
+            ).length;
+            subtasks.forEach((subtask) => {
+              if (subtask.user_id) workingEmployees.add(subtask.user_id);
+            });
+          } else {
+            totalItems += 1;
+            if (task.status === 3) completedItems += 1;
+            if (task.user_id) workingEmployees.add(task.user_id);
+          }
         }
-      }
 
-      const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+        const completionPercentage =
+          totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
-      let employeeList = [];
-      if (workingEmployees.size > 0) {
-        const [employees] = await db.query(`
+        let employeeList = [];
+        if (workingEmployees.size > 0) {
+          const [employees] = await db.query(
+            `
           SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
           FROM users WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
-        `, [Array.from(workingEmployees), teamIds]);
+        `,
+            [Array.from(workingEmployees), teamIds]
+          );
 
-        employeeList = employees.map(user => {
-          const words = user.full_name ? user.full_name.split(" ") : [];
-          const initials = words.length > 1 ? words.map(word => word[0].toUpperCase()).join("") : (words[0] || "").slice(0, 2).toUpperCase();
-          return { employee_name: user.full_name || "N/A", employee_id: user.id || "N/A", initials };
-        });
-      }
+          employeeList = employees.map((user) => {
+            const words = user.full_name ? user.full_name.split(" ") : [];
+            const initials =
+              words.length > 1
+                ? words.map((word) => word[0].toUpperCase()).join("")
+                : (words[0] || "").slice(0, 2).toUpperCase();
+            return {
+              employee_name: user.full_name || "N/A",
+              employee_id: user.id || "N/A",
+              initials,
+            };
+          });
+        }
 
-      return {
-        product_id: product.id,
-        product_name: product.name,
-        completed_percentage: completionPercentage,
-        employee_count: workingEmployees.size,
-        employees: employeeList,
-      };
-    }));
+        return {
+          product_id: product.id,
+          product_name: product.name,
+          completed_percentage: completionPercentage,
+          employee_count: workingEmployees.size,
+          employees: employeeList,
+        };
+      })
+    );
 
     // ========================= Fetch Resource Allotment ========================
-    const [absentEmployeesForAllocation] = await db.query(`
+    const [absentEmployeesForAllocation] = await db.query(
+      `
       SELECT user_id FROM employee_leave WHERE date = ? AND user_id IN (SELECT id FROM users WHERE team_id IN (?) AND deleted_at IS NULL) AND deleted_at IS NULL
-    `, [today, teamIds]);
+    `,
+      [today, teamIds]
+    );
 
-    const absentEmployeeIdsForAllocation = absentEmployeesForAllocation.map((emp) => emp.user_id);
-    const absentEmployeeConditionForAllocation = absentEmployeeIdsForAllocation.length > 0 ? `AND id NOT IN (?)` : "";
+    const absentEmployeeIdsForAllocation = absentEmployeesForAllocation.map(
+      (emp) => emp.user_id
+    );
+    const absentEmployeeConditionForAllocation =
+      absentEmployeeIdsForAllocation.length > 0 ? `AND id NOT IN (?)` : "";
 
-    const [totalUsersData] = await db.query(`
+    const [totalUsersData] = await db.query(
+      `
       SELECT COUNT(*) as total_count FROM users WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeConditionForAllocation}
-    `, absentEmployeeIdsForAllocation.length > 0 ? [teamIds, absentEmployeeIdsForAllocation] : [teamIds]);
+    `,
+      absentEmployeeIdsForAllocation.length > 0
+        ? [teamIds, absentEmployeeIdsForAllocation]
+        : [teamIds]
+    );
 
     const totalCountForAllocation = totalUsersData[0].total_count;
     let allocatedCountForAllocation = 0;
     const allocatedTaskUsers = new Set();
 
-    const [tasksForAllocation] = await db.query(`
+    const [tasksForAllocation] = await db.query(
+      `
       SELECT id, user_id FROM tasks WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeConditionForAllocation} AND status != 3
-    `, absentEmployeeIdsForAllocation.length > 0 ? [teamIds, absentEmployeeIdsForAllocation] : [teamIds]);
+    `,
+      absentEmployeeIdsForAllocation.length > 0
+        ? [teamIds, absentEmployeeIdsForAllocation]
+        : [teamIds]
+    );
 
     const taskIdsForAllocation = tasksForAllocation.map((task) => task.id);
 
-    const [subtasksForAllocation] = await db.query(`
+    const [subtasksForAllocation] = await db.query(
+      `
       SELECT task_id, user_id FROM sub_tasks WHERE task_id IN (?) AND status != 3 AND deleted_at IS NULL
-    `, [taskIdsForAllocation]);
+    `,
+      [taskIdsForAllocation]
+    );
 
     subtasksForAllocation.forEach((subtask) => {
       allocatedTaskUsers.add(subtask.user_id);
@@ -660,36 +825,52 @@ exports.fetchTLdatas = async (req, res) => {
 
     let employeeDetailsForAllocation = [];
     if (allocatedTaskUsers.size > 0) {
-      const [allocatedEmployeeDetails] = await db.query(`
+      const [allocatedEmployeeDetails] = await db.query(
+        `
         SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
         FROM users WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
-      `, [Array.from(allocatedTaskUsers), teamIds]);
+      `,
+        [Array.from(allocatedTaskUsers), teamIds]
+      );
 
-      allocatedEmployeeDetails.forEach(user => {
+      allocatedEmployeeDetails.forEach((user) => {
         employeeDetailsForAllocation.push({
           employee_name: user.employee_name,
-          status: 'Allocated',
+          status: "Allocated",
         });
       });
     }
 
-    const [allEmployeesForAllocation] = await db.query(`
+    const [allEmployeesForAllocation] = await db.query(
+      `
       SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
       FROM users WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeConditionForAllocation}
-    `, absentEmployeeIdsForAllocation.length > 0 ? [teamIds, absentEmployeeIdsForAllocation] : [teamIds]);
+    `,
+      absentEmployeeIdsForAllocation.length > 0
+        ? [teamIds, absentEmployeeIdsForAllocation]
+        : [teamIds]
+    );
 
-    allEmployeesForAllocation.forEach(user => {
+    allEmployeesForAllocation.forEach((user) => {
       if (!allocatedTaskUsers.has(user.id)) {
         employeeDetailsForAllocation.push({
           employee_name: user.employee_name,
-          status: 'Not Allocated',
+          status: "Not Allocated",
         });
       }
     });
 
-    allocatedCountForAllocation = employeeDetailsForAllocation.filter(emp => emp.status === 'Allocated').length;
-    const nonAllocatedCount = totalCountForAllocation - allocatedCountForAllocation;
-    const allocatedPercentage = totalCountForAllocation > 0 ? Math.round((allocatedCountForAllocation / totalCountForAllocation) * 100) : 0;
+    allocatedCountForAllocation = employeeDetailsForAllocation.filter(
+      (emp) => emp.status === "Allocated"
+    ).length;
+    const nonAllocatedCount =
+      totalCountForAllocation - allocatedCountForAllocation;
+    const allocatedPercentage =
+      totalCountForAllocation > 0
+        ? Math.round(
+            (allocatedCountForAllocation / totalCountForAllocation) * 100
+          )
+        : 0;
     const nonAllocatedPercentage = 100 - allocatedPercentage;
 
     const allottedData = {
@@ -734,17 +915,31 @@ exports.fetchTlviewproductdata = async (req, res) => {
     const { user_id, product_id, project_id, date, search } = req.query;
 
     if (!product_id) {
-      return errorResponse(res, null, 'Product ID is required', 400);
+      return errorResponse(res, null, "Product ID is required", 400);
     }
     if (!user_id) {
-      return errorResponse(res, null, 'User ID is required', 400);
+      return errorResponse(res, null, "User ID is required", 400);
+    }
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    // Check if no rows are returned
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
     }
 
     // Fetch team IDs for the reporting user
-    const [teamResult] = await db.query("SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL", [user_id]);
+    const [teamResult] = await db.query(
+      "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
 
     if (teamResult.length === 0) {
-      return res.status(404).json({ message: "No teams found for the given user_id" });
+      return res
+        .status(404)
+        .json({ message: "No teams found for the given user_id" });
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -756,11 +951,11 @@ exports.fetchTlviewproductdata = async (req, res) => {
       WHERE id = ? AND deleted_at IS NULL
     `;
     const [productRows] = await db.query(productQuery, [product_id]);
-    const product = productRows[0] || { name: 'N/A', id: 'N/A' };
+    const product = productRows[0] || { name: "N/A", id: "N/A" };
 
     // Build dynamic query for tasks and subtasks
     // Build dynamic query for tasks and subtasks
-let tasksQuery = `
+    let tasksQuery = `
 SELECT 
   t.id AS task_id,
   t.name AS task_name,
@@ -791,31 +986,32 @@ AND te.deleted_at IS NULL
 AND p.deleted_at IS NULL
 `;
 
-// Filter by team_ids based on reporting_user_id
-if (teamIds.length > 0) {
-tasksQuery += ` AND t.team_id IN (${teamIds.map((id) => db.escape(id)).join(',')})`;
-}
+    // Filter by team_ids based on reporting_user_id
+    if (teamIds.length > 0) {
+      tasksQuery += ` AND t.team_id IN (${teamIds
+        .map((id) => db.escape(id))
+        .join(",")})`;
+    }
 
-// Add other filters as necessary
-if (project_id) {
-tasksQuery += ` AND t.project_id = ${db.escape(project_id)}`;
-}
-if (date) {
-tasksQuery += ` AND DATE(t.created_at) = ${db.escape(date)}`;
-}
-if (search) {
-  tasksQuery += `
+    // Add other filters as necessary
+    if (project_id) {
+      tasksQuery += ` AND t.project_id = ${db.escape(project_id)}`;
+    }
+    if (date) {
+      tasksQuery += ` AND DATE(t.created_at) = ${db.escape(date)}`;
+    }
+    if (search) {
+      tasksQuery += `
     AND (
-      COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ${db.escape('%' + search + '%')} OR
-      p.name LIKE ${db.escape('%' + search + '%')} OR
-      te.name LIKE ${db.escape('%' + search + '%')} OR
-      s.name LIKE ${db.escape('%' + search + '%')}
+      COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ${db.escape(
+        "%" + search + "%"
+      )} OR
+      p.name LIKE ${db.escape("%" + search + "%")} OR
+      te.name LIKE ${db.escape("%" + search + "%")} OR
+      s.name LIKE ${db.escape("%" + search + "%")}
     )
   `;
-}
-
-
-
+    }
 
     // Execute the query
     const [taskRows] = await db.query(tasksQuery, [product_id]);
@@ -823,15 +1019,15 @@ if (search) {
     // Helper function to validate subtask inclusion based on status
     const isValidSubtask = (subtask, status) => {
       switch (status) {
-        case 'Pending':
+        case "Pending":
           return subtask.active_status === 1 && subtask.status === 0;
-        case 'In Progress':
+        case "In Progress":
           return subtask.active_status === 1 && subtask.status === 1;
-        case 'In Review':
+        case "In Review":
           return subtask.active_status === 1 && subtask.status === 2;
-        case 'On Hold':
+        case "On Hold":
           return subtask.active_status === 0;
-        case 'Done':
+        case "Done":
           return subtask.active_status === 1 && subtask.status === 3;
         default:
           return false;
@@ -848,12 +1044,12 @@ if (search) {
       subtasks.forEach((subtask) => {
         if (isValidSubtask(subtask, status)) {
           validSubtasks.push({
-            SubtaskId: subtask.id || 'N/A',
-            SubtaskName: subtask.name || 'N/A',
-            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
-            SubtaskDescription: subtask.description || 'N/A',
-            SubtaskActiveStatus: subtask.active_status || 'N/A',
-            SubtaskStatus: subtask.status || 'N/A',
+            SubtaskId: subtask.id || "N/A",
+            SubtaskName: subtask.name || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskDescription: subtask.description || "N/A",
+            SubtaskActiveStatus: subtask.active_status || "N/A",
+            SubtaskStatus: subtask.status || "N/A",
           });
         }
         totalSubtasks++;
@@ -872,17 +1068,19 @@ if (search) {
 
       // Return the formatted task object
       return {
-        Date: task.date ? new Date(task.date).toISOString().split('T')[0] : 'N/A',
-        Team: task.team_name || 'N/A',
-        EmployeeName: task.employee_name || 'N/A',
-        Priority: task.priority || 'N/A',
-        ProjectName: task.project_name || 'N/A',
-        TaskName: task.name || 'N/A',
-        TaskId: task.id || 'N/A',
+        Date: task.date
+          ? new Date(task.date).toISOString().split("T")[0]
+          : "N/A",
+        Team: task.team_name || "N/A",
+        EmployeeName: task.employee_name || "N/A",
+        Priority: task.priority || "N/A",
+        ProjectName: task.project_name || "N/A",
+        TaskName: task.name || "N/A",
+        TaskId: task.id || "N/A",
         TotalSubtaskCount: totalSubtasks,
         CompletedSubtaskCount: completedSubtasks,
-        EstimationHours: task.estimation_hours || 'N/A',
-        Description: task.description || 'N/A',
+        EstimationHours: task.estimation_hours || "N/A",
+        Description: task.description || "N/A",
         Subtasks: validSubtasks,
         CompletionPercentage: completionPercentage,
         Status: status,
@@ -891,20 +1089,20 @@ if (search) {
 
     // Group tasks by status
     const groupedTasks = {
-      'Pending': [],
-      'In Progress': [],
-      'In Review': [],
-      'On Hold': [],
-      'Done': [],
+      Pending: [],
+      "In Progress": [],
+      "In Review": [],
+      "On Hold": [],
+      Done: [],
     };
 
     // Track added task IDs for each section
     const addedTaskIds = {
-      'Pending': [],
-      'In Progress': [],
-      'In Review': [],
-      'On Hold': [],
-      'Done': [],
+      Pending: [],
+      "In Progress": [],
+      "In Review": [],
+      "On Hold": [],
+      Done: [],
     };
 
     // Process each row and categorize tasks
@@ -940,20 +1138,24 @@ if (search) {
 
       // Only add task if it hasn't been added to that category already
       if (category) {
-        const existingTaskIndex = groupedTasks[category].findIndex(t => t.TaskId === task.id);
+        const existingTaskIndex = groupedTasks[category].findIndex(
+          (t) => t.TaskId === task.id
+        );
 
         if (existingTaskIndex === -1) {
           // Task does not exist in the section, so push the task with its subtask
-          groupedTasks[category].push(formatTask(task, subtask ? [subtask] : [], category));
+          groupedTasks[category].push(
+            formatTask(task, subtask ? [subtask] : [], category)
+          );
         } else {
           // Task exists, so add the subtask to the existing task
           groupedTasks[category][existingTaskIndex].Subtasks.push({
-            SubtaskId: subtask.id || 'N/A',
-            SubtaskName: subtask.name || 'N/A',
-            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
-            SubtaskDescription: subtask.description || 'N/A',
-            SubtaskActiveStatus: subtask.active_status || 'N/A',
-            SubtaskStatus: subtask.status || 'N/A',
+            SubtaskId: subtask.id || "N/A",
+            SubtaskName: subtask.name || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskDescription: subtask.description || "N/A",
+            SubtaskActiveStatus: subtask.active_status || "N/A",
+            SubtaskStatus: subtask.status || "N/A",
           });
         }
       }
@@ -961,24 +1163,24 @@ if (search) {
 
     // Prepare the response
     const result = {
-      PendingTasks: groupedTasks['Pending'],
-      InProgressTasks: groupedTasks['In Progress'],
-      InReviewTasks: groupedTasks['In Review'],
-      OnHoldTasks: groupedTasks['On Hold'],
-      DoneTasks: groupedTasks['Done'],
-      TodoCount: groupedTasks['Pending'].length,
-      InProgressCount: groupedTasks['In Progress'].length,
-      InReviewCount: groupedTasks['In Review'].length,
-      OnHoldCount: groupedTasks['On Hold'].length,
-      DoneCount: groupedTasks['Done'].length,
+      PendingTasks: groupedTasks["Pending"],
+      InProgressTasks: groupedTasks["In Progress"],
+      InReviewTasks: groupedTasks["In Review"],
+      OnHoldTasks: groupedTasks["On Hold"],
+      DoneTasks: groupedTasks["Done"],
+      TodoCount: groupedTasks["Pending"].length,
+      InProgressCount: groupedTasks["In Progress"].length,
+      InReviewCount: groupedTasks["In Review"].length,
+      OnHoldCount: groupedTasks["On Hold"].length,
+      DoneCount: groupedTasks["Done"].length,
       OverallCompletionPercentage:
-        groupedTasks['Done'].length > 0
+        groupedTasks["Done"].length > 0
           ? Math.round(
-              (groupedTasks.Done.length / 
-                (groupedTasks.Pending.length + 
-                  groupedTasks['In Progress'].length + 
-                  groupedTasks['In Review'].length + 
-                  groupedTasks['On Hold'].length + 
+              (groupedTasks.Done.length /
+                (groupedTasks.Pending.length +
+                  groupedTasks["In Progress"].length +
+                  groupedTasks["In Review"].length +
+                  groupedTasks["On Hold"].length +
                   groupedTasks.Done.length)) *
                 100
             )
@@ -987,34 +1189,19 @@ if (search) {
       productid: product.id,
     };
 
-    return successResponse(res, result, 'TL Product details retrieved successfully', 200);
-
+    return successResponse(
+      res,
+      result,
+      "TL Product details retrieved successfully",
+      200
+    );
   } catch (error) {
-    console.error('Error fetching product details:', error);
-    return errorResponse(res, error.message, 'Error fetching product details', 500);
+    console.error("Error fetching product details:", error);
+    return errorResponse(
+      res,
+      error.message,
+      "Error fetching product details",
+      500
+    );
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
