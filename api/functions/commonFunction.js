@@ -68,6 +68,7 @@ exports.getAuthUserDetails = async (authUserId, res) => {
       const [authUserDetails] = await db.query(authUserQuery, [authUserId]);
   
       if (!authUserDetails || authUserDetails.length === 0) {
+        // Send error response and return immediately
         return errorResponse(
           res,
           "User not found",
@@ -76,9 +77,14 @@ exports.getAuthUserDetails = async (authUserId, res) => {
         );
       }
   
-      return authUserDetails[0]; // Return the first user object
+      // Return the first user object if found
+      return authUserDetails[0];
     } catch (error) {
+      // Catch any error and return error response
       return errorResponse(res, error.message, 'Error fetching User', 500);
     }
   };
+  
+  
+  
   
