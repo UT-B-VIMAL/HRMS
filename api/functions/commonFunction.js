@@ -71,8 +71,8 @@ exports.getAuthUserDetails = async (authUserId, res) => {
         // Send error response and return immediately
         return errorResponse(
           res,
-          "User not found",
-          'User not found',
+          "Auth User not found",
+          'Auth User not found',
           404 // Return a 404 as user is not found
         );
       }
