@@ -112,7 +112,7 @@ exports.createTask = async (payload, res) => {
           active_status, status, total_hours_worked, rating, command,
           assigned_user_id, remark, reopen_status, description,
           team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(),NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
       `;
 
     const values = [
@@ -949,7 +949,9 @@ exports.getTaskList = async (queryParams, res) => {
       dropdown_projects
     } = queryParams;
 
+    // Validate if user_id exists
     if (!user_id) {
+      console.log('Missing user_id in query parameters');
       return errorResponse(
         res,
         "User ID is required",
@@ -959,15 +961,12 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     // Get user details
-    const userDetails = await getAuthUserDetails(user_id,res);
-   if (!userDetails) {
-  return errorResponse(
-    res,
-    "User not found",
-    "The provided user_id does not exist in the database",
-    404 // Use 404 for "Not Found" error
-  );
-}
+    const userDetails = await getAuthUserDetails(user_id, res);
+   
+    if (!userDetails || userDetails.id == undefined) {
+      
+      return; 
+    }
 
     const { role_id, team_id: userTeamId } = userDetails;
 
@@ -1183,10 +1182,11 @@ exports.getTaskList = async (queryParams, res) => {
       lastActiveTask: lastActiveTaskData,
     };
 
+    console.log('Sending success response');
     return successResponse(
       res,
       data,
-      "Task datas retrieved successfully",
+      "Task data retrieved successfully",
       200
     );
 
@@ -1195,6 +1195,12 @@ exports.getTaskList = async (queryParams, res) => {
     return errorResponse(res, error.message, 'Error fetching task data', 500);
   }
 };
+
+
+
+
+
+
 
 
 
