@@ -119,6 +119,109 @@ async function changePassword(id, payload, res) {
   }
 }
 
+async function resetKeycloakPassword(userId, newPassword) {
+  try {
+    const token = await getAdminToken(); // Obtain admin token
+
+    const response = await axios.put(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/reset-password`,
+      {
+        type: 'password',
+        value: newPassword,   // New password
+        temporary: false      // Set to true if you want the user to reset their password on first login
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Error resetting password in Keycloak:", error.response ? error.response.data : error.message);
+    throw new Error("Failed to reset password in Keycloak.");
+  }
+}
+
+async function forgotPassword(email, res) {
+  try {
+    const query = "SELECT id, email FROM users WHERE email = ?";
+    const [user] = await db.query(query, [email]);
+
+    if (!user || user.length === 0) {
+      return errorResponse(res, null, 'User not found with this email', 404);
+    }
+
+    const currentUser = user[0];
+
+    // Generate Reset Token (or OTP)
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    const resetTokenExpiry = Date.now() + 3600000; // Token expires in 1 hour
+    const updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?";
+    await db.query(updateQuery, [resetToken, resetTokenExpiry, currentUser.id]);
+
+    // Send the reset token via email (you can implement this with nodemailer as shown previously)
+    const transporter = nodemailer.createTransport({
+      service: 'gmail', 
+      auth: {
+        user: 'your-email@gmail.com',
+        pass: 'your-email-password',
+      },
+    });
+
+    const mailOptions = {
+      from: 'your-email@gmail.com',
+      to: currentUser.email,
+      subject: 'Password Reset Request',
+      text: `You requested a password reset. Please use the following link to reset your password:\n\n` +
+            `http://localhost:3000/reset-password?token=${resetToken}&id=${currentUser.id}\n\n` +
+            `If you did not request this, please ignore this email.`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return successResponse(res, null, 'Password reset link has been sent to your email.');
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    return errorResponse(res, error.message, 'Error sending password reset email', 500);
+  }
+}
+
+// After token validation and password update by user, reset password in Keycloak
+async function resetPasswordWithKeycloak(token, id, newPassword, res) {
+  try {
+    const query = "SELECT id, reset_token, reset_token_expiry FROM users WHERE id = ?";
+    const [user] = await db.query(query, [id]);
+
+    if (!user || user.length === 0) {
+      return errorResponse(res, null, 'User not found', 404);
+    }
+
+    const currentUser = user[0];
+
+    // Check if token is valid and not expired
+    if (currentUser.reset_token !== token || currentUser.reset_token_expiry < Date.now()) {
+      return errorResponse(res, null, 'Invalid or expired token', 400);
+    }
+
+    // Reset password in the local database
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const updateQuery = "UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?";
+    await db.query(updateQuery, [hashedPassword, id]);
+
+    // Now reset password in Keycloak
+    await resetKeycloakPassword(currentUser.keycloak_id, newPassword);
+
+    return successResponse(res, null, 'Password updated successfully in both system and Keycloak.');
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    return errorResponse(res, error.message, 'Error resetting password', 500);
+  }
+}
+
+
 
 
 async function createUserInKeycloak(userData) {
@@ -355,7 +458,8 @@ module.exports = {
   assignRoleToUser,
   signInUser,
   logoutUser,
-  changePassword
+  changePassword,
+  resetKeycloakPassword
 };
 
 
