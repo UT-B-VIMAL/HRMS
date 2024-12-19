@@ -60,6 +60,7 @@ exports.getAttendance = async (req, res) => {
             t.reporting_user_id = ?  
             AND u.id != ? 
             AND u.role_id != 2
+            AND u.deleted_at IS NULL
             AND u.id NOT IN (
                 SELECT user_id 
                 FROM employee_leave 
@@ -98,6 +99,7 @@ exports.getAttendance = async (req, res) => {
       INNER JOIN users u ON el.user_id = u.id  -- Join with users table to get user details
       INNER JOIN teams t ON t.reporting_user_id = ?  
       WHERE el.user_id IN (SELECT id FROM users WHERE team_id = t.id AND id != ? AND role_id != 2)
+       AND u.deleted_at IS NULL
       ${dynamicDate ? 'AND el.date = ?' : ''}  -- Optional date filter
       ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''}  -- Optional search filter
       LIMIT ?, ?
