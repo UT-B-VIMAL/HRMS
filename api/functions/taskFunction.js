@@ -1100,26 +1100,26 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Define the task sections (groups)
     const groups = {
-      'To-Do': [],
-      'On-Hold': [],
-      'Pending-Approval': [],
+      'To_Do': [],
+      'On_Hold': [],
+      'Pending_Approval': [],
       'Reopen': [],
-      'In-Progress': [],
+      'In_Progress': [],
       'Done': []
     };
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-        return 'To-Do';
+        return 'To_Do';
       } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
-        return 'On-Hold';
+        return 'On_Hold';
       } else if (status === 2 && reopenStatus === 0) {
-        return 'Pending-Approval';
+        return 'Pending_Approval';
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return 'Reopen';
       } else if (status === 1 && activeStatus === 1) {
-        return 'In-Progress';
+        return 'In_Progress';
       } else if (status === 3) {
         return 'Done';
       }
