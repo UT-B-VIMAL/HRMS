@@ -87,7 +87,7 @@ exports.fetchAttendance = async (req, res) => {
       ...absentEmployees,
       ...presentEmployees.map((emp) => ({
         employee_id: emp.id,
-        employee_name: emp.full_name,
+        full_name: emp.full_name,
         status: "Present",
       })),
     ];
@@ -101,21 +101,33 @@ exports.fetchAttendance = async (req, res) => {
       ? Math.round((totalAbsentEmployees / totalStrength) * 100)
       : 0;
 
-    // Add initials for each employee
-    const attendanceWithInitials = attendanceList.map((employee) => {
-      const nameParts = employee.employee_name.split(" ");
-      let initials = "";
-      if (nameParts.length > 1) {
-        initials =
-          nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase();
-      } else {
-        initials = nameParts[0].slice(0, 2).toUpperCase();
-      }
-      return {
-        ...employee,
-        initials,
-      };
-    });
+      const attendanceWithInitials = attendanceList.map((employee) => {
+        const nameParts = employee.employee_name
+          ? employee.employee_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
+          : []; // Safely handle missing or invalid employee_name
+      
+        let initials = "";
+      
+        if (nameParts.length > 1) {
+          // Use first letters of the two name parts
+          initials =
+            (nameParts[0][0]?.toUpperCase() || "") +
+            (nameParts[1][0]?.toUpperCase() || "");
+        } else if (nameParts.length === 1) {
+          // Use the first two letters of the single part
+          initials = nameParts[0].slice(0, 2).toUpperCase();
+        } else {
+          // Fallback for empty or missing names
+          initials = "NA";
+        }
+      
+        return {
+          ...employee,
+          initials,
+        };
+      });
+      
+    
 
     // Return the response
     return res.status(200).json({
@@ -191,25 +203,39 @@ exports.fetchTlrating = async (req, res) => {
 
     // Process team members
     const finalRatingResult = teamMembers.map((member) => {
-      const nameParts = member.full_name.split(" ");
-      const initials =
-        nameParts.length > 1
-          ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
-          : nameParts[0].slice(0, 2).toUpperCase();
-
+      const nameParts = member.full_name
+        ? member.full_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
+        : []; // Safely handle missing or invalid full_name
+    
+      let initials = "";
+    
+      if (nameParts.length > 1) {
+        // Use first letters of the two name parts
+        initials =
+          (nameParts[0][0]?.toUpperCase() || "") +
+          (nameParts[1][0]?.toUpperCase() || "");
+      } else if (nameParts.length === 1) {
+        // Use the first two letters of the single part
+        initials = nameParts[0].slice(0, 2).toUpperCase();
+      } else {
+        // Fallback for empty or missing names
+        initials = "NA";
+      }
+    
       const ratingRecord = ratingsMap.get(member.id) || {
         rating: 0,
         average: 0,
       };
-
+    
       return {
-        employee_name: member.full_name,
-        employee_id: member.id,
+        employee_name: member.full_name || "N/A",
+        employee_id: member.id || "N/A",
         initials,
         rating_value: ratingRecord.rating,
         average_value: ratingRecord.average,
       };
     });
+    
 
     // If no team members are found, add a placeholder entry
     if (finalRatingResult.length === 0) {
@@ -626,7 +652,7 @@ exports.fetchTLdatas = async (req, res) => {
       ...absentEmployees,
       ...presentEmployees.map((emp) => ({
         employee_id: emp.id,
-        employee_name: emp.full_name,
+        full_name: emp.full_name,
         status: "Present",
       })),
     ];
@@ -642,15 +668,29 @@ exports.fetchTLdatas = async (req, res) => {
 
     // Add initials for each employee
     const attendanceWithInitials = attendanceList.map((employee) => {
-      const nameParts = employee.employee_name.split(" ");
+      const nameParts = employee.employee_name
+        ? employee.employee_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
+        : []; // Safely handle missing or invalid employee_name
+    
       let initials = "";
+    
       if (nameParts.length > 1) {
+        // Use first letters of the two name parts
         initials =
-          nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase();
-      } else {
+          (nameParts[0][0]?.toUpperCase() || "") +
+          (nameParts[1][0]?.toUpperCase() || "");
+      } else if (nameParts.length === 1) {
+        // Use the first two letters of the single part
         initials = nameParts[0].slice(0, 2).toUpperCase();
+      } else {
+        // Fallback for empty or missing names
+        initials = "NA";
       }
-      return { ...employee, initials };
+    
+      return {
+        ...employee,
+        initials,
+      };
     });
 
     // ========================= Fetch Team Ratings ========================
@@ -674,24 +714,39 @@ exports.fetchTLdatas = async (req, res) => {
     });
 
     const finalRatingResult = teamMembers.map((member) => {
-      const nameParts = member.full_name.split(" ");
-      const initials =
-        nameParts.length > 1
-          ? nameParts[0][0].toUpperCase() + nameParts[1][0].toUpperCase()
-          : nameParts[0].slice(0, 2).toUpperCase();
-
+      const nameParts = member.full_name
+        ? member.full_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
+        : []; // Safely handle missing or invalid full_name
+    
+      let initials = "";
+    
+      if (nameParts.length > 1) {
+        // Use first letters of the two name parts
+        initials =
+          (nameParts[0][0]?.toUpperCase() || "") +
+          (nameParts[1][0]?.toUpperCase() || "");
+      } else if (nameParts.length === 1) {
+        // Use the first two letters of the single part
+        initials = nameParts[0].slice(0, 2).toUpperCase();
+      } else {
+        // Fallback for empty or missing names
+        initials = "NA";
+      }
+    
       const ratingRecord = ratingsMap.get(member.id) || {
         rating: 0,
         average: 0,
       };
+    
       return {
-        employee_name: member.full_name,
-        employee_id: member.id,
+        employee_name: member.full_name || "N/A",
+        employee_id: member.id || "N/A",
         initials,
         rating_value: ratingRecord.rating,
         average_value: ratingRecord.average,
       };
     });
+    
 
     // ========================= Fetch Products ========================
     const [products] = await db.query("SELECT * FROM products");

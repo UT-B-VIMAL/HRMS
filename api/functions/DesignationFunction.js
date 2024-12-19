@@ -105,7 +105,7 @@ exports.deleteDesignation = async (id, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Designation not found or already deleted", "Not Found", 404);
     }
-    const checkReferencesQuery = `SELECT COUNT(*) as count FROM users WHERE designation_id = ?`;
+    const checkReferencesQuery = `SELECT COUNT(*) as count FROM users WHERE designation_id = ?  AND deleted_at IS NULL`;
     const [checkReferencesResult] = await db
       
       .query(checkReferencesQuery, [id]);
@@ -113,7 +113,7 @@ exports.deleteDesignation = async (id, res) => {
     if (checkReferencesResult[0].count > 0) {
       return errorResponse(
         res,
-        `Designation is referenced in the User table and cannot be deleted`,
+        `This designation is referenced in the Users and cannot be deleted`,
         "Reference Error",
         400
       );

@@ -97,15 +97,20 @@ exports.fetchProducts = async (payload, res) => {
 exports.fetchUtilization = async (req, res) => {
   try {
     const { team_id } = req.query;
-    const [rows] = await db.query(
-      "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
-      [team_id]
-    );
 
-    // Check if no rows are returned
-    if (rows.length === 0) {
-      return errorResponse(res, null, "Team Not Found", 400);
-    }
+    if (team_id) {
+      const [rows] = await db.query(
+        "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+        [team_id]
+      );
+      
+      // Check if no rows are returned
+      if (rows.length === 0) {
+        return errorResponse(res, null, "Team Not Found", 400);
+      }
+}
+
+
 
     // Step 1: Get total strength grouped by team, including team name
     const totalStrengthQuery = `
@@ -174,6 +179,7 @@ exports.fetchUtilization = async (req, res) => {
       };
 
       return {
+        team_id: teamId,
         team_name: team.team_name,
         total_strength: team.total_strength,
         working_count: working.working_count,
@@ -650,15 +656,17 @@ exports.fetchPmdatas = async (req, res) => {
     // Step 2: Fetch utilization data
     const { team_id } = req.query;
 
-    const [rows] = await db.query(
-      "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
-      [team_id]
-    );
-
-    // Check if no rows are returned
-    if (rows.length === 0) {
-      return errorResponse(res, null, "Team Not Found", 400);
-    }
+    if (team_id) {
+      const [rows] = await db.query(
+        "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+        [team_id]
+      );
+      
+      // Check if no rows are returned
+      if (rows.length === 0) {
+        return errorResponse(res, null, "Team Not Found", 400);
+      }
+}
 
     // Step 1: Get total strength grouped by team, including team name
     const totalStrengthQuery = `
@@ -727,6 +735,7 @@ exports.fetchPmdatas = async (req, res) => {
       };
 
       return {
+        team_id: teamId,
         team_name: team.team_name,
         total_strength: team.total_strength,
         working_count: working.working_count,
