@@ -1,6 +1,7 @@
 const Joi = require('joi');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const { getAuthUserDetails } = require('./commonFunction');
 // const getPagination = require('../../helpers/paginationHelper');
 const getPagination = (page, perPage, totalRecords) => {
     page = parseInt(page, 10);
@@ -47,7 +48,10 @@ exports.createProduct = async (payload, res) => {
       }, {});
       return errorResponse(res, errorMessages, "Validation Error", 400);
     }
+    
   try {
+    const user = await getAuthUserDetails(user_id, res);
+    if (!user) return;
     const checkQuery = "SELECT COUNT(*) as count FROM products WHERE name = ?";
     const [checkResult] = await db.query(checkQuery, [name]);
 
@@ -73,6 +77,8 @@ exports.updateProduct = async (id, payload, res) => {
       { name, user_id },
       { abortEarly: false }
     );
+    const user = await getAuthUserDetails(user_id, res);
+    if (!user) return;
     if (error) {
       const errorMessages = error.details.reduce((acc, err) => {
         acc[err.path[0]] = err.message;

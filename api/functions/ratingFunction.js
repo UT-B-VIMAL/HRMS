@@ -6,6 +6,7 @@ const {
 } = require("../../helpers/responseHelper");
 
 const getPagination  = require("../../helpers/pagination");
+const { getAuthUserDetails } = require("./commonFunction");
 
 
 
@@ -89,7 +90,8 @@ exports.updateRating = async (payload, res) => {
     }, {});
     return errorResponse(res, errorMessages, "Validation Error", 400);
   }
-
+  const user = await getAuthUserDetails(updated_by, res);
+  if (!user) return;
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const checkUserQuery = "SELECT COUNT(*) as count FROM users WHERE id = ? AND deleted_at IS NULL";
