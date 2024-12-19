@@ -6,6 +6,7 @@ const {
   getPagination
 } = require("../../helpers/responseHelper");
 const { projectSchema } = require("../../validators/projectValidator");
+const { getAuthUserDetails } = require("./commonFunction");
 
 
 // Create Project
@@ -24,6 +25,8 @@ exports.createProject = async (payload, res) => {
     return errorResponse(res, errorMessages, "Validation Error", 400);
   }
   try {
+    const user = await getAuthUserDetails(user_id, res);
+    if (!user) return;
     const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ?";
     const [checkResult] = await db.query(checkQuery, [name]);
 
@@ -75,6 +78,8 @@ exports.updateProject = async (id, payload, res) => {
   }
 
   try {
+    const user = await getAuthUserDetails(user_id, res);
+    if (!user) return;
     const checkQuery =
       "SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);

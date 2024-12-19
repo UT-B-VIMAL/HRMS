@@ -8,111 +8,129 @@ const { getAuthUserDetails } = require("./commonFunction");
 
 
 
-  exports.getAttendance = async (req, res) => {
-    const { status, date, search, page = 1, perPage = 10, user_id } = req.query;
+exports.getAttendance = async (req, res) => {
+  const { status, date, search, page = 1, perPage = 10, user_id } = req.query;
 
-    try {
-        let query = '';
-        let queryParams = [];
-     // Validate the request data
-     const { error } = attendanceFetch.validate(
-        { status,user_id },
-        { abortEarly: false }
-      );
-      if (error) {
-        const errorMessages = error.details.reduce((acc, err) => {
-          acc[err.path[0]] = err.message;
-          return acc;
-        }, {});
-        return errorResponse(res, errorMessages, "Validation Error", 400);
-      }
-      await getAuthUserDetails(user_id,res);
-      let today = new Date().toISOString().slice(0, 10);
-      let dynamicDate = date || today; 
-        if (status === 'Present') {
-        query = `
-        SELECT u.id AS user_id, u.first_name, u.employee_id,
-                el.day_type, el.date AS leave_date, CASE 
+  try {
+      let query = '';
+      let queryParams = [];
+   // Validate the request data
+   const { error } = attendanceFetch.validate(
+      { status,user_id },
+      { abortEarly: false }
+    );
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 400);
+    }
+    if (status === 'Present') {
+      // Use today's date as default if `date` is not provided
+      const today = new Date().toISOString().slice(0, 10);
+      const dynamicDate = date || today; // If `date` is provided, use it; otherwise, use today's date
+    
+      query = `
+        SELECT 
+            u.id AS user_id, 
+            u.first_name, 
+            u.employee_id,
+            el.day_type, 
+            el.date AS leave_date, 
+            CASE 
                 WHEN el.day_type = 1 THEN 'Full Day' 
                 WHEN el.day_type = 2 THEN 'Half Day' 
-                ELSE null 
+                ELSE 'Unknown' 
             END AS day_type,
-            el.date AS leave_date,
             CASE 
                 WHEN el.half_type = 1 THEN 'Second Half' 
                 WHEN el.half_type = 2 THEN 'First Half' 
-                ELSE null 
+                ELSE 'Unknown' 
             END AS half_type
-        FROM users u
-        LEFT JOIN employee_leave el ON u.id = el.user_id AND el.day_type != 1  
-        LEFT JOIN teams t ON u.team_id = t.id  
-        WHERE t.reporting_user_id = ?  
-        AND u.id != ? AND u.role_id != 2
-        ${dynamicDate ? 'AND (el.date = ? OR el.date IS NULL)' : ''}   
-        ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''}  
+        FROM 
+            users u
+        LEFT JOIN 
+            employee_leave el 
+            ON u.id = el.user_id AND el.day_type != 1  
+        LEFT JOIN 
+            teams t 
+            ON u.team_id = t.id  
+        WHERE 
+            t.reporting_user_id = ?  
+            AND u.id != ? 
+            AND u.role_id != 2
+            AND u.id NOT IN (
+                SELECT user_id 
+                FROM employee_leave 
+                WHERE date = ? AND day_type = 1
+            )
+            ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''}  
         LIMIT ?, ?
-        `;
-
-        queryParams.push(user_id,user_id); // reporting_user_id condition
-
-        if (dynamicDate) queryParams.push(dynamicDate); // Apply date filter on employee_leave only
-        if (search) {
-        queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or email)
-        }
-
-        queryParams.push((Number(page) - 1) * Number(perPage), Number(perPage)); // Pagination
-
-        } else if (status === 'Absent') {
-        // Fetch records from the employee leave table only
-        query = `SELECT  el.user_id,u.first_name, u.employee_id, 
-                el.date,  
-            CASE 
-                WHEN el.day_type = 1 THEN 'Full Day' 
-                WHEN el.day_type = 2 THEN 'Half Day' 
-                ELSE null 
-            END AS day_type,
-            el.date AS leave_date,
-            CASE 
-                WHEN el.half_type = 1 THEN 'First Half' 
-                WHEN el.half_type = 2 THEN 'Second Half' 
-                ELSE null 
-            END AS half_type
-        FROM employee_leave el
-        INNER JOIN users u ON el.user_id = u.id  -- Join with users table to get user details
-        INNER JOIN teams t ON t.reporting_user_id = ?  
-        WHERE el.user_id IN (SELECT id FROM users WHERE team_id = t.id AND id != ? AND role_id != 2)
-        ${dynamicDate ? 'AND el.date = ?' : ''}  
-        ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''} 
-        LIMIT ?, ?
-        `;
-            
-        queryParams.push(user_id,user_id); // reporting_user_id condition
+      `;
     
-        if (dynamicDate) queryParams.push(dynamicDate); 
-        if (search) {
-            queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or email)
-        }
+      queryParams.push(user_id, user_id); // reporting_user_id condition
+      queryParams.push(dynamicDate); // Use dynamicDate (either passed date or today's date)
     
-        queryParams.push((Number(page) - 1) * Number(perPage), Number(perPage)); // Pagination
-        }
+      if (search) {
+        queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or employee_id)
+      }
     
-      // Execute query
-      const [result] = await db.query(query, queryParams);
-        const totalRecords = result.length > 0 ? result.length : 0;
-        const rowsWithSerialNo = result.map((row, index) => ({
-            s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
-            ...row,
-        }));
-    
-      const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
+      queryParams.push((Number(page) - 1) * Number(perPage), Number(perPage)); // Pagination
+    }else if (status === 'Absent') {
+      const today = new Date().toISOString().slice(0, 10);
+      const dynamicDate = date || today; 
+      // Fetch records from the employee leave table only
+      query = `SELECT  el.user_id,u.first_name, u.employee_id, 
+              el.date,  
+          CASE 
+              WHEN el.day_type = 1 THEN 'Full Day' 
+              WHEN el.day_type = 2 THEN 'Half Day' 
+              ELSE 'Unknown' 
+          END AS day_type,
+          el.date AS leave_date,
+          CASE 
+              WHEN el.half_type = 1 THEN 'First Half' 
+              WHEN el.half_type = 2 THEN 'Second Half' 
+              ELSE 'Unknown' 
+          END AS half_type
+      FROM employee_leave el
+      INNER JOIN users u ON el.user_id = u.id  -- Join with users table to get user details
+      INNER JOIN teams t ON t.reporting_user_id = ?  
+      WHERE el.user_id IN (SELECT id FROM users WHERE team_id = t.id AND id != ? AND role_id != 2)
+      ${dynamicDate ? 'AND el.date = ?' : ''}  -- Optional date filter
+      ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''}  -- Optional search filter
+      LIMIT ?, ?
+      `;
+          
+      queryParams.push(user_id,user_id); // reporting_user_id condition
+      queryParams.push(dynamicDate); // Optional date filter
+      if (search) {
+          queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or email)
+      }
   
-      // Return paginated data with results
-      return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No Records found' : 'Records fetched successfully', 200, pagination);
+      queryParams.push((Number(page) - 1) * Number(perPage), Number(perPage)); // Pagination
+      }
+  
+    // Execute query
+    const [result] = await db.query(query, queryParams);
+      const totalRecords = result.length > 0 ? result.length : 0;
+      const rowsWithSerialNo = result.map((row, index) => ({
+          s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
+          ...row,
+      }));
+  
+    const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
 
-    } catch (error) {
-      return errorResponse(res, error.message, "Error fetching attendance data", 500);
-    }
-  };
+    // Return paginated data with results
+    return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No Records found' : 'Records fetched successfully', 200, pagination);
+
+  } catch (error) {
+    return errorResponse(res, error.message, "Error fetching attendance data", 500);
+  }
+};
+
+
 
 // Controller function
 exports.updateAttendanceData = async (req, res) => {
@@ -171,8 +189,9 @@ exports.updateAttendanceData = async (req, res) => {
                 ((half_type = 2 AND ? = 1) OR (half_type = 1 AND ? = 2))`;
               
               const conflictingRecord = await db.query(conflictingHalfTypeQuery, [id, date, halfDay, halfDay]);
-          
+            // console.log(conflictingRecord[0]?.length)
               if (conflictingRecord[0]?.length) {
+                // return errorResponse(res, conflictingRecord[0]?.length, "Validation Error", 400);
                 // Update record to set half_type = NULL
                 await db.query(
                   `UPDATE employee_leave 

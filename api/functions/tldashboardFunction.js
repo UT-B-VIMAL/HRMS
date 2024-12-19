@@ -16,16 +16,17 @@ exports.fetchAttendance = async (req, res) => {
       return errorResponse(res, null, "User ID is required", 400);
     }
 
-    // Fetch team IDs for the reporting user
-    const [rows] = await db.query(
+    // Check if the user exists
+    const [userCheck] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
 
-    // Check if no rows are returned
-    if (rows.length === 0) {
+    if (userCheck.length === 0) {
       return errorResponse(res, null, "User Not Found", 400);
     }
+
+    // Fetch teams for the reporting user
     const [teamResult] = await db.query(
       "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
       [user_id]
@@ -49,9 +50,8 @@ exports.fetchAttendance = async (req, res) => {
     // Fetch absent employees
     const [absentEmployees] = await db.query(
       `
-        SELECT e.user_id, 
-               COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name, 
-               'Absent' AS status
+        SELECT e.user_id AS employee_id, u.employee_id AS employeeId,
+               COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name
         FROM employee_leave e
         JOIN users u ON e.user_id = u.id
         WHERE DATE(e.date) = ?
@@ -66,32 +66,64 @@ exports.fetchAttendance = async (req, res) => {
       [today, currentTime, cutoffTime, teamIds]
     );
 
-    const absentEmployeeIds = absentEmployees.map((emp) => emp.user_id);
+    const absentEmployeeIds = absentEmployees.map((emp) => emp.employee_id);
     const absentEmployeeIdsCondition =
       absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
     // Fetch present employees
     const [presentEmployees] = await db.query(
       `
-        SELECT id, 
+        SELECT id AS user_id,employee_id AS employeeId, 
                COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
         FROM users
-        WHERE team_id IN (?) AND deleted_at IS NULL
-        ${absentEmployeeIdsCondition}
+        WHERE team_id IN (?) 
+          AND deleted_at IS NULL
+          ${absentEmployeeIdsCondition}
       `,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
 
     // Combine attendance data
     const attendanceList = [
-      ...absentEmployees,
+      ...absentEmployees.map((emp) => ({
+        employee_id: emp.employeeId,
+        user_id: emp.employee_id,
+        full_name: emp.full_name,
+        status: "Absent",
+      })),
       ...presentEmployees.map((emp) => ({
-        employee_id: emp.id,
+        employee_id: emp.employeeId,
+        user_id: emp.user_id,
         full_name: emp.full_name,
         status: "Present",
       })),
     ];
 
+    // Add initials to attendance data
+    const attendanceWithInitials = attendanceList.map((employee) => {
+      const nameParts = employee.full_name
+        ? employee.full_name.split(" ").filter((part) => part.trim() !== "")
+        : [];
+
+      let initials = "";
+
+      if (nameParts.length > 1) {
+        initials =
+          (nameParts[0][0]?.toUpperCase() || "") +
+          (nameParts[1][0]?.toUpperCase() || "");
+      } else if (nameParts.length === 1) {
+        initials = nameParts[0].slice(0, 2).toUpperCase();
+      } else {
+        initials = "NA";
+      }
+
+      return {
+        ...employee,
+        initials,
+      };
+    });
+
+    // Calculate attendance percentages
     const totalAbsentEmployees = absentEmployees.length;
     const totalPresentEmployees = presentEmployees.length;
     const presentPercentage = totalStrength
@@ -100,34 +132,6 @@ exports.fetchAttendance = async (req, res) => {
     const absentPercentage = totalStrength
       ? Math.round((totalAbsentEmployees / totalStrength) * 100)
       : 0;
-
-      const attendanceWithInitials = attendanceList.map((employee) => {
-        const nameParts = employee.employee_name
-          ? employee.employee_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
-          : []; // Safely handle missing or invalid employee_name
-      
-        let initials = "";
-      
-        if (nameParts.length > 1) {
-          // Use first letters of the two name parts
-          initials =
-            (nameParts[0][0]?.toUpperCase() || "") +
-            (nameParts[1][0]?.toUpperCase() || "");
-        } else if (nameParts.length === 1) {
-          // Use the first two letters of the single part
-          initials = nameParts[0].slice(0, 2).toUpperCase();
-        } else {
-          // Fallback for empty or missing names
-          initials = "NA";
-        }
-      
-        return {
-          ...employee,
-          initials,
-        };
-      });
-      
-    
 
     // Return the response
     return res.status(200).json({
@@ -149,6 +153,7 @@ exports.fetchAttendance = async (req, res) => {
     });
   }
 };
+
 
 exports.fetchTlrating = async (req, res) => {
   try {
@@ -621,37 +626,46 @@ exports.fetchTLdatas = async (req, res) => {
     // Fetch absent employees
     const [absentEmployees] = await db.query(
       `
-      SELECT e.user_id, 
-             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name, 
-             'Absent' AS status
-      FROM employee_leave e
-      JOIN users u ON e.user_id = u.id
-      WHERE DATE(e.date) = ? AND (
-        e.day_type = 1
-        OR (e.day_type = 2 AND e.half_type = 1 AND ? < ?)
-      ) AND u.team_id IN (?) AND u.deleted_at IS NULL AND e.deleted_at IS NULL
-    `,
+        SELECT e.user_id AS employee_id,employee_id AS employeeId,  
+               COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name, 
+               'Absent' AS status
+        FROM employee_leave e
+        JOIN users u ON e.user_id = u.id
+        WHERE DATE(e.date) = ? AND (
+          e.day_type = 1
+          OR (e.day_type = 2 AND e.half_type = 1 AND ? < ?)
+        ) AND u.team_id IN (?) AND u.deleted_at IS NULL AND e.deleted_at IS NULL
+      `,
       [today, currentTime, cutoffTime, teamIds]
     );
 
-    const absentEmployeeIds = absentEmployees.map((emp) => emp.user_id);
+    const absentEmployeeIds = absentEmployees.map((emp) => emp.employee_id);
     const absentEmployeeIdsCondition =
       absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
     // Fetch present employees
     const [presentEmployees] = await db.query(
       `
-      SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
-      FROM users WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeIdsCondition}
-    `,
+        SELECT id AS employee_id,employee_id AS employeeId,  
+               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
+        FROM users 
+        WHERE team_id IN (?) AND deleted_at IS NULL 
+        ${absentEmployeeIdsCondition}
+      `,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
 
     // Combine attendance data
     const attendanceList = [
-      ...absentEmployees,
+      ...absentEmployees.map((emp) => ({
+        employee_id: emp.employeeId,
+        user_id: emp.employee_id,
+        full_name: emp.full_name,
+        status: "Absent",
+      })),
       ...presentEmployees.map((emp) => ({
-        employee_id: emp.id,
+        employee_id: emp.employeeId,
+        user_id: emp.employee_id,
         full_name: emp.full_name,
         status: "Present",
       })),
@@ -668,12 +682,12 @@ exports.fetchTLdatas = async (req, res) => {
 
     // Add initials for each employee
     const attendanceWithInitials = attendanceList.map((employee) => {
-      const nameParts = employee.employee_name
-        ? employee.employee_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
-        : []; // Safely handle missing or invalid employee_name
-    
+      const nameParts = employee.full_name
+        ? employee.full_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
+        : []; // Safely handle missing or invalid full_name
+
       let initials = "";
-    
+
       if (nameParts.length > 1) {
         // Use first letters of the two name parts
         initials =
@@ -686,7 +700,7 @@ exports.fetchTLdatas = async (req, res) => {
         // Fallback for empty or missing names
         initials = "NA";
       }
-    
+
       return {
         ...employee,
         initials,
