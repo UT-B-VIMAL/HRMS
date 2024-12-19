@@ -293,14 +293,15 @@ exports.fetchTLproducts = async (req, res) => {
     }
     const teamIds = teamResult.map((team) => team.id);
 
+    let productIds = [];
+    if (product_id) {
+      productIds = product_id.split(",").map((id) => parseInt(id.trim(), 10));
+    }
     // Fetch products (filtered by product_id if provided)
-    const productsQuery = product_id
-      ? "SELECT * FROM products WHERE id = ? AND deleted_at IS NULL"
+    const productsQuery = productIds.length
+      ? "SELECT * FROM products WHERE id IN (?) AND deleted_at IS NULL"
       : "SELECT * FROM products WHERE deleted_at IS NULL";
-    const [products] = await db.query(
-      productsQuery,
-      product_id ? [product_id] : []
-    );
+    const [products] = await db.query(productsQuery, productIds.length ? [productIds] : []);
 
     if (products.length === 0) {
       return res.status(404).json({ message: "No products found" });
