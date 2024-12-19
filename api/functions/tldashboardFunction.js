@@ -87,7 +87,7 @@ exports.fetchAttendance = async (req, res) => {
       ...absentEmployees,
       ...presentEmployees.map((emp) => ({
         employee_id: emp.id,
-        employee_name: emp.full_name,
+        full_name: emp.full_name,
         status: "Present",
       })),
     ];
@@ -652,7 +652,7 @@ exports.fetchTLdatas = async (req, res) => {
       ...absentEmployees,
       ...presentEmployees.map((emp) => ({
         employee_id: emp.id,
-        employee_name: emp.full_name,
+        full_name: emp.full_name,
         status: "Present",
       })),
     ];
