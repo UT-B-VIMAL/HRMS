@@ -1441,7 +1441,6 @@ exports.updateTaskTimeLine = async (req, res) => {
       taskId = taskOrSubtask.id;
       subtaskId = null;
     }
-    console.log(taskId);
 
     if (action === "start") {
       // Check if a record already exists in the sub_tasks_user_timeline table for the current task/subtask
@@ -1449,7 +1448,6 @@ exports.updateTaskTimeLine = async (req, res) => {
         "SELECT * FROM ?? WHERE active_status = 1 AND deleted_at IS NULL AND user_id = ?",
         [type === "subtask" ? "sub_tasks" : "tasks", taskOrSubtask.user_id]
       );
-      console.log(existingSubtaskSublime);
       if (existingSubtaskSublime.length > 0) {
         return res
           .status(400)
