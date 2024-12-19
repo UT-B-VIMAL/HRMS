@@ -1,4 +1,4 @@
-const { signInUser,logoutUser,changePassword } = require("../api/functions/keycloakFunction");
+const { signInUser,logoutUser,changePassword,forgotPassword } = require("../api/functions/keycloakFunction");
 const { changePasswordSchema } = require("../validators/authValidator");
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
@@ -13,7 +13,7 @@ exports.login = async (req, res) => {
         const tokens = await signInUser(username, password);
         res.status(200).json({ message: "Login successful", tokens });
     } catch (error) {
-        res.status(401).json({ error: "Failed to sign in", details: error.response?.data || error.message });
+        res.status(401).json({ error: "Failed to login", details: error.response?.data || error.message });
     }
   };
 
@@ -53,8 +53,27 @@ exports.login = async (req, res) => {
          await changePassword(id, payload, res);
    
        } catch (error) {
-         return errorResponse(res, error.message, 'Error updating task', 500);
+         return errorResponse(res, error.message, 'Error updating change password', 500);
        }
      };
+
+
+     exports.forgotPassword = async (req, res) => {
+      try {
+        const { email } = req.body;
+        if (!email) {
+          return res.status(400).json({ error: "email is required" });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+  
+        await forgotPassword(email, res);
+  
+      } catch (error) {
+        return errorResponse(res, error.message, 'Error updating task', 500);
+      }
+    };
    
    

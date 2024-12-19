@@ -64,7 +64,8 @@ const apiRouter = express.Router();
 //authentication
 apiRouter.post('/login', loginController.login);
 apiRouter.post('/logout', loginController.logout);
-apiRouter.put('/change_password/:id',loginController.changePassword);
+apiRouter.put('/change_password/:id',RoleController.checkRole(['pm','admin','tl','employee']),loginController.changePassword);
+apiRouter.post('/forgot_password',loginController.forgotPassword);
 
 // User Routes
 apiRouter.post('/user',RoleController.checkRole(['admin','tl','pm']), userController.createUser);
