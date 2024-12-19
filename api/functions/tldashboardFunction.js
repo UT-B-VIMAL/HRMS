@@ -374,7 +374,7 @@ exports.fetchTLproducts = async (req, res) => {
         let employeeList = [];
         if (workingEmployees.size > 0) {
           const employeeDetailsQuery = `
-                      SELECT id, 
+                      SELECT id,employee_id, 
                              COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
                       FROM users 
                       WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
@@ -393,7 +393,7 @@ exports.fetchTLproducts = async (req, res) => {
 
             return {
               employee_name: user.full_name || "N/A",
-              employee_id: user.id || "N/A",
+              employee_id: user.employee_id || "N/A",
               initials: initials,
             };
           });
@@ -402,6 +402,7 @@ exports.fetchTLproducts = async (req, res) => {
         return {
           product_id: product.id,
           product_name: product.name,
+          task_count:tasks.length,
           completed_percentage: completionPercentage,
           employee_count: workingEmployees.size,
           employees: employeeList,
@@ -850,7 +851,7 @@ exports.fetchTLdatas = async (req, res) => {
         if (workingEmployees.size > 0) {
           const [employees] = await db.query(
             `
-          SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
+          SELECT id,employee_id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
           FROM users WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
         `,
             [Array.from(workingEmployees), teamIds]
@@ -864,7 +865,7 @@ exports.fetchTLdatas = async (req, res) => {
                 : (words[0] || "").slice(0, 2).toUpperCase();
             return {
               employee_name: user.full_name || "N/A",
-              employee_id: user.id || "N/A",
+              employee_id: user.employee_id || "N/A",
               initials,
             };
           });
@@ -873,6 +874,7 @@ exports.fetchTLdatas = async (req, res) => {
         return {
           product_id: product.id,
           product_name: product.name,
+          task_count:tasks.length,
           completed_percentage: completionPercentage,
           employee_count: workingEmployees.size,
           employees: employeeList,
