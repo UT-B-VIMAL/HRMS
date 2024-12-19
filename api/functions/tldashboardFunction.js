@@ -324,27 +324,48 @@ exports.fetchTLproducts = async (req, res) => {
         for (const task of tasks) {
           // Fetch subtasks associated with the task
           const subtasksQuery = `
-                      SELECT * FROM sub_tasks 
-                      WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
-                  `;
+            SELECT * FROM sub_tasks 
+            WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
+          `;
           const [subtasks] = await db.query(subtasksQuery, [task.id, teamIds]);
-
+        
           if (subtasks.length > 0) {
             totalItems += subtasks.length;
             completedItems += subtasks.filter(
               (subtask) => subtask.status === 3
             ).length;
-
-            subtasks.forEach((subtask) => {
-              if (subtask.user_id) workingEmployees.add(subtask.user_id);
-            });
+        
+            for (const subtask of subtasks) {
+              if (subtask.user_id) {
+                // Check if the user_id exists in the users table and is not deleted
+                const [userCheck] = await db.query(
+                  "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                  [subtask.user_id]
+                );
+        
+                if (userCheck.length > 0) {
+                  workingEmployees.add(subtask.user_id);
+                }
+              }
+            }
           } else {
             totalItems += 1;
             if (task.status === 3) completedItems += 1;
-
-            if (task.user_id) workingEmployees.add(task.user_id);
+        
+            if (task.user_id) {
+              // Check if the user_id exists in the users table and is not deleted
+              const [userCheck] = await db.query(
+                "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                [task.user_id]
+              );
+        
+              if (userCheck.length > 0) {
+                workingEmployees.add(task.user_id);
+              }
+            }
           }
         }
+        
 
         const completionPercentage =
           totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
@@ -778,25 +799,47 @@ exports.fetchTLdatas = async (req, res) => {
         let workingEmployees = new Set();
 
         for (const task of tasks) {
-          const [subtasks] = await db.query(
-            `
-          SELECT * FROM sub_tasks WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
-        `,
-            [task.id, teamIds]
-          );
-
+          // Fetch subtasks associated with the task
+          const subtasksQuery = `
+            SELECT * FROM sub_tasks 
+            WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
+          `;
+          const [subtasks] = await db.query(subtasksQuery, [task.id, teamIds]);
+        
           if (subtasks.length > 0) {
             totalItems += subtasks.length;
             completedItems += subtasks.filter(
               (subtask) => subtask.status === 3
             ).length;
-            subtasks.forEach((subtask) => {
-              if (subtask.user_id) workingEmployees.add(subtask.user_id);
-            });
+        
+            for (const subtask of subtasks) {
+              if (subtask.user_id) {
+                // Check if the user_id exists in the users table and is not deleted
+                const [userCheck] = await db.query(
+                  "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                  [subtask.user_id]
+                );
+        
+                if (userCheck.length > 0) {
+                  workingEmployees.add(subtask.user_id);
+                }
+              }
+            }
           } else {
             totalItems += 1;
             if (task.status === 3) completedItems += 1;
-            if (task.user_id) workingEmployees.add(task.user_id);
+        
+            if (task.user_id) {
+              // Check if the user_id exists in the users table and is not deleted
+              const [userCheck] = await db.query(
+                "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                [task.user_id]
+              );
+        
+              if (userCheck.length > 0) {
+                workingEmployees.add(task.user_id);
+              }
+            }
           }
         }
 
