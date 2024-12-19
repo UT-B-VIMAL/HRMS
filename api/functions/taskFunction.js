@@ -1048,18 +1048,9 @@ exports.getTaskList = async (queryParams, res) => {
 
     if (search) {
       const searchTerm = `%${search}%`;
-      baseQuery += `
-        AND (
-          tasks.name LIKE ? OR 
-          EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ?) OR 
-          projects.name LIKE ? OR 
-          products.name LIKE ? OR 
-          users.name LIKE ? OR 
-          teams.name LIKE ? OR 
-          tasks.priority LIKE ?
-        )
-      `;
+      baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ?) OR projects.name LIKE ? OR products.name LIKE ? OR users.first_name LIKE ? OR users.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
       params.push(
+        searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
@@ -1069,6 +1060,7 @@ exports.getTaskList = async (queryParams, res) => {
         searchTerm
       );
     }
+    
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
@@ -1214,151 +1206,6 @@ function calculateTimeLeft(estimatedHours, totalHoursWorked) {
 
 
 
-// exports.doneTaskList = async (req, res) => {
-//   try {
-//     const { user_id, product_id, project_id, search, page = 1, perPage = 10  } = req.query;
-//     const offset = (page - 1) * perPage;
-//     let query = `
-//       SELECT
-//         t.id AS task_id,
-//         t.name AS task_name,
-//         t.rating AS task_rating,
-//         t.estimated_hours AS task_estimated_hours,
-//         t.total_hours_worked AS task_total_hours_worked,
-//         t.updated_at AS task_updated_at,
-//         tsut.start_time AS task_start_time,
-//         tsut.end_time AS task_end_time,
-//         u.id AS user_id,
-//         u.first_name AS user_name,
-//         u.employee_id AS employee_id,
-//         p.id AS product_id,
-//         p.name AS product_name,
-//         pr.id AS project_id,
-//         pr.name AS project_name,
-//         st.id AS subtask_id,
-//         st.name AS subtask_name,
-//         st.rating AS subtask_rating,
-//         st.estimated_hours AS subtask_estimated_hours,
-//         st.total_hours_worked AS subtask_total_hours_worked,
-//         st.updated_at AS subtask_updated_at,
-//         tsut_sub.start_time AS subtask_start_time,
-//         tsut_sub.end_time AS subtask_end_time,
-//         DATE(t.created_at) AS task_date,
-//         t.status AS task_status
-//       FROM
-//         tasks t
-//       LEFT JOIN
-//         users u ON u.id = t.user_id
-//       LEFT JOIN
-//         products p ON p.id = t.product_id
-//       LEFT JOIN
-//         projects pr ON pr.id = t.project_id
-//       LEFT JOIN
-//         sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-//       LEFT JOIN
-//         sub_tasks_user_timeline tsut ON tsut.task_id = t.id AND tsut.deleted_at IS NULL
-//       LEFT JOIN
-//         sub_tasks_user_timeline tsut_sub ON tsut_sub.subtask_id = st.id AND tsut_sub.deleted_at IS NULL
-//       WHERE
-//         t.deleted_at IS NULL
-//         AND t.status = 3
-//         ${product_id ? `AND (t.product_id = ? OR st.product_id = ?)` : ""}
-//         ${project_id ? `AND (t.project_id = ? OR st.project_id = ?)` : ""}
-//         ${user_id ? `AND t.user_id = ?` : ""}
-//         ${search ? `AND (t.name LIKE ? OR st.name LIKE ?)` : ""}
-//       ORDER BY t.id, st.id
-
-//     `;
-
-//     const values = [];
-//     if (product_id) {
-//       values.push(product_id, product_id);
-//     }
-//     if (project_id) {
-//       values.push(project_id, project_id);
-//     }
-//     if (user_id) values.push(user_id);
-//     if (search) {
-//       const searchTerm = `%${search}%`;
-//       values.push(searchTerm, searchTerm);
-//     }
-
-//     const [result] = await db.execute(query, values);
-
-//     const groupedTasks = result.reduce((acc, row) => {
-//       if (!acc[row.task_id]) {
-//         acc[row.task_id] = {
-//           task_id: row.task_id,
-//           task_name: row.task_name,
-//           estimated_time: row.task_estimated_hours,
-//           task_duration: row.task_updated_at
-//             ? moment(row.task_updated_at).fromNow()
-//             : "Not started",
-//           user_id: row.user_id,
-//           employee_id: row.employee_id,
-//           product_id: row.product_id,
-//           product_name: row.product_name,
-//           project_id: row.project_id,
-//           project_name: row.project_name,
-//           rating: row.task_rating,
-//           subtasks: [],
-//         };
-//       }
-
-//       if (row.subtask_id) {
-//         acc[row.task_id].subtasks.push({
-//           subtask_id: row.subtask_id,
-//           subtask_name: row.subtask_name,
-//           estimated_time: row.subtask_estimated_hours,
-//           task_duration: row.subtask_updated_at
-//             ? moment(row.subtask_updated_at).fromNow()
-//             : "Not started",
-//           rating: row.subtask_rating,
-//         });
-//       }
-
-//       return acc;
-//     }, {});
-
-//     const data = Object.values(groupedTasks).flatMap((task) => {
-//       if (task.subtasks.length > 0) {
-//         return task.subtasks.map((subtask) => ({
-//           task_name: subtask.subtask_name,
-//           estimated_time: subtask.estimated_time,
-//           task_duration: subtask.task_duration,
-//           rating: subtask.rating,
-//           product_id: task.product_id,
-//           product_name: task.product_name,
-//           project_id: task.project_id,
-//           project_name: task.project_name,
-//         }));
-//       }
-
-//       return {
-//         task_name: task.task_name,
-//         estimated_time: task.estimated_time,
-//         task_duration: task.task_duration,
-//         rating: task.rating,
-//         product_id: task.product_id,
-//         product_name: task.product_name,
-//         project_id: task.project_id,
-//         project_name: task.project_name,
-//       };
-//     });
-
-//     successResponse(
-//       res,
-//       data,
-//       data.length === 0
-//         ? "No tasks or subtasks found"
-//         : "Tasks and subtasks retrieved successfully",
-//       200
-//     );
-//   } catch (error) {
-//     console.error("Error fetching tasks and subtasks:", error);
-//     return errorResponse(res, error.message, "Server error", 500);
-//   }
-// };
 exports.doneTaskList = async (req, res) => {
   try {
     const {

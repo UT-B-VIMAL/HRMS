@@ -156,27 +156,25 @@ async function forgotPassword(email, res) {
 
     const currentUser = user[0];
 
-    // Generate Reset Token (or OTP)
     const resetToken = crypto.randomBytes(20).toString('hex');
-    const resetTokenExpiry = Date.now() + 3600000; // Token expires in 1 hour
+    const resetTokenExpiry = Date.now() + 3600000; 
     const updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?";
     await db.query(updateQuery, [resetToken, resetTokenExpiry, currentUser.id]);
 
-    // Send the reset token via email (you can implement this with nodemailer as shown previously)
     const transporter = nodemailer.createTransport({
       service: 'gmail', 
       auth: {
-        user: 'your-email@gmail.com',
-        pass: 'your-email-password',
+        user: 'nathishmanadarajan@gmail.com',
+        pass: 'zlmu qdlu qgpg phnm',
       },
     });
 
     const mailOptions = {
-      from: 'your-email@gmail.com',
+      from: 'nathishmanadarajan@gmail.com',
       to: currentUser.email,
       subject: 'Password Reset Request',
       text: `You requested a password reset. Please use the following link to reset your password:\n\n` +
-            `http://localhost:3000/reset-password?token=${resetToken}&id=${currentUser.id}\n\n` +
+            `http://localhost:3000/reset_password?token=${resetToken}&id=${currentUser.id}\n\n` +
             `If you did not request this, please ignore this email.`,
     };
 
@@ -459,6 +457,7 @@ module.exports = {
   signInUser,
   logoutUser,
   changePassword,
+  forgotPassword,
   resetKeycloakPassword
 };
 
