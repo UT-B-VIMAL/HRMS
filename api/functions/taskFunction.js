@@ -183,9 +183,9 @@ exports.getTask = async (id, res) => {
       COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
       COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
       p.name AS product_name, 
-      pj.name AS project_name 
+      pj.name AS project_name,
      CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
-    CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
+     CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
     FROM tasks t 
     LEFT JOIN teams te ON t.team_id = te.id 
     LEFT JOIN users owner ON t.user_id = owner.id 
