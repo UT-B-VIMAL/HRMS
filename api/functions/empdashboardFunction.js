@@ -133,74 +133,100 @@ exports.fetchPendingTask = async (req, res) => {
     }
 };
 exports.fetchDailybreakdown = async (req, res) => {
-    try {
-      const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
-      if (!userId) {
-        return errorResponse(res, null, 'User ID is required', 400);
-      }
-  
-      // Fetch SubTaskUserTimeline with project, subtask, and task data
-      const query = `
-        SELECT 
-          sut.start_time,
-          sut.end_time,
-          p.name AS project_name,
-          t.name AS task_name,
-          st.name AS subtask_name,
-          st.id AS subtask_id
-        FROM sub_tasks_user_timeline sut
-        LEFT JOIN tasks t ON sut.task_id = t.id
-        LEFT JOIN sub_tasks st ON sut.subtask_id = st.id
-        LEFT JOIN projects p ON t.project_id = p.id
-        WHERE sut.user_id = ? AND DATE(sut.start_time) = CURDATE() AND sut.deleted_at IS NULL
-      `;
-  
-      const [rows] = await db.query(query, [userId]);
-  
-      // Process the results
-      const dailyBreakdown = rows.map((record) => {
-        const startTime = new Date(record.start_time);
-        const endTime = record.end_time ? new Date(record.end_time) : new Date();
-  
-        // Format times as h:i A
-        const formattedStartTime = startTime.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        });
-  
-        const formattedEndTime = endTime.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        });
-  
-        // Calculate the duration and format as HH:MM:SS
-        const durationInSeconds = Math.max((endTime - startTime) / 1000, 0);
-        const hours = Math.floor(durationInSeconds / 3600);
-        const minutes = Math.floor((durationInSeconds % 3600) / 60);
-        const seconds = Math.floor(durationInSeconds % 60);
-        const formattedDuration = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  
-        return {
-          startTime: formattedStartTime,
-          endTime: formattedEndTime,
-          project_name: record.project_name || 'N/A',
-          name: record.subtask_id ? record.subtask_name : record.task_name || 'N/A',
-          duration: formattedDuration,
-        };
-      });
-      return successResponse(
-        res,
-        dailyBreakdown,
-        "Daily breakdown retrieved successfully",
-        200
-      );
-    } catch (error) {
-      console.error("Error fetching daily breakdown:", error);
-      return errorResponse(res, error.message, "Error fetching products", 500);
+  try {
+    const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
+    if (!userId) {
+      return errorResponse(res, null, "User ID is required", 400);
     }
- };
+
+    // Fetch SubTaskUserTimeline with project, subtask, and task data
+    const query = `
+      SELECT 
+        sut.start_time,
+        sut.end_time,
+        p.name AS project_name,
+        t.name AS task_name,
+        st.name AS subtask_name,
+        st.id AS subtask_id
+      FROM sub_tasks_user_timeline sut
+      LEFT JOIN tasks t ON sut.task_id = t.id
+      LEFT JOIN sub_tasks st ON sut.subtask_id = st.id
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE sut.user_id = ? AND DATE(sut.start_time) = CURDATE() AND sut.deleted_at IS NULL
+    `;
+
+    const [rows] = await db.query(query, [userId]);
+
+    let totalDurationInSeconds = 0;
+
+    // Process the results
+    const dailyBreakdown = rows.map((record) => {
+      const startTime = new Date(record.start_time);
+      const endTime = record.end_time ? new Date(record.end_time) : new Date();
+
+      // Format times as h:i A
+      const formattedStartTime = startTime.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+      const formattedEndTime = endTime.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+      // Calculate the duration and format as HH:MM:SS
+      const durationInSeconds = Math.max((endTime - startTime) / 1000, 0);
+      totalDurationInSeconds += durationInSeconds;
+
+      const hours = Math.floor(durationInSeconds / 3600);
+      const minutes = Math.floor((durationInSeconds % 3600) / 60);
+      const seconds = Math.floor(durationInSeconds % 60);
+      const formattedDuration = `${String(hours).padStart(2, "0")}:${String(
+        minutes
+      ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
+      return {
+        startTime: formattedStartTime,
+        endTime: formattedEndTime,
+        project_name: record.project_name || "N/A",
+        name: record.subtask_id ? record.subtask_name : record.task_name || "N/A",
+        duration: formattedDuration,
+      };
+    });
+
+    // Calculate total duration in HH:MM:SS format
+    const totalHours = Math.floor(totalDurationInSeconds / 3600);
+    const totalMinutes = Math.floor((totalDurationInSeconds % 3600) / 60);
+    const totalSeconds = Math.floor(totalDurationInSeconds % 60);
+    const totalDurationFormatted = `${String(totalHours).padStart(2, "0")}:${String(
+      totalMinutes
+    ).padStart(2, "0")}:${String(totalSeconds).padStart(2, "0")}`;
+
+    // Calculate percentage based on 8 hours (8 * 3600 seconds)
+    const totalDurationPercentage = Math.min(
+      Math.round((totalDurationInSeconds / (8 * 3600)) * 100),
+      100
+    );
+
+    return successResponse(
+      res,
+      {
+        dailyBreakdown,
+        totalDuration: totalDurationFormatted,
+        percentage: `${totalDurationPercentage}%`,
+      },
+      "Daily breakdown retrieved successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Error fetching daily breakdown:", error);
+    return errorResponse(res, error.message, "Error fetching daily breakdown", 500);
+  }
+};
+
 exports.fetchStatistics = async (req, res) => {
     try {
         const userId = req.query.user_id; 
