@@ -2,6 +2,9 @@ const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const keycloakConfig = require('../../config/keycloak');
 const db = require('../../config/db');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const moment = require('moment');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 
 async function getAdminToken() {
@@ -119,31 +122,7 @@ async function changePassword(id, payload, res) {
   }
 }
 
-async function resetKeycloakPassword(userId, newPassword) {
-  try {
-    const token = await getAdminToken(); // Obtain admin token
 
-    const response = await axios.put(
-      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/reset-password`,
-      {
-        type: 'password',
-        value: newPassword,   // New password
-        temporary: false      // Set to true if you want the user to reset their password on first login
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    return response.data;
-  } catch (error) {
-    console.error("Error resetting password in Keycloak:", error.response ? error.response.data : error.message);
-    throw new Error("Failed to reset password in Keycloak.");
-  }
-}
 
 async function forgotPassword(email, res) {
   try {
@@ -157,7 +136,7 @@ async function forgotPassword(email, res) {
     const currentUser = user[0];
 
     const resetToken = crypto.randomBytes(20).toString('hex');
-    const resetTokenExpiry = Date.now() + 3600000; 
+    const resetTokenExpiry = moment().add(1, 'hour').format('YYYY-MM-DD HH:mm:ss');
     const updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?";
     await db.query(updateQuery, [resetToken, resetTokenExpiry, currentUser.id]);
 
@@ -174,13 +153,13 @@ async function forgotPassword(email, res) {
       to: currentUser.email,
       subject: 'Password Reset Request',
       text: `You requested a password reset. Please use the following link to reset your password:\n\n` +
-            `http://localhost:3000/reset_password?token=${resetToken}&id=${currentUser.id}\n\n` +
+            `http://localhost:3000/reset_password\n\n` +
             `If you did not request this, please ignore this email.`,
     };
 
     await transporter.sendMail(mailOptions);
 
-    return successResponse(res, null, 'Password reset link has been sent to your email.');
+    return successResponse(res, { token: resetToken, id: currentUser.id }, 'Password reset link has been sent to your email.');
   } catch (error) {
     console.error('Error sending password reset email:', error);
     return errorResponse(res, error.message, 'Error sending password reset email', 500);
@@ -190,7 +169,7 @@ async function forgotPassword(email, res) {
 // After token validation and password update by user, reset password in Keycloak
 async function resetPasswordWithKeycloak(token, id, newPassword, res) {
   try {
-    const query = "SELECT id, reset_token, reset_token_expiry FROM users WHERE id = ?";
+    const query = "SELECT id, reset_token, reset_token_expiry,keycloak_id FROM users WHERE id = ?";
     const [user] = await db.query(query, [id]);
 
     if (!user || user.length === 0) {
@@ -200,7 +179,7 @@ async function resetPasswordWithKeycloak(token, id, newPassword, res) {
     const currentUser = user[0];
 
     // Check if token is valid and not expired
-    if (currentUser.reset_token !== token || currentUser.reset_token_expiry < Date.now()) {
+    if (!token || currentUser.reset_token !== token || currentUser.reset_token_expiry < Date.now()) {
       return errorResponse(res, null, 'Invalid or expired token', 400);
     }
 
@@ -209,8 +188,10 @@ async function resetPasswordWithKeycloak(token, id, newPassword, res) {
     const updateQuery = "UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?";
     await db.query(updateQuery, [hashedPassword, id]);
 
+    
+
     // Now reset password in Keycloak
-    await resetKeycloakPassword(currentUser.keycloak_id, newPassword);
+    await changePasswordInKeycloak(currentUser.keycloak_id, newPassword);
 
     return successResponse(res, null, 'Password updated successfully in both system and Keycloak.');
   } catch (error) {
@@ -458,7 +439,7 @@ module.exports = {
   logoutUser,
   changePassword,
   forgotPassword,
-  resetKeycloakPassword
+  resetPasswordWithKeycloak
 };
 
 
