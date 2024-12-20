@@ -21,19 +21,19 @@ const validationshems = {
       'string.empty': 'Task name is required',
       'any.required': 'Task name is required',
     }),
-    estimated_hours: Joi.string().pattern(/^([0-9]{2}):([0-9]{2}):([0-9]{2})$/).required().messages({
-      'string.pattern.base': 'Estimated hours must be in the format HH:MM:SS (e.g., 00:00:00)',
-      'any.required': 'Estimated hours is required',
-    }),
-    start_date: Joi.date().required().messages({
-      'date.base': 'Start date must be a valid date',
-      'any.required': 'Start date is required',
-    }),
-    end_date: Joi.date().greater(Joi.ref('start_date')).required().messages({
-      'date.base': 'End date must be a valid date',
-      'date.greater': 'End date must be greater than the start date',
-      'any.required': 'End date is required',
-    }),
+    // estimated_hours: Joi.string().pattern(/^([0-9]{2}):([0-9]{2}):([0-9]{2})$/).required().messages({
+    //   'string.pattern.base': 'Estimated hours must be in the format HH:MM:SS (e.g., 00:00:00)',
+    //   'any.required': 'Estimated hours is required',
+    // }),
+    // start_date: Joi.date().required().messages({
+    //   'date.base': 'Start date must be a valid date',
+    //   'any.required': 'Start date is required',
+    // }),
+    // end_date: Joi.date().min(Joi.ref('start_date')).optional().messages({
+    //   'date.base': 'End date must be a valid date',
+    //   'date.min': 'End date must be greater than or equal to the start date',
+    // }),
+    
   }).unknown(true),
 
   updateTaskSchema: Joi.object({
@@ -49,10 +49,11 @@ const validationshems = {
     start_date: Joi.date().optional().messages({
       'date.base': 'Start date must be a valid date',
     }),
-    end_date: Joi.date().greater(Joi.ref('start_date')).optional().messages({
+    end_date: Joi.date().min(Joi.ref('start_date')).optional().messages({
       'date.base': 'End date must be a valid date',
-      'date.greater': 'End date must be greater than the start date',
+      'date.min': 'End date must be greater than or equal to the start date',
     }),
+    
   }).unknown(true),
 
   updateTaskDataSchema: Joi.object({
