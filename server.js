@@ -117,7 +117,7 @@ apiRouter.get('/task', RoleController.checkRole(['pm','admin']),taskController.g
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['pm','admin']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
 apiRouter.get('/doneTask',RoleController.checkRole(['pm','admin']), taskController.doneTask);
-apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['pm','admin','tl','employee']), taskController.updateTaskTimeLineStatus);
+apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
 
 
 // Subtask Routes

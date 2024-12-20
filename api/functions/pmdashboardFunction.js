@@ -1,5 +1,8 @@
 const db = require("../../config/db");
-const { successResponse, errorResponse } = require("../../helpers/responseHelper");
+const {
+  successResponse,
+  errorResponse,
+} = require("../../helpers/responseHelper");
 
 exports.fetchProducts = async (payload, res) => {
   try {
@@ -9,7 +12,8 @@ exports.fetchProducts = async (payload, res) => {
 
     const result = await Promise.all(
       products.map(async (product) => {
-        const tasksQuery = "SELECT * FROM tasks WHERE product_id = ? AND deleted_at IS NULL";
+        const tasksQuery =
+          "SELECT * FROM tasks WHERE product_id = ? AND deleted_at IS NULL";
         const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
@@ -17,7 +21,11 @@ exports.fetchProducts = async (payload, res) => {
         let workingEmployees = new Set();
 
         for (const task of tasks) {
-          const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
+          // Fetch subtasks associated with the task
+          const subtasksQuery = `
+            SELECT * FROM sub_tasks 
+            WHERE task_id = ? AND deleted_at IS NULL
+          `;
           const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
@@ -26,14 +34,34 @@ exports.fetchProducts = async (payload, res) => {
               (subtask) => subtask.status === 3
             ).length;
 
-            subtasks.forEach((subtask) => {
-              if (subtask.user_id) workingEmployees.add(subtask.user_id);
-            });
+            for (const subtask of subtasks) {
+              if (subtask.user_id) {
+                // Check if the user_id exists in the users table and is not deleted
+                const [userCheck] = await db.query(
+                  "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                  [subtask.user_id]
+                );
+
+                if (userCheck.length > 0) {
+                  workingEmployees.add(subtask.user_id);
+                }
+              }
+            }
           } else {
             totalItems += 1;
             if (task.status === 3) completedItems += 1;
 
-            if (task.user_id) workingEmployees.add(task.user_id);
+            if (task.user_id) {
+              // Check if the user_id exists in the users table and is not deleted
+              const [userCheck] = await db.query(
+                "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                [task.user_id]
+              );
+
+              if (userCheck.length > 0) {
+                workingEmployees.add(task.user_id);
+              }
+            }
           }
         }
 
@@ -54,18 +82,25 @@ exports.fetchProducts = async (payload, res) => {
 
           employeeList = employees.map((user) => {
             const nameParts = user.full_name ? user.full_name.split(" ") : [];
-            const firstInitial = nameParts[0] && nameParts[0][0] ? nameParts[0][0].toUpperCase() : "";
-            const secondInitial = nameParts[1] && nameParts[1][0] ? nameParts[1][0].toUpperCase() : "";
-          
-            const initials = firstInitial + secondInitial || (nameParts[0] || "").slice(0, 2).toUpperCase();
-          
+            const firstInitial =
+              nameParts[0] && nameParts[0][0]
+                ? nameParts[0][0].toUpperCase()
+                : "";
+            const secondInitial =
+              nameParts[1] && nameParts[1][0]
+                ? nameParts[1][0].toUpperCase()
+                : "";
+
+            const initials =
+              firstInitial + secondInitial ||
+              (nameParts[0] || "").slice(0, 2).toUpperCase();
+
             return {
               employee_name: user.full_name || "N/A",
               employee_id: user.id || "N/A",
               initials: initials,
             };
           });
-          
         }
 
         return {
@@ -103,14 +138,12 @@ exports.fetchUtilization = async (req, res) => {
         "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
         [team_id]
       );
-      
+
       // Check if no rows are returned
       if (rows.length === 0) {
         return errorResponse(res, null, "Team Not Found", 400);
       }
-}
-
-
+    }
 
     // Step 1: Get total strength grouped by team, including team name
     const totalStrengthQuery = `
@@ -124,7 +157,10 @@ exports.fetchUtilization = async (req, res) => {
       ${team_id ? "AND t.id = ?" : ""}
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.query(totalStrengthQuery, team_id ? [team_id] : []);
+    const [totalStrengthData] = await db.query(
+      totalStrengthQuery,
+      team_id ? [team_id] : []
+    );
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -151,7 +187,10 @@ exports.fetchUtilization = async (req, res) => {
         AND t.deleted_at IS NULL
         ${team_id ? "AND t.id = ?" : ""}
     `;
-    const [workingEmployeesData] = await db.query(workingEmployeesQuery, team_id ? [team_id] : []);
+    const [workingEmployeesData] = await db.query(
+      workingEmployeesQuery,
+      team_id ? [team_id] : []
+    );
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -198,7 +237,12 @@ exports.fetchUtilization = async (req, res) => {
     );
   } catch (error) {
     console.error("Error fetching utilization data:", error);
-    return errorResponse(res, error.message, "Error fetching utilization data", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error fetching utilization data",
+      500
+    );
   }
 };
 
@@ -206,7 +250,9 @@ exports.fetchAttendance = async (payload, res) => {
   try {
     // Step 1: Get total strength of all users
     const totalStrengthQuery = `SELECT COUNT(*) AS total_strength FROM users WHERE deleted_at IS NULL`;
-    const [[{ total_strength: totalStrength }]] = await db.query(totalStrengthQuery);
+    const [[{ total_strength: totalStrength }]] = await db.query(
+      totalStrengthQuery
+    );
 
     // Step 2: Calculate total absent employees
     const currentTime = new Date();
@@ -223,21 +269,21 @@ exports.fetchAttendance = async (payload, res) => {
           (day_type = 2 AND half_type = 2 AND ? >= ?)
         )
     `;
-    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(totalAbsentQuery, [
-      currentTime,
-      cutoffTime,
-      currentTime,
-      cutoffTime,
-    ]);
+    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(
+      totalAbsentQuery,
+      [currentTime, cutoffTime, currentTime, cutoffTime]
+    );
 
     const totalPresentEmployees = totalStrength - totalAbsentEmployees;
 
-    const totalPresentPercentage = totalStrength > 0
-      ? Math.round((totalPresentEmployees / totalStrength) * 100)
-      : 0;
-    const totalAbsentPercentage = totalStrength > 0
-      ? Math.round((totalAbsentEmployees / totalStrength) * 100)
-      : 0;
+    const totalPresentPercentage =
+      totalStrength > 0
+        ? Math.round((totalPresentEmployees / totalStrength) * 100)
+        : 0;
+    const totalAbsentPercentage =
+      totalStrength > 0
+        ? Math.round((totalAbsentEmployees / totalStrength) * 100)
+        : 0;
 
     // Step 3: Get team-wise attendance details
     const teamWiseAttendanceQuery = `
@@ -255,7 +301,14 @@ exports.fetchAttendance = async (payload, res) => {
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
-      const { team_id, team_name, employee_id, employee_name, day_type, half_type } = row;
+      const {
+        team_id,
+        team_name,
+        employee_id,
+        employee_name,
+        day_type,
+        half_type,
+      } = row;
 
       if (!acc[team_id]) {
         acc[team_id] = {
@@ -313,7 +366,12 @@ exports.fetchAttendance = async (payload, res) => {
     );
   } catch (error) {
     console.error("Error fetching attendance data:", error);
-    return errorResponse(res, error.message, "Error fetching attendance data", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error fetching attendance data",
+      500
+    );
   }
 };
 exports.fetchPmviewproductdata = async (req, res) => {
@@ -321,7 +379,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
     const { product_id, project_id, team_id, date, search } = req.query;
 
     if (!product_id) {
-      return errorResponse(res, null, 'Product ID is required', 400);
+      return errorResponse(res, null, "Product ID is required", 400);
     }
 
     const [rows] = await db.query(
@@ -340,7 +398,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
       WHERE id = ? AND deleted_at IS NULL
     `;
     const [productRows] = await db.query(productQuery, [product_id]);
-    const product = productRows[0] || { name: 'N/A', id: 'N/A' };
+    const product = productRows[0] || { name: "N/A", id: "N/A" };
 
     // Build dynamic query for tasks and subtasks
     let tasksQuery = `
@@ -389,10 +447,12 @@ exports.fetchPmviewproductdata = async (req, res) => {
     if (search) {
       tasksQuery += `
         AND (
-          COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ${db.escape('%' + search + '%')} OR
-          p.name LIKE ${db.escape('%' + search + '%')} OR
-          te.name LIKE ${db.escape('%' + search + '%')} OR
-          s.name LIKE ${db.escape('%' + search + '%')}
+          COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ${db.escape(
+            "%" + search + "%"
+          )} OR
+          p.name LIKE ${db.escape("%" + search + "%")} OR
+          te.name LIKE ${db.escape("%" + search + "%")} OR
+          s.name LIKE ${db.escape("%" + search + "%")}
         )
       `;
     }
@@ -403,15 +463,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
     // Helper function to validate subtask inclusion based on status
     const isValidSubtask = (subtask, status) => {
       switch (status) {
-        case 'Pending':
+        case "Pending":
           return subtask.active_status === 1 && subtask.status === 0;
-        case 'In Progress':
+        case "In Progress":
           return subtask.active_status === 1 && subtask.status === 1;
-        case 'In Review':
+        case "In Review":
           return subtask.active_status === 1 && subtask.status === 2;
-        case 'On Hold':
+        case "On Hold":
           return subtask.active_status === 0;
-        case 'Done':
+        case "Done":
           return subtask.active_status === 1 && subtask.status === 3;
         default:
           return false;
@@ -428,12 +488,12 @@ exports.fetchPmviewproductdata = async (req, res) => {
       subtasks.forEach((subtask) => {
         if (isValidSubtask(subtask, status)) {
           validSubtasks.push({
-            SubtaskId: subtask.id || 'N/A',
-            SubtaskName: subtask.name || 'N/A',
-            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
-            SubtaskDescription: subtask.description || 'N/A',
-            SubtaskActiveStatus: subtask.active_status || 'N/A',
-            SubtaskStatus: subtask.status || 'N/A',
+            SubtaskId: subtask.id || "N/A",
+            SubtaskName: subtask.name || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskDescription: subtask.description || "N/A",
+            SubtaskActiveStatus: subtask.active_status || "N/A",
+            SubtaskStatus: subtask.status || "N/A",
           });
         }
         totalSubtasks++;
@@ -452,17 +512,19 @@ exports.fetchPmviewproductdata = async (req, res) => {
 
       // Return the formatted task object
       return {
-        Date: task.date ? new Date(task.date).toISOString().split('T')[0] : 'N/A',
-        Team: task.team_name || 'N/A',
-        EmployeeName: task.employee_name || 'N/A',
-        Priority: task.priority || 'N/A',
-        ProjectName: task.project_name || 'N/A',
-        TaskName: task.name || 'N/A',
-        TaskId: task.id || 'N/A',
+        Date: task.date
+          ? new Date(task.date).toISOString().split("T")[0]
+          : "N/A",
+        Team: task.team_name || "N/A",
+        EmployeeName: task.employee_name || "N/A",
+        Priority: task.priority || "N/A",
+        ProjectName: task.project_name || "N/A",
+        TaskName: task.name || "N/A",
+        TaskId: task.id || "N/A",
         TotalSubtaskCount: totalSubtasks,
         CompletedSubtaskCount: completedSubtasks,
-        EstimationHours: task.estimation_hours || 'N/A',
-        Description: task.description || 'N/A',
+        EstimationHours: task.estimation_hours || "N/A",
+        Description: task.description || "N/A",
         Subtasks: validSubtasks,
         CompletionPercentage: completionPercentage,
         Status: status,
@@ -471,20 +533,20 @@ exports.fetchPmviewproductdata = async (req, res) => {
 
     // Group tasks by status
     const groupedTasks = {
-      'Pending': [],
-      'In Progress': [],
-      'In Review': [],
-      'On Hold': [],
-      'Done': [],
+      Pending: [],
+      "In Progress": [],
+      "In Review": [],
+      "On Hold": [],
+      Done: [],
     };
 
     // Track added task IDs for each section
     const addedTaskIds = {
-      'Pending': [],
-      'In Progress': [],
-      'In Review': [],
-      'On Hold': [],
-      'Done': [],
+      Pending: [],
+      "In Progress": [],
+      "In Review": [],
+      "On Hold": [],
+      Done: [],
     };
 
     // Process each row and categorize tasks
@@ -520,58 +582,108 @@ exports.fetchPmviewproductdata = async (req, res) => {
 
       // Only add task if it hasn't been added to that category already
       if (category) {
-        const existingTaskIndex = groupedTasks[category].findIndex(t => t.TaskId === task.id);
+        const existingTaskIndex = groupedTasks[category].findIndex(
+          (t) => t.TaskId === task.id
+        );
 
         if (existingTaskIndex === -1) {
           // Task does not exist in the section, so push the task with its subtask
-          groupedTasks[category].push(formatTask(task, subtask ? [subtask] : [], category));
+          groupedTasks[category].push(
+            formatTask(task, subtask ? [subtask] : [], category)
+          );
         } else {
           // Task exists, so add the subtask to the existing task
           groupedTasks[category][existingTaskIndex].Subtasks.push({
-            SubtaskId: subtask.id || 'N/A',
-            SubtaskName: subtask.name || 'N/A',
-            SubtaskEstimationHours: subtask.estimated_hours || 'N/A',
-            SubtaskDescription: subtask.description || 'N/A',
-            SubtaskActiveStatus: subtask.active_status || 'N/A',
-            SubtaskStatus: subtask.status || 'N/A',
+            SubtaskId: subtask.id || "N/A",
+            SubtaskName: subtask.name || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskDescription: subtask.description || "N/A",
+            SubtaskActiveStatus: subtask.active_status || "N/A",
+            SubtaskStatus: subtask.status || "N/A",
           });
         }
       }
     });
 
+    // Calculate the overall completion percentage
+    let totalTasksAndSubtasks = 0;
+    let completedTasksAndSubtasks = 0;
+
+    // Loop through all task groups and count
+    Object.keys(groupedTasks).forEach((status) => {
+      groupedTasks[status].forEach((task) => {
+        if (task.Subtasks.length > 0) {
+          // If the task has subtasks, count only the subtasks
+          task.Subtasks.forEach((subtask) => {
+            totalTasksAndSubtasks++;
+            if (subtask.SubtaskStatus === 3) {
+              completedTasksAndSubtasks++;
+            }
+          });
+        } else {
+          // If the task has no subtasks, count the task itself
+          totalTasksAndSubtasks++;
+          if (task.Status === "Done") {
+            completedTasksAndSubtasks++;
+          }
+        }
+      });
+    });
+
+
+    const OverallCompletionPercentage =
+      totalTasksAndSubtasks > 0
+        ? Math.round((completedTasksAndSubtasks / totalTasksAndSubtasks) * 100)
+        : 0;
+
+    let taskCountQuery = `
+  SELECT COUNT(*) AS task_count
+  FROM tasks
+  WHERE product_id = ? 
+    AND deleted_at IS NULL
+`;
+
+    if (team_id) {
+      taskCountQuery += ` AND team_id = ${db.escape(team_id)}`;
+    }
+
+    const [taskCountResult] = await db.query(taskCountQuery, [product_id]);
+
+    // Access the task count
+    const taskCount = taskCountResult[0]?.task_count || 0;
+
     // Prepare the response
     const result = {
-      PendingTasks: groupedTasks['Pending'],
-      InProgressTasks: groupedTasks['In Progress'],
-      InReviewTasks: groupedTasks['In Review'],
-      OnHoldTasks: groupedTasks['On Hold'],
-      DoneTasks: groupedTasks['Done'],
-      TodoCount: groupedTasks['Pending'].length,
-      InProgressCount: groupedTasks['In Progress'].length,
-      InReviewCount: groupedTasks['In Review'].length,
-      OnHoldCount: groupedTasks['On Hold'].length,
-      DoneCount: groupedTasks['Done'].length,
-      OverallCompletionPercentage:
-        groupedTasks['Done'].length > 0
-          ? Math.round(
-              (groupedTasks.Done.length / 
-                (groupedTasks.Pending.length + 
-                  groupedTasks['In Progress'].length + 
-                  groupedTasks['In Review'].length + 
-                  groupedTasks['On Hold'].length + 
-                  groupedTasks.Done.length)) *
-                100
-            )
-          : 0,
+      PendingTasks: groupedTasks["Pending"],
+      InProgressTasks: groupedTasks["In Progress"],
+      InReviewTasks: groupedTasks["In Review"],
+      OnHoldTasks: groupedTasks["On Hold"],
+      DoneTasks: groupedTasks["Done"],
+      TodoCount: groupedTasks["Pending"].length,
+      InProgressCount: groupedTasks["In Progress"].length,
+      InReviewCount: groupedTasks["In Review"].length,
+      OnHoldCount: groupedTasks["On Hold"].length,
+      DoneCount: groupedTasks["Done"].length,
+      TaskCount: taskCount,
+      OverallCompletionPercentage: OverallCompletionPercentage,
       productname: product.name,
       productid: product.id,
     };
 
-    return successResponse(res, result, 'Product details retrieved successfully', 200);
-
+    return successResponse(
+      res,
+      result,
+      "Product details retrieved successfully",
+      200
+    );
   } catch (error) {
-    console.error('Error fetching product details:', error);
-    return errorResponse(res, error.message, 'Error fetching product details', 500);
+    console.error("Error fetching product details:", error);
+    return errorResponse(
+      res,
+      error.message,
+      "Error fetching product details",
+      500
+    );
   }
 };
 
@@ -583,7 +695,8 @@ exports.fetchPmdatas = async (req, res) => {
 
     const productData = await Promise.all(
       products.map(async (product) => {
-        const tasksQuery = "SELECT * FROM tasks WHERE product_id = ? AND deleted_at IS NULL";
+        const tasksQuery =
+          "SELECT * FROM tasks WHERE product_id = ? AND deleted_at IS NULL";
         const [tasks] = await db.query(tasksQuery, [product.id]);
 
         let totalItems = 0;
@@ -591,7 +704,8 @@ exports.fetchPmdatas = async (req, res) => {
         let workingEmployees = new Set();
 
         for (const task of tasks) {
-          const subtasksQuery = "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
+          const subtasksQuery =
+            "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
           const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
@@ -628,18 +742,25 @@ exports.fetchPmdatas = async (req, res) => {
 
           employeeList = employees.map((user) => {
             const nameParts = user.full_name ? user.full_name.split(" ") : [];
-            const firstInitial = nameParts[0] && nameParts[0][0] ? nameParts[0][0].toUpperCase() : "";
-            const secondInitial = nameParts[1] && nameParts[1][0] ? nameParts[1][0].toUpperCase() : "";
-          
-            const initials = firstInitial + secondInitial || (nameParts[0] || "").slice(0, 2).toUpperCase();
-          
+            const firstInitial =
+              nameParts[0] && nameParts[0][0]
+                ? nameParts[0][0].toUpperCase()
+                : "";
+            const secondInitial =
+              nameParts[1] && nameParts[1][0]
+                ? nameParts[1][0].toUpperCase()
+                : "";
+
+            const initials =
+              firstInitial + secondInitial ||
+              (nameParts[0] || "").slice(0, 2).toUpperCase();
+
             return {
               employee_name: user.full_name || "N/A",
               employee_id: user.id || "N/A",
               initials: initials,
             };
           });
-          
         }
 
         return {
@@ -661,12 +782,12 @@ exports.fetchPmdatas = async (req, res) => {
         "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
         [team_id]
       );
-      
+
       // Check if no rows are returned
       if (rows.length === 0) {
         return errorResponse(res, null, "Team Not Found", 400);
       }
-}
+    }
 
     // Step 1: Get total strength grouped by team, including team name
     const totalStrengthQuery = `
@@ -680,7 +801,10 @@ exports.fetchPmdatas = async (req, res) => {
       ${team_id ? "AND t.id = ?" : ""}
       GROUP BY t.id
     `;
-    const [totalStrengthData] = await db.query(totalStrengthQuery, team_id ? [team_id] : []);
+    const [totalStrengthData] = await db.query(
+      totalStrengthQuery,
+      team_id ? [team_id] : []
+    );
 
     const totalStrength = totalStrengthData.reduce((acc, row) => {
       acc[row.team_id] = {
@@ -707,7 +831,10 @@ exports.fetchPmdatas = async (req, res) => {
         AND t.deleted_at IS NULL
         ${team_id ? "AND t.id = ?" : ""}
     `;
-    const [workingEmployeesData] = await db.query(workingEmployeesQuery, team_id ? [team_id] : []);
+    const [workingEmployeesData] = await db.query(
+      workingEmployeesQuery,
+      team_id ? [team_id] : []
+    );
 
     const workingEmployees = workingEmployeesData.reduce((acc, user) => {
       if (!acc[user.team_id]) {
@@ -745,7 +872,9 @@ exports.fetchPmdatas = async (req, res) => {
 
     // Step 3: Fetch attendance data
     const totalStrengthQueryAttendance = `SELECT COUNT(*) AS total_strength FROM users WHERE deleted_at IS NULL`;
-    const [[{ total_strength: totalStrengthAttendance }]] = await db.query(totalStrengthQueryAttendance);
+    const [[{ total_strength: totalStrengthAttendance }]] = await db.query(
+      totalStrengthQueryAttendance
+    );
 
     const currentTime = new Date();
     const cutoffTime = new Date();
@@ -762,21 +891,22 @@ exports.fetchPmdatas = async (req, res) => {
           (day_type = 2 AND half_type = 2 AND ? >= ?)
         )
     `;
-    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(totalAbsentQuery, [
-      currentTime,
-      cutoffTime,
-      currentTime,
-      cutoffTime,
-    ]);
+    const [[{ total_absent: totalAbsentEmployees }]] = await db.query(
+      totalAbsentQuery,
+      [currentTime, cutoffTime, currentTime, cutoffTime]
+    );
 
-    const totalPresentEmployees = totalStrengthAttendance - totalAbsentEmployees;
+    const totalPresentEmployees =
+      totalStrengthAttendance - totalAbsentEmployees;
 
-    const totalPresentPercentage = totalStrengthAttendance > 0
-      ? Math.round((totalPresentEmployees / totalStrengthAttendance) * 100)
-      : 0;
-    const totalAbsentPercentage = totalStrengthAttendance > 0
-      ? Math.round((totalAbsentEmployees / totalStrengthAttendance) * 100)
-      : 0;
+    const totalPresentPercentage =
+      totalStrengthAttendance > 0
+        ? Math.round((totalPresentEmployees / totalStrengthAttendance) * 100)
+        : 0;
+    const totalAbsentPercentage =
+      totalStrengthAttendance > 0
+        ? Math.round((totalAbsentEmployees / totalStrengthAttendance) * 100)
+        : 0;
 
     const teamWiseAttendanceQuery = `
       SELECT 
@@ -793,7 +923,14 @@ exports.fetchPmdatas = async (req, res) => {
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
-      const { team_id, team_name, employee_id, employee_name, day_type, half_type } = row;
+      const {
+        team_id,
+        team_name,
+        employee_id,
+        employee_name,
+        day_type,
+        half_type,
+      } = row;
 
       if (!acc[team_id]) {
         acc[team_id] = {
@@ -850,17 +987,9 @@ exports.fetchPmdatas = async (req, res) => {
     };
 
     // Step 5: Return response
-    return successResponse(
-      res,
-      result,
-      "PM data retrieved successfully",
-      200
-    );
+    return successResponse(res, result, "PM data retrieved successfully", 200);
   } catch (error) {
     console.error("Error fetching PM data:", error);
     return errorResponse(res, error.message, "Error fetching PM data", 500);
   }
 };
-
-
-

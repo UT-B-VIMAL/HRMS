@@ -154,7 +154,6 @@ exports.fetchAttendance = async (req, res) => {
   }
 };
 
-
 exports.fetchTlrating = async (req, res) => {
   try {
     const { user_id } = req.query;
@@ -211,9 +210,9 @@ exports.fetchTlrating = async (req, res) => {
       const nameParts = member.full_name
         ? member.full_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
         : []; // Safely handle missing or invalid full_name
-    
+
       let initials = "";
-    
+
       if (nameParts.length > 1) {
         // Use first letters of the two name parts
         initials =
@@ -226,12 +225,12 @@ exports.fetchTlrating = async (req, res) => {
         // Fallback for empty or missing names
         initials = "NA";
       }
-    
+
       const ratingRecord = ratingsMap.get(member.id) || {
         rating: 0,
         average: 0,
       };
-    
+
       return {
         employee_name: member.full_name || "N/A",
         employee_id: member.id || "N/A",
@@ -240,7 +239,6 @@ exports.fetchTlrating = async (req, res) => {
         average_value: ratingRecord.average,
       };
     });
-    
 
     // If no team members are found, add a placeholder entry
     if (finalRatingResult.length === 0) {
@@ -295,14 +293,15 @@ exports.fetchTLproducts = async (req, res) => {
     }
     const teamIds = teamResult.map((team) => team.id);
 
+    let productIds = [];
+    if (product_id) {
+      productIds = product_id.split(",").map((id) => parseInt(id.trim(), 10));
+    }
     // Fetch products (filtered by product_id if provided)
-    const productsQuery = product_id
-      ? "SELECT * FROM products WHERE id = ?"
-      : "SELECT * FROM products";
-    const [products] = await db.query(
-      productsQuery,
-      product_id ? [product_id] : []
-    );
+    const productsQuery = productIds.length
+      ? "SELECT * FROM products WHERE id IN (?) AND deleted_at IS NULL"
+      : "SELECT * FROM products WHERE deleted_at IS NULL";
+    const [products] = await db.query(productsQuery, productIds.length ? [productIds] : []);
 
     if (products.length === 0) {
       return res.status(404).json({ message: "No products found" });
@@ -324,9 +323,9 @@ exports.fetchTLproducts = async (req, res) => {
         for (const task of tasks) {
           // Fetch subtasks associated with the task
           const subtasksQuery = `
-                      SELECT * FROM sub_tasks 
-                      WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
-                  `;
+            SELECT * FROM sub_tasks 
+            WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
+          `;
           const [subtasks] = await db.query(subtasksQuery, [task.id, teamIds]);
 
           if (subtasks.length > 0) {
@@ -335,14 +334,34 @@ exports.fetchTLproducts = async (req, res) => {
               (subtask) => subtask.status === 3
             ).length;
 
-            subtasks.forEach((subtask) => {
-              if (subtask.user_id) workingEmployees.add(subtask.user_id);
-            });
+            for (const subtask of subtasks) {
+              if (subtask.user_id) {
+                // Check if the user_id exists in the users table and is not deleted
+                const [userCheck] = await db.query(
+                  "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                  [subtask.user_id]
+                );
+
+                if (userCheck.length > 0) {
+                  workingEmployees.add(subtask.user_id);
+                }
+              }
+            }
           } else {
             totalItems += 1;
             if (task.status === 3) completedItems += 1;
 
-            if (task.user_id) workingEmployees.add(task.user_id);
+            if (task.user_id) {
+              // Check if the user_id exists in the users table and is not deleted
+              const [userCheck] = await db.query(
+                "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                [task.user_id]
+              );
+
+              if (userCheck.length > 0) {
+                workingEmployees.add(task.user_id);
+              }
+            }
           }
         }
 
@@ -353,7 +372,7 @@ exports.fetchTLproducts = async (req, res) => {
         let employeeList = [];
         if (workingEmployees.size > 0) {
           const employeeDetailsQuery = `
-                      SELECT id, 
+                      SELECT id,employee_id, 
                              COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
                       FROM users 
                       WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
@@ -372,7 +391,7 @@ exports.fetchTLproducts = async (req, res) => {
 
             return {
               employee_name: user.full_name || "N/A",
-              employee_id: user.id || "N/A",
+              employee_id: user.employee_id || "N/A",
               initials: initials,
             };
           });
@@ -381,6 +400,7 @@ exports.fetchTLproducts = async (req, res) => {
         return {
           product_id: product.id,
           product_name: product.name,
+          task_count: tasks.length,
           completed_percentage: completionPercentage,
           employee_count: workingEmployees.size,
           employees: employeeList,
@@ -731,9 +751,9 @@ exports.fetchTLdatas = async (req, res) => {
       const nameParts = member.full_name
         ? member.full_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
         : []; // Safely handle missing or invalid full_name
-    
+
       let initials = "";
-    
+
       if (nameParts.length > 1) {
         // Use first letters of the two name parts
         initials =
@@ -746,12 +766,12 @@ exports.fetchTLdatas = async (req, res) => {
         // Fallback for empty or missing names
         initials = "NA";
       }
-    
+
       const ratingRecord = ratingsMap.get(member.id) || {
         rating: 0,
         average: 0,
       };
-    
+
       return {
         employee_name: member.full_name || "N/A",
         employee_id: member.id || "N/A",
@@ -760,7 +780,6 @@ exports.fetchTLdatas = async (req, res) => {
         average_value: ratingRecord.average,
       };
     });
-    
 
     // ========================= Fetch Products ========================
     const [products] = await db.query("SELECT * FROM products");
@@ -778,25 +797,47 @@ exports.fetchTLdatas = async (req, res) => {
         let workingEmployees = new Set();
 
         for (const task of tasks) {
-          const [subtasks] = await db.query(
-            `
-          SELECT * FROM sub_tasks WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
-        `,
-            [task.id, teamIds]
-          );
+          // Fetch subtasks associated with the task
+          const subtasksQuery = `
+            SELECT * FROM sub_tasks 
+            WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
+          `;
+          const [subtasks] = await db.query(subtasksQuery, [task.id, teamIds]);
 
           if (subtasks.length > 0) {
             totalItems += subtasks.length;
             completedItems += subtasks.filter(
               (subtask) => subtask.status === 3
             ).length;
-            subtasks.forEach((subtask) => {
-              if (subtask.user_id) workingEmployees.add(subtask.user_id);
-            });
+
+            for (const subtask of subtasks) {
+              if (subtask.user_id) {
+                // Check if the user_id exists in the users table and is not deleted
+                const [userCheck] = await db.query(
+                  "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                  [subtask.user_id]
+                );
+
+                if (userCheck.length > 0) {
+                  workingEmployees.add(subtask.user_id);
+                }
+              }
+            }
           } else {
             totalItems += 1;
             if (task.status === 3) completedItems += 1;
-            if (task.user_id) workingEmployees.add(task.user_id);
+
+            if (task.user_id) {
+              // Check if the user_id exists in the users table and is not deleted
+              const [userCheck] = await db.query(
+                "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
+                [task.user_id]
+              );
+
+              if (userCheck.length > 0) {
+                workingEmployees.add(task.user_id);
+              }
+            }
           }
         }
 
@@ -807,7 +848,7 @@ exports.fetchTLdatas = async (req, res) => {
         if (workingEmployees.size > 0) {
           const [employees] = await db.query(
             `
-          SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
+          SELECT id,employee_id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
           FROM users WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
         `,
             [Array.from(workingEmployees), teamIds]
@@ -821,7 +862,7 @@ exports.fetchTLdatas = async (req, res) => {
                 : (words[0] || "").slice(0, 2).toUpperCase();
             return {
               employee_name: user.full_name || "N/A",
-              employee_id: user.id || "N/A",
+              employee_id: user.employee_id || "N/A",
               initials,
             };
           });
@@ -830,6 +871,7 @@ exports.fetchTLdatas = async (req, res) => {
         return {
           product_id: product.id,
           product_name: product.name,
+          task_count: tasks.length,
           completed_percentage: completionPercentage,
           employee_count: workingEmployees.size,
           employees: employeeList,
@@ -1053,6 +1095,7 @@ AND t.deleted_at IS NULL
 AND s.deleted_at IS NULL
 AND te.deleted_at IS NULL
 AND p.deleted_at IS NULL
+AND u.deleted_at IS NULL
 `;
 
     // Filter by team_ids based on reporting_user_id
@@ -1230,6 +1273,52 @@ AND p.deleted_at IS NULL
       }
     });
 
+    // Calculate the overall completion percentage
+    let totalTasksAndSubtasks = 0;
+    let completedTasksAndSubtasks = 0;
+
+    // Loop through all task groups and count
+    Object.keys(groupedTasks).forEach((status) => {
+      groupedTasks[status].forEach((task) => {
+        if (task.Subtasks.length > 0) {
+          // If the task has subtasks, count only the subtasks
+          task.Subtasks.forEach((subtask) => {
+            totalTasksAndSubtasks++;
+            if (subtask.SubtaskStatus === 3) {
+              completedTasksAndSubtasks++;
+            }
+          });
+        } else {
+          // If the task has no subtasks, count the task itself
+          totalTasksAndSubtasks++;
+          if (task.Status === "Done") {
+            completedTasksAndSubtasks++;
+          }
+        }
+      });
+    });
+
+    const OverallCompletionPercentage =
+      totalTasksAndSubtasks > 0
+        ? Math.round((completedTasksAndSubtasks / totalTasksAndSubtasks) * 100)
+        : 0;
+
+    const taskCountQuery = `
+    SELECT COUNT(*) AS task_count
+    FROM tasks
+    WHERE product_id = ? 
+      AND team_id IN (?) 
+      AND deleted_at IS NULL
+  `;
+
+    const [taskCountResult] = await db.query(taskCountQuery, [
+      product_id,
+      teamIds,
+    ]);
+
+    // Access the task count
+    const taskCount = taskCountResult[0]?.task_count || 0;
+
     // Prepare the response
     const result = {
       PendingTasks: groupedTasks["Pending"],
@@ -1242,18 +1331,8 @@ AND p.deleted_at IS NULL
       InReviewCount: groupedTasks["In Review"].length,
       OnHoldCount: groupedTasks["On Hold"].length,
       DoneCount: groupedTasks["Done"].length,
-      OverallCompletionPercentage:
-        groupedTasks["Done"].length > 0
-          ? Math.round(
-              (groupedTasks.Done.length /
-                (groupedTasks.Pending.length +
-                  groupedTasks["In Progress"].length +
-                  groupedTasks["In Review"].length +
-                  groupedTasks["On Hold"].length +
-                  groupedTasks.Done.length)) *
-                100
-            )
-          : 0,
+      TaskCount: taskCount,
+      OverallCompletionPercentage: OverallCompletionPercentage,
       productname: product.name,
       productid: product.id,
     };

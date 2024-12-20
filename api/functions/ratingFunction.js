@@ -32,7 +32,7 @@ exports.getAllRatings = async (queryParamsval, res) => {
       LEFT JOIN 
         ratings ON users.id = ratings.user_id AND ratings.month = ?
       WHERE 
-        users.role_id != 2
+        users.role_id != 2 AND users.deleted_at IS NULL
     `;
 
   const queryParams = [currentMonth];
