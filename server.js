@@ -66,6 +66,7 @@ apiRouter.post('/login', loginController.login);
 apiRouter.post('/logout', loginController.logout);
 apiRouter.put('/change_password/:id',RoleController.checkRole(['pm','admin','tl','employee']),loginController.changePassword);
 apiRouter.post('/forgot_password',loginController.forgotPassword);
+apiRouter.post('/reset_password',loginController.reset_password);
 
 // User Routes
 apiRouter.post('/user',RoleController.checkRole(['admin','tl','pm']), userController.createUser);
