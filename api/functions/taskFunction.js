@@ -254,7 +254,6 @@ exports.getTask = async (id, res) => {
       3: "Done",
     };
 
-
     // Prepare task data
     const taskData = task.map((task) => ({
       task_id: task.id || "N/A",
