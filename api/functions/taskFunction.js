@@ -992,23 +992,26 @@ exports.getTaskList = async (queryParams, res) => {
         projects.name AS project_name,
         products.name AS product_name,
         users.first_name AS assignee_name,
-        teams.name AS team_name
+        teams.name AS team_name,
+        teams.id AS team_id
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users ON tasks.user_id = users.id
-      LEFT JOIN teams ON users.team_id = teams.id
+      LEFT JOIN teams ON tasks.team_id = teams.id
       WHERE 1=1
     `;
 
     const params = [];
 
-    // Role-based filtering
-    if (role_id === 3) {
+    if (team_id) {
+      baseQuery += ` AND tasks.team_id = ?`;
+      params.push(team_id);
+    } else if (role_id === 3) {
       baseQuery += ` AND tasks.team_id = ?`;
       params.push(userTeamId);
     }
-
+    
     if (role_id === 4) {
       baseQuery += ` AND (
         tasks.user_id = ? OR 
@@ -1029,11 +1032,6 @@ exports.getTaskList = async (queryParams, res) => {
     if (project_id) {
       baseQuery += ` AND tasks.project_id = ?`;
       params.push(project_id);
-    }
-
-    if (team_id) {
-      baseQuery += ` AND tasks.team_id = ?`;
-      params.push(team_id);
     }
 
     if (priority) {
@@ -1133,7 +1131,8 @@ exports.getTaskList = async (queryParams, res) => {
         priority: task.priority,
         estimated_hours: task.estimated_hours,
         assignee_name: task.assignee_name,
-        team_name: task.team_name
+        team_name: task.team_name,
+        team_id: task.team_id
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];

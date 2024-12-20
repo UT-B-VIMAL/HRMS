@@ -242,6 +242,20 @@ exports.deleteUser = async (id, res) => {
 
     const keycloakId = rows[0].keycloak_id;
 
+    const checkTasksQuery = `SELECT COUNT(*) AS task_count FROM tasks WHERE user_id = ? AND deleted_at IS NULL`;
+    const [taskRows] = await db.query(checkTasksQuery, [id]);
+
+    if (taskRows[0].task_count > 0) {
+      return errorResponse(res, null, 'User has tasks', 400);
+    }
+
+    const checkSubTasksQuery = `SELECT COUNT(*) AS subtask_count FROM sub_tasks WHERE user_id = ? AND deleted_at IS NULL`;
+    const [subTaskRows] = await db.query(checkSubTasksQuery, [id]);
+
+    if (subTaskRows[0].subtask_count > 0) {
+      return errorResponse(res, null, 'User has sub-tasks', 400);
+    }
+
     const updateQuery = `UPDATE users SET deleted_at = NOW() WHERE id = ?`;
     const [result] = await db.query(updateQuery, [id]);
 
@@ -257,6 +271,7 @@ exports.deleteUser = async (id, res) => {
     return errorResponse(res, error.message, 'Error deleting user', 500);
   }
 };
+
 
 const getRoleName = async (roleId) => {
   try {
