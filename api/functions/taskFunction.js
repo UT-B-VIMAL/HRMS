@@ -185,7 +185,7 @@ exports.getTask = async (id, res) => {
       p.name AS product_name, 
       pj.name AS project_name 
      CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
-   CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
+    CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
     FROM tasks t 
     LEFT JOIN teams te ON t.team_id = te.id 
     LEFT JOIN users owner ON t.user_id = owner.id 
