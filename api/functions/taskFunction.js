@@ -1,5 +1,5 @@
 const db = require("../../config/db");
-const mysql = require('mysql2');
+const mysql = require("mysql2");
 const {
   successResponse,
   errorResponse,
@@ -19,16 +19,16 @@ exports.createTask = async (payload, res) => {
     estimated_hours,
     start_date,
     end_date,
-    extended_status = '00:00:00',
-    extended_hours = '00:00:00', 
-    active_status=0,
-    status=0,
-    total_hours_worked = '00:00:00',
+    extended_status = "00:00:00",
+    extended_hours = "00:00:00",
+    active_status = 0,
+    status = 0,
+    total_hours_worked = "00:00:00",
     rating,
     command,
     assigned_user_id,
     remark,
-    reopen_status=0,
+    reopen_status = 0,
     description,
     team_id,
     priority,
@@ -184,6 +184,8 @@ exports.getTask = async (id, res) => {
       COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
       p.name AS product_name, 
       pj.name AS project_name 
+     CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
+   CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
     FROM tasks t 
     LEFT JOIN teams te ON t.team_id = te.id 
     LEFT JOIN users owner ON t.user_id = owner.id 
@@ -259,19 +261,22 @@ exports.getTask = async (id, res) => {
       task_id: task.id || "N/A",
       name: task.name || "N/A",
       status: task.status || "N/A",
-      project_id: task.project_id|| "N/A",
+      project_id: task.project_id || "N/A",
       project: task.project_name || "N/A",
-      product_id: task.product_id|| "N/A",
+      product_id: task.product_id || "N/A",
       product: task.product_name || "N/A",
       owner_id: task.user_id || "N/A",
       owner: task.owner_name || "N/A",
       team_id: task.team_id || "N/A",
       team: task.team_name || "N/A",
-      estimated_hours:task.estimated_hours,
-      time_taken:task.total_hours_worked||"N/A" ,
-      assignee_id:task.assigned_user_id || "N/A",
+      estimated_hours: task.estimated_hours,
+      time_taken: task.total_hours_worked || "N/A",
+      assignee_id: task.assigned_user_id || "N/A",
       assignee: task.assignee_name || "N/A",
-      remaining_hours: calculateRemainingHours(task.estimated_hours, task.total_hours_worked),
+      remaining_hours: calculateRemainingHours(
+        task.estimated_hours,
+        task.total_hours_worked
+      ),
       start_date: task.start_date,
       end_date: task.end_date,
       priority: task.priority,
@@ -382,6 +387,19 @@ exports.updateTask = async (id, payload, res) => {
   } = payload;
 
   try {
+    const [updatduser] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [updated_by]
+    );
+    if (updatduser.length === 0) {
+      return errorResponse(
+        res,
+        null,
+        "Updated User not found or has been deleted",
+        404
+      );
+    }
+
     const [product] = await db.query(
       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
       [product_id]
@@ -850,8 +868,6 @@ exports.deleteTask = async (id, res) => {
   }
 };
 
-
-
 const lastActiveTask = async (userId) => {
   try {
     const query = `
@@ -923,12 +939,12 @@ exports.getTaskList = async (queryParams, res) => {
       priority,
       search,
       dropdown_products,
-      dropdown_projects
+      dropdown_projects,
     } = queryParams;
 
     // Validate if user_id exists
     if (!user_id) {
-      console.log('Missing user_id in query parameters');
+      console.log("Missing user_id in query parameters");
       return errorResponse(
         res,
         "User ID is required",
@@ -939,10 +955,9 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Get user details
     const userDetails = await getAuthUserDetails(user_id, res);
-   
+
     if (!userDetails || userDetails.id == undefined) {
-      
-      return; 
+      return;
     }
 
     const { role_id, team_id: userTeamId } = userDetails;
@@ -983,7 +998,7 @@ exports.getTaskList = async (queryParams, res) => {
       baseQuery += ` AND tasks.team_id = ?`;
       params.push(userTeamId);
     }
-    
+
     if (role_id === 4) {
       baseQuery += ` AND (
         tasks.user_id = ? OR 
@@ -1012,12 +1027,16 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     if (dropdown_products && dropdown_products.length > 0) {
-      baseQuery += ` AND tasks.product_id IN (${dropdown_products.map(() => '?').join(',')})`;
+      baseQuery += ` AND tasks.product_id IN (${dropdown_products
+        .map(() => "?")
+        .join(",")})`;
       params.push(...dropdown_products);
     }
 
     if (dropdown_projects && dropdown_projects.length > 0) {
-      baseQuery += ` AND tasks.project_id IN (${dropdown_projects.map(() => '?').join(',')})`;
+      baseQuery += ` AND tasks.project_id IN (${dropdown_projects
+        .map(() => "?")
+        .join(",")})`;
       params.push(...dropdown_projects);
     }
 
@@ -1037,16 +1056,16 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     baseQuery += ` ORDER BY tasks.updated_at DESC`;
-    
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
 
     // Fetch subtasks only if tasks exist
-    const taskIds = tasks.map(task => task.task_id);
+    const taskIds = tasks.map((task) => task.task_id);
     let allSubtasks = [];
     if (taskIds.length > 0) {
-      [allSubtasks] = await db.query(`
+      [allSubtasks] = await db.query(
+        `
         SELECT 
           id AS subtask_id, 
           name AS subtask_name, 
@@ -1057,7 +1076,9 @@ exports.getTaskList = async (queryParams, res) => {
           reopen_status, 
           active_status 
         FROM sub_tasks
-        WHERE task_id IN (?)`, [taskIds]);
+        WHERE task_id IN (?)`,
+        [taskIds]
+      );
     }
 
     // Group subtasks by task_id
@@ -1069,34 +1090,34 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Define the task sections (groups)
     const groups = {
-      'To_Do': [],
-      'On_Hold': [],
-      'Pending_Approval': [],
-      'Reopen': [],
-      'In_Progress': [],
-      'Done': []
+      To_Do: [],
+      On_Hold: [],
+      Pending_Approval: [],
+      Reopen: [],
+      In_Progress: [],
+      Done: [],
     };
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-        return 'To_Do';
+        return "To_Do";
       } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
-        return 'On_Hold';
+        return "On_Hold";
       } else if (status === 2 && reopenStatus === 0) {
-        return 'Pending_Approval';
+        return "Pending_Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
-        return 'Reopen';
+        return "Reopen";
       } else if (status === 1 && activeStatus === 1) {
-        return 'In_Progress';
+        return "In_Progress";
       } else if (status === 3) {
-        return 'Done';
+        return "Done";
       }
       return null; // Default case if status doesn't match any known group
     };
 
     // Iterate through tasks and categorize
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       const taskDetails = {
         task_id: task.task_id,
         task_name: task.task_name,
@@ -1106,7 +1127,7 @@ exports.getTaskList = async (queryParams, res) => {
         estimated_hours: task.estimated_hours,
         assignee_name: task.assignee_name,
         team_name: task.team_name,
-        team_id: task.team_id
+        team_id: task.team_id,
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
@@ -1114,8 +1135,12 @@ exports.getTaskList = async (queryParams, res) => {
 
       // If the task has subtasks, group them by subtask status
       if (subtasks.length > 0) {
-        subtasks.forEach(subtask => {
-          const group = getStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status);
+        subtasks.forEach((subtask) => {
+          const group = getStatusGroup(
+            subtask.status,
+            subtask.reopen_status,
+            subtask.active_status
+          );
           if (group) {
             if (!groupedSubtasks[group]) {
               groupedSubtasks[group] = [];
@@ -1123,23 +1148,27 @@ exports.getTaskList = async (queryParams, res) => {
             groupedSubtasks[group].push({
               subtask_id: subtask.subtask_id,
               subtask_name: subtask.subtask_name,
-              estimated_hours: subtask.estimated_hours
+              estimated_hours: subtask.estimated_hours,
             });
           }
         });
       } else {
         // If no subtasks, classify based on task status
-        const group = getStatusGroup(task.task_status, task.reopen_status, task.active_status);
+        const group = getStatusGroup(
+          task.task_status,
+          task.reopen_status,
+          task.active_status
+        );
         if (group) {
           groupedSubtasks[group] = [];
         }
       }
 
       // Add task to respective groups
-      Object.keys(groupedSubtasks).forEach(group => {
+      Object.keys(groupedSubtasks).forEach((group) => {
         groups[group].push({
           task_details: taskDetails,
-          subtask_details: groupedSubtasks[group]
+          subtask_details: groupedSubtasks[group],
         });
       });
     });
@@ -1148,41 +1177,23 @@ exports.getTaskList = async (queryParams, res) => {
 
     const data = {
       groups: groups,
-      taskCounts: Object.values(groups).map(group => group.length),
+      taskCounts: Object.values(groups).map((group) => group.length),
       lastActiveTask: lastActiveTaskData,
     };
 
-    console.log('Sending success response');
-    return successResponse(
-      res,
-      data,
-      "Task data retrieved successfully",
-      200
-    );
-
+    console.log("Sending success response");
+    return successResponse(res, data, "Task data retrieved successfully", 200);
   } catch (error) {
     console.error(error);
-    return errorResponse(res, error.message, 'Error fetching task data', 500);
+    return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
-
-
-
-
-
-
-
-
 
 // Utility function for calculating time left
 function calculateTimeLeft(estimatedHours, totalHoursWorked) {
   const timeLeft = estimatedHours - totalHoursWorked;
-  return timeLeft > 0 ? `${timeLeft} hours left` : 'Completed';
+  return timeLeft > 0 ? `${timeLeft} hours left` : "Completed";
 }
-
-
-
-
 
 exports.doneTaskList = async (req, res) => {
   try {
@@ -1533,7 +1544,6 @@ const convertToSeconds = (timeString) => {
 function calculateRemainingHours(estimated, worked) {
   const estimatedSeconds = convertToSeconds(estimated);
   const workedSeconds = convertToSeconds(worked);
-  const remainingSeconds = Math.max(0, estimatedSeconds - workedSeconds); 
+  const remainingSeconds = Math.max(0, estimatedSeconds - workedSeconds);
   return convertSecondsToHHMMSS(remainingSeconds);
 }
-
