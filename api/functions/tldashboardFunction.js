@@ -529,11 +529,13 @@ exports.fetchTLresourceallotment = async (req, res) => {
         SELECT id, 
                COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
         FROM users 
-        WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
+        WHERE id IN (?) AND team_id IN (?) ${absentEmployeeCondition} AND deleted_at IS NULL
       `,
-        [Array.from(allocatedTaskUsers), teamIds]
+        absentEmployeeIds.length > 0
+          ? [Array.from(allocatedTaskUsers), teamIds, absentEmployeeIds]
+          : [Array.from(allocatedTaskUsers), teamIds]
       );
-
+    
       allocatedEmployeeDetailsData.forEach((user) => {
         employeeDetails.push({
           employee_name: user.employee_name,
@@ -541,7 +543,6 @@ exports.fetchTLresourceallotment = async (req, res) => {
         });
       });
     }
-
     // Step 6: Get all users in the team (excluding absentees) and check for non-allocated employees
     const [allEmployeesData] = await db.query(
       `
@@ -936,22 +937,25 @@ exports.fetchTLdatas = async (req, res) => {
 
     let employeeDetailsForAllocation = [];
     if (allocatedTaskUsers.size > 0) {
-      const [allocatedEmployeeDetails] = await db.query(
+      const [allocatedEmployeeDetailsData] = await db.query(
         `
-        SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
-        FROM users WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
+        SELECT id, 
+               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
+        FROM users 
+        WHERE id IN (?) AND team_id IN (?) ${absentEmployeeConditionForAllocation} AND deleted_at IS NULL
       `,
-        [Array.from(allocatedTaskUsers), teamIds]
+        absentEmployeeIds.length > 0
+          ? [Array.from(allocatedTaskUsers), teamIds, absentEmployeeIds]
+          : [Array.from(allocatedTaskUsers), teamIds]
       );
-
-      allocatedEmployeeDetails.forEach((user) => {
+    
+      allocatedEmployeeDetailsData.forEach((user) => {
         employeeDetailsForAllocation.push({
           employee_name: user.employee_name,
-          status: "Allocated",
+          status: "Allocated", // These employees are allocated tasks/subtasks
         });
       });
     }
-
     const [allEmployeesForAllocation] = await db.query(
       `
       SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name
