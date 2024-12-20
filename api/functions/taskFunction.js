@@ -112,7 +112,7 @@ exports.createTask = async (payload, res) => {
           active_status, status, total_hours_worked, rating, command,
           assigned_user_id, remark, reopen_status, description,
           team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, now(),now())
       `;
 
     const values = [
@@ -254,15 +254,6 @@ exports.getTask = async (id, res) => {
       3: "Done",
     };
 
-    // Time calculations
-    const timeTaken = isNaN(parseFloat(task.total_hours_worked))
-      ? 0
-      : parseFloat(task.total_hours_worked);
-    const estimatedHours = isNaN(parseFloat(task.estimated_hours))
-      ? 0
-      : parseFloat(task.estimated_hours);
-    const remainingHours =
-      estimatedHours > 0 ? Math.max(0, estimatedHours - timeTaken) : 0;
 
     // Prepare task data
     const taskData = task.map((task) => ({
@@ -277,13 +268,11 @@ exports.getTask = async (id, res) => {
       owner: task.owner_name || "N/A",
       team_id: task.team_id || "N/A",
       team: task.team_name || "N/A",
-      estimated_hours: estimatedHours,
-      time_taken: timeTaken,
+      estimated_hours:task.estimated_hours,
+      time_taken:task.total_hours_worked||"N/A" ,
       assignee_id:task.assigned_user_id || "N/A",
       assignee: task.assignee_name || "N/A",
-      remaining_hours: remainingHours
-        ? new Date(remainingHours * 3600 * 1000).toISOString().substr(11, 8)
-        : "N/A",
+      remaining_hours: calculateRemainingHours(task.estimated_hours, task.total_hours_worked),
       start_date: task.start_date,
       end_date: task.end_date,
       priority: task.priority,
@@ -862,23 +851,7 @@ exports.deleteTask = async (id, res) => {
   }
 };
 
-const convertToSeconds = (timeString) => {
-  const [hours, minutes, seconds] = timeString.split(":").map(Number);
-  return hours * 3600 + minutes * 60 + seconds;
-};
-// const calculateTimeLeft = (
-//   estimatedHours,
-//   totalHoursWorked,
-//   timeDifference
-// ) => {
-//   const estimatedInSeconds = convertToSeconds(estimatedHours || "00:00:00");
-//   const workedInSeconds = convertToSeconds(totalHoursWorked || "00:00:00");
-//   const remainingSeconds = Math.max(
-//     0,
-//     estimatedInSeconds - workedInSeconds - timeDifference
-//   );
-//   return new Date(remainingSeconds * 1000).toISOString().substr(11, 8);
-// };
+
 
 const lastActiveTask = async (userId) => {
   try {
@@ -1550,3 +1523,16 @@ function convertSecondsToHHMMSS(totalSeconds) {
     .map((num) => String(num).padStart(2, "0"))
     .join(":");
 }
+
+const convertToSeconds = (timeString) => {
+  const [hours, minutes, seconds] = timeString.split(":").map(Number);
+  return hours * 3600 + minutes * 60 + seconds;
+};
+
+function calculateRemainingHours(estimated, worked) {
+  const estimatedSeconds = convertToSeconds(estimated);
+  const workedSeconds = convertToSeconds(worked);
+  const remainingSeconds = Math.max(0, estimatedSeconds - workedSeconds); 
+  return convertSecondsToHHMMSS(remainingSeconds);
+}
+
