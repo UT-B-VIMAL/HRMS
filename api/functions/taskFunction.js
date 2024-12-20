@@ -986,7 +986,7 @@ exports.getTaskList = async (queryParams, res) => {
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users ON tasks.user_id = users.id
       LEFT JOIN teams ON tasks.team_id = teams.id
-      WHERE 1=1
+      WHERE tasks.deleted_at IS NULL
     `;
 
     const params = [];
