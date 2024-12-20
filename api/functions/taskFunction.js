@@ -1063,6 +1063,8 @@ exports.getTaskList = async (queryParams, res) => {
         searchTerm
       );
     }
+
+    baseQuery += ` ORDER BY tasks.updated_at DESC`;
     
 
     // Execute the base query for tasks
