@@ -29,7 +29,7 @@ const commentsController = require('./controllers/commentsController');
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
 const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
-const PORT = isProduction ? 9000 : 3000;
+const PORT = isProduction ? 8085 : 3000;
 
 const corsOptions = {
   origin: (origin, callback) => {
