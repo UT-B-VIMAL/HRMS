@@ -136,12 +136,12 @@ const taskController = {
 
 
   updateTaskTimeLineStatus: async (req, res) => {
-    // try {
+    try {
       await updateTaskTimeLine(req,res);
 
-    // } catch (error) {
-    //   return errorResponse(res, error.message, 'Error updating task timeline', 500);
-    // }
+    } catch (error) {
+      return errorResponse(res, error.message, 'Error updating task timeline', 500);
+    }
   },
 };
 

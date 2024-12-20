@@ -14,7 +14,6 @@ exports.getAttendance = async (req, res) => {
   try {
       let query = '';
       let queryParams = [];
-   // Validate the request data
    const { error } = attendanceFetch.validate(
       { status,user_id },
       { abortEarly: false }
@@ -41,12 +40,12 @@ exports.getAttendance = async (req, res) => {
             CASE 
                 WHEN el.day_type = 1 THEN 'Full Day' 
                 WHEN el.day_type = 2 THEN 'Half Day' 
-                ELSE 'Unknown' 
+                ELSE 'Full Day' 
             END AS day_type,
             CASE 
                 WHEN el.half_type = 1 THEN 'Second Half' 
                 WHEN el.half_type = 2 THEN 'First Half' 
-                ELSE 'Unknown' 
+                ELSE null 
             END AS half_type
         FROM 
             users u
@@ -70,11 +69,11 @@ exports.getAttendance = async (req, res) => {
         LIMIT ?, ?
       `;
     
-      queryParams.push(user_id, user_id); // reporting_user_id condition
-      queryParams.push(dynamicDate); // Use dynamicDate (either passed date or today's date)
+      queryParams.push(user_id, user_id); 
+      queryParams.push(dynamicDate); 
     
       if (search) {
-        queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or employee_id)
+        queryParams.push(`%${search}%`, `%${search}%`); 
       }
     
       queryParams.push((Number(page) - 1) * Number(perPage), Number(perPage)); // Pagination
@@ -87,13 +86,13 @@ exports.getAttendance = async (req, res) => {
           CASE 
               WHEN el.day_type = 1 THEN 'Full Day' 
               WHEN el.day_type = 2 THEN 'Half Day' 
-              ELSE 'Unknown' 
+              ELSE null
           END AS day_type,
           el.date AS leave_date,
           CASE 
               WHEN el.half_type = 1 THEN 'First Half' 
               WHEN el.half_type = 2 THEN 'Second Half' 
-              ELSE 'Unknown' 
+              ELSE null
           END AS half_type
       FROM employee_leave el
       INNER JOIN users u ON el.user_id = u.id  -- Join with users table to get user details

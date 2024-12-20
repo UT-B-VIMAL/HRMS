@@ -269,13 +269,18 @@ exports.getTask = async (id, res) => {
       task_id: task.id || "N/A",
       name: task.name || "N/A",
       status: task.status || "N/A",
+      project_id: task.project_id|| "N/A",
       project: task.project_name || "N/A",
+      product_id: task.product_id|| "N/A",
       product: task.product_name || "N/A",
+      owner_id: task.user_id || "N/A",
       owner: task.owner_name || "N/A",
+      team_id: task.team_id || "N/A",
       team: task.team_name || "N/A",
       estimated_hours: estimatedHours,
       time_taken: timeTaken,
-      assigned_to: task.assignee_name || "N/A",
+      assignee_id:task.assigned_user_id || "N/A",
+      assignee: task.assignee_name || "N/A",
       remaining_hours: remainingHours
         ? new Date(remainingHours * 3600 * 1000).toISOString().substr(11, 8)
         : "N/A",
@@ -987,23 +992,26 @@ exports.getTaskList = async (queryParams, res) => {
         projects.name AS project_name,
         products.name AS product_name,
         users.first_name AS assignee_name,
-        teams.name AS team_name
+        teams.name AS team_name,
+        teams.id AS team_id
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users ON tasks.user_id = users.id
-      LEFT JOIN teams ON users.team_id = teams.id
+      LEFT JOIN teams ON tasks.team_id = teams.id
       WHERE 1=1
     `;
 
     const params = [];
 
-    // Role-based filtering
-    if (role_id === 3) {
+    if (team_id) {
+      baseQuery += ` AND tasks.team_id = ?`;
+      params.push(team_id);
+    } else if (role_id === 3) {
       baseQuery += ` AND tasks.team_id = ?`;
       params.push(userTeamId);
     }
-
+    
     if (role_id === 4) {
       baseQuery += ` AND (
         tasks.user_id = ? OR 
@@ -1024,11 +1032,6 @@ exports.getTaskList = async (queryParams, res) => {
     if (project_id) {
       baseQuery += ` AND tasks.project_id = ?`;
       params.push(project_id);
-    }
-
-    if (team_id) {
-      baseQuery += ` AND tasks.team_id = ?`;
-      params.push(team_id);
     }
 
     if (priority) {
@@ -1128,7 +1131,8 @@ exports.getTaskList = async (queryParams, res) => {
         priority: task.priority,
         estimated_hours: task.estimated_hours,
         assignee_name: task.assignee_name,
-        team_name: task.team_name
+        team_name: task.team_name,
+        team_id: task.team_id
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
@@ -1441,7 +1445,6 @@ exports.updateTaskTimeLine = async (req, res) => {
       taskId = taskOrSubtask.id;
       subtaskId = null;
     }
-    console.log(taskId);
 
     if (action === "start") {
       // Check if a record already exists in the sub_tasks_user_timeline table for the current task/subtask
@@ -1449,7 +1452,6 @@ exports.updateTaskTimeLine = async (req, res) => {
         "SELECT * FROM ?? WHERE active_status = 1 AND deleted_at IS NULL AND user_id = ?",
         [type === "subtask" ? "sub_tasks" : "tasks", taskOrSubtask.user_id]
       );
-      console.log(existingSubtaskSublime);
       if (existingSubtaskSublime.length > 0) {
         return res
           .status(400)

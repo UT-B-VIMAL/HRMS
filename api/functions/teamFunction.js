@@ -1,6 +1,7 @@
 const Joi = require('joi');
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const { getAuthUserDetails } = require('./commonFunction');
 // const getPagination = require('../../helpers/paginationHelper');
 const getPagination = (page, perPage, totalRecords) => {
     page = parseInt(page, 10);
@@ -50,7 +51,7 @@ const getPagination = (page, perPage, totalRecords) => {
 
 // Create Team
 exports.createTeam = async (payload, res) => {
-const { name ,user_id } = payload;
+  const { name ,user_id } = payload;
   const { error } = teamSchema.validate(
     { name, user_id },
     { abortEarly: false }
@@ -63,6 +64,8 @@ const { name ,user_id } = payload;
     return errorResponse(res, errorMessages, "Validation Error", 400);
   }
   try {
+    const user = await getAuthUserDetails(user_id, res);
+    if (!user) return;
     const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE name = ?";
     const [checkResult] = await db.query(checkQuery, [name]);
 
@@ -96,6 +99,8 @@ exports.updateTeam = async (id, payload, res) => {
     }
 
   try {
+    const user = await getAuthUserDetails(user_id, res);
+    if (!user) return;
     const checkQuery = "SELECT COUNT(*) as count FROM teams WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
 

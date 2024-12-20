@@ -66,6 +66,7 @@ apiRouter.post('/login', loginController.login);
 apiRouter.post('/logout', loginController.logout);
 apiRouter.put('/change_password/:id',RoleController.checkRole(['pm','admin','tl','employee']),loginController.changePassword);
 apiRouter.post('/forgot_password',loginController.forgotPassword);
+apiRouter.post('/reset_password',loginController.reset_password);
 
 // User Routes
 apiRouter.post('/user',RoleController.checkRole(['admin','tl','pm']), userController.createUser);
@@ -116,7 +117,7 @@ apiRouter.get('/task', RoleController.checkRole(['pm','admin']),taskController.g
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['pm','admin']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
 apiRouter.get('/doneTask',RoleController.checkRole(['pm','admin']), taskController.doneTask);
-apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['pm','admin','tl','employee']), taskController.updateTaskTimeLineStatus);
+apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
 
 
 // Subtask Routes
