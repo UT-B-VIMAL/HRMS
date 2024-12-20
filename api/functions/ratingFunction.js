@@ -11,7 +11,7 @@ const { getAuthUserDetails } = require("./commonFunction");
 
 
 exports.getAllRatings = async (queryParamsval, res) => {
-  const { search, teamId, page = 1, perPage = 10 } = queryParamsval;
+  const { search, team_id, page = 1, perPage = 10 } = queryParamsval;
 
   const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
 
@@ -38,9 +38,9 @@ exports.getAllRatings = async (queryParamsval, res) => {
   const queryParams = [currentMonth];
 
   // Add filters for `teamId` and `search`
-  if (teamId) {
+  if (team_id) {
     query += ` AND users.team_id = ?`;
-    queryParams.push(teamId);
+    queryParams.push(team_id);
   }
 
   if (search && search.trim() !== "") {
