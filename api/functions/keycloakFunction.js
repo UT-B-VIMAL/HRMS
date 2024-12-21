@@ -50,10 +50,20 @@ async function signInUser(username, password) {
 
       if (user) {
         const role = await getRoleName(user.role_id);
+        let profileName = '';
+        if (user.last_name) {
+          const firstNameInitial = user.first_name ? user.first_name.charAt(0).toUpperCase() : '';
+          const lastNameInitial = user.last_name.charAt(0).toUpperCase();
+          profileName = `${firstNameInitial}${lastNameInitial}`;
+        } else if (user.first_name) {
+          profileName = user.first_name.substring(0, 2).toUpperCase();
+        }
         return {
           keycloak_id: user.keycloak_id,
           user_id: user.id,
           role_id: user.role_id,
+          employee_id: user.employee_id,
+          profile_name: profileName,
           role_name: role,
           access_token: response.data.access_token,
           refresh_token: response.data.refresh_token
@@ -370,7 +380,7 @@ async function assignRoleToUser(userId, roleName) {
 
 async function getUserByEmployeeId(employeeId) {
   
-  const query = "SELECT id, keycloak_id,role_id FROM users WHERE employee_id = ?";
+  const query = "SELECT id, keycloak_id,role_id,employee_id,first_name,last_name FROM users WHERE employee_id = ?";
   const params = [employeeId];
 
   try {
