@@ -64,6 +64,7 @@ async function signInUser(username, password) {
           role_id: user.role_id,
           employee_id: user.employee_id,
           profile_name: profileName,
+          designation_name:user.designation_name,
           role_name: role,
           access_token: response.data.access_token,
           refresh_token: response.data.refresh_token
@@ -380,8 +381,19 @@ async function assignRoleToUser(userId, roleName) {
 
 async function getUserByEmployeeId(employeeId) {
   
-  const query = "SELECT id, keycloak_id,role_id,employee_id,first_name,last_name FROM users WHERE employee_id = ?";
-  const params = [employeeId];
+  const query = `
+  SELECT 
+    users.id, 
+    users.keycloak_id, 
+    users.role_id, 
+    users.employee_id, 
+    users.first_name, 
+    users.last_name, 
+    designations.name AS designation_name
+  FROM users
+  LEFT JOIN designations ON users.designation_id = designations.id
+  WHERE users.employee_id = ?`;
+const params = [employeeId];
 
   try {
     const [rows] = await db.execute(query, params);  // Use your DB query method here (e.g., mysql2, sequelize)
