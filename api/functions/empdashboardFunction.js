@@ -220,7 +220,7 @@ exports.fetchDailybreakdown = async (req, res) => {
       {
         dailyBreakdown,
         totalDuration: totalDurationFormatted,
-        percentage: `${totalDurationPercentage}%`,
+        percentage: totalDurationPercentage,
       },
       "Daily breakdown retrieved successfully",
       200
