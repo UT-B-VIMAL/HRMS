@@ -188,12 +188,16 @@ exports.fetchDailybreakdown = async (req, res) => {
         minutes
       ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
+      // Determine if the record is a Task or Subtask
+      const type = record.subtask_id ? "Subtask" : "Task";
+
       return {
         startTime: formattedStartTime,
         endTime: formattedEndTime,
         project_name: record.project_name || "N/A",
         name: record.subtask_id ? record.subtask_name : record.task_name || "N/A",
         duration: formattedDuration,
+        type: type, // New field added for type
       };
     });
 
@@ -216,7 +220,7 @@ exports.fetchDailybreakdown = async (req, res) => {
       {
         dailyBreakdown,
         totalDuration: totalDurationFormatted,
-        percentage: `${totalDurationPercentage}%`,
+        percentage: totalDurationPercentage,
       },
       "Daily breakdown retrieved successfully",
       200
@@ -226,6 +230,7 @@ exports.fetchDailybreakdown = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching daily breakdown", 500);
   }
 };
+
 
 exports.fetchStatistics = async (req, res) => {
     try {
