@@ -257,32 +257,43 @@ exports.getTask = async (id, res) => {
     };
 
     // Prepare task data
-    const taskData = task.map((task) => ({
-      task_id: task.id || "N/A",
-      name: task.name || "N/A",
-      status: task.status || "N/A",
-      project_id: task.project_id || "N/A",
-      project: task.project_name || "N/A",
-      product_id: task.product_id || "N/A",
-      product: task.product_name || "N/A",
-      owner_id: task.user_id || "N/A",
-      owner: task.owner_name || "N/A",
-      team_id: task.team_id || "N/A",
-      team: task.team_name || "N/A",
-      estimated_hours: task.estimated_hours,
-      time_taken: task.total_hours_worked || "N/A",
-      assignee_id: task.assigned_user_id || "N/A",
-      assignee: task.assignee_name || "N/A",
-      remaining_hours: calculateRemainingHours(
-        task.estimated_hours,
-        task.total_hours_worked
-      ),
-      start_date: task.start_date,
-      end_date: task.end_date,
-      priority: task.priority,
-      description: task.description,
-      status_text: statusMap[task.status] || "Unknown",
-    }));
+    const taskData = task.map((task) => {
+      const totalEstimatedHours = task.estimated_hours || "00:00:00";  // Ensure default format as "HH:MM:SS"
+      const timeTaken = task.total_hours_worked || "00:00:00";  // Ensure default format as "HH:MM:SS"
+      
+      // Calculate remaining hours and ensure consistent formatting
+      const remainingHours = calculateRemainingHours(totalEstimatedHours, timeTaken);
+    
+      // Calculate percentage for hours
+      const estimatedInSeconds = convertToSeconds(totalEstimatedHours); 
+      const timeTakenInSeconds = convertToSeconds(timeTaken);
+      const remainingInSeconds = convertToSeconds(remainingHours);
+    
+      return {
+        task_id: task.id || "N/A",
+        name: task.name || "N/A",
+        status: task.status || "N/A",
+        project_id: task.project_id || "N/A",
+        project: task.project_name || "N/A",
+        product_id: task.product_id || "N/A",
+        product: task.product_name || "N/A",
+        owner_id: task.user_id || "N/A",
+        owner: task.owner_name || "N/A",
+        team_id: task.team_id || "N/A",
+        team: task.team_name || "N/A",
+        estimated_hours: totalEstimatedHours,
+        estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
+        time_taken: timeTaken,
+        time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
+        remaining_hours: remainingHours,
+        remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
+        start_date: task.start_date,
+        end_date: task.end_date,
+        priority: task.priority,
+        description: task.description,
+        status_text: statusMap[task.status] || "Unknown",
+      };
+    });
 
     // Prepare subtasks data
     const subtasksData =
@@ -1547,3 +1558,8 @@ function calculateRemainingHours(estimated, worked) {
   const remainingSeconds = Math.max(0, estimatedSeconds - workedSeconds);
   return convertSecondsToHHMMSS(remainingSeconds);
 }
+
+const calculatePercentage = (value, total) => {
+  if (!total || total === 0) return "0%";
+  return ((value / total) * 100).toFixed(2) + "%";
+};
