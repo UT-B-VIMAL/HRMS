@@ -1,5 +1,5 @@
 const db = require('../../config/db');
-const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const { successResponse, errorResponse,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage } = require('../../helpers/responseHelper');
 
 // Insert Task
 exports.createSubTask = async (payload, res) => {
@@ -103,38 +103,46 @@ exports.getSubTask = async (id, res) => {
       3: "Done",
     };
 
-        // Time calculations
-        const timeTaken = isNaN(parseFloat(subtask.total_hours_worked))
-        ? 0
-        : parseFloat(subtask.total_hours_worked);
-      const estimatedHours = isNaN(parseFloat(subtask.estimated_hours))
-        ? 0
-        : parseFloat(subtask.estimated_hours);
-      const remainingHours =
-        estimatedHours > 0 ? Math.max(0, estimatedHours - timeTaken) : 0;
-
-    // // Prepare subtask data
-    const subtaskData = subtask.map((subtask) => ({
-      subtask_id: subtask.id || "N/A",
-      name: subtask.name || "N/A",
-      status: subtask.status || "N/A",
-      project: subtask.project_name || "N/A",
-      product: subtask.product_name || "N/A",
-      owner: subtask.owner_name || "N/A",
-      team: subtask.team_name || "N/A",
-      estimated_hours: estimatedHours,
-      time_taken: timeTaken,
-      assigned_to: subtask.assignee_name || "N/A",
-      remaining_hours: remainingHours
-        ? new Date(remainingHours * 3600 * 1000).toISOString().substr(11, 8)
-        : "N/A",
-      start_date: subtask.start_date,
-      end_date: subtask.end_date,
-      priority: subtask.priority,
-      description: subtask.description,
-      status_text: statusMap[subtask.status] || "Unknown",
-    }));
-    console.log( histories);
+    const subtaskData = subtask.map((subtask) => {
+      const totalEstimatedHours = subtask.estimated_hours || "00:00:00"; // Default format as "HH:MM:SS"
+      const timeTaken = subtask.total_hours_worked || "00:00:00"; // Default format as "HH:MM:SS"
+    
+      // Calculate remaining hours and ensure consistent formatting
+      const remainingHours = calculateRemainingHours(totalEstimatedHours, timeTaken);
+    
+      // Calculate percentages for hours
+      const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
+      const timeTakenInSeconds = convertToSeconds(timeTaken);
+      const remainingInSeconds = convertToSeconds(remainingHours);
+    
+      return {
+        subtask_id: subtask.id || "N/A",
+        name: subtask.name || "N/A",
+        status: subtask.status || "N/A",
+        project_id: subtask.project_id || "N/A",
+        project: subtask.project_name || "N/A",
+        product_id: subtask.product_id || "N/A",
+        product: subtask.product_name || "N/A",
+        owner_id: subtask.user_id || "N/A",
+        owner: subtask.owner_name || "N/A",
+        team_id: subtask.team_id || "N/A",
+        team: subtask.team_name || "N/A",
+        assignee_id: subtask.assigned_user_id || "N/A",
+        assignee: subtask.assignee_name || "N/A",
+        estimated_hours: totalEstimatedHours,
+        estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
+        time_taken: timeTaken,
+        time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
+        remaining_hours: remainingHours,
+        remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
+        start_date: subtask.start_date || "N/A",
+        end_date: subtask.end_date || "N/A",
+        priority: subtask.priority || "N/A",
+        description: subtask.description || "N/A",
+        status_text: statusMap[subtask.status] || "Unknown",
+      };
+    });
+    
 
     // Prepare histories data
     const validHistories = Array.isArray(histories) && Array.isArray(histories[0]) ? histories[0] : [];
