@@ -1,9 +1,7 @@
 const db = require("../../config/db");
 const mysql = require("mysql2");
 const {
-  successResponse,
-  errorResponse,
-  getPagination,
+  successResponse, errorResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage
 } = require("../../helpers/responseHelper");
 const { getAuthUserDetails } = require("../../api/functions/commonFunction");
 const moment = require("moment");
@@ -1534,34 +1532,34 @@ exports.updateTaskTimeLine = async (req, res) => {
   }
 };
 
-function calculateNewWorkedTime(worked, timeDifference) {
-  const workedInSeconds = convertToSeconds(worked);
-  const newTotalWorkedInSeconds = workedInSeconds + timeDifference;
-  return convertSecondsToHHMMSS(newTotalWorkedInSeconds);
-}
+// function calculateNewWorkedTime(worked, timeDifference) {
+//   const workedInSeconds = convertToSeconds(worked);
+//   const newTotalWorkedInSeconds = workedInSeconds + timeDifference;
+//   return convertSecondsToHHMMSS(newTotalWorkedInSeconds);
+// }
 
-function convertSecondsToHHMMSS(totalSeconds) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds]
-    .map((num) => String(num).padStart(2, "0"))
-    .join(":");
-}
+// function convertSecondsToHHMMSS(totalSeconds) {
+//   const hours = Math.floor(totalSeconds / 3600);
+//   const minutes = Math.floor((totalSeconds % 3600) / 60);
+//   const seconds = totalSeconds % 60;
+//   return [hours, minutes, seconds]
+//     .map((num) => String(num).padStart(2, "0"))
+//     .join(":");
+// }
 
-const convertToSeconds = (timeString) => {
-  const [hours, minutes, seconds] = timeString.split(":").map(Number);
-  return hours * 3600 + minutes * 60 + seconds;
-};
+// const convertToSeconds = (timeString) => {
+//   const [hours, minutes, seconds] = timeString.split(":").map(Number);
+//   return hours * 3600 + minutes * 60 + seconds;
+// };
 
-function calculateRemainingHours(estimated, worked) {
-  const estimatedSeconds = convertToSeconds(estimated);
-  const workedSeconds = convertToSeconds(worked);
-  const remainingSeconds = Math.max(0, estimatedSeconds - workedSeconds);
-  return convertSecondsToHHMMSS(remainingSeconds);
-}
+// function calculateRemainingHours(estimated, worked) {
+//   const estimatedSeconds = convertToSeconds(estimated);
+//   const workedSeconds = convertToSeconds(worked);
+//   const remainingSeconds = Math.max(0, estimatedSeconds - workedSeconds);
+//   return convertSecondsToHHMMSS(remainingSeconds);
+// }
 
-const calculatePercentage = (value, total) => {
-  if (!total || total === 0) return "0%";
-  return ((value / total) * 100).toFixed(2) + "%";
-};
+// const calculatePercentage = (value, total) => {
+//   if (!total || total === 0) return "0%";
+//   return ((value / total) * 100).toFixed(2) + "%";
+// };

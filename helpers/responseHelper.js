@@ -52,4 +52,36 @@ const getPagination = (page, perPage, totalRecords) => {
   };
 };
 
-module.exports = { successResponse, errorResponse, getResponse,getPagination };
+function calculateNewWorkedTime(worked, timeDifference) {
+  const workedInSeconds = convertToSeconds(worked);
+  const newTotalWorkedInSeconds = workedInSeconds + timeDifference;
+  return convertSecondsToHHMMSS(newTotalWorkedInSeconds);
+};
+
+function convertSecondsToHHMMSS(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((num) => String(num).padStart(2, "0"))
+    .join(":");
+};
+
+const convertToSeconds = (timeString) => {
+  const [hours, minutes, seconds] = timeString.split(":").map(Number);
+  return hours * 3600 + minutes * 60 + seconds;
+};
+
+function calculateRemainingHours(estimated, worked) {
+  const estimatedSeconds = convertToSeconds(estimated);
+  const workedSeconds = convertToSeconds(worked);
+  const remainingSeconds = Math.max(0, estimatedSeconds - workedSeconds);
+  return convertSecondsToHHMMSS(remainingSeconds);
+};
+
+const calculatePercentage = (value, total) => {
+  if (!total || total === 0) return "0%";
+  return ((value / total) * 100).toFixed(2) + "%";
+};
+
+module.exports = { successResponse, errorResponse, getResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage };
