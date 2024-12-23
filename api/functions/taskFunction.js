@@ -281,6 +281,8 @@ exports.getTask = async (id, res) => {
         owner: task.owner_name || "N/A",
         team_id: task.team_id || "N/A",
         team: task.team_name || "N/A",
+        assignee_id: task.assigned_user_id || "N/A",
+        assignee: task.assignee_name || "N/A",
         estimated_hours: totalEstimatedHours,
         estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
         time_taken: timeTaken,
