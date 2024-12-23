@@ -316,8 +316,8 @@ exports.getTask = async (id, res) => {
             old_data: history.old_data,
             new_data: history.new_data,
             description: history.status_description || "N/A",
-            updated_by: updatedBy,
-            shortName: updatedBy.substr(0, 2),
+            updated_by: history.updated_by,
+            shortName:history.updated_by.substr(0, 2),
             time: history.created_at,
           }))
         : [];
