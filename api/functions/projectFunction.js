@@ -397,10 +397,10 @@ exports.projectStatus = async (req, res) => {
       status,
       search,
       page = 1,
-      per_page = 10,
+      perPage = 10,
     } = req.query;
 
-    const offset = (page - 1) * per_page;
+    const offset = (page - 1) * perPage;
 
     const taskConditions = [];
     const taskValues = [];
@@ -584,12 +584,11 @@ exports.projectStatus = async (req, res) => {
 
     // Pagination logic
     const totalRecords = results.length;
-    const paginatedData = results.slice(offset, offset + per_page);
-    const pagination = getPagination(page, per_page, totalRecords);
+    const pagination = getPagination(page, perPage, totalRecords);
 
     // Add serial numbers to the paginated data
-    const data = paginatedData.map((row, index) => ({
-      s_no: offset + index + 1,
+    const data = results.map((row, index) => ({
+      s_no: (page - 1) * perPage + index + 1,
       ...row,
     }));
 
