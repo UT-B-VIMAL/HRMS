@@ -401,7 +401,16 @@ exports.projectStatus = async (req, res) => {
     } = req.query;
 
     const offset = (page - 1) * perPage;
+    const loggedInUserQuery = 'SELECT * FROM users WHERE id = ?';
+    
+    const [loggedInUserData] = await db.query(loggedInUserQuery, [ req.query.user_id]);  // Assuming user ID is in `req.user.id`
 
+    if (!loggedInUserData || loggedInUserData.length === 0) {
+      return errorResponse(res, "User not found", "No user data available", 404);
+    }
+
+    const loggedInUserRoleId = loggedInUserData[0].role_id;
+    const loggedInUserTeamId = loggedInUserData[0].team_id;
     const taskConditions = [];
     const taskValues = [];
 
@@ -409,6 +418,14 @@ exports.projectStatus = async (req, res) => {
     const subtaskValues = [];
 
     // Task-specific filters
+    if (loggedInUserRoleId === 3) {
+      taskConditions.push("u.team_id = ?");
+      taskValues.push(loggedInUserTeamId);
+
+      subtaskConditions.push("u.team_id = ?");
+      subtaskValues.push(loggedInUserTeamId);
+    }
+
     if (product_id) {
       taskConditions.push("t.product_id = ?");
       taskValues.push(product_id);
@@ -523,6 +540,7 @@ exports.projectStatus = async (req, res) => {
         p.name AS product_name,
         pr.id AS project_id,
         pr.name AS project_name,
+        tm.name AS team_name,
         u.id AS user_id,
         t.status AS task_status,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
@@ -532,6 +550,7 @@ exports.projectStatus = async (req, res) => {
         users u ON u.id = t.user_id
       LEFT JOIN products p ON p.id = t.product_id
       LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN teams tm ON tm.id = u.team_id
       WHERE t.deleted_at IS NULL
       AND t.id NOT IN (SELECT task_id FROM sub_tasks)
         ${taskWhereClause}
@@ -559,6 +578,7 @@ exports.projectStatus = async (req, res) => {
         estimated_time: subtask.estimated_time,
         time_taken: subtask.time_taken,
         rating: subtask.subtask_rating,
+        team_name:subtask.team_name,
       };
     });
 
@@ -576,6 +596,8 @@ exports.projectStatus = async (req, res) => {
         estimated_time: task.estimated_time,
         task_duration: task.task_duration,
         rating: task.rating,
+        team_name:task.team_name,
+
       };
     });
 
