@@ -417,10 +417,10 @@ exports.projectStatus = async (req, res) => {
       taskConditions.push("t.project_id = ?");
       taskValues.push(project_id);
     }
-    if (user_id) {
-      taskConditions.push("t.user_id = ?");
-      taskValues.push(user_id);
-    }
+    // if (user_id) {
+    //   taskConditions.push("t.user_id = ?");
+    //   taskValues.push(user_id);
+    // }
 
     if (date) {
       taskConditions.push("t.created_at = ?");
@@ -449,10 +449,10 @@ exports.projectStatus = async (req, res) => {
       subtaskConditions.push("st.project_id = ?");
       subtaskValues.push(project_id);
     }
-    if (user_id) {
-      subtaskConditions.push("st.user_id = ?");
-      subtaskValues.push(user_id);
-    }
+    // if (user_id) {
+    //   subtaskConditions.push("st.user_id = ?");
+    //   subtaskValues.push(user_id);
+    // }
     if (date) {
       subtaskConditions.push("st.created_at = ?");
       subtaskValues.push(date);
