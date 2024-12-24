@@ -1,5 +1,6 @@
 const db = require('../../config/db');
 const { successResponse, errorResponse,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage } = require('../../helpers/responseHelper');
+const moment = require("moment");
 
 // Insert Task
 exports.createSubTask = async (payload, res) => {
@@ -151,7 +152,8 @@ exports.getSubTask = async (id, res) => {
       new_data: history.new_data ,
       description: history.status_description || "N/A",
       updated_by: history.updated_by || "Unknown User",
-      time: history.created_at || null,
+      time: moment(history.updated_at).fromNow(),
+      
     }));
 
     // Prepare comments data
@@ -159,7 +161,8 @@ exports.getSubTask = async (id, res) => {
     const commentsData = validComments.map((comment) => ({
       comments: comment.comments || "No Comment",
       updated_by: comment.updated_by || "Unknown User",
-      time: comment.created_at || null,
+      time: moment(history.updated_at).fromNow(),
+     
     }));
 
 
