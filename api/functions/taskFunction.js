@@ -320,7 +320,7 @@ exports.getTask = async (id, res) => {
             updated_by: history.updated_by,
             shortName:history.updated_by.substr(0, 2),
             // time: history.created_at,
-            time: moment(history.created_at).fromNow(),
+            time: moment(history.updated_at).fromNow(),
           }))
         : [];
 
@@ -329,7 +329,7 @@ exports.getTask = async (id, res) => {
         ? comments[0].map((comment) => ({
             comments: comment.comments,
             updated_by: comment.updated_by || "N/A",
-            time: comment.created_at,
+            time: moment(history.updated_at).fromNow(),
           }))
         : [];
 
