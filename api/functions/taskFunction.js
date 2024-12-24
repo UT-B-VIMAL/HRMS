@@ -329,7 +329,7 @@ exports.getTask = async (id, res) => {
         ? comments[0].map((comment) => ({
             comments: comment.comments,
             updated_by: comment.updated_by || "N/A",
-            time: moment(history.updated_at).fromNow(),
+            time: moment(comment.updated_at).fromNow(),
           }))
         : [];
 
