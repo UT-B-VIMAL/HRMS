@@ -159,6 +159,7 @@ exports.getSubTask = async (id, res) => {
     // Prepare comments data
     const validComments = Array.isArray(comments) && Array.isArray(comments[0]) ? comments[0] : [];
     const commentsData = validComments.map((comment) => ({
+      comments_id: comment.id || "No Comment",
       comments: comment.comments || "No Comment",
       updated_by: comment.updated_by || "Unknown User",
       shortName:comment. updated_by.substr(0, 2),
