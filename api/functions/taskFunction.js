@@ -7,6 +7,7 @@ const { getAuthUserDetails } = require("../../api/functions/commonFunction");
 const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
 
+
 // Insert Task
 exports.createTask = async (payload, res) => {
   const {
@@ -318,7 +319,8 @@ exports.getTask = async (id, res) => {
             description: history.status_description || "N/A",
             updated_by: history.updated_by,
             shortName:history.updated_by.substr(0, 2),
-            time: history.created_at,
+            // time: history.created_at,
+            time: moment(history.created_at).fromNow(),
           }))
         : [];
 
