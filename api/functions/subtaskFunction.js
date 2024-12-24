@@ -28,7 +28,6 @@ exports.createSubTask = async (payload, res) => {
           ) VALUES (?, ?, ?, ?, ?,?, NULL, NOW(), NOW())
       `;
       const values = [product_id, project_id, task_id, name, created_by, created_by];
-console.log(values);
 
       const [result] = await db.query(insertQuery, values);
 
@@ -152,6 +151,7 @@ exports.getSubTask = async (id, res) => {
       new_data: history.new_data ,
       description: history.status_description || "N/A",
       updated_by: history.updated_by || "Unknown User",
+      shortName:history. updated_by.substr(0, 2),
       time: moment(history.updated_at).fromNow(),
       
     }));
@@ -161,6 +161,7 @@ exports.getSubTask = async (id, res) => {
     const commentsData = validComments.map((comment) => ({
       comments: comment.comments || "No Comment",
       updated_by: comment.updated_by || "Unknown User",
+      shortName:comment. updated_by.substr(0, 2),
       time: moment(history.updated_at).fromNow(),
      
     }));
