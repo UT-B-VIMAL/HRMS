@@ -502,6 +502,9 @@ exports.projectStatus = async (req, res) => {
         t.name AS task_name,
         st.name AS subtask_name,
         st.created_at AS date,
+        st.total_hours_worked AS subtask_duration,
+        stut.start_time AS start_time,
+        stut.end_time AS end_time,
         st.estimated_hours AS estimated_time,
         st.total_hours_worked AS time_taken,
         st.rating AS subtask_rating,
@@ -523,6 +526,8 @@ exports.projectStatus = async (req, res) => {
       LEFT JOIN 
         projects pr ON pr.id = t.project_id
       LEFT JOIN 
+          sub_tasks_user_timeline stut ON stut.subtask_id = t.id 
+      LEFT JOIN 
         teams tm ON tm.id = u.team_id
       WHERE 
         st.deleted_at IS NULL
@@ -535,6 +540,8 @@ exports.projectStatus = async (req, res) => {
         t.name AS task_name,
         t.estimated_hours AS estimated_time,
         t.total_hours_worked AS task_duration,
+        stut.start_time AS start_time,
+        stut.end_time AS end_time,
         t.rating AS rating,
         p.id AS product_id,
         p.name AS product_name,
@@ -549,6 +556,8 @@ exports.projectStatus = async (req, res) => {
       LEFT JOIN 
         users u ON u.id = t.user_id
       LEFT JOIN products p ON p.id = t.product_id
+      LEFT JOIN 
+          sub_tasks_user_timeline stut ON stut.task_id = t.id 
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
       WHERE t.deleted_at IS NULL
@@ -579,6 +588,10 @@ exports.projectStatus = async (req, res) => {
         time_taken: subtask.time_taken,
         rating: subtask.subtask_rating,
         team_name:subtask.team_name,
+        start_time:subtask.start_time,
+        end_time:subtask.end_time,
+        subtask_duration: subtask.subtask_duration,
+
       };
     });
 
@@ -597,6 +610,10 @@ exports.projectStatus = async (req, res) => {
         task_duration: task.task_duration,
         rating: task.rating,
         team_name:task.team_name,
+        start_time:task.start_time,
+        end_time:task.end_time,
+        task_duration: task.task_duration,
+
 
       };
     });
@@ -606,13 +623,15 @@ exports.projectStatus = async (req, res) => {
 
     // Pagination logic
     const totalRecords = results.length;
+    const paginatedData =  results.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
     // Add serial numbers to the paginated data
-    const data = results.map((row, index) => ({
-      s_no: (page - 1) * perPage + index + 1,
+    const data = paginatedData.map((row, index) => ({
+      s_no: offset + index + 1,
       ...row,
     }));
+
 
     successResponse(res, { data, pagination }, "Tasks and subtasks retrieved successfully", 200);
   } catch (error) {
