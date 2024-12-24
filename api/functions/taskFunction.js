@@ -327,6 +327,7 @@ exports.getTask = async (id, res) => {
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
+            comment_id: comment.id ,
             comments: comment.comments,
             updated_by: comment.updated_by || "N/A",
             shortName:comment. updated_by.substr(0, 2),
