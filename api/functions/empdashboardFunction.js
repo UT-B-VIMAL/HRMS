@@ -326,113 +326,120 @@ exports.fetchStatistics = async (req, res) => {
 };
 exports.fetchStatisticschart = async (req, res) => {
   try {
-      const userId = req.query.user_id;
-      if (!userId) {
-          return errorResponse(res, null, 'User ID is required', 400);
-      }
+    const userId = req.query.user_id;
+    if (!userId) {
+      return errorResponse(res, null, 'User ID is required', 400);
+    }
 
-      const currentMonth = new Date().getMonth() + 1;
-      const totalDaysInMonth = new Date(new Date().getFullYear(), currentMonth, 0).getDate();
-      const weeksInMonth = Math.ceil(totalDaysInMonth / 7);
+    const currentMonth = new Date().getMonth() + 1;
+    const totalDaysInMonth = new Date(new Date().getFullYear(), currentMonth, 0).getDate();
+    const weeksInMonth = Math.ceil(totalDaysInMonth / 7);
 
-      // Initialize week statistics
-      const weekTaskCounts = Array.from({ length: weeksInMonth }, (_, i) => ({
-          week: `week_${i + 1}`,
-          total_task_count: 0,
-          in_progress_task_count: 0,
-          completed_task_count: 0,
-          todo_task_count: 0,
-          in_progress_percentage: 0,
-          completed_percentage: 0,
-          todo_percentage: 0,
-      }));
+    // Initialize week statistics
+    const weekTaskCounts = Array.from({ length: weeksInMonth }, (_, i) => ({
+      week: `week_${i + 1}`,
+      total_task_count: 0,
+      in_progress_task_count: 0,
+      completed_task_count: 0,
+      todo_task_count: 0,
+      in_progress_percentage: 0,
+      completed_percentage: 0,
+      todo_percentage: 0,
+    }));
 
-      // Fetch all tasks for the user
-      const tasksQuery = `
-          SELECT id, name, status, created_at 
-          FROM tasks 
-          WHERE user_id = ? AND deleted_at IS NULL
+    // Fetch all tasks for the user
+    const tasksQuery = `
+      SELECT id, name, status, created_at 
+      FROM tasks 
+      WHERE user_id = ? AND deleted_at IS NULL
+    `;
+    const [tasks] = await db.query(tasksQuery, [userId]);
+
+    for (const task of tasks) {
+      // Fetch subtasks for the task
+      const subtasksQuery = `
+        SELECT id, status, created_at 
+        FROM sub_tasks 
+        WHERE task_id = ? AND user_id = ? AND deleted_at IS NULL
       `;
-      const [tasks] = await db.query(tasksQuery, [userId]);
+      const [subtasks] = await db.query(subtasksQuery, [task.id, userId]);
 
-      for (const task of tasks) {
-          // Fetch subtasks for the task
-          const subtasksQuery = `
-              SELECT id, status, created_at 
-              FROM sub_tasks 
-              WHERE task_id = ? AND user_id = ? AND deleted_at IS NULL
-          `;
-          const [subtasks] = await db.query(subtasksQuery, [task.id, userId]);
+      // Determine the week of the month based on created_at date
+      const taskWeek = Math.ceil(new Date(task.created_at).getDate() / 7);
 
-          // Determine the week of the month based on created_at date
-          const taskWeek = Math.ceil(new Date(task.created_at).getDate() / 7);
-
-          if (taskWeek < 1 || taskWeek > weeksInMonth) {
-              console.warn(`Task with ID ${task.id} has an invalid week: ${taskWeek}`);
-              continue; // Skip invalid week data
-          }
-
-          const weekData = weekTaskCounts[taskWeek - 1];
-
-          if (subtasks.length === 0) {
-              // No subtasks, count the task itself if it falls in the current month
-              const isTaskInCurrentMonth = new Date(task.created_at).getMonth() + 1 === currentMonth;
-
-              if (isTaskInCurrentMonth) {
-                  weekData.total_task_count++;
-
-                  if (task.status === 1) {
-                      weekData.in_progress_task_count++;
-                  } else if (task.status === 3) {
-                      weekData.completed_task_count++;
-                  } else if (task.status === 0) {
-                      weekData.todo_task_count++;
-                  }
-              }
-          } else {
-              // Subtasks exist, count only subtasks in the current month
-              const subtasksInCurrentMonth = subtasks.filter(subtask => new Date(subtask.created_at).getMonth() + 1 === currentMonth);
-
-              subtasksInCurrentMonth.forEach(subtask => {
-                  const subtaskWeek = Math.ceil(new Date(subtask.created_at).getDate() / 7);
-
-                  if (subtaskWeek < 1 || subtaskWeek > weeksInMonth) {
-                      console.warn(`Subtask with ID ${subtask.id} has an invalid week: ${subtaskWeek}`);
-                      return; // Skip invalid week data
-                  }
-
-                  const subtaskWeekData = weekTaskCounts[subtaskWeek - 1];
-                  subtaskWeekData.total_task_count++;
-
-                  if (subtask.status === 1) {
-                      subtaskWeekData.in_progress_task_count++;
-                  } else if (subtask.status === 3) {
-                      subtaskWeekData.completed_task_count++;
-                  } else if (subtask.status === 0) {
-                      subtaskWeekData.todo_task_count++;
-                  }
-              });
-          }
-
-          // Calculate percentages for the current week
-          if (weekData.total_task_count > 0) {
-              weekData.in_progress_percentage = (weekData.in_progress_task_count / weekData.total_task_count) * 100;
-              weekData.completed_percentage = (weekData.completed_task_count / weekData.total_task_count) * 100;
-              weekData.todo_percentage = (weekData.todo_task_count / weekData.total_task_count) * 100;
-          }
+      if (taskWeek < 1 || taskWeek > weeksInMonth) {
+        console.warn(`Task with ID ${task.id} has an invalid week: ${taskWeek}`);
+        continue; // Skip invalid week data
       }
 
-      return successResponse(
-          res,
-          weekTaskCounts,
-          "Weekly task statistics retrieved successfully",
-          200
-      );
+      const weekData = weekTaskCounts[taskWeek - 1];
+
+      if (subtasks.length === 0) {
+        // No subtasks, count the task itself if it falls in the current month
+        const isTaskInCurrentMonth = new Date(task.created_at).getMonth() + 1 === currentMonth;
+
+        if (isTaskInCurrentMonth) {
+          weekData.total_task_count++;
+
+          if (task.status === 1) {
+            weekData.in_progress_task_count++;
+          } else if (task.status === 3) {
+            weekData.completed_task_count++;
+          } else if (task.status === 0) {
+            weekData.todo_task_count++;
+          }
+        }
+      } else {
+        // Subtasks exist, count only subtasks in the current month
+        const subtasksInCurrentMonth = subtasks.filter(
+          subtask => new Date(subtask.created_at).getMonth() + 1 === currentMonth
+        );
+
+        subtasksInCurrentMonth.forEach(subtask => {
+          const subtaskWeek = Math.ceil(new Date(subtask.created_at).getDate() / 7);
+
+          if (subtaskWeek < 1 || subtaskWeek > weeksInMonth) {
+            console.warn(`Subtask with ID ${subtask.id} has an invalid week: ${subtaskWeek}`);
+            return; // Skip invalid week data
+          }
+
+          const subtaskWeekData = weekTaskCounts[subtaskWeek - 1];
+          subtaskWeekData.total_task_count++;
+
+          if (subtask.status === 1) {
+            subtaskWeekData.in_progress_task_count++;
+          } else if (subtask.status === 3) {
+            subtaskWeekData.completed_task_count++;
+          } else if (subtask.status === 0) {
+            subtaskWeekData.todo_task_count++;
+          }
+        });
+      }
+    }
+
+    // Recalculate percentages for each week
+    weekTaskCounts.forEach(weekData => {
+      if (weekData.total_task_count > 0) {
+        weekData.in_progress_percentage = (weekData.in_progress_task_count / weekData.total_task_count) * 100;
+        weekData.completed_percentage = (weekData.completed_task_count / weekData.total_task_count) * 100;
+        weekData.todo_percentage = (weekData.todo_task_count / weekData.total_task_count) * 100;
+      }
+    });
+
+    console.log(weekTaskCounts);
+
+    return successResponse(
+      res,
+      weekTaskCounts,
+      'Weekly task statistics retrieved successfully',
+      200
+    );
   } catch (error) {
-      console.error("Error fetching statistics:", error);
-      return errorResponse(res, error.message, "Error fetching statistics", 500);
+    console.error('Error fetching statistics:', error);
+    return errorResponse(res, error.message, 'Error fetching statistics', 500);
   }
 };
+
 exports.fetchRatings = async (req, res) => {
   try {
       const userId = req.query.user_id; 
