@@ -267,11 +267,13 @@ exports.getTask = async (id, res) => {
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours); 
       const timeTakenInSeconds = convertToSeconds(timeTaken);
       const remainingInSeconds = convertToSeconds(remainingHours);
+      console.log(task.status);
+      
     
       return {
         task_id: task.id || "N/A",
         name: task.name || "N/A",
-        status: task.status || "N/A",
+        status: task.status,
         project_id: task.project_id || "N/A",
         project: task.project_name || "N/A",
         product_id: task.product_id || "N/A",
@@ -298,18 +300,18 @@ exports.getTask = async (id, res) => {
 
     // Prepare subtasks data
     const subtasksData =
-      Array.isArray(subtasks) && subtasks[0].length > 0
-        ? subtasks[0].map((subtask) => ({
-            subtask_id: subtask.id,
-            name: subtask.name || "",
-            status: subtask.status,
-            assignee: subtask.user_id,
-            assigneename: subtask.assignee_name || "N/A",
-            reopen_status: subtask.reopen_status,
-            short_name: (subtask.assignee_name || "N/A").substr(0, 2),
-            status_text: statusMap[subtask.status] || "Unknown",
-          }))
-        : [];
+  Array.isArray(subtasks) && subtasks[0].length > 0
+    ? subtasks[0].map((subtask) => ({
+        subtask_id: subtask.id,
+        name: subtask.name || "",
+        status: subtask.status,
+        assignee: subtask.user_id,
+        assigneename: subtask.assignee_name || "N/A",
+        reopen_status: subtask.reopen_status,
+        short_name: (subtask.assignee_name || "N/A").substr(0, 2),
+        status_text: statusMap[subtask.status] || "Unknown", // Using statusMap for status text
+      }))
+    : [];
 
     const historiesData =
       Array.isArray(histories) && histories[0].length > 0
