@@ -1019,7 +1019,7 @@ exports.getTaskList = async (queryParams, res) => {
         tasks.user_id = ? OR 
         EXISTS (
           SELECT 1 FROM sub_tasks 
-          WHERE sub_tasks.task_id = tasks.id AND sub_tasks.user_id = ?
+          WHERE sub_tasks.task_id = tasks.id AND sub_tasks.user_id = ? AND sub_tasks.deleted_at IS NULL
         )
       )`;
       params.push(user_id, user_id);
@@ -1057,7 +1057,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     if (search) {
       const searchTerm = `%${search}%`;
-      baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ?) OR projects.name LIKE ? OR products.name LIKE ? OR users.first_name LIKE ? OR users.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
+      baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ? AND sub_tasks.deleted_at IS NULL) OR projects.name LIKE ? OR products.name LIKE ? OR users.first_name LIKE ? OR users.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
       params.push(
         searchTerm,
         searchTerm,
@@ -1091,7 +1091,7 @@ exports.getTaskList = async (queryParams, res) => {
           reopen_status, 
           active_status 
         FROM sub_tasks
-        WHERE task_id IN (?)`,
+        WHERE task_id IN (?) AND sub_tasks.deleted_at IS NULL`,
         [taskIds]
       );
     }
