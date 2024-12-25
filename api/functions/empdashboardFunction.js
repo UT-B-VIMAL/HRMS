@@ -426,8 +426,6 @@ exports.fetchStatisticschart = async (req, res) => {
       }
     });
 
-    console.log(weekTaskCounts);
-
     return successResponse(
       res,
       weekTaskCounts,
