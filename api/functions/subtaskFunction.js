@@ -114,7 +114,6 @@ exports.getSubTask = async (id, res) => {
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
       const timeTakenInSeconds = convertToSeconds(timeTaken);
       const remainingInSeconds = convertToSeconds(remainingHours);
-    console.log(subtask.assignee_name);
     
       return {
         subtask_id: subtask.id || "N/A",
@@ -165,8 +164,7 @@ exports.getSubTask = async (id, res) => {
       comments: comment.comments || "No Comment",
       updated_by: comment.updated_by || "Unknown User",
       shortName:comment. updated_by.substr(0, 2),
-      time: moment(history.updated_at).fromNow(),
-     
+      time: moment(comment.updated_at).fromNow(),
     }));
 
 
