@@ -114,6 +114,7 @@ exports.getSubTask = async (id, res) => {
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
       const timeTakenInSeconds = convertToSeconds(timeTaken);
       const remainingInSeconds = convertToSeconds(remainingHours);
+    console.log(subtask.assignee_name);
     
       return {
         subtask_id: subtask.id || "N/A",
@@ -124,11 +125,11 @@ exports.getSubTask = async (id, res) => {
         product_id: subtask.product_id || "N/A",
         product: subtask.product_name || "N/A",
         owner_id: subtask.user_id || "N/A",
-        owner: subtask.owner_name || "N/A",
+        owner: subtask.owner_name?.trim() ? subtask.owner_name : "N/A",
         team_id: subtask.team_id || "N/A",
         team: subtask.team_name || "N/A",
         assignee_id: subtask.assigned_user_id || "N/A",
-        assignee: subtask.assignee_name || "N/A",
+        assignee: subtask.assignee_name?.trim() ? subtask.assignee_name : "N/A",
         estimated_hours: totalEstimatedHours,
         estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
         time_taken: timeTaken,
