@@ -305,6 +305,7 @@ exports.getTask = async (id, res) => {
         subtask_id: subtask.id,
         name: subtask.name || "",
         status: subtask.status,
+        active_status: subtask.active_status,
         assignee: subtask.user_id,
         assigneename: subtask.assignee_name || "N/A",
         reopen_status: subtask.reopen_status,
