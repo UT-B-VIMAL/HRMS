@@ -118,6 +118,7 @@ exports.getSubTask = async (id, res) => {
     
       return {
         subtask_id: subtask.id || "N/A",
+        task_id: subtask.task_id || "N/A",
         name: subtask.name || "N/A",
         status: subtask.status || "N/A",
         project_id: subtask.project_id || "N/A",
