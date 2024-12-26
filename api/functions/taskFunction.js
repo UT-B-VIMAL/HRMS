@@ -274,6 +274,8 @@ exports.getTask = async (id, res) => {
         task_id: task.id || "N/A",
         name: task.name || "N/A",
         status: task.status,
+        active_status: task.active_status,
+        reopen_status: task.reopen_status,
         project_id: task.project_id || "N/A",
         project: task.project_name || "N/A",
         product_id: task.product_id || "N/A",
