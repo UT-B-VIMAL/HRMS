@@ -275,6 +275,8 @@ exports.deleteSubTask = async (id, res) => {
 exports.updatesubTaskData = async (id, payload, res) => {
   const {
     status,
+    reopen_status,
+    active_status,
     assigned_user_id,
     team_id,
     owner_id,
