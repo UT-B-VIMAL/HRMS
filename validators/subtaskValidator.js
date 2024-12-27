@@ -43,10 +43,6 @@ updateSubTaskSchema : Joi.object({
     'string.empty': 'Task name is required',
     'string.min': 'Task name must be at least 3 characters long',
   }),
-  estimated_hours: Joi.number().integer().optional().messages({
-    'number.base': 'Estimated hours must be a number',
-    'number.integer': 'Estimated hours must be an integer',
-  }),
   start_date: Joi.date().optional().messages({
     'date.base': 'Start date must be a valid date',
   }),
@@ -55,6 +51,23 @@ updateSubTaskSchema : Joi.object({
     'date.greater': 'End date must be greater than the start date',
   }),
 }).unknown(true),
+// updateSubTaskSchema : Joi.object({
+//   name: Joi.string().min(3).optional().messages({
+//     'string.empty': 'Task name is required',
+//     'string.min': 'Task name must be at least 3 characters long',
+//   }),
+//   estimated_hours: Joi.number().integer().optional().messages({
+//     'number.base': 'Estimated hours must be a number',
+//     'number.integer': 'Estimated hours must be an integer',
+//   }),
+//   start_date: Joi.date().optional().messages({
+//     'date.base': 'Start date must be a valid date',
+//   }),
+//   end_date: Joi.date().greater(Joi.ref('start_date')).optional().messages({
+//     'date.base': 'End date must be a valid date',
+//     'date.greater': 'End date must be greater than the start date',
+//   }),
+// }).unknown(true),
 
 updatesubTaskDataSchema: Joi.object({
 }).unknown(true),

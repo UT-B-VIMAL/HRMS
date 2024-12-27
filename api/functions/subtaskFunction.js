@@ -114,10 +114,10 @@ exports.getSubTask = async (id, res) => {
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
       const timeTakenInSeconds = convertToSeconds(timeTaken);
       const remainingInSeconds = convertToSeconds(remainingHours);
-    console.log(subtask.assignee_name);
     
       return {
         subtask_id: subtask.id || "N/A",
+        task_id: subtask.task_id || "N/A",
         name: subtask.name || "N/A",
         status: subtask.status || "N/A",
         project_id: subtask.project_id || "N/A",
@@ -164,8 +164,7 @@ exports.getSubTask = async (id, res) => {
       comments: comment.comments || "No Comment",
       updated_by: comment.updated_by || "Unknown User",
       shortName:comment. updated_by.substr(0, 2),
-      time: moment(history.updated_at).fromNow(),
-     
+      time: moment(comment.updated_at).fromNow(),
     }));
 
 
@@ -302,17 +301,13 @@ exports.updatesubTaskData = async (id, payload, res) => {
     updated_by: 12,
   };
 
-  console.log([id]);
-
   // Define the field mapping for database column names
   const fieldMapping = {
     owner_id: 'user_id',
-    due_date:'end_date',
-
+    due_date: 'end_date',
   };
 
   try {
-
     if (assigned_user_id) {
       const [assigned_user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
       if (assigned_user.length === 0) {
@@ -333,14 +328,33 @@ exports.updatesubTaskData = async (id, payload, res) => {
         return errorResponse(res, null, 'Team not found or has been deleted', 404);
       }
     }
+
     const [tasks] = await db.query(
       'SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL',
       [id]
     );
-    const currentTask = tasks[0]; 
+    const currentTask = tasks[0];
 
     if (!currentTask) {
       return errorResponse(res, null, 'SubTask not found or has been deleted', 404);
+    }
+
+    // Handle estimated_hours format conversion
+    if (estimated_hours) {
+      // Strict regex to match only "12h 30m", "12h", or "30m"
+      const timeMatch = estimated_hours.match(/^((\d+)h\s*)?((\d+)m)?$/);
+      if (!timeMatch) {
+        return errorResponse(res, null, 'Invalid format for estimated_hours. Use formats like "12h 30m", "12h", or "30m".', 400);
+      }
+
+      const hours = parseInt(timeMatch[2] || '0', 10); // Extract hours
+      const minutes = parseInt(timeMatch[4] || '0', 10); // Extract minutes
+
+      if (hours < 0 || minutes < 0 || minutes >= 60) {
+        return errorResponse(res, null, 'Invalid time values in estimated_hours', 400);
+      }
+
+      payload.estimated_hours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
     }
 
     const updateFields = [];
@@ -348,7 +362,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
 
     for (const key in payload) {
       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
-        const fieldName = fieldMapping[key] || key; 
+        const fieldName = fieldMapping[key] || key;
         updateFields.push(`${fieldName} = ?`);
         updateValues.push(payload[key]);
       }
@@ -372,20 +386,19 @@ exports.updatesubTaskData = async (id, payload, res) => {
         const flag = statusFlagMapping[key] || null;
         taskHistoryEntries.push([
           currentTask[key],
-          payload[key], 
+          payload[key],
           currentTask.task_id,
-          id, 
-          `Changed ${key}`, 
-          updated_by, 
-          flag, 
-          new Date(), 
-          new Date(), 
-          null, 
+          id,
+          `Changed ${key}`,
+          updated_by,
+          flag,
+          new Date(),
+          new Date(),
+          null,
         ]);
       }
     }
 
-    // Insert task history entries into the task_histories table
     if (taskHistoryEntries.length > 0) {
       const historyQuery = `
         INSERT INTO task_histories (
@@ -401,5 +414,6 @@ exports.updatesubTaskData = async (id, payload, res) => {
     return errorResponse(res, error.message, 'Error updating task', 500);
   }
 };
+
 
 
