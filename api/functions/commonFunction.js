@@ -10,7 +10,7 @@ exports.getAllData = async (payload, res) => {
     if (type === "teams") {
         query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
     } else if (type === "users") {
-        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL";
+        query = "SELECT id, first_name AS name,employee_id FROM users WHERE deleted_at IS NULL";
     } else if (type === "products") {
         query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
     } else if (type === "projects") {
@@ -22,9 +22,9 @@ exports.getAllData = async (payload, res) => {
     } else if (type === "roles") {
         query = "SELECT id, name FROM roles";
     } else if (type === "owners") {
-        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL AND role_id != 4";
+        query = "SELECT id, first_name AS name,employee_id FROM users WHERE deleted_at IS NULL AND role_id != 4";
     } else if (type === "assignee") {
-        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL";
+        query = "SELECT id, first_name AS name,employee_id FROM users WHERE deleted_at IS NULL";
     } else {
         return res.status(400).json({
             message: "Invalid type provided",
