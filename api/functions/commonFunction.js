@@ -10,7 +10,7 @@ exports.getAllData = async (payload, res) => {
     if (type === "teams") {
         query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
     } else if (type === "users") {
-        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL";
+        query = "SELECT id, first_name AS name,employee_id,last_name FROM users WHERE deleted_at IS NULL";
     } else if (type === "products") {
         query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
     } else if (type === "projects") {
@@ -22,13 +22,11 @@ exports.getAllData = async (payload, res) => {
     } else if (type === "roles") {
         query = "SELECT id, name FROM roles";
     } else if (type === "owners") {
-        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL AND role_id != 4";
+        query = "SELECT id, first_name AS name,employee_id,last_name FROM users WHERE deleted_at IS NULL AND role_id != 4";
     } else if (type === "assignee") {
-        query = "SELECT id, first_name AS name FROM users WHERE deleted_at IS NULL";
+        query = "SELECT id, first_name AS name,employee_id,last_name FROM users WHERE deleted_at IS NULL";
     } else {
-        return res.status(400).json({
-            message: "Invalid type provided",
-        });
+        return errorResponse(res, "Invalid type provided", "Invalid type provided", 500);
     }
 
     // Append additional conditions based on `id`
@@ -56,6 +54,18 @@ exports.getAllData = async (payload, res) => {
 
     try {
         const [rows] = await db.query(query, queryParams);
+
+        if (type === "users" || type === "owners" || type === "assignee") {
+            rows.forEach(user => {
+                if (user.last_name) {
+                    const firstNameInitial = user.name ? user.name.charAt(0).toUpperCase() : '';
+                    const lastNameInitial = user.last_name.charAt(0).toUpperCase();
+                    user.profileName = `${firstNameInitial}${lastNameInitial}`;
+                } else if (user.name) {
+                   user.profileName = user.name.substring(0, 2).toUpperCase();
+                }
+            });
+        }
 
         return successResponse(
             res,
