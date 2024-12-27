@@ -830,15 +830,43 @@ exports.getRequestupdate = async (req, res) => {
       return errorResponse(res, null, "ID is required", 400);
     }
 
-    let rows;
+    let result;
 
     // Handle task or subtask based on type
     if (type === "task") {
-      const query = "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL";
-      [rows] = await db.query(query, [id]);
+      const query = `
+        SELECT 
+          t.*,
+          CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+          p.name AS product_name,
+          pr.name AS project_name
+        FROM tasks t
+        LEFT JOIN users u ON t.user_id = u.id
+        LEFT JOIN products p ON t.product_id = p.id
+        LEFT JOIN projects pr ON t.project_id = pr.id
+        WHERE t.id = ? AND t.deleted_at IS NULL
+      `;
+      const [rows] = await db.query(query, [id]);
+      result = rows[0];
     } else if (type === "subtask") {
-      const query = "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL";
-      [rows] = await db.query(query, [id]);
+      const query = `
+        SELECT 
+          st.*,
+          CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+          p.name AS product_name,
+          pr.name AS project_name,
+          t.name AS task_name,
+          CONCAT(au.first_name, ' ', au.last_name) AS assigned_user_name
+        FROM sub_tasks st
+        LEFT JOIN users u ON st.user_id = u.id
+        LEFT JOIN products p ON st.product_id = p.id
+        LEFT JOIN projects pr ON st.project_id = pr.id
+        LEFT JOIN tasks t ON st.task_id = t.id
+        LEFT JOIN users au ON st.assigned_user_id = au.id
+        WHERE st.id = ? AND st.deleted_at IS NULL
+      `;
+      const [rows] = await db.query(query, [id]);
+      result = rows[0];
     } else {
       return errorResponse(
         res,
@@ -849,7 +877,7 @@ exports.getRequestupdate = async (req, res) => {
     }
 
     // If no rows are found, return an error
-    if (rows.length === 0) {
+    if (!result) {
       return errorResponse(
         res,
         null,
@@ -861,7 +889,7 @@ exports.getRequestupdate = async (req, res) => {
     // Return the result if found
     return successResponse(
       res,
-      rows[0],
+      result,
       `${type.charAt(0).toUpperCase() + type.slice(1)} fetched successfully`,
       200
     );
@@ -870,6 +898,7 @@ exports.getRequestupdate = async (req, res) => {
     return errorResponse(res, null, "Error fetching request update", 500);
   }
 };
+
 
 
 exports.getRequestchange = async (id, payload, res) => {
