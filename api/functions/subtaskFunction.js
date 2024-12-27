@@ -308,11 +308,15 @@ exports.updatesubTaskData = async (id, payload, res) => {
   };
 
   try {
+    // If assigned_user_id is provided, fetch the associated team_id
     if (assigned_user_id) {
-      const [assigned_user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
-      if (assigned_user.length === 0) {
+      const [assignedUser] = await db.query('SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
+      if (assignedUser.length === 0) {
         return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
       }
+
+      // Fetch the team_id from the user record and update the payload
+      payload.team_id = assignedUser[0].team_id;
     }
 
     if (owner_id) {
@@ -384,17 +388,17 @@ exports.updatesubTaskData = async (id, payload, res) => {
     for (const key in payload) {
       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
         const flag = statusFlagMapping[key] || null;
-        taskHistoryEntries.push([
-          currentTask[key],
-          payload[key],
-          currentTask.task_id,
-          id,
-          `Changed ${key}`,
-          updated_by,
-          flag,
-          new Date(),
-          new Date(),
-          null,
+        taskHistoryEntries.push([ 
+          currentTask[key], 
+          payload[key], 
+          currentTask.task_id, 
+          id, 
+          `Changed ${key}`, 
+          updated_by, 
+          flag, 
+          new Date(), 
+          new Date(), 
+          null 
         ]);
       }
     }
@@ -414,6 +418,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
     return errorResponse(res, error.message, 'Error updating task', 500);
   }
 };
+
 
 
 
