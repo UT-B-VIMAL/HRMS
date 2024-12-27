@@ -839,11 +839,14 @@ exports.getRequestupdate = async (req, res) => {
           t.*,
           CONCAT(u.first_name, ' ', u.last_name) AS user_name,
           p.name AS product_name,
-          pr.name AS project_name
+          pr.name AS project_name,
+          t.name AS task_name,
+          CONCAT(au.first_name, ' ', au.last_name) AS assigned_user_name
         FROM tasks t
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN products p ON t.product_id = p.id
         LEFT JOIN projects pr ON t.project_id = pr.id
+        LEFT JOIN users au ON t.assigned_user_id = au.id
         WHERE t.id = ? AND t.deleted_at IS NULL
       `;
       const [rows] = await db.query(query, [id]);
