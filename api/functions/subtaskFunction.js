@@ -274,6 +274,7 @@ exports.deleteSubTask = async (id, res) => {
 exports.updatesubTaskData = async (id, payload, res) => {
   const {
     status,
+    name,
     reopen_status,
     active_status,
     assigned_user_id,
@@ -299,23 +300,20 @@ exports.updatesubTaskData = async (id, payload, res) => {
     team_id: 10,
     priority: 11,
     updated_by: 12,
+    name: 10, // Ensure name is mapped
   };
 
-  // Define the field mapping for database column names
   const fieldMapping = {
     owner_id: 'user_id',
     due_date: 'end_date',
   };
 
   try {
-    // If assigned_user_id is provided, fetch the associated team_id
     if (assigned_user_id) {
       const [assignedUser] = await db.query('SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
       if (assignedUser.length === 0) {
         return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
       }
-
-      // Fetch the team_id from the user record and update the payload
       payload.team_id = assignedUser[0].team_id;
     }
 
@@ -343,16 +341,14 @@ exports.updatesubTaskData = async (id, payload, res) => {
       return errorResponse(res, null, 'SubTask not found or has been deleted', 404);
     }
 
-    // Handle estimated_hours format conversion
     if (estimated_hours) {
-      // Strict regex to match only "12h 30m", "12h", or "30m"
       const timeMatch = estimated_hours.match(/^((\d+)h\s*)?((\d+)m)?$/);
       if (!timeMatch) {
         return errorResponse(res, null, 'Invalid format for estimated_hours. Use formats like "12h 30m", "12h", or "30m".', 400);
       }
 
-      const hours = parseInt(timeMatch[2] || '0', 10); // Extract hours
-      const minutes = parseInt(timeMatch[4] || '0', 10); // Extract minutes
+      const hours = parseInt(timeMatch[2] || '0', 10);
+      const minutes = parseInt(timeMatch[4] || '0', 10);
 
       if (hours < 0 || minutes < 0 || minutes >= 60) {
         return errorResponse(res, null, 'Invalid time values in estimated_hours', 400);
@@ -375,6 +371,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
     if (updateFields.length === 0) {
       return errorResponse(res, null, 'No fields to update', 400);
     }
+
     updateValues.push(id);
 
     const updateQuery = `UPDATE sub_tasks SET ${updateFields.join(', ')} WHERE id = ?`;
@@ -388,17 +385,17 @@ exports.updatesubTaskData = async (id, payload, res) => {
     for (const key in payload) {
       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
         const flag = statusFlagMapping[key] || null;
-        taskHistoryEntries.push([ 
-          currentTask[key], 
-          payload[key], 
-          currentTask.task_id, 
-          id, 
-          `Changed ${key}`, 
-          updated_by, 
-          flag, 
-          new Date(), 
-          new Date(), 
-          null 
+        taskHistoryEntries.push([
+          currentTask[key],
+          payload[key],
+          currentTask.task_id,
+          id,
+          `Changed ${key}`,
+          updated_by,
+          flag,
+          new Date(),
+          new Date(),
+          null
         ]);
       }
     }
@@ -418,6 +415,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
     return errorResponse(res, error.message, 'Error updating task', 500);
   }
 };
+
 
 
 
