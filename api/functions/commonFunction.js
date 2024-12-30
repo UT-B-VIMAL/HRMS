@@ -7,7 +7,7 @@ exports.getAllData = async (payload, res) => {
     let query = "";
     let queryParams = [];
 
-    try {
+    // try {
         // Initialize queries based on type
         if (type === "teams") {
             query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
@@ -112,9 +112,9 @@ exports.getAllData = async (payload, res) => {
                 : `${type.charAt(0).toUpperCase() + type.slice(1)} fetched successfully`,
             200
         );
-    } catch (err) {
-        return errorResponse(res, err.message, "Error fetching Data", 500);
-    }
+    // } catch (err) {
+    //     return errorResponse(res, err.message, "Error fetching Data", 500);
+    // }
 };
 
 exports.getAuthUserDetails = async (authUserId, res) => {
