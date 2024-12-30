@@ -14,7 +14,9 @@ exports.getAllData = async (payload, res) => {
         } else if (type === "users") {
             query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
         } else if (type === "products") {
+            if(user_id){
             const users = await this.getAuthUserDetails(user_id, res);
+            if (!users) return;
             if (users.role_id === 3) {
                 const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
                 const [rows] = await db.query(query1, [user_id]);
@@ -29,11 +31,14 @@ exports.getAllData = async (payload, res) => {
                 const productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
                 queryParams.push(productIds);
+            }
             } else {
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
             }
         } else if (type === "projects") {
+            if(user_id){
             const users = await this.getAuthUserDetails(user_id, res);
+            if (!users) return;
             if (users.role_id === 3) {
                 const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
                 const [rows] = await db.query(query1, [user_id]);
@@ -48,9 +53,10 @@ exports.getAllData = async (payload, res) => {
                 const projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
                 query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
                 queryParams.push(projectIds);
-            } else {
-                query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
             }
+            } else {
+                    query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
+                }
         } else if (type === "tasks") {
             query = "SELECT id, name FROM tasks WHERE deleted_at IS NULL";
         } else if (type === "designations") {
@@ -80,6 +86,7 @@ exports.getAllData = async (payload, res) => {
         }
         if (type === "teams" && id) {
             const users = await this.getAuthUserDetails(id, res);
+            if (!users) return;
             if (users.role_id === 3) {
                 query += " AND reporting_user_id = ?";
                 queryParams.push(id);
