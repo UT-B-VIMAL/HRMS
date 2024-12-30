@@ -31,6 +31,8 @@ exports.getAllData = async (payload, res) => {
                 const productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
                 queryParams.push(productIds);
+            }else {
+                query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
             }
             } else {
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
@@ -53,10 +55,12 @@ exports.getAllData = async (payload, res) => {
                 const projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
                 query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
                 queryParams.push(projectIds);
+            }else {
+                query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
             }
-            } else {
+            }else {
                     query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
-                }
+            }
         } else if (type === "tasks") {
             query = "SELECT id, name FROM tasks WHERE deleted_at IS NULL";
         } else if (type === "designations") {
