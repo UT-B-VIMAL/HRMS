@@ -58,8 +58,8 @@ exports.getSubTask = async (id, res) => {
         pj.name AS project_name 
       FROM sub_tasks st 
       LEFT JOIN teams te ON st.team_id = te.id 
-      LEFT JOIN users owner ON st.user_id = owner.id 
-      LEFT JOIN users assignee ON st.assigned_user_id = assignee.id 
+      LEFT JOIN users assignee ON st.user_id = assignee.id 
+      LEFT JOIN users owner ON st.assigned_user_id = owner.id 
       LEFT JOIN products p ON st.product_id = p.id 
       LEFT JOIN projects pj ON st.project_id = pj.id 
       WHERE st.id = ?
@@ -300,7 +300,6 @@ exports.updatesubTaskData = async (id, payload, res) => {
     team_id: 10,
     priority: 11,
     updated_by: 12,
-    name: 10, 
   };
 
   const fieldMapping = {
