@@ -2,7 +2,7 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 
 exports.getAllData = async (payload, res) => {
-    const { type, id } = payload;
+    const { type, id,user_id} = payload;
 
     let query = "";
     let queryParams = [];
@@ -12,9 +12,55 @@ exports.getAllData = async (payload, res) => {
     } else if (type === "users") {
         query = "SELECT id, first_name AS name,employee_id,last_name FROM users WHERE deleted_at IS NULL";
     } else if (type === "products") {
-        query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
+        const users=  await this.getAuthUserDetails(user_id,res);
+        if(users.role_id === 3) {
+          let  query1 ="SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?"
+          let queryparams1= [user_id];
+        const [rows] = await db.query(query1, queryparams1);
+        const teamIds = rows.map(row => row.id); 
+        const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND team_id IN (?)";
+        const [taskRows] = await db.query(queryTasks, [teamIds]);
+
+        const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND team_id IN (?)";
+        const [subtaskRows] = await db.query(querySubtasks, [teamIds]);
+
+        const productIds = [
+            ...new Set([
+                ...taskRows.map(row => row.product_id),
+                ...subtaskRows.map(row => row.product_id)
+            ])
+        ];
+        query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";  
+        queryParams.push(productIds);
+        }else{
+        query = "SELECT id, name FROM products WHERE deleted_at IS NULL";  
+        }
     } else if (type === "projects") {
-        query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
+        const users=  await this.getAuthUserDetails(user_id,res);
+        if(users.role_id === 3) {
+          let  query1 ="SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?"
+          let queryparams1= [user_id];
+        const [rows] = await db.query(query1, queryparams1);
+        const teamIds = rows.map(row => row.id); // Pluck only the `id` values
+        const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND team_id IN (?)";
+        const [taskRows] = await db.query(queryTasks, [teamIds]);
+
+        const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND team_id IN (?)";
+        const [subtaskRows] = await db.query(querySubtasks, [teamIds]);
+
+        const projectIds = [
+            ...new Set([
+                ...taskRows.map(row => row.project_id),
+                ...subtaskRows.map(row => row.project_id)
+            ])
+        ];
+
+        console.log(projectIds);
+        query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";  
+        queryParams.push(projectIds);
+        }else{
+        query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";  
+        }
     } else if (type === "tasks") {
         query = "SELECT id, name FROM tasks WHERE deleted_at IS NULL";
     } else if (type === "designations") {
