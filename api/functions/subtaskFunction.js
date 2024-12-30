@@ -291,20 +291,19 @@ exports.updatesubTaskData = async (id, payload, res) => {
   // Define the mapping of fields to status_flag values
   const statusFlagMapping = {
     status: 1,
-    owner_id: 2,
+    assigned_user_id: 2,
+    user_id: 9 ,
     estimated_hours: 3,
     due_date: 4,
     start_date: 5,
     description: 6,
-    assigned_user_id: 9,
     team_id: 10,
     priority: 11,
     updated_by: 12,
-    name: 10, // Ensure name is mapped
+    name: 10, 
   };
 
   const fieldMapping = {
-    owner_id: 'user_id',
     due_date: 'end_date',
   };
 

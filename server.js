@@ -24,7 +24,7 @@ const attendanceController = require('./controllers/attendanceController');
 const commonController = require("./controllers/commonController");
 const empdashboardController = require('./controllers/empdashboardController');
 const commentsController = require('./controllers/commentsController');
-
+// const ticketsController =require('./controllers/ticketsController');
 
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
@@ -173,6 +173,12 @@ apiRouter.post('/comments',RoleController.checkRole(['tl','pm','admin','employee
 apiRouter.put('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. updateComments);
 apiRouter.delete('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. deleteComments);
 
+//tickets
+// apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getAlltickets);
+// apiRouter.get('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getTickets);
+// apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. addTickets);
+// apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
+// apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
 
 
 
