@@ -1136,15 +1136,15 @@ AND u.deleted_at IS NULL
     const isValidSubtask = (subtask, status) => {
       switch (status) {
         case "Pending":
-          return subtask.active_status === 1 && subtask.status === 0;
+          return subtask.active_status === 0 && subtask.status === 0 && subtask.reopenStatus === 0;
         case "In Progress":
-          return subtask.active_status === 1 && subtask.status === 1;
+          return subtask.active_status === 1 && subtask.status === 1 && subtask.reopenStatus === 0;
         case "In Review":
-          return subtask.active_status === 1 && subtask.status === 2;
+          return subtask.status === 2 && subtask.reopenStatus === 0;
         case "On Hold":
-          return subtask.active_status === 0;
+          return subtask.active_status === 0 && subtask.status === 1 && subtask.reopenStatus === 0;
         case "Done":
-          return subtask.active_status === 1 && subtask.status === 3;
+          return subtask.status === 3;
         default:
           return false;
       }
