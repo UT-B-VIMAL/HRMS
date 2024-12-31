@@ -466,11 +466,11 @@ exports.fetchPmviewproductdata = async (req, res) => {
         case "Pending":
           return subtask.active_status === 0 && subtask.status === 0 && subtask.reopenStatus === 0;
         case "In Progress":
-          return subtask.active_status === 1 && subtask.status === 1 && subtask.reopenStatus === 0;
+          return subtask.active_status === 1 && subtask.status === 1;
         case "In Review":
-          return subtask.status === 2 && subtask.reopenStatus === 0;
+          return subtask.reopenStatus === 0 && subtask.status === 2;
         case "On Hold":
-          return subtask.active_status === 0 && subtask.status === 1 && subtask.reopenStatus === 0;
+          return subtask.active_status === 0 && subtask.reopenStatus === 0 && subtask.status === 1;
         case "Done":
           return subtask.status === 3;
         default:
@@ -564,7 +564,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         employee_name: row.employee_name,
         project_name: row.project_name,
       };
-
+    
+      // Create subtask if applicable
       const subtask = row.subtask_id
         ? {
             id: row.subtask_id,
@@ -575,17 +576,18 @@ exports.fetchPmviewproductdata = async (req, res) => {
             description: row.subtask_description,
           }
         : null;
-
+    
+      // Find category based on task's subtask or status
       const category = Object.keys(groupedTasks).find((status) =>
         isValidSubtask(subtask || task, status)
       );
-
+    
       // Only add task if it hasn't been added to that category already
       if (category) {
         const existingTaskIndex = groupedTasks[category].findIndex(
           (t) => t.TaskId === task.id
         );
-
+    
         if (existingTaskIndex === -1) {
           // Task does not exist in the section, so push the task with its subtask
           groupedTasks[category].push(
@@ -593,7 +595,10 @@ exports.fetchPmviewproductdata = async (req, res) => {
           );
         } else {
           // Task exists, so add the subtask to the existing task
-          groupedTasks[category][existingTaskIndex].Subtasks.push({
+          const existingTask = groupedTasks[category][existingTaskIndex];
+          
+          // Add the new subtask to the existing task
+          existingTask.Subtasks.push({
             SubtaskId: subtask.id || "N/A",
             SubtaskName: subtask.name || "N/A",
             SubtaskEstimationHours: subtask.estimated_hours || "N/A",
@@ -601,9 +606,28 @@ exports.fetchPmviewproductdata = async (req, res) => {
             SubtaskActiveStatus: subtask.active_status || "N/A",
             SubtaskStatus: subtask.status || "N/A",
           });
+    
+          // Update the counts for subtasks
+          existingTask.TotalSubtaskCount++;  // Increment total subtasks count
+          if (subtask.status === 3) {
+            existingTask.CompletedSubtaskCount++;  // Increment completed subtasks count
+          }
+    
+          // Recalculate completion percentage
+          const completionPercentage =
+            existingTask.TotalSubtaskCount > 0
+              ? Math.round(
+                  (existingTask.CompletedSubtaskCount /
+                    existingTask.TotalSubtaskCount) *
+                    100
+                )
+              : 0;
+    
+          existingTask.CompletionPercentage = completionPercentage;
         }
       }
     });
+    
 
     // Calculate the overall completion percentage
     let totalTasksAndSubtasks = 0;
