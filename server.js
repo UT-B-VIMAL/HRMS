@@ -118,6 +118,7 @@ apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin']),taskControl
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
 apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin','employee']), taskController.doneTask);
+apiRouter.get('/deletedTaskList',RoleController.checkRole(['pm','admin']), taskController.deletedTaskList);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
 
 
@@ -189,7 +190,7 @@ apiRouter.get('/otdetail/:id', RoleController.checkRole(['tl','pm','admin','empl
 apiRouter.get('/otdetail',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.getAllOtdetails);
 
 //common
-apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin']),commonController.getDropDownList);
+apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix
