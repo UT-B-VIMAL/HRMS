@@ -24,6 +24,7 @@ const attendanceController = require('./controllers/attendanceController');
 const commonController = require("./controllers/commonController");
 const empdashboardController = require('./controllers/empdashboardController');
 const commentsController = require('./controllers/commentsController');
+const otdetailController = require('./controllers/otdetailController');
 // const ticketsController =require('./controllers/ticketsController');
 
 const app = express();
@@ -181,7 +182,12 @@ apiRouter.delete('/comments/:id',RoleController.checkRole(['tl','pm','admin','em
 // apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
 // apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
 
-
+// OT Details
+apiRouter.post('/otdetail', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.createOtdetail);
+apiRouter.put('/otdetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.updateOtdetail);
+apiRouter.delete('/otdetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.deleteOtdetail);
+apiRouter.get('/otdetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.getOtdetail);
+apiRouter.get('/otdetail',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.getAllOtdetails);
 
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
