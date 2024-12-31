@@ -641,12 +641,6 @@ exports.projectStatus = async (req, res) => {
 };
 
 
-
-
-
-
-
-
 exports.projectRequest = async (req, res) => {
   try {
     const { project_id, user_id, date, search, page = 1, perPage = 10 } = req.query;
