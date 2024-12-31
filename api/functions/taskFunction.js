@@ -886,11 +886,13 @@ exports.deleteTask = async (id, res) => {
 const lastActiveTask = async (userId) => {
   try {
     const query = `
-        SELECT stut.*, s.name as subtask_name, s.estimated_hours as subtask_estimated_hours,
-               s.total_hours_worked as subtask_total_hours_worked, t.name as task_name,
+        SELECT stut.*, s.name as subtask_name, s.estimated_hours as subtask_estimated_hours,s.priority as subtask_priority,t.priority as task_proirity,
+               s.total_hours_worked as subtask_total_hours_worked, t.name as task_name,pr.name as project_name, pd.name as product_name,
                t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked
         FROM sub_tasks_user_timeline stut
         LEFT JOIN sub_tasks s ON stut.subtask_id = s.id
+        LEFT JOIN products pd ON stut.product_id = pd.id
+        LEFT JOIN projects pr ON stut.project_id = pr.id
         LEFT JOIN tasks t ON stut.task_id = t.id
         WHERE stut.user_id = ? AND stut.end_time IS NULL
         ORDER BY stut.start_time DESC
@@ -923,10 +925,14 @@ const lastActiveTask = async (userId) => {
     // Add time left to the task or subtask object
     if (task.subtask_id) {
       task.subtask_time_left = timeLeft;
+      task.priority = task.subtask_priority;
     } else {
       task.task_time_left = timeLeft;
-    }
+      task.priority = task.task_priority;
 
+    }
+    delete task.subtask_priority;
+    delete task.task_priority;
     return task;
   } catch (err) {
     console.error("Error fetching last active task:", err.message);
