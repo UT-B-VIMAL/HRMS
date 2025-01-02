@@ -888,7 +888,7 @@ const lastActiveTask = async (userId) => {
     const query = `
         SELECT stut.*, s.name as subtask_name, s.estimated_hours as subtask_estimated_hours,s.priority as subtask_priority,t.priority as task_priority,
                s.total_hours_worked as subtask_total_hours_worked, t.name as task_name,pr.name as project_name, pd.name as product_name,
-               t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked,    u1.first_name AS subtask_assigned_to,
+               t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked,u1.first_name AS subtask_assigned_to,
                 u2.first_name AS subtask_assigned_by,
                 u3.first_name AS task_assigned_to,
                 u4.first_name AS task_assigned_by
@@ -1479,8 +1479,8 @@ exports.updateTaskTimeLine = async (req, res) => {
     if (action === "start") {
       // Check if a record already exists in the sub_tasks_user_timeline table for the current task/subtask
       const [existingSubtaskSublime] = await db.query(
-        "SELECT * FROM ?? WHERE active_status = 1 AND deleted_at IS NULL AND user_id = ?",
-        [type === "subtask" ? "sub_tasks" : "tasks", taskOrSubtask.user_id]
+        "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+        [taskOrSubtask.user_id]
       );
       if (existingSubtaskSublime.length > 0) {
         return res

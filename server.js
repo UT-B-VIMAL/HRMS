@@ -172,6 +172,7 @@ apiRouter.post('/ratingUpdation', RoleController.checkRole(['pm','admin']), rati
 //Attendance
 apiRouter.get('/getAttendanceList', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceList);
 apiRouter.post('/updateAttendance', RoleController.checkRole(['tl','admin']), attendanceController.updateAttendance);
+apiRouter.get('/getAttendanceReport', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceListReport);
 
 
 // Comments
