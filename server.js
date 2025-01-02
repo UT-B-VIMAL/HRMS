@@ -181,7 +181,7 @@ apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']
 apiRouter.get('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getTickets);
 apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController.createTicket);
 apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
-// apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
+ //apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
 
 
 
