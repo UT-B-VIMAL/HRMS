@@ -888,14 +888,23 @@ const lastActiveTask = async (userId) => {
     const query = `
         SELECT stut.*, s.name as subtask_name, s.estimated_hours as subtask_estimated_hours,s.priority as subtask_priority,t.priority as task_priority,
                s.total_hours_worked as subtask_total_hours_worked, t.name as task_name,pr.name as project_name, pd.name as product_name,
-               t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked
+               t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked,    u1.first_name AS subtask_assigned_to,
+                u2.first_name AS subtask_assigned_by,
+                u3.first_name AS task_assigned_to,
+                u4.first_name AS task_assigned_by
         FROM sub_tasks_user_timeline stut
         LEFT JOIN sub_tasks s ON stut.subtask_id = s.id
         LEFT JOIN products pd ON stut.product_id = pd.id
         LEFT JOIN projects pr ON stut.project_id = pr.id
         LEFT JOIN tasks t ON stut.task_id = t.id
-       
-
+        LEFT JOIN 
+            users u1 ON s.user_id = u1.id
+        LEFT JOIN 
+            users u2 ON s.assigned_user_id = u2.id
+        LEFT JOIN 
+            users u3 ON t.user_id = u3.id
+        LEFT JOIN 
+            users u4 ON t.assigned_user_id = u4.id
         WHERE stut.user_id = ? AND stut.end_time IS NULL
         ORDER BY stut.start_time DESC
         LIMIT 1;
@@ -931,9 +940,9 @@ const lastActiveTask = async (userId) => {
     task.estimated_hours = task.subtask_id ? task.subtask_estimated_hours : task.task_estimated_hours;
     task.total_hours_worked = task.subtask_id ? task.subtask_total_hours_worked : task.task_total_hours_worked;
     task.id = task.subtask_id || task.task_id;
-    task.assignedTo = "testuser";
-    task.assignedBy = "testuser";
     task.time_exceed_status=task.subtask_total_hours_worked > task.estimated_hours?true:false;
+    task.assignedTo=task.subtask_id?task.subtask_assigned_to:task.task_assigned_to;
+    task.assignedBy=task.subtask_id?task.subtask_assigned_by:task.task_assigned_by;
     
     const keysToRemove = [
       'subtask_priority',
@@ -942,6 +951,7 @@ const lastActiveTask = async (userId) => {
       'subtask_total_hours_worked',
       'task_total_hours_worked',
       'task_estimated_hours',
+      'subtask_assigned_to','task_assigned_to','subtask_assigned_by','task_assigned_by',
       'task_id',
       'subtask_id',
     ];
