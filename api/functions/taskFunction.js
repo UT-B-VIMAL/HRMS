@@ -924,7 +924,6 @@ const lastActiveTask = async (userId) => {
       timeDifference
     );
     task.timeline_id=task.id;
-
     // Add time left to the task or subtask object
     task.time_left = timeLeft;
     task.type = task.subtask_id ? 'subtask' : 'task';
@@ -934,8 +933,8 @@ const lastActiveTask = async (userId) => {
     task.id = task.subtask_id || task.task_id;
     task.assignedTo = "testuser";
     task.assignedBy = "testuser";
+    task.time_exceed_status=task.subtask_total_hours_worked > task.estimated_hours?true:false;
     
-    // Delete unnecessary properties in one step
     const keysToRemove = [
       'subtask_priority',
       'task_priority',
