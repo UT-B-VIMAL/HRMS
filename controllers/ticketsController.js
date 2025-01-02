@@ -1,10 +1,10 @@
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const Joi = require('joi');
-const { createTicketSchema  } = require("../validators/ticketValidator");
+const { createTicketSchema,updateTicketSchema  } = require("../validators/ticketValidator");
 const fileUpload =require('express-fileupload');
 const {  uploadFileToS3 } = require('../config/s3');
 const db = require('../config/db');
-const {getAlltickets}= require("../api/functions/ticketFunction")
+const {getAlltickets,getTickets,updateTickets}= require("../api/functions/ticketFunction")
 
 exports.createTicket = async (req, res) => {
     try {
@@ -42,4 +42,45 @@ exports.getAlltickets = async (req, res) => {
     } catch (error) {
         return errorResponse(res, error.message, 'Error retrieving tasks', 500);
     }
+};
+    
+exports.getTickets= async (req, res) => {
+        try {
+           const { id } = req.params;
+           console.log(id);
+           
+            await getTickets(id, res);
+        } catch (error) {
+            return errorResponse(res, error.message, 'Error retrieving tasks', 500);
+        }
+};
+
+
+exports.updateTickets= async (req, res) => {
+
+  try {
+    const { id } = req.params; 
+    const payload = req.body; 
+console.log(req.params);
+
+    const idValidation = Joi.string().required().validate(id);
+    if (idValidation.error) {
+      return errorResponse(res, { id: 'Ticket ID is required and must be valid' }, 'Validation Error', 403);
+    }
+
+    const { error } = updateTicketSchema.validate(payload, { abortEarly: false });
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+      return errorResponse(res, errorMessages, "Validation Error", 403);
+    }
+
+    await updateTickets(id, payload, res);
+
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error updating ticket', 500);
+  }
+
 };
