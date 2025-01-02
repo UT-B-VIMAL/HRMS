@@ -1483,10 +1483,9 @@ exports.updateTaskTimeLine = async (req, res) => {
         [taskOrSubtask.user_id]
       );
       if (existingSubtaskSublime.length > 0) {
-        return res
-          .status(400)
-          .json({ message: "Time Line is Already Started" });
+          return errorResponse(res, "Time Line is Already Started", 400);
       }
+
 
       await db.query(
         "UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?",
