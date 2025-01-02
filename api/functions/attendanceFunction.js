@@ -255,3 +255,37 @@ exports.updateAttendanceData = async (req, res) => {
       return errorResponse(res, error, "Error updating Attendance", 500);
     }
   };
+  exports.getEmployeeAttendance = async (req, res) => {
+    const { fromDate, toDate } = req.query;
+      try {
+          const query = `
+              WITH RECURSIVE date_range AS (
+                  SELECT ? AS date
+                  UNION ALL
+                  SELECT DATE_ADD(date, INTERVAL 1 DAY)
+                  FROM date_range
+                  WHERE date < ?
+              )
+              SELECT 
+                  u.first_name AS employee_name,
+                  dr.date AS date,
+                  CASE 
+                      WHEN el.user_id IS NOT NULL THEN 'Absent'
+                      ELSE 'Present'
+                  END AS status
+              FROM 
+                  date_range dr
+              CROSS JOIN users u
+              LEFT JOIN employee_leave el
+                  ON el.user_id = u.id AND el.date = dr.date
+              ORDER BY u.first_name, dr.date;
+          `;
+  
+          // Execute the query
+          const [rows] = await db.query(query, [fromDate, toDate]);
+          return rows;
+      } catch (error) {
+          console.error('Error fetching attendance data:', error);
+          throw error;
+      }
+  }
