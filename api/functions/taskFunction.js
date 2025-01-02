@@ -886,7 +886,7 @@ exports.deleteTask = async (id, res) => {
 const lastActiveTask = async (userId) => {
   try {
     const query = `
-        SELECT stut.*, s.name as subtask_name, s.estimated_hours as subtask_estimated_hours,s.priority as subtask_priority,t.priority as task_proirity,
+        SELECT stut.*, s.name as subtask_name, s.estimated_hours as subtask_estimated_hours,s.priority as subtask_priority,t.priority as task_priority,
                s.total_hours_worked as subtask_total_hours_worked, t.name as task_name,pr.name as project_name, pd.name as product_name,
                t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked
         FROM sub_tasks_user_timeline stut
@@ -894,6 +894,8 @@ const lastActiveTask = async (userId) => {
         LEFT JOIN products pd ON stut.product_id = pd.id
         LEFT JOIN projects pr ON stut.project_id = pr.id
         LEFT JOIN tasks t ON stut.task_id = t.id
+       
+
         WHERE stut.user_id = ? AND stut.end_time IS NULL
         ORDER BY stut.start_time DESC
         LIMIT 1;
@@ -921,18 +923,31 @@ const lastActiveTask = async (userId) => {
         : task.task_total_hours_worked,
       timeDifference
     );
+    task.timeline_id=task.id;
 
     // Add time left to the task or subtask object
-    if (task.subtask_id) {
-      task.subtask_time_left = timeLeft;
-      task.priority = task.subtask_priority;
-    } else {
-      task.task_time_left = timeLeft;
-      task.priority = task.task_priority;
-
-    }
-    delete task.subtask_priority;
-    delete task.task_priority;
+    task.time_left = timeLeft;
+    task.type = task.subtask_id ? 'subtask' : 'task';
+    task.priority = task.subtask_id ? task.subtask_priority : task.task_priority;
+    task.estimated_hours = task.subtask_id ? task.subtask_estimated_hours : task.task_estimated_hours;
+    task.total_hours_worked = task.subtask_id ? task.subtask_total_hours_worked : task.task_total_hours_worked;
+    task.id = task.subtask_id || task.task_id;
+    task.assignedTo = "testuser";
+    task.assignedBy = "testuser";
+    
+    // Delete unnecessary properties in one step
+    const keysToRemove = [
+      'subtask_priority',
+      'task_priority',
+      'subtask_estimated_hours',
+      'subtask_total_hours_worked',
+      'task_total_hours_worked',
+      'task_estimated_hours',
+      'task_id',
+      'subtask_id',
+    ];
+    
+    keysToRemove.forEach((key) => delete task[key]);
     return task;
   } catch (err) {
     console.error("Error fetching last active task:", err.message);
@@ -1765,13 +1780,14 @@ exports.deleteTaskList = async (req, res) => {
   }
 };
 
-exports.restoreTasks = async (id, payload, res) => {
+exports.restoreTasks = async ( req, res) => {
 try{
-  const { task_id ,subtask_id,user_id } = payload;
+  const { task_id ,subtask_id,user_id } = req.body;
   // const { error } = productSchema.validate(
   //   { name, user_id },
   //   { abortEarly: false }
   // );
+  console.log(user_id,task_id);
   const user = await getAuthUserDetails(user_id, res);
   if (!user) return;
   // if (error) {

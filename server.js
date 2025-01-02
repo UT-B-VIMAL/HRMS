@@ -120,6 +120,7 @@ apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','emplo
 apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin','employee']), taskController.doneTask);
 apiRouter.get('/deletedTaskList',RoleController.checkRole(['pm','admin']), taskController.deletedTaskList);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
+apiRouter.post('/restoreTasks',RoleController.checkRole(['admin','pm']), taskController.taskRestore);
 
 
 // Subtask Routes
