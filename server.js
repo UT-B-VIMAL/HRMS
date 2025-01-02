@@ -1,4 +1,5 @@
 const express = require("express");
+const fileUpload = require("express-fileupload");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
@@ -25,8 +26,10 @@ const commonController = require("./controllers/commonController");
 const empdashboardController = require('./controllers/empdashboardController');
 const commentsController = require('./controllers/commentsController');
 const otdetailController = require('./controllers/otdetailController');
-// const ticketsController =require('./controllers/ticketsController');
+const ticketsController =require('./controllers/ticketsController');
 
+const multer = require('multer');
+const upload = multer();
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
 const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
@@ -52,7 +55,7 @@ const corsOptions = {
 };
 
 
-
+app.use(fileUpload());
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(bodyParser);
@@ -177,11 +180,12 @@ apiRouter.put('/comments/:id',RoleController.checkRole(['tl','pm','admin','emplo
 apiRouter.delete('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. deleteComments);
 
 //tickets
-// apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getAlltickets);
+apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getAlltickets);
 // apiRouter.get('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getTickets);
-// apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. addTickets);
+apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController.createTicket);
 // apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
 // apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
+
 
 // OT Details
 apiRouter.post('/otdetail', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.createOtdetail);
