@@ -1,6 +1,7 @@
 const db = require('../../config/db');
 const { successResponse, errorResponse,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage } = require('../../helpers/responseHelper');
 const moment = require("moment");
+const { getAuthUserDetails } = require('./commonFunction');
 
 // Insert Task
 exports.createSubTask = async (payload, res) => {
@@ -247,7 +248,6 @@ exports.updateSubTask = async (id, payload, res) => {
         if (result.affectedRows === 0) {
             return errorResponse(res, null, 'SubTask not found', 204);
         }
-
         return successResponse(res, { id, ...payload }, 'SubTask updated successfully');
     } catch (error) {
         return errorResponse(res, error.message, 'Error updating subtask', 500);
@@ -280,6 +280,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
     assigned_user_id,
     team_id,
     owner_id,
+    user_id,
     estimated_hours,
     start_date,
     due_date,
@@ -338,7 +339,40 @@ exports.updatesubTaskData = async (id, payload, res) => {
     if (!currentTask) {
       return errorResponse(res, null, 'SubTask not found or has been deleted', 404);
     }
+    
+    if(active_status==1 && status==1){
+      const userDetails = await getAuthUserDetails(user_id, res);
 
+      if (!userDetails || userDetails.id == undefined) {
+        return;
+      }
+      if(userDetails.role_id==4){
+        const [existingSubtaskSublime] = await db.query(
+          "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+          [user_id]
+        );
+        if (existingSubtaskSublime.length > 0) {
+            return errorResponse(res, "You Already have Active Task", 400);
+        }
+        await db.query(
+          "UPDATE sub_tasks SET status = 1, active_status = 1 WHERE id = ?",
+          [ id]
+        );
+        const [timeline] = await db.query(
+          "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            user_id,
+            currentTask.product_id,
+            currentTask.project_id,
+            currentTask.task_id,
+            id,
+            moment().format("YYYY-MM-DD HH:mm:ss"),
+          ]
+        );
+      }else{
+        return errorResponse(res, "You are not allowed to start task", 400);
+      }
+    }
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(/^((\d+)h\s*)?((\d+)m)?$/);
       if (!timeMatch) {
