@@ -4,10 +4,10 @@ const {
   errorResponse,
   getPagination,
 } = require("../../helpers/responseHelper");
-const { uploadexpenseFileToS3 } = require('../../config/s3');
+const { uploadexpenseFileToS3, deleteFileFromS3  } = require('../../config/s3');
 
 
-// Insert OT
+// Insert Expense
 exports.createexpense = async (req, res) => {
   const { date, category, amount, project_id, user_id, description, created_by } = req.body;
   try {
@@ -65,8 +65,9 @@ exports.createexpense = async (req, res) => {
       if (req.files && req.files.file) {
               const file = req.files.file;
               const fileBuffer = file.data;  
-              const fileName = file.name;  
-             fileUrl = await uploadexpenseFileToS3(fileBuffer, fileName);
+              const originalFileName = file.name;
+              const uniqueFileName = `${Date.now()}_${originalFileName}`;  
+             fileUrl = await uploadexpenseFileToS3(fileBuffer, uniqueFileName);
             }
 
     const insertQuery = `
@@ -117,73 +118,60 @@ exports.createexpense = async (req, res) => {
     return errorResponse(res, error.message, "Error inserting Expense detail", 500);
   }
 };
-// Show OT
-exports.getOt = async (id, res) => {
+// Show Expense
+exports.getexpense = async (id, res) => {
   try {
-    const otdetailQuery = `
+    const expensedetailQuery = `
         SELECT 
           id, 
-          DATE_FORMAT(date, '%Y-%m-%d') AS date, 
-          IFNULL(time, '00:00:00') AS time, 
-          comments, 
+          DATE_FORMAT(date, '%Y-%m-%d') AS date,
+          description, 
           product_id, 
-          project_id, 
-          task_id,
-          user_id, 
-          IFNULL(tledited_time, '00:00:00') AS tl_edited_time,
-          IFNULL(pmedited_time, '00:00:00') AS pm_edited_time,
-          user_id, 
+          project_id,
+          user_id,
           status,
           tl_status,
-          pm_status
+          pm_status,
+          file
         FROM 
-          ot_details
+          expense_details
         WHERE 
           id = ?
           AND deleted_at IS NULL;
       `;
-    const [otdetail] = await db.query(otdetailQuery, [id]);
+    const [expensedetail] = await db.query(expensedetailQuery, [id]);
 
-    if (!otdetail || otdetail.length === 0) {
+    if (!expensedetail || expensedetail.length === 0) {
       return errorResponse(
         res,
-        "OT detail not found",
-        "Error retrieving OT detail",
+        "Expense detail not found",
+        "Error retrieving Expense detail",
         404
       );
     }
 
-    const result = otdetail[0];
+    const result = expensedetail[0];
 
     return successResponse(
       res,
       result,
-      "OT detail retrieved successfully",
+      "Expense detail retrieved successfully",
       200
     );
   } catch (error) {
-    return errorResponse(res, error.message, "Error retrieving OT detail", 500);
+    return errorResponse(res, error.message, "Error retrieving expense detail", 500);
   }
 };
-// Show All OT
-exports.getAllOts = async (req, res) => {
+// Show All Expense
+exports.getAllexpense = async (req, res) => {
   try {
-    const {
-      project_id,
-      user_id,
-      date,
-      status,
-      product_id,
-      search,
-      page = 1,
-      perPage = 10,
-    } = req.query;
+    const { user_id, status, search, page = 1, perPage = 10, project_id } = req.query;
 
     if (!user_id) {
       return errorResponse(
         res,
         "user_id is required",
-        "Error fetching OT details",
+        "Error fetching expense details",
         400
       );
     }
@@ -191,11 +179,12 @@ exports.getAllOts = async (req, res) => {
       return errorResponse(
         res,
         "status is required",
-        "Error fetching OT details",
+        "Error fetching expense details",
         400
       );
     }
 
+    // Validate user existence
     const [userCheck] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
@@ -204,94 +193,99 @@ exports.getAllOts = async (req, res) => {
       return errorResponse(
         res,
         "User not found or deleted",
-        "Error fetching OT details",
+        "Error fetching expense details",
         404
       );
     }
 
     const offset = (page - 1) * perPage;
 
-    const otConditions = [];
-    const otValues = [];
+    // Query filters
+    const expenseConditions = [];
+    const expenseValues = [];
 
     if (project_id) {
       const projectIds = project_id.split(",");
-      otConditions.push(`ot.project_id IN (?)`);
-      otValues.push(projectIds);
+      expenseConditions.push(`et.project_id IN (?)`);
+      expenseValues.push(projectIds);
     }
     if (user_id) {
-      otConditions.push("ot.user_id = ?");
-      otValues.push(user_id);
-    }
-    if (date) {
-      otConditions.push("DATE(ot.date) = ?");
-      otValues.push(date);
-    }
-    if (product_id) {
-      const productIds = product_id.split(",");
-      otConditions.push(`ot.product_id IN (?)`);
-      otValues.push(productIds);
+      expenseConditions.push("et.user_id = ?");
+      expenseValues.push(user_id);
     }
     if (search) {
       const searchTerm = `%${search}%`;
-      otConditions.push(
-        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
+      expenseConditions.push(
+        `(pr.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR et.description LIKE ?)`
       );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      expenseValues.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
-
     if (status) {
       const statusArray = status.split(",");
-      otConditions.push(`ot.status IN (?)`);
-      otValues.push(statusArray);
+      expenseConditions.push(`et.status IN (?)`);
+      expenseValues.push(statusArray);
     }
 
-    const otWhereClause =
-      otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
+    const expenseWhereClause =
+      expenseConditions.length > 0 ? `WHERE ${expenseConditions.join(" AND ")}` : "";
 
-    const otQuery = `
-        SELECT 
-          pr.name AS project_name,
-          t.name AS task_name,
-          DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-          ot.time,
-          ot.comments,
-          ot.status,
-          ot.id AS ot_id,
-          ot.user_id,
-          u.first_name AS user_first_name,
-          u.last_name AS user_last_name
-        FROM 
-          ot_details ot
-        LEFT JOIN 
-          tasks t ON t.id = ot.task_id
-        LEFT JOIN 
-          projects pr ON pr.id = ot.project_id
-        LEFT JOIN 
-          users u ON u.id = ot.user_id
-        ${otWhereClause}
-        ORDER BY 
-          ot.id
-      `;
+    // Main query
+    const expenseQuery = `
+      SELECT 
+        pr.name AS project_name,
+        DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
+        et.expense_amount,
+        et.description,
+        et.status,
+        et.tl_status,
+        et.pm_status,
+        et.id AS expense_id,
+        et.user_id,
+        et.file,
+        u.first_name AS user_first_name,
+        u.last_name AS user_last_name
+      FROM 
+        expense_details et
+      LEFT JOIN 
+        projects pr ON pr.id = et.project_id
+      LEFT JOIN 
+        users u ON u.id = et.user_id
+      ${expenseWhereClause}
+      ORDER BY 
+        et.id
+      LIMIT ?, ?
+    `;
 
-    const [ots] = await db.query(otQuery, otValues);
+    expenseValues.push(offset, parseInt(perPage));
 
-    // Pagination logic
-    const totalRecords = ots.length;
-    const paginatedData = ots.slice(offset, offset + parseInt(perPage));
+    const [expenses] = await db.query(expenseQuery, expenseValues);
+
+    // Pagination
+    const countQuery = `
+      SELECT COUNT(*) AS total 
+      FROM expense_details et
+      LEFT JOIN projects pr ON pr.id = et.project_id
+      LEFT JOIN users u ON u.id = et.user_id
+      ${expenseWhereClause}
+    `;
+    const [totalRecordsResult] = await db.query(countQuery, expenseValues.slice(0, -2));
+    const totalRecords = totalRecordsResult[0]?.total || 0;
+
     const pagination = getPagination(page, perPage, totalRecords);
 
-    // Add serial numbers and include id, user_id in the paginated data
-    const data = paginatedData.map((row, index) => ({
+    // Format response data
+    const data = expenses.map((row, index) => ({
       s_no: offset + index + 1,
-      id: row.ot_id,
+      id: row.expense_id,
       user_id: row.user_id,
       date: row.date,
-      time: row.time,
+      expense_amount: row.expense_amount,
       project_name: row.project_name,
-      task_name: row.task_name,
-      comments: row.comments,
+      description: row.description,
+      file: row.file,
       status: row.status,
+      tl_status: row.tl_status,
+      pm_status: row.pm_status,
       user_name: `${row.user_first_name} ${row.user_last_name}`,
     }));
 
@@ -299,212 +293,218 @@ exports.getAllOts = async (req, res) => {
       res,
       data,
       data.length === 0
-        ? "No OT details found"
-        : "OT details retrieved successfully",
+        ? "No expense details found"
+        : "Expense details retrieved successfully",
       200,
-      pagination,
+      pagination
     );
   } catch (error) {
-    console.error("Error fetching OT details:", error);
+    console.error("Error fetching expense details:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-// Update OT
-exports.updateOt = async (id, payload, res) => {
-  const { date, time, tltime, pmtime, project_id, task_id, user_id, comments, updated_by } =
-    payload;
+
+// Update Expense
+exports.updateexpenses = async (id, req, res) => {
+  const { date, category, amount, project_id, user_id, description, updated_by } = req.body;
 
   try {
-    const checkQuery = `
-        SELECT id 
-        FROM ot_details 
-        WHERE id = ? AND deleted_at IS NULL
-      `;
-    const [existingOt] = await db.query(checkQuery, [id]);
+    const expenseQuery = `
+      SELECT id 
+      FROM expense_details 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
+    const [expenseResult] = await db.query(expenseQuery, [id]);
 
-    if (existingOt.length === 0) {
+    if (expenseResult.length === 0) {
       return errorResponse(
         res,
-        "OT detail not found or already deleted",
-        "Error updating OT",
+        "Expense record not found or deleted",
+        "Error updating expense details",
         404
       );
     }
 
+    // Fetch project details
     const projectQuery = `
-        SELECT product_id 
-        FROM projects 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
+      SELECT product_id 
+      FROM projects 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
     const [projectResult] = await db.query(projectQuery, [project_id]);
 
     if (projectResult.length === 0) {
       return errorResponse(
         res,
         "Project not found or deleted",
-        "Error updating OT",
+        "Error updating expense details",
         404
       );
     }
     const { product_id } = projectResult[0];
 
+    // Fetch product details
     const productQuery = `
-        SELECT id 
-        FROM products 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
+      SELECT id 
+      FROM products 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
     const [productResult] = await db.query(productQuery, [product_id]);
 
     if (productResult.length === 0) {
       return errorResponse(
         res,
         "Product not found or deleted",
-        "Error updating OT",
+        "Error updating expense details",
         404
       );
     }
 
-    const taskQuery = `
-        SELECT id 
-        FROM tasks 
-        WHERE deleted_at IS NULL AND id = ? AND project_id = ?
-      `;
-    const [taskResult] = await db.query(taskQuery, [task_id, project_id]);
-
-    if (taskResult.length === 0) {
-      return errorResponse(
-        res,
-        "Task not found or does not belong to the specified project",
-        "Error updating OT",
-        404
-      );
-    }
-
+    // Fetch user details
     const userQuery = `
-        SELECT id 
-        FROM users 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
+      SELECT id, team_id 
+      FROM users 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
     const [userResult] = await db.query(userQuery, [user_id]);
 
     if (userResult.length === 0) {
       return errorResponse(
         res,
         "User not found or deleted",
-        "Error updating OT",
+        "Error updating expense details",
         404
       );
     }
 
+    const { team_id } = userResult[0];
+
+    // Handle file upload if present
+    let fileUrl = null;
+    if (req.files && req.files.file) {
+      const file = req.files.file;
+      const fileBuffer = file.data;
+      const originalFileName = file.name;
+      const uniqueFileName = `${Date.now()}_${originalFileName}`;
+      fileUrl = await uploadexpenseFileToS3(fileBuffer, uniqueFileName);
+    }
+
+    // Construct the update query
     const updateQuery = `
-        UPDATE ot_details 
-        SET 
-          user_id = ?, 
-          product_id = ?, 
-          project_id = ?, 
-          task_id = ?, 
-          comments = ?, 
-          date = ?, 
-          time = ?, 
-          tledited_time = ?, 
-          pmedited_time = ?, 
-          updated_by = ?, 
-          updated_at = NOW() 
-        WHERE id = ? AND deleted_at IS NULL
-      `;
+      UPDATE expense_details 
+      SET 
+        user_id = ?, 
+        category = ?, 
+        product_id = ?, 
+        project_id = ?, 
+        team_id = ?, 
+        description = ?, 
+        expense_amount = ?, 
+        date = ?, 
+        file = ?, 
+        updated_by = ?, 
+        updated_at = NOW() 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+
     const values = [
       user_id,
+      category,
       product_id,
       project_id,
-      task_id,
-      comments,
+      team_id,
+      description,
+      amount,
       date,
-      time,
-      tltime,
-      pmtime,
+      fileUrl,
       updated_by,
       id,
     ];
 
+    // Execute the update query
     const [result] = await db.query(updateQuery, values);
 
+    // Check if any rows were updated
     if (result.affectedRows === 0) {
       return errorResponse(
         res,
-        "OT detail not found or no changes made",
-        "Error updating OT",
-        404
+        "Failed to update expense details",
+        "Error updating expense details",
+        400
       );
     }
 
-    const selectQuery = `
-        SELECT status 
-        FROM ot_details 
-        WHERE id = ?
-      `;
-    const [statusResult] = await db.query(selectQuery, [id]);
-
-    const status = statusResult.length > 0 ? statusResult[0].status : 0;
-
+    // Return success response
     return successResponse(
       res,
       {
         id,
-        task_id,
-        project_id, 
+        project_id,
         product_id,
-        status,
         user_id,
         updated_by,
-        date,
-        tltime,
-        pmtime,
-        comments,
       },
-      "OT detail updated successfully",
+      "Expense detail updated successfully",
       200
     );
   } catch (error) {
-    console.error("Error updating OT detail:", error.message);
-    return errorResponse(res, error.message, "Error updating OT detail", 500);
+    console.error("Error updating expense detail:", error.message);
+    return errorResponse(res, error.message, "Error updating expense detail", 500);
   }
 };
-// Delete OT
-exports.deleteOt = async (id, res) => {
-  try {
-    const checkQuery =
-      "SELECT id FROM ot_details WHERE id = ? AND deleted_at IS NULL";
-    const [existingOt] = await db.query(checkQuery, [id]);
 
-    if (existingOt.length === 0) {
+// Delete Expense
+exports.deleteExpense = async (id, res) => {
+  try {
+    // Check if the expense record exists and retrieve the file key
+    const checkQuery = `
+      SELECT id, file 
+      FROM expense_details 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+    const [existingExpense] = await db.query(checkQuery, [id]);
+
+    if (existingExpense.length === 0) {
       return errorResponse(
         res,
         null,
-        "OT detail not found or already deleted",
+        "Expense detail not found or already deleted",
         404
       );
     }
 
-    const updateQuery =
-      "UPDATE ot_details SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL";
+    const fileUrl = existingExpense[0].file;
+
+    // Delete the file from the S3 bucket if it exists
+    if (fileUrl) {
+      await deleteFileFromS3(fileUrl);
+    }
+
+    // Soft delete the expense record
+    const updateQuery = `
+      UPDATE expense_details 
+      SET deleted_at = NOW() 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
     const [result] = await db.query(updateQuery, [id]);
 
     if (result.affectedRows === 0) {
       return errorResponse(
         res,
         null,
-        "OT detail not found or already deleted",
+        "Expense detail not found or already deleted",
         204
       );
     }
 
-    return successResponse(res, null, "OT detail deleted successfully");
+    return successResponse(res, null, "Expense detail deleted successfully");
   } catch (error) {
-    return errorResponse(res, error.message, "Error deleting OT detail", 500);
+    console.error("Error deleting expense detail:", error.message);
+    return errorResponse(res, error.message, "Error deleting Expense detail", 500);
   }
 };
 
-// PM Employee OT Details
+// PM Employee Expense Details
 exports.getAllpmemployeeOts = async (req, res) => {
   try {
     const {
@@ -845,7 +845,7 @@ exports.approve_reject_OT = async (payload, res) => {
 };
 
 
-// TL Employee OT Details
+// TL Employee Expense Details
 exports.getAlltlemployeeOts = async (req, res) => {
   try {
     const {
