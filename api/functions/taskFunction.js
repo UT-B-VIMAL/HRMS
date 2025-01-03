@@ -702,9 +702,11 @@ exports.updateTask = async (id, payload, res) => {
 exports.updateTaskData = async (id, payload, res) => {
   const {
     status,
+    active_status,
     assigned_user_id,
     team_id,
     owner_id,
+    user_id,
     estimated_hours,
     start_date,
     due_date,
@@ -789,7 +791,39 @@ exports.updateTaskData = async (id, payload, res) => {
         404
       );
     }
+    if(active_status==1 && status==1){
+      const userDetails = await getAuthUserDetails(user_id, res);
 
+      if (!userDetails || userDetails.id == undefined) {
+        return;
+      }
+      if(userDetails.role_id==4){
+        const [existingSubtaskSublime] = await db.query(
+          "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+          [user_id]
+        );
+        if (existingSubtaskSublime.length > 0) {
+            return errorResponse(res, "You Already have Active Task", 400);
+        }
+        await db.query(
+          "UPDATE tasks SET status = 1, active_status = 1 WHERE id = ?",
+          [ id]
+        );
+        const [timeline] = await db.query(
+          "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            user_id,
+            currentTask.product_id,
+            currentTask.project_id,
+            id,
+            null,
+            moment().format("YYYY-MM-DD HH:mm:ss"),
+          ]
+        );
+      }else{
+        return errorResponse(res, "You are not allowed to start task", 400);
+      }
+    }
     const updateFields = [];
     const updateValues = [];
 
@@ -845,6 +879,7 @@ exports.updateTaskData = async (id, payload, res) => {
       await db.query(historyQuery, [taskHistoryEntries]);
     }
 
+   
     return successResponse(
       res,
       { id, ...payload },

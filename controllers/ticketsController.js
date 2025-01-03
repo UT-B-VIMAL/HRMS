@@ -14,8 +14,9 @@ exports.createTicket = async (req, res) => {
       if (req.files && req.files.file) {
         const file = req.files.file;
         const fileBuffer = file.data;  
-        const fileName = file.name;  
-       fileUrl = await uploadFileToS3(fileBuffer, fileName);
+        const originalFileName = file.name;
+        const uniqueFileName = `${Date.now()}_${originalFileName}`;   
+       fileUrl = await uploadFileToS3(fileBuffer, uniqueFileName);
       }
   
       const [result] = await db.execute(
