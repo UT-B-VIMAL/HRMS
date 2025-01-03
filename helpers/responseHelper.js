@@ -9,7 +9,7 @@ const getResponse = (response) => {
 
 
 
-const successResponse = (res, data, message = 'Request successful', status = 200, pagination = null) => {
+const successResponse = (res, data, message = 'Request successful', status = 200, pagination = null, totalPendingCounts = null) => {
   const response = {
     status,
     success: true,
@@ -18,6 +18,9 @@ const successResponse = (res, data, message = 'Request successful', status = 200
   };
   if (pagination) {
     response.pagination = pagination;
+  }
+  if (totalPendingCounts !== null) {
+    response.total_pending_counts = totalPendingCounts;
   }
   res.status(status).json(getResponse(response)); 
 };

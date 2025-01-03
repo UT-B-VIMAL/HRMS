@@ -188,6 +188,10 @@ apiRouter.put('/otdetail/:id',RoleController.checkRole(['tl','pm','admin','emplo
 apiRouter.delete('/otdetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.deleteOtdetail);
 apiRouter.get('/otdetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.getOtdetail);
 apiRouter.get('/otdetail',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.getAllOtdetails);
+apiRouter.get('/pmemployeeotdetail',RoleController.checkRole(['pm','admin']), otdetailController.getAllpmemployeeOtdetails);
+apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(['pm','tl','admin']), otdetailController.getAlltlemployeeOtdetails);
+apiRouter.put('/tlotdetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.updatetlOtdetail);
+apiRouter.post('/approve_reject_ot', RoleController.checkRole(['pm','tl','admin']),otdetailController.approve_reject_otdetail);
 
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
