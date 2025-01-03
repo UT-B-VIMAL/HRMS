@@ -24,6 +24,22 @@ const validationshems = {
       'any.only': 'Status must be one of the following values: 0 (Pending), 1 (In Progress), 2 (Done), 3 (Rejected)',
     }),
   }).unknown(true),
-};
+
+
+  ticketCommentSchema: Joi.object({
+    sender_id: Joi.number().integer().required().messages({
+      'any.required': 'Status is required',
+      'number.base': 'Status should be an integer',
+    }),
+    receiver_id: Joi.number().integer().required().messages({
+      'any.required': 'Status is required',
+      'number.base': 'Status should be an integer',
+    }),
+    comments: Joi.string().required().messages({
+      'any.required': 'Comment is required',
+      'string.base': 'Comment should be a string',
+    }),
+  }).unknown(true),
+  };
 
 module.exports = validationshems;

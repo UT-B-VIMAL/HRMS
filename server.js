@@ -28,8 +28,6 @@ const commentsController = require('./controllers/commentsController');
 const ticketsController =require('./controllers/ticketsController');
 const otdetailController =require('./controllers/otdetailController');
 const multer = require('multer');
-
-// Initialize multer for file handling
 const upload = multer();
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
@@ -51,8 +49,8 @@ const corsOptions = {
       callback(new Error(`Origin ${origin} is not allowed by CORS`));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+  allowedHeaders: ['Content-Type', 'Authorization'], 
 };
 
 
@@ -182,6 +180,8 @@ apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']
 apiRouter.get('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getTickets);
 apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController.createTicket);
 apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
+apiRouter.post('/ticket-comments',RoleController.checkRole(['tl', 'pm', 'admin', 'employee']),(req, res) => ticketsController.ticketComments(req, res, wss));
+
  //apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
 
 // OT Details
