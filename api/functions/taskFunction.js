@@ -706,6 +706,7 @@ exports.updateTaskData = async (id, payload, res) => {
     assigned_user_id,
     team_id,
     owner_id,
+    user_id,
     estimated_hours,
     start_date,
     due_date,
