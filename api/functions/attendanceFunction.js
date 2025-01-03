@@ -285,11 +285,16 @@ exports.updateAttendanceData = async (req, res) => {
           `;
           queryParams.push(fromDate, toDate);
   
-          if (teamId) {
-              teamFilter = `AND u.team_id = ?`;
-              queryParams.push(teamId);
+          // if (teamId) {
+          //     teamFilter = `AND u.team_id = ?`;
+          //     queryParams.push(teamId);
+          // }
+          if (teamId && teamId.length > 0) {
+            teamFilter = ` AND tasks.product_id IN (${teamId
+              .map(() => "?")
+              .join(",")})`;
+              queryParams.push(...teamId);
           }
-  
           if (search) {
               searchFilter = `AND u.first_name LIKE ?`;
               queryParams.push(`%${search}%`);
