@@ -284,8 +284,8 @@ exports.updateSubTask = async (id, payload, res) => {
                 user_id,
                 currentSubTasks.product_id,
                 currentSubTasks.project_id,
+                currentSubTasks.task_id,
                 id,
-                null,
                 moment().format("YYYY-MM-DD HH:mm:ss"),
               ]
             );
