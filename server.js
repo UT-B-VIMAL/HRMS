@@ -26,6 +26,7 @@ const commonController = require("./controllers/commonController");
 const empdashboardController = require('./controllers/empdashboardController');
 const commentsController = require('./controllers/commentsController');
 const ticketsController =require('./controllers/ticketsController');
+const otdetailController =require('./controllers/otdetailController');
 const multer = require('multer');
 
 // Initialize multer for file handling
