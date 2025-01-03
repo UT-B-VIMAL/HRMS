@@ -247,7 +247,52 @@ exports.updateSubTask = async (id, payload, res) => {
         if (result.affectedRows === 0) {
             return errorResponse(res, null, 'SubTask not found', 204);
         }
-
+        const [subtasks] = await db.query(
+          "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL",
+          [id]
+        );
+        const currentSubTasks = subtasks[0];
+        if (!currentSubTasks) {
+          return errorResponse(
+            res,
+            null,
+            "Task not found or has been deleted",
+            404
+          );
+        }
+        if(active_status==1 && status==1){
+          const userDetails = await getAuthUserDetails(user_id, res);
+    
+          if (!userDetails || userDetails.id == undefined) {
+            return;
+          }
+          if(userDetails.role_id==4){
+            const [existingSubtaskSublime] = await db.query(
+              "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+              [user_id]
+            );
+            if (existingSubtaskSublime.length > 0) {
+                return errorResponse(res, "You Already have Active Task", 400);
+            }
+            await db.query(
+              "UPDATE sub_tasks SET status = 1, active_status = 1 WHERE id = ?",
+              [ id]
+            );
+            const [timeline] = await db.query(
+              "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+              [
+                user_id,
+                currentSubTasks.product_id,
+                currentSubTasks.project_id,
+                id,
+                null,
+                moment().format("YYYY-MM-DD HH:mm:ss"),
+              ]
+            );
+          }else{
+            return errorResponse(res, "You are not allowed to start task", 400);
+          }
+        }
         return successResponse(res, { id, ...payload }, 'SubTask updated successfully');
     } catch (error) {
         return errorResponse(res, error.message, 'Error updating subtask', 500);
