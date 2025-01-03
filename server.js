@@ -118,7 +118,7 @@ apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin']), taskCon
 apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin']),taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
-apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin']), taskController.doneTask);
+apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin',,'employee']), taskController.doneTask);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
 
 
@@ -186,7 +186,7 @@ apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employ
 
 
 //common
-apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin']),commonController.getDropDownList);
+apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix

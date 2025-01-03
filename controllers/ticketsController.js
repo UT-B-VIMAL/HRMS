@@ -61,7 +61,6 @@ exports.updateTickets= async (req, res) => {
   try {
     const { id } = req.params; 
     const payload = req.body; 
-console.log(req.params);
 
     const idValidation = Joi.string().required().validate(id);
     if (idValidation.error) {
