@@ -285,16 +285,13 @@ exports.updateAttendanceData = async (req, res) => {
           `;
           queryParams.push(fromDate, toDate);
   
-          // if (teamId) {
-          //     teamFilter = `AND u.team_id = ?`;
-          //     queryParams.push(teamId);
-          // }
-          if (teamId && teamId.length > 0) {
-            teamFilter = ` AND tasks.product_id IN (${teamId
-              .map(() => "?")
-              .join(",")})`;
-              queryParams.push(...teamId);
-          }
+          if (teamId) {
+            const teamIds = teamId.split(',').map(id => id.trim());
+            if (teamIds.length > 0) {
+                teamFilter = `AND u.team_id IN (${teamIds.map(() => '?').join(',')})`;
+                queryParams.push(...teamIds);
+            }
+        }
           if (search) {
               searchFilter = `AND u.first_name LIKE ?`;
               queryParams.push(`%${search}%`);
@@ -304,7 +301,7 @@ exports.updateAttendanceData = async (req, res) => {
               ${dateFilter}
               SELECT 
                   u.first_name AS employee_name, employee_id,
-                  dr.date AS date,
+                  dr.date AS date,u.team_id,
                   CASE 
                       WHEN el.user_id IS NOT NULL THEN 'Absent'
                       ELSE 'Present'
