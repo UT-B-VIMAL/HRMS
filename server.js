@@ -27,6 +27,7 @@ const empdashboardController = require('./controllers/empdashboardController');
 const commentsController = require('./controllers/commentsController');
 const ticketsController =require('./controllers/ticketsController');
 const otdetailController =require('./controllers/otdetailController');
+const expensedetailController =require('./controllers/expensedetailController');
 const multer = require('multer');
 
 // Initialize multer for file handling
@@ -115,9 +116,9 @@ apiRouter.get('/designations',RoleController.checkRole(['pm','admin']), designat
 apiRouter.post('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.createTask);
 apiRouter.put('/task/:id',RoleController.checkRole(['tl','pm','admin']), taskController.updateTask);
 apiRouter.delete('/task/:id', RoleController.checkRole(['tl','pm','admin']),taskController.deleteTask);
-apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.getTask);
-apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.getAllTasks);
-apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin']), taskController.updateDatas);
+apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin']), taskController.getTask);
+apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin']),taskController.getAllTasks);
+apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
 apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin',,'employee']), taskController.doneTask);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
@@ -127,9 +128,9 @@ apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','em
 apiRouter.post('/subtask', RoleController.checkRole(['tl','pm','admin','employee']),subtaskController.createSubTask);
 apiRouter.put('/subtask/:id',RoleController.checkRole(['tl','pm','admin']), subtaskController.updateSubTask);
 apiRouter.delete('/subtask/:id', RoleController.checkRole(['tl','pm','admin']),subtaskController.deleteSubTask);
-apiRouter.get('/subtask/:id', RoleController.checkRole(['tl','pm','admin','employee']),subtaskController.getSubTask);
-apiRouter.get('/subtask',RoleController.checkRole(['tl','pm','admin','employee']), subtaskController.getAllSubTasks);
-apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(['tl','pm','admin']), subtaskController.updateDatas);
+apiRouter.get('/subtask/:id', RoleController.checkRole(['tl','pm','admin']),subtaskController.getSubTask);
+apiRouter.get('/subtask',RoleController.checkRole(['tl','pm','admin']), subtaskController.getAllSubTasks);
+apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), subtaskController.updateDatas);
 
 
 
@@ -195,6 +196,12 @@ apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(['pm','tl','admin']
 apiRouter.put('/tlotdetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.updatetlOtdetail);
 apiRouter.post('/approve_reject_ot', RoleController.checkRole(['pm','tl','admin']),otdetailController.approve_reject_otdetail);
 
+
+// Expense
+apiRouter.post('/expensedetail', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.createexpensedetail);
+// apiRouter.put('/expensedetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.updateexpensedetail);
+// apiRouter.delete('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.deleteexpensedetail);
+// apiRouter.get('/expensedetail',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.getAllexpensedetails);
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
 
