@@ -113,19 +113,19 @@ apiRouter.get('/designations',RoleController.checkRole(['pm','admin']), designat
 
 
 // Task Routes
-apiRouter.post('/task', RoleController.checkRole(['tl','pm','admin']),taskController.createTask);
+apiRouter.post('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.createTask);
 apiRouter.put('/task/:id',RoleController.checkRole(['tl','pm','admin']), taskController.updateTask);
 apiRouter.delete('/task/:id', RoleController.checkRole(['tl','pm','admin']),taskController.deleteTask);
 apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin']), taskController.getTask);
 apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin']),taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
-apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin']), taskController.doneTask);
+apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin',,'employee']), taskController.doneTask);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
 
 
 // Subtask Routes
-apiRouter.post('/subtask', RoleController.checkRole(['tl','pm','admin']),subtaskController.createSubTask);
+apiRouter.post('/subtask', RoleController.checkRole(['tl','pm','admin','employee']),subtaskController.createSubTask);
 apiRouter.put('/subtask/:id',RoleController.checkRole(['tl','pm','admin']), subtaskController.updateSubTask);
 apiRouter.delete('/subtask/:id', RoleController.checkRole(['tl','pm','admin']),subtaskController.deleteSubTask);
 apiRouter.get('/subtask/:id', RoleController.checkRole(['tl','pm','admin']),subtaskController.getSubTask);
@@ -203,7 +203,7 @@ apiRouter.post('/expensedetail', RoleController.checkRole(['tl','pm','admin','em
 // apiRouter.delete('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.deleteexpensedetail);
 // apiRouter.get('/expensedetail',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.getAllexpensedetails);
 //common
-apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin']),commonController.getDropDownList);
+apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix

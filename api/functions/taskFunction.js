@@ -921,7 +921,11 @@ const lastActiveTask = async (userId) => {
     const lastStartTime = moment(task.start_time);
     const now = moment();
     const timeDifference = now.diff(lastStartTime, "seconds"); // Calculate the difference in seconds
-
+    const totalWorkedTime = task.subtask_id
+    ? moment.duration(task.subtask_total_hours_worked).asSeconds()
+    : moment.duration(task.task_total_hours_worked).asSeconds();
+    const totaltimeTaken=totalWorkedTime+timeDifference;
+    const timeTaken=convertSecondsToHHMMSS(totaltimeTaken);
     // Calculate the time left based on whether it's a subtask or task
     const timeLeft = calculateTimeLeft(
       task.subtask_id
@@ -943,6 +947,7 @@ const lastActiveTask = async (userId) => {
     task.time_exceed_status=task.subtask_total_hours_worked > task.estimated_hours?true:false;
     task.assignedTo=task.subtask_id?task.subtask_assigned_to:task.task_assigned_to;
     task.assignedBy=task.subtask_id?task.subtask_assigned_by:task.task_assigned_by;
+    task.timeTaken=timeTaken;
     
     const keysToRemove = [
       'subtask_priority',
@@ -1483,7 +1488,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         [taskOrSubtask.user_id]
       );
       if (existingSubtaskSublime.length > 0) {
-          return errorResponse(res, "Time Line is Already Started", 400);
+          return errorResponse(res, "You Already have Active Task", 400);
       }
 
 
