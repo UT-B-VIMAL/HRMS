@@ -1,4 +1,5 @@
 const express = require("express");
+const fileUpload = require("express-fileupload");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
@@ -24,9 +25,11 @@ const attendanceController = require('./controllers/attendanceController');
 const commonController = require("./controllers/commonController");
 const empdashboardController = require('./controllers/empdashboardController');
 const commentsController = require('./controllers/commentsController');
-const otdetailController = require('./controllers/otdetailController');
-// const ticketsController =require('./controllers/ticketsController');
+const ticketsController =require('./controllers/ticketsController');
+const multer = require('multer');
 
+// Initialize multer for file handling
+const upload = multer();
 const app = express();
 const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
 const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
@@ -55,13 +58,11 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(bodyParser);
-
-// Allow requests from localhost:5173
-
-
+app.use(express.json({ limit: '50mb' })); 
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const apiRouter = express.Router();
-
+app.use(fileUpload());
+ 
 //authentication
 apiRouter.post('/login', loginController.login);
 apiRouter.post('/logout', loginController.logout);
@@ -117,8 +118,7 @@ apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin']), taskCon
 apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin']),taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
-apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin','employee']), taskController.doneTask);
-apiRouter.get('/deletedTaskList',RoleController.checkRole(['pm','admin']), taskController.deletedTaskList);
+apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin']), taskController.doneTask);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
 
 
@@ -168,6 +168,7 @@ apiRouter.post('/ratingUpdation', RoleController.checkRole(['pm','admin']), rati
 //Attendance
 apiRouter.get('/getAttendanceList', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceList);
 apiRouter.post('/updateAttendance', RoleController.checkRole(['tl','admin']), attendanceController.updateAttendance);
+apiRouter.get('/getAttendanceReport', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceListReport);
 
 
 // Comments
@@ -176,11 +177,11 @@ apiRouter.put('/comments/:id',RoleController.checkRole(['tl','pm','admin','emplo
 apiRouter.delete('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. deleteComments);
 
 //tickets
-// apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getAlltickets);
-// apiRouter.get('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getTickets);
-// apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. addTickets);
-// apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
-// apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
+apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getAlltickets);
+apiRouter.get('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getTickets);
+apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController.createTicket);
+apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
+ //apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
 
 // OT Details
 apiRouter.post('/otdetail', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.createOtdetail);
@@ -194,7 +195,7 @@ apiRouter.put('/tlotdetail/:id',RoleController.checkRole(['tl','pm','admin','emp
 apiRouter.post('/approve_reject_ot', RoleController.checkRole(['pm','tl','admin']),otdetailController.approve_reject_otdetail);
 
 //common
-apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
+apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin']),commonController.getDropDownList);
 
 
 // Use `/api` as a common prefix
