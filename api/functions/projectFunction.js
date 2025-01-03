@@ -393,6 +393,7 @@ exports.projectStatus = async (req, res) => {
       product_id,
       project_id,
       user_id,
+      employee_id,
       date,
       status,
       search,
@@ -401,98 +402,63 @@ exports.projectStatus = async (req, res) => {
     } = req.query;
 
     const offset = (page - 1) * perPage;
-    const loggedInUserQuery = 'SELECT * FROM users WHERE id = ?';
-    
-    const [loggedInUserData] = await db.query(loggedInUserQuery, [ req.query.user_id]);  // Assuming user ID is in `req.user.id`
+    const users = await getAuthUserDetails(user_id, res);
+    if (!users) return;
 
-    if (!loggedInUserData || loggedInUserData.length === 0) {
-      return errorResponse(res, "User not found", "No user data available", 404);
-    }
-
-    const loggedInUserRoleId = loggedInUserData[0].role_id;
-    const loggedInUserTeamId = loggedInUserData[0].team_id;
+    // Filter for role 3 (Assuming role_id 3 is a regular user)
     const taskConditions = [];
     const taskValues = [];
-
     const subtaskConditions = [];
     const subtaskValues = [];
 
-    // Task-specific filters
-    if (loggedInUserRoleId === 3) {
-      taskConditions.push("u.team_id = ?");
-      taskValues.push(loggedInUserTeamId);
-
-      subtaskConditions.push("u.team_id = ?");
-      subtaskValues.push(loggedInUserTeamId);
+    if (users.role_id === 3) {
+      taskConditions.push("tm.reporting_user_id = ?");
+      taskValues.push(users.id);
+      subtaskConditions.push("tm.reporting_user_id = ?");
+      subtaskValues.push(users.id);
     }
 
     if (product_id) {
       taskConditions.push("t.product_id = ?");
       taskValues.push(product_id);
-    }
-    if (project_id) {
-      taskConditions.push("t.project_id = ?");
-      taskValues.push(project_id);
-    }
-    // if (user_id) {
-    //   taskConditions.push("t.user_id = ?");
-    //   taskValues.push(user_id);
-    // }
-
-    if (date) {
-      taskConditions.push("t.created_at = ?");
-      taskValues.push(date);
-    }
-
-    if (status !== undefined) {
-      taskConditions.push("t.status = ?");
-      taskValues.push(status); // Filter by the passed status (default 0)
-    }
-
-    if (search) {
-      const searchTerm = `%${search}%`;
-      taskConditions.push(
-        `(t.name LIKE ?)`
-      );
-      taskValues.push(searchTerm);
-    }
-
-    // Subtask-specific filters
-    if (product_id) {
       subtaskConditions.push("st.product_id = ?");
       subtaskValues.push(product_id);
     }
     if (project_id) {
+      taskConditions.push("t.project_id = ?");
+      taskValues.push(project_id);
       subtaskConditions.push("st.project_id = ?");
       subtaskValues.push(project_id);
     }
-    // if (user_id) {
-    //   subtaskConditions.push("st.user_id = ?");
-    //   subtaskValues.push(user_id);
-    // }
+    if (employee_id) {
+      taskConditions.push("t.user_id = ?");
+      taskValues.push(employee_id);
+      subtaskConditions.push("st.user_id = ?");
+      subtaskValues.push(employee_id);
+    }
     if (date) {
+      taskConditions.push("t.created_at = ?");
+      taskValues.push(date);
       subtaskConditions.push("st.created_at = ?");
       subtaskValues.push(date);
     }
-
     if (status !== undefined) {
+      taskConditions.push("t.status = ?");
+      taskValues.push(status);
       subtaskConditions.push("st.status = ?");
-      subtaskValues.push(status); // Filter by the passed status (default 0)
+      subtaskValues.push(status);
     }
     if (search) {
       const searchTerm = `%${search}%`;
-      subtaskConditions.push(
-        `(st.name LIKE ?)`
-      );
+      taskConditions.push(`(t.name LIKE ?)`);
+      taskValues.push(searchTerm);
+      subtaskConditions.push(`(st.name LIKE ?)`);
       subtaskValues.push(searchTerm);
     }
 
-    const taskWhereClause =
-      taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
-    const subtaskWhereClause =
-      subtaskConditions.length > 0
-        ? `AND ${subtaskConditions.join(" AND ")}`
-        : "";
+    // Construct WHERE clauses
+    const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
+    const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
 
     // Query to fetch subtasks
     const subtasksQuery = `
@@ -508,6 +474,7 @@ exports.projectStatus = async (req, res) => {
         st.estimated_hours AS estimated_time,
         st.total_hours_worked AS time_taken,
         st.rating AS subtask_rating,
+        tm.id AS team_id,
         tm.name AS team_name,
         'Subtask' AS type,
         t.id AS task_id,
@@ -526,9 +493,9 @@ exports.projectStatus = async (req, res) => {
       LEFT JOIN 
         projects pr ON pr.id = t.project_id
       LEFT JOIN 
-          sub_tasks_user_timeline stut ON stut.subtask_id = t.id 
+        sub_tasks_user_timeline stut ON stut.subtask_id = st.id 
       LEFT JOIN 
-        teams tm ON tm.id = u.team_id
+        teams tm ON tm.id = st.team_id
       WHERE 
         st.deleted_at IS NULL
         ${subtaskWhereClause}
@@ -547,6 +514,7 @@ exports.projectStatus = async (req, res) => {
         p.name AS product_name,
         pr.id AS project_id,
         pr.name AS project_name,
+        tm.id AS team_id,
         tm.name AS team_name,
         u.id AS user_id,
         t.status AS task_status,
@@ -556,13 +524,12 @@ exports.projectStatus = async (req, res) => {
       LEFT JOIN 
         users u ON u.id = t.user_id
       LEFT JOIN products p ON p.id = t.product_id
-      LEFT JOIN 
-          sub_tasks_user_timeline stut ON stut.task_id = t.id 
+      LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id 
       LEFT JOIN projects pr ON pr.id = t.project_id
-      LEFT JOIN teams tm ON tm.id = u.team_id
+      LEFT JOIN teams tm ON tm.id = t.team_id
       WHERE t.deleted_at IS NULL
       AND t.id NOT IN (SELECT task_id FROM sub_tasks)
-        ${taskWhereClause}
+      ${taskWhereClause}
     `;
 
     // Execute both queries
@@ -578,20 +545,20 @@ exports.projectStatus = async (req, res) => {
         date: subtask.date,
         product_name: subtask.product_name,
         project_name: subtask.project_name,
-        task_id:subtask.task_id,
+        task_id: subtask.task_id,
         task_name: subtask.task_name,
-        subtask_id:subtask.subtask_id,
+        subtask_id: subtask.subtask_id,
         subtask_name: subtask.subtask_name,
-        user_id:subtask.user_id,
+        user_id: subtask.user_id,
         assignee: subtask.assignee,
         estimated_time: subtask.estimated_time,
         time_taken: subtask.time_taken,
         rating: subtask.subtask_rating,
-        team_name:subtask.team_name,
-        start_time:subtask.start_time,
-        end_time:subtask.end_time,
+        team_id: subtask.team_id,
+        team_name: subtask.team_name,
+        start_time: subtask.start_time,
+        end_time: subtask.end_time,
         subtask_duration: subtask.subtask_duration,
-
       };
     });
 
@@ -609,12 +576,11 @@ exports.projectStatus = async (req, res) => {
         estimated_time: task.estimated_time,
         task_duration: task.task_duration,
         rating: task.rating,
-        team_name:task.team_name,
-        start_time:task.start_time,
-        end_time:task.end_time,
+        team_id: task.team_id,
+        team_name: task.team_name,
+        start_time: task.start_time,
+        end_time: task.end_time,
         task_duration: task.task_duration,
-
-
       };
     });
 
@@ -623,7 +589,7 @@ exports.projectStatus = async (req, res) => {
 
     // Pagination logic
     const totalRecords = results.length;
-    const paginatedData =  results.slice(offset, offset + parseInt(perPage));
+    const paginatedData = results.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
     // Add serial numbers to the paginated data
@@ -632,13 +598,16 @@ exports.projectStatus = async (req, res) => {
       ...row,
     }));
 
-
+    // Send success response
     successResponse(res, { data, pagination }, "Tasks and subtasks retrieved successfully", 200);
   } catch (error) {
     console.error("Error fetching tasks and subtasks:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
+
 
 
 exports.projectRequest = async (req, res) => {
