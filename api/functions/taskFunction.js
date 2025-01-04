@@ -1277,10 +1277,11 @@ exports.getTaskList = async (queryParams, res) => {
 };
 
 // Utility function for calculating time left
-function calculateTimeLeft(estimatedHours, totalHoursWorked) {
+function calculateTimeLeft(estimatedHours, totalHoursWorked,timeDifference) {
   const timeLeft = convertToSeconds(estimatedHours) - convertToSeconds(totalHoursWorked);
-  const time= convertSecondsToHHMMSS(timeLeft);
-  return timeLeft > 0 ? `${time}` : "Completed";
+  const times =timeLeft-timeDifference;
+  const time= convertSecondsToHHMMSS(times);
+  return times > 0 ? `${time}` : "Completed";
 }
 
 exports.doneTaskList = async (req, res) => {

@@ -196,6 +196,7 @@ apiRouter.get('/pmemployeeotdetail',RoleController.checkRole(['pm','admin']), ot
 apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(['pm','tl','admin']), otdetailController.getAlltlemployeeOtdetails);
 apiRouter.put('/tlotdetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.updatetlOtdetail);
 apiRouter.post('/approve_reject_ot', RoleController.checkRole(['pm','tl','admin']),otdetailController.approve_reject_otdetail);
+apiRouter.get('/otReport', RoleController.checkRole(['pm','admin']),otdetailController.getOtReport);
 
 
 // Expense
