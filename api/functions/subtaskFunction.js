@@ -120,7 +120,7 @@ exports.getSubTask = async (id, res) => {
         subtask_id: subtask.id || "N/A",
         task_id: subtask.task_id || "N/A",
         name: subtask.name || "N/A",
-        status: subtask.status || "N/A",
+        status: subtask.status ,
         project_id: subtask.project_id || "N/A",
         project: subtask.project_name || "N/A",
         product_id: subtask.product_id || "N/A",
@@ -142,6 +142,8 @@ exports.getSubTask = async (id, res) => {
         priority: subtask.priority || "N/A",
         description: subtask.description || "N/A",
         status_text: statusMap[subtask.status] || "Unknown",
+        active_status:subtask.active_status ,
+        reopen_status:subtask.reopen_status
       };
     });
     
