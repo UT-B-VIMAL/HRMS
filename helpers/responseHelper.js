@@ -58,8 +58,14 @@ const getPagination = (page, perPage, totalRecords) => {
 function calculateNewWorkedTime(worked, timeDifference) {
   const workedInSeconds = convertToSeconds(worked);
   const newTotalWorkedInSeconds = workedInSeconds + timeDifference;
+
+  // Prevent negative total worked time
+  if (newTotalWorkedInSeconds < 0) {
+    return convertSecondsToHHMMSS(0);
+  }
+
   return convertSecondsToHHMMSS(newTotalWorkedInSeconds);
-};
+}
 
 function convertSecondsToHHMMSS(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600);

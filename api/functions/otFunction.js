@@ -1110,3 +1110,121 @@ exports.getAlltlemployeeOts = async (req, res) => {
   }
 };
 
+exports.getOtReportData = async (queryParams, res) => {
+  try {
+    const {
+      fromDate,
+      toDate,
+      team_id,
+      export_status,
+      page = 1,
+      perPage = 10,
+    } = queryParams;
+
+    // Base query to fetch OT details
+    let baseQuery = `
+      SELECT 
+        ot.user_id,
+        users.first_name AS user_name,
+        ot.project_id,
+        projects.name AS project_name,
+        ot.date,
+        SUM(TIME_TO_SEC(ot.time)) AS total_seconds,
+        ot.comments
+      FROM ot_details ot
+      LEFT JOIN users ON ot.user_id = users.id
+      LEFT JOIN projects ON ot.project_id = projects.id
+      WHERE ot.deleted_at IS NULL
+      AND ot.date BETWEEN ? AND ? 
+      AND ot.team_id IN (?)
+      GROUP BY ot.user_id, ot.date, ot.project_id
+      ORDER BY ot.user_id, ot.date;
+    `;
+
+    const params = [fromDate, toDate, team_id];
+
+    // Fetch the OT data from the database
+    const [otRecords] = await db.query(baseQuery, params);
+
+    // Process the records and group by user_id
+    const report = {};
+
+    otRecords.forEach(record => {
+      // If the user_id doesn't exist in the report object, initialize it
+      if (!report[record.user_id]) {
+        report[record.user_id] = {
+          user_name: record.user_name,
+          projects: {}
+        };
+      }
+
+      // If the project_id doesn't exist for the user, initialize it
+      if (!report[record.user_id].projects[record.project_id]) {
+        report[record.user_id].projects[record.project_id] = {
+          project_name: record.project_name,
+          ot_details: [],
+          total_hours: 0
+        };
+      }
+
+      // Add the date entry to the OT details for the user and project
+      const totalHours = record.total_seconds / 3600; // Convert total seconds to hours
+
+      report[record.user_id].projects[record.project_id].ot_details.push({
+        date: record.date,
+        comments: record.comments,
+        total_hours: totalHours
+      });
+
+      // Update the total hours for the project
+      report[record.user_id].projects[record.project_id].total_hours += totalHours;
+    });
+
+    // Format the report
+    const formattedReport = Object.values(report).map(user => {
+      const projects = Object.values(user.projects).map(project => ({
+        project_name: project.project_name,
+        total_hours: project.total_hours,
+        ot_details: project.ot_details
+      }));
+
+      return {
+        user_name: user.user_name,
+        projects: projects
+      };
+    });
+
+    // Handle export case (no pagination)
+    if (export_status == 1) {
+      const json2csvParser = new Parser();
+      const csv = json2csvParser.parse(formattedReport);
+
+      res.header('Content-Type', 'text/csv');
+      res.attachment('ot_report.csv');
+      return res.send(csv);
+    }
+
+    // Pagination logic
+    const totalRecords = formattedReport.length;
+    const offset = (page - 1) * perPage;
+    const paginatedData = formattedReport.slice(offset, offset + parseInt(perPage));
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    // Return the response
+    successResponse(
+      res,
+      paginatedData,
+      paginatedData.length === 0
+        ? "No overtime records found"
+        : "Overtime records retrieved successfully",
+      200,
+      pagination
+    );
+  } catch (error) {
+    console.error("Error fetching OT report data:", error);
+    return errorResponse(res, error.message, "Server error", 500);
+  }
+};
+
+
+
