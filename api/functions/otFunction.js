@@ -526,7 +526,6 @@ exports.getAllpmemployeeOts = async (req, res) => {
       perPage = 10,
     } = req.query;
 
-    // Ensure status is provided
     if (!status) {
       return errorResponse(
         res,
@@ -548,7 +547,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
         otValues.push(teamIds);
       }
     }
-    // Handle date filters
+
     if (start_date && end_date) {
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
@@ -561,20 +560,16 @@ exports.getAllpmemployeeOts = async (req, res) => {
           400
         );
       }
-      // Both dates are provided; filter by range
       otConditions.push("DATE(ot.date) BETWEEN ? AND ?");
       otValues.push(start_date, end_date);
     } else if (start_date) {
-      // Only start_date is provided; fetch data from start_date onward
       otConditions.push("DATE(ot.date) >= ?");
       otValues.push(start_date);
     } else if (end_date) {
-      // Only end_date is provided; fetch all data up to and including end_date
       otConditions.push("DATE(ot.date) <= ?");
       otValues.push(end_date);
     }
 
-    // Handle search term
     if (search) {
       const searchTerm = `%${search}%`;
       otConditions.push(
@@ -583,7 +578,6 @@ exports.getAllpmemployeeOts = async (req, res) => {
       otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    // Handle status conditions based on the provided status
     if (status) {
       if (status.includes(",")) {
         return errorResponse(
@@ -596,19 +590,14 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
       switch (status) {
         case "0":
-          // All statuses must be 0
           otConditions.push("ot.tl_status != 0 AND ot.pm_status = 0");
           break;
 
         case "1":
-          // ot.status must be 1, and at least one of tl_status or pm_status must be 1
-          otConditions.push(
-            "AND (ot.tl_status = 1 OR ot.pm_status = 1)"
-          );
+          otConditions.push("ot.tl_status = 1 OR ot.pm_status = 1");
           break;
 
         case "2":
-          // All statuses must be 2
           otConditions.push("ot.pm_status = 2 AND (ot.tl_status = 2 OR ot.status = 2)");
           break;
 
@@ -622,83 +611,67 @@ exports.getAllpmemployeeOts = async (req, res) => {
       }
     }
 
-    // Combine all conditions into a WHERE clause
     const otWhereClause =
       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
 
-    // Prepare the query to fetch OT details
     const otQuery = `
-        SELECT 
-          pr.name AS project_name,
-          t.name AS task_name,
-          DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-          ot.time AS employee_time,
-          ot.comments,
-          ot.status,
-          ot.tl_status,
-          ot.pm_status,
-          ot.tledited_time AS tl_time,
-          ot.pmedited_time AS pm_time,
-          ot.id AS ot_id,
-          ot.user_id,
-          u.first_name AS user_first_name,
-          u.last_name AS user_last_name,
-          u.employee_id,
-          d.name AS designation
-        FROM 
-          ot_details ot
-        LEFT JOIN 
-          tasks t ON t.id = ot.task_id
-        LEFT JOIN 
-          projects pr ON pr.id = ot.project_id
-        LEFT JOIN 
-          users u ON u.id = ot.user_id
-        LEFT JOIN 
-          designations d ON d.id = u.designation_id
-        ${otWhereClause}
-        ORDER BY 
-          ot.id
-      `;
+      SELECT 
+        pr.name AS project_name,
+        t.name AS task_name,
+        DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
+        ot.time AS employee_time,
+        ot.comments,
+        ot.status,
+        ot.tl_status,
+        ot.pm_status,
+        ot.tledited_time AS tl_time,
+        ot.pmedited_time AS pm_time,
+        ot.id AS ot_id,
+        ot.user_id,
+        u.first_name AS user_first_name,
+        u.last_name AS user_last_name,
+        u.employee_id,
+        d.name AS designation
+      FROM 
+        ot_details ot
+      LEFT JOIN 
+        tasks t ON t.id = ot.task_id
+      LEFT JOIN 
+        projects pr ON pr.id = ot.project_id
+      LEFT JOIN 
+        users u ON u.id = ot.user_id
+      LEFT JOIN 
+        designations d ON d.id = u.designation_id
+      ${otWhereClause}
+      ORDER BY 
+        ot.id
+    `;
 
-    // Execute the query
     const [ots] = await db.query(otQuery, otValues);
 
-    // Pagination logic
     const totalRecords = ots.length;
     const paginatedData = ots.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
-    // Group the data by user_id and calculate pending counts for status 0
     const data = Object.values(
       paginatedData.reduce((acc, row, index) => {
         const userId = row.user_id;
 
-        // Initialize user group if not already present
         if (!acc[userId]) {
-          if (row.status === 0) {
-            acc[userId] = {
-              employee_name: `${row.user_first_name} ${row.user_last_name}`,
-              employee_id: row.employee_id,
-              designation: row.designation,
-              pending_counts: 0,
-              details: [],
-            };
-          } else {
-            acc[userId] = {
-              employee_name: `${row.user_first_name} ${row.user_last_name}`,
-              employee_id: row.employee_id,
-              designation: row.designation,
-              details: [],
-            };
-          }
+          acc[userId] = {
+            employee_name: `${row.user_first_name} ${row.user_last_name}`,
+            employee_id: row.employee_id,
+            designation: row.designation,
+            total_hours: "00:00:00",
+            pending_counts: 0,
+            details: [],
+          };
         }
 
-        // Increment pending count if status is 0
         if (row.status === 0) {
           acc[userId].pending_counts += 1;
         }
 
-        // Add individual OT details
         acc[userId].details.push({
           s_no: offset + index + 1,
           id: row.ot_id,
@@ -715,21 +688,24 @@ exports.getAllpmemployeeOts = async (req, res) => {
           pmstatus: row.pm_status,
         });
 
+        const currentHours = row.employee_time || "00:00:00";
+        acc[userId].total_hours = addTimes(acc[userId].total_hours, currentHours);
+
         return acc;
       }, {})
     );
-    const totalPendingCounts = Object.values(data).reduce((sum, user) => sum + user.pending_counts, 0);
 
-    // Format the data for the response
+    const totalPendingCounts = data.reduce((sum, user) => sum + user.pending_counts, 0);
+
     const formattedData = data.map((group) => ({
       employee_name: group.employee_name,
       employee_id: group.employee_id,
       designation: group.designation,
+      total_hours: group.total_hours,
       pending_counts: group.pending_counts,
       details: group.details,
     }));
 
-    // Send success response with formatted data and pagination
     successResponse(
       res,
       formattedData,
@@ -738,13 +714,29 @@ exports.getAllpmemployeeOts = async (req, res) => {
         : "OT details retrieved successfully",
       200,
       pagination,
-      totalPendingCounts  // Include the totalPendingCounts in the response
+      totalPendingCounts
     );
   } catch (error) {
     console.error("Error fetching OT details:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+// Utility function to add times in "HH:MM:SS" format
+const addTimes = (time1, time2) => {
+  const [h1, m1, s1] = time1.split(":").map(Number);
+  const [h2, m2, s2] = time2.split(":").map(Number);
+
+  let seconds = s1 + s2;
+  let minutes = m1 + m2 + Math.floor(seconds / 60);
+  let hours = h1 + h2 + Math.floor(minutes / 60);
+
+  seconds %= 60;
+  minutes %= 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
 
 // Approve or reject
 exports.approve_reject_OT = async (payload, res) => {
