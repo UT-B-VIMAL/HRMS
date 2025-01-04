@@ -335,7 +335,7 @@ exports.updateAttendanceData = async (req, res) => {
   
           const [result] = await db.query(query, queryParams);
   
-          if (exportType === 'csv') {
+          if (exportType === true) {
               // Convert data to CSV
               const json2csvParser = new Parser();
               const csv = json2csvParser.parse(result);

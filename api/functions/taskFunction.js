@@ -1870,3 +1870,103 @@ try{
   return errorResponse(res, error.message, 'Error updating product', 500);
 }
 };
+
+exports.getWorkReportData = async (queryParams, res) => {
+  try {
+    const {
+      team_id,
+      fromDate,
+      toDate,
+      search,
+      page = 1,
+      perPage = 10,
+    } = queryParams;
+
+
+
+    // Base query for tasks with subtasks aggregation
+    let baseQuery = `
+      SELECT 
+        tasks.id AS task_id, 
+        tasks.name AS task_name,
+        tasks.priority,
+        tasks.estimated_hours,
+       COALESCE(
+        SEC_TO_TIME(SUM(TIME_TO_SEC(sub_tasks.total_hours_worked))), 
+        tasks.total_hours_worked
+      ) AS total_hours_worked ,
+        tasks.status AS task_status,
+        tasks.reopen_status,
+        tasks.active_status,
+        tasks.product_id,
+        tasks.project_id,
+        tasks.team_id,
+        projects.name AS project_name,
+        users.first_name AS assignee_name,
+        teams.name AS team_name,
+        teams.id AS team_id
+      FROM tasks
+      LEFT JOIN projects ON tasks.project_id = projects.id
+      LEFT JOIN products ON tasks.product_id = products.id
+      LEFT JOIN users ON tasks.user_id = users.id
+      LEFT JOIN teams ON tasks.team_id = teams.id
+      LEFT JOIN sub_tasks AS sub_tasks 
+        ON sub_tasks.task_id= tasks.id AND sub_tasks.deleted_at IS NULL -- Join for subtasks
+      WHERE tasks.deleted_at IS NULL
+    `;
+
+    const params = [];
+
+    // Apply filters
+    if (team_id) {
+      baseQuery += ` AND tasks.team_id = ?`;
+      params.push(team_id);
+    } 
+
+    if (fromDate && toDate) {
+      baseQuery += ` AND tasks.created_at BETWEEN ? AND ?`;
+      params.push(fromDate, toDate);
+    }
+
+    if (search) {
+      baseQuery += ` AND tasks.name LIKE ?`;
+      params.push(`%${search}%`);
+    }
+
+    baseQuery += `
+      GROUP BY tasks.id, tasks.name, tasks.priority, tasks.estimated_hours, 
+               tasks.total_hours_worked, tasks.status, tasks.reopen_status, 
+               tasks.active_status, tasks.product_id, tasks.project_id, 
+               tasks.team_id, projects.name, users.first_name, teams.name, teams.id
+    `;
+
+    // Pagination parameters
+    const offset = (page - 1) * perPage;
+
+    // Fetch data
+    const [tasks] = await db.query(baseQuery, params);
+
+    const totalRecords = tasks.length;
+    const paginatedData = tasks.slice(offset, offset + parseInt(perPage));
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    // Add serial numbers to the paginated data
+    const data = paginatedData.map((row, index) => ({
+      s_no: offset + index + 1,
+      ...row,
+    }));
+
+    successResponse(
+      res,
+      data,
+      data.length === 0
+        ? "No tasks or subtasks found"
+        : "Tasks and subtasks retrieved successfully",
+      200,
+      pagination
+    );
+  } catch (error) {
+    console.error("Error fetching tasks and subtasks:", error);
+    return errorResponse(res, error.message, "Server error", 500);
+  }
+};

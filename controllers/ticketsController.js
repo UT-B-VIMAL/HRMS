@@ -1,6 +1,6 @@
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const Joi = require('joi');
-const { createTicketSchema,updateTicketSchema  } = require("../validators/ticketValidator");
+const { createTicketSchema,updateTicketSchema,ticketCommentSchema } = require("../validators/ticketValidator");
 const fileUpload =require('express-fileupload');
 const {  uploadFileToS3 } = require('../config/s3');
 const db = require('../config/db');
@@ -83,4 +83,66 @@ exports.updateTickets= async (req, res) => {
     return errorResponse(res, error.message, 'Error updating ticket', 500);
   }
 
+};
+
+exports.ticketComments = async (req, res, io) => {
+  const { ticket_id, sender_id, receiver_id, comments } = req.body;
+
+  // Perform validation or other necessary operations
+  const { error } = ticketCommentSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+          acc[err.path[0]] = err.message;
+          return acc;
+      }, {});
+      return res.status(400).json({ status: 'error', message: 'Validation Error', errors: errorMessages });
+  }
+
+  try {
+      // Insert the ticket comment into the database
+      const [result] = await db.execute(
+          `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, NOW(), NOW(), NULL)`,
+          [ticket_id, sender_id, receiver_id, comments]
+      );
+
+      // Fetch the sender and receiver names
+      const [userResult] = await db.execute(
+          `SELECT 
+              CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) AS sender_name,
+              CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) AS receiver_name
+           FROM ticket_comments tc
+           JOIN users sender ON tc.sender_id = sender.id
+           JOIN users receiver ON tc.receiver_id = receiver.id
+           WHERE tc.id = ?`,
+          [result.insertId]
+      );
+
+      if (userResult && userResult.length > 0) {
+          const { sender_name, receiver_name } = userResult[0]; // Access sender and receiver names
+
+          const newComment = {
+              id: result.insertId,
+              ticket_id,
+              sender_id,
+              receiver_id,
+              comments,
+              sender_name,
+              receiver_name,
+              formatted_time: new Date().toLocaleString(),
+              created_at: new Date(),
+          };
+
+          // Emit WebSocket event to all connected users who should receive this comment
+          io.sockets.emit('new_ticket_comment', newComment);  // Send the new comment to all connected users
+
+          // Return success response
+          return res.status(201).json({ status: 'success', message: 'Ticket Comment created successfully', data: newComment });
+      } else {
+          return res.status(404).json({ status: 'error', message: 'User data not found' });
+      }
+  } catch (error) {
+      console.error('Error creating ticket comment:', error.message);
+      return res.status(500).json({ status: 'error', message: 'Error creating ticket comment', error: error.message });
+  }
 };
