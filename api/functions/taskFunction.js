@@ -6,6 +6,7 @@ const {
 const { getAuthUserDetails } = require("../../api/functions/commonFunction");
 const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
+const { Parser } = require('json2csv');
 
 
 // Insert Task
@@ -979,11 +980,12 @@ const lastActiveTask = async (userId) => {
     task.estimated_hours = task.subtask_id ? task.subtask_estimated_hours : task.task_estimated_hours;
     task.total_hours_worked = task.subtask_id ? task.subtask_total_hours_worked : task.task_total_hours_worked;
     task.id = task.subtask_id || task.task_id;
-    task.time_exceed_status=task.subtask_total_hours_worked > task.estimated_hours?true:false;
+    task.time_exceed_status= task.subtask_id ? task.subtask_total_hours_worked > task.subtask_estimated_hours?true:false:task.task_total_hours_worked > task.estimated_hours?true:false;
     task.assignedTo=task.subtask_id?task.subtask_assigned_to:task.task_assigned_to;
     task.assignedBy=task.subtask_id?task.subtask_assigned_by:task.task_assigned_by;
     task.timeTaken=timeTaken;
-    
+    console.log(task.task_total_hours_worked)
+    console.log(task.estimated_hours)
     const keysToRemove = [
       'subtask_priority',
       'task_priority',
@@ -1276,8 +1278,9 @@ exports.getTaskList = async (queryParams, res) => {
 
 // Utility function for calculating time left
 function calculateTimeLeft(estimatedHours, totalHoursWorked) {
-  const timeLeft = estimatedHours - totalHoursWorked;
-  return timeLeft > 0 ? `${timeLeft} hours left` : "Completed";
+  const timeLeft = convertToSeconds(estimatedHours) - convertToSeconds(totalHoursWorked);
+  const time= convertSecondsToHHMMSS(timeLeft);
+  return timeLeft > 0 ? `${time}` : "Completed";
 }
 
 exports.doneTaskList = async (req, res) => {
@@ -1544,12 +1547,20 @@ exports.updateTaskTimeLine = async (req, res) => {
       );
     } else if (action === "pause") {
       const currentTime = moment();
-      const timeDifference = lastStartTime.diff(currentTime, "seconds");
+      const timeDifference =currentTime .diff(lastStartTime, "seconds");
+
+      // Prevent negative time difference
+      let safeTimeDifference = timeDifference;
+      if (timeDifference < 0) {
+        console.warn("Time difference is negative. Adjusting to 0.");
+        safeTimeDifference = 0;
+      }
+
+      // Calculate new total hours worked
       const newTotalHoursWorked = calculateNewWorkedTime(
         taskOrSubtask.total_hours_worked,
-        timeDifference
+        safeTimeDifference
       );
-
       await db.query(
         "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?",
         [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
@@ -1562,25 +1573,30 @@ exports.updateTaskTimeLine = async (req, res) => {
     } else if (action === "end") {
       const currentTime = moment();
       const timeDifference = currentTime.diff(lastStartTime, "seconds");
+      
       const newTotalHoursWorked = calculateNewWorkedTime(
         taskOrSubtask.total_hours_worked,
         timeDifference
       );
+      
       const estimatedHours = taskOrSubtask.estimated_hours;
-
+      
       const newTotalHoursWorkedSeconds = convertToSeconds(newTotalHoursWorked);
       const estimatedHoursSeconds = convertToSeconds(estimatedHours);
-
-      const remainingSeconds =
-        estimatedHoursSeconds - newTotalHoursWorkedSeconds;
+      
+      const remainingSeconds = estimatedHoursSeconds - newTotalHoursWorkedSeconds;
       let extendedHours = "00:00:00";
-
+      
       if (remainingSeconds < 0) {
-        extendedHours = new Date(Math.abs(remainingSeconds) * 1000)
-          .toISOString()
-          .substr(11, 8);
+        // Convert absolute seconds to HH:MM:SS
+        const absSeconds = Math.abs(remainingSeconds);
+        const hours = Math.floor(absSeconds / 3600).toString().padStart(2, "0");
+        const minutes = Math.floor((absSeconds % 3600) / 60).toString().padStart(2, "0");
+        const seconds = (absSeconds % 60).toString().padStart(2, "0");
+      
+        extendedHours = `${hours}:${minutes}:${seconds}`;
       }
-
+      
       await db.query(
         "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?",
         [
@@ -1878,23 +1894,18 @@ exports.getWorkReportData = async (queryParams, res) => {
       fromDate,
       toDate,
       search,
+      export_status,
       page = 1,
       perPage = 10,
     } = queryParams;
 
-
-
-    // Base query for tasks with subtasks aggregation
     let baseQuery = `
       SELECT 
         tasks.id AS task_id, 
         tasks.name AS task_name,
         tasks.priority,
         tasks.estimated_hours,
-       COALESCE(
-        SEC_TO_TIME(SUM(TIME_TO_SEC(sub_tasks.total_hours_worked))), 
-        tasks.total_hours_worked
-      ) AS total_hours_worked ,
+        tasks.total_hours_worked,
         tasks.status AS task_status,
         tasks.reopen_status,
         tasks.active_status,
@@ -1902,27 +1913,22 @@ exports.getWorkReportData = async (queryParams, res) => {
         tasks.project_id,
         tasks.team_id,
         projects.name AS project_name,
-        users.first_name AS assignee_name,
-        teams.name AS team_name,
-        teams.id AS team_id
+        users.first_name AS assignee_name
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
-      LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users ON tasks.user_id = users.id
-      LEFT JOIN teams ON tasks.team_id = teams.id
-      LEFT JOIN sub_tasks AS sub_tasks 
-        ON sub_tasks.task_id= tasks.id AND sub_tasks.deleted_at IS NULL -- Join for subtasks
       WHERE tasks.deleted_at IS NULL
     `;
 
     const params = [];
 
-    // Apply filters
     if (team_id) {
-      baseQuery += ` AND tasks.team_id = ?`;
-      params.push(team_id);
-    } 
-
+      const teamIds = team_id.split(',').map(id => id.trim());
+      if (teamIds.length > 0) {
+        baseQuery += `AND tasks.team_id IN (${teamIds.map(() => '?').join(',')})`;
+        params.push(...teamIds);
+      }
+    }
     if (fromDate && toDate) {
       baseQuery += ` AND tasks.created_at BETWEEN ? AND ?`;
       params.push(fromDate, toDate);
@@ -1933,28 +1939,70 @@ exports.getWorkReportData = async (queryParams, res) => {
       params.push(`%${search}%`);
     }
 
-    baseQuery += `
-      GROUP BY tasks.id, tasks.name, tasks.priority, tasks.estimated_hours, 
-               tasks.total_hours_worked, tasks.status, tasks.reopen_status, 
-               tasks.active_status, tasks.product_id, tasks.project_id, 
-               tasks.team_id, projects.name, users.first_name, teams.name, teams.id
-    `;
-
-    // Pagination parameters
-    const offset = (page - 1) * perPage;
-
-    // Fetch data
+    // Fetch tasks data
     const [tasks] = await db.query(baseQuery, params);
 
+    // Fetch subtasks data
+    const subtaskQuery = `
+      SELECT 
+       task_id,
+       total_hours_worked
+      FROM sub_tasks
+    `;
+    
+    const [subtasks] = await db.query(subtaskQuery);
+
+    // Create a map of task_id to total work hours
+    const subtaskMap = subtasks.reduce((acc, subtask) => {
+      const seconds = convertToSeconds(subtask.total_hours_worked);
+      acc[subtask.task_id] = (acc[subtask.task_id] || 0) + seconds;
+      return acc;
+    }, {});
+
+    // Function to convert time (HH:MM:SS) to seconds
+    
+
+    // Handle export case (no pagination)
+    if (export_status == 1) {
+      const result = tasks.map((task ,index) => {
+        const subtaskSeconds = subtaskMap[task.task_id] || 0;
+        const taskSeconds = task.total_hours_worked ? convertToSeconds(task.total_hours_worked) : 0;
+        const totalSeconds = subtaskSeconds + taskSeconds;
+
+        return {
+          s_no: index + 1,
+          ...task,
+          total_work_hours: convertSecondsToHHMMSS(totalSeconds),
+        };
+      });
+
+      // Convert data to CSV
+      const json2csvParser = new Parser();
+      const csv = json2csvParser.parse(result);
+
+      res.header('Content-Type', 'text/csv');
+      res.attachment('work_report_data.csv');
+      return res.send(csv);
+    }
+
+    // Pagination logic (only applied when no exportType)
     const totalRecords = tasks.length;
+    const offset = (page - 1) * perPage;
     const paginatedData = tasks.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
-    // Add serial numbers to the paginated data
-    const data = paginatedData.map((row, index) => ({
-      s_no: offset + index + 1,
-      ...row,
-    }));
+    // Process data with total work hours calculated
+    const data = paginatedData.map((task, index) => {
+      const subtaskSeconds = subtaskMap[task.task_id] || 0;
+      const taskSeconds = task.total_hours_worked ? convertToSeconds(task.total_hours_worked) : 0;
+      const totalSeconds = subtaskSeconds + taskSeconds;
+
+      return {
+        s_no: offset + index + 1,
+        ...task,
+        total_work_hours: convertSecondsToHHMMSS(totalSeconds),
+      };
+    });
 
     successResponse(
       res,
@@ -1970,3 +2018,9 @@ exports.getWorkReportData = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
+
+
+
+
