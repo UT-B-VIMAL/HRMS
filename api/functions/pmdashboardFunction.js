@@ -415,6 +415,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         s.name AS subtask_name,
         s.status AS subtask_status,
         s.active_status AS subtask_active_status,
+        s.reopen_status AS subtask_reopen_status,
         s.estimated_hours AS subtask_estimation_hours,
         s.description AS subtask_description,
         te.name AS team_name,
@@ -462,15 +463,17 @@ exports.fetchPmviewproductdata = async (req, res) => {
 
     // Helper function to validate subtask inclusion based on status
     const isValidSubtask = (subtask, status) => {
+      console.log(subtask);
+      
       switch (status) {
         case "Pending":
-          return subtask.active_status === 0 && subtask.status === 0 && subtask.reopenStatus === 0;
+          return subtask.active_status === 0 && subtask.status === 0 && subtask.reopen_status === 0;
         case "In Progress":
           return subtask.active_status === 1 && subtask.status === 1;
         case "In Review":
-          return subtask.reopenStatus === 0 && subtask.status === 2;
+          return subtask.reopen_status === 0 && subtask.status === 2;
         case "On Hold":
-          return subtask.active_status === 0 && subtask.reopenStatus === 0 && subtask.status === 1;
+          return subtask.active_status === 0 && subtask.status === 1 && subtask.reopen_status === 0;
         case "Done":
           return subtask.status === 3;
         default:
@@ -572,6 +575,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
             name: row.subtask_name,
             status: row.subtask_status,
             active_status: row.subtask_active_status,
+            reopen_status: row.subtask_reopen_status,
             estimated_hours: row.subtask_estimation_hours,
             description: row.subtask_description,
           }
