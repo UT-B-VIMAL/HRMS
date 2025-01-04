@@ -1,4 +1,4 @@
-const { createTask, updateTask, deleteTask, getTask, getAllTasks,updateTaskData,getTaskList,updateTaskTimeLine,doneTaskList,deleteTaskList, restoreTasks } = require('../api/functions/taskFunction');
+const { createTask, updateTask, deleteTask, getTask, getAllTasks,updateTaskData,getTaskList,updateTaskTimeLine,doneTaskList,deleteTaskList, restoreTasks, getWorkReportData } = require('../api/functions/taskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const { createTaskSchema, updateTaskSchema,updateTaskDataSchema } = require("../validators/taskValidator");
 const Joi = require('joi');
@@ -155,6 +155,16 @@ const taskController = {
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error updating task timeline', 500);
+    }
+  },
+  
+  workReport: async (req, res) => {
+    try {
+      const queryParams = req.query;
+      await getWorkReportData(queryParams, res);
+
+    } catch (error) {
+      return errorResponse(res, error.message, 'Error fetching task', 500);
     }
   },
 };
