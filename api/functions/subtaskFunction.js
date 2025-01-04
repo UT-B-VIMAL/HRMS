@@ -318,12 +318,12 @@ exports.updatesubTaskData = async (id, payload, res) => {
       payload.team_id = assignee[0].team_id;
     }
 
-    // if (owner_id) {
-    //   const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [owner_id]);
-    //   if (user.length === 0) {
-    //     return errorResponse(res, null, 'Owner not found or has been deleted', 404);
-    //   }
-    // }
+    if (assigned_user_id) {
+      const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
+      if (user.length === 0) {
+        return errorResponse(res, null, 'Owner not found or has been deleted', 404);
+      }
+    }
 
     if (team_id) {
       const [team] = await db.query('SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL', [team_id]);
