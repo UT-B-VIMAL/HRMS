@@ -463,7 +463,6 @@ exports.fetchPmviewproductdata = async (req, res) => {
 
     // Helper function to validate subtask inclusion based on status
     const isValidSubtask = (subtask, status) => {
-      console.log(subtask);
       
       switch (status) {
         case "Pending":

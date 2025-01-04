@@ -310,16 +310,16 @@ exports.updatesubTaskData = async (id, payload, res) => {
   };
 
   try {
-    if (assigned_user_id) {
-      const [assignedUser] = await db.query('SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
-      if (assignedUser.length === 0) {
+    if (user_id) {
+      const [assignee] = await db.query('SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL', [user_id]);
+      if (assignee.length === 0) {
         return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
       }
-      payload.team_id = assignedUser[0].team_id;
+      payload.team_id = assignee[0].team_id;
     }
 
-    if (owner_id) {
-      const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [owner_id]);
+    if (assigned_user_id) {
+      const [user] = await db.query('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL', [assigned_user_id]);
       if (user.length === 0) {
         return errorResponse(res, null, 'Owner not found or has been deleted', 404);
       }

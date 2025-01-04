@@ -28,6 +28,8 @@ const commentsController = require('./controllers/commentsController');
 const ticketsController =require('./controllers/ticketsController');
 const otdetailController =require('./controllers/otdetailController');
 const expensedetailController =require('./controllers/expensedetailController');
+const reportController = require('./controllers/reportController')
+
 const multer = require('multer');
 const upload = multer();
 const app = express();
@@ -207,6 +209,9 @@ apiRouter.delete('/expensedetail/:id', RoleController.checkRole(['tl','pm','admi
 apiRouter.get('/expensedetail',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.getAllexpensedetails);
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
+
+//reports
+apiRouter.get('/getTimeReport', RoleController.checkRole(['tl','admin']), reportController.getTimeListReport);
 
 
 // Use `/api` as a common prefix
