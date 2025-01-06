@@ -1104,119 +1104,107 @@ exports.getAlltlemployeeOts = async (req, res) => {
 
 exports.getOtReportData = async (queryParams, res) => {
   try {
-    const {
-      fromDate,
-      toDate,
-      team_id,
-      export_status,
-      page = 1,
-      perPage = 10,
-    } = queryParams;
+    const { from_date, to_date, team_id, search } = queryParams.query;
+    console.log("Query Params:", { from_date, to_date, team_id, search });
 
-    // Base query to fetch OT details
+    // Base query with filters
     let baseQuery = `
       SELECT 
-        ot.user_id,
-        users.first_name AS user_name,
-        ot.project_id,
-        projects.name AS project_name,
-        ot.date,
-        SUM(TIME_TO_SEC(ot.time)) AS total_seconds,
-        ot.comments
-      FROM ot_details ot
-      LEFT JOIN users ON ot.user_id = users.id
-      LEFT JOIN projects ON ot.project_id = projects.id
-      WHERE ot.deleted_at IS NULL
-      AND ot.date BETWEEN ? AND ? 
-      AND ot.team_id IN (?)
-      GROUP BY ot.user_id, ot.date, ot.project_id
-      ORDER BY ot.user_id, ot.date;
+          user_id,
+          JSON_ARRAYAGG(DATE(date)) AS date,
+          JSON_ARRAYAGG(projects.name) AS projects,
+          JSON_ARRAYAGG(time) AS time,
+          JSON_ARRAYAGG(comments) AS work_done,
+          teams.name AS team_name,
+          SEC_TO_TIME(SUM(TIME_TO_SEC(time))) AS total_hours,
+          users.first_name AS user_name,
+          users.employee_id AS employee_id
+      FROM 
+          ot_details
+      LEFT JOIN projects ON projects.id = ot_details.project_id
+      LEFT JOIN teams ON teams.id = ot_details.team_id
+      LEFT JOIN users ON users.id = ot_details.user_id
+      WHERE 
+          ot_details.deleted_at IS NULL
+          AND ot_details.pm_status = 2
+          AND (ot_details.date BETWEEN ? AND ?)
     `;
 
-    const params = [fromDate, toDate, team_id];
+    const params = [from_date, to_date];
 
-    // Fetch the OT data from the database
-    const [otRecords] = await db.query(baseQuery, params);
+    // Add team_id filter if provided
+    if (team_id) {
+      baseQuery += ` AND ot_details.team_id = ?`;
+      params.push(team_id);
+    }
 
-    // Process the records and group by user_id
-    const report = {};
+    // Add search filter if provided
+    if (search) {
+      baseQuery += `
+        AND (
+          users.first_name LIKE ? OR 
+          users.employee_id LIKE ? OR 
+          teams.name LIKE ? OR 
+          projects.name LIKE ?
+        )
+      `;
+      const searchParam = `%${search}%`;
+      params.push(searchParam, searchParam, searchParam, searchParam);
+    }
 
-    otRecords.forEach(record => {
-      // If the user_id doesn't exist in the report object, initialize it
-      if (!report[record.user_id]) {
-        report[record.user_id] = {
-          user_name: record.user_name,
-          projects: {}
-        };
-      }
+    baseQuery += `
+      GROUP BY 
+          user_id, team_name, user_name
+    `;
 
-      // If the project_id doesn't exist for the user, initialize it
-      if (!report[record.user_id].projects[record.project_id]) {
-        report[record.user_id].projects[record.project_id] = {
-          project_name: record.project_name,
-          ot_details: [],
-          total_hours: 0
-        };
-      }
+    // Execute the query
+    const [results] = await db.query(baseQuery, params);
+    console.log("Query Results:", results);
 
-      // Add the date entry to the OT details for the user and project
-      const totalHours = record.total_seconds / 3600; // Convert total seconds to hours
+    // Format response with time in HH hrs MM mins
+    const data = results.map((row, index) => {
+      // Format total_hours
+      const totalSeconds = row.total_hours ? row.total_hours.split(':') : [0, 0, 0];
+      const hours = parseInt(totalSeconds[0], 10) || 0;
+      const minutes = parseInt(totalSeconds[1], 10) || 0;
+      const formattedTotalTime = `${hours} hrs ${minutes} mins`;
 
-      report[record.user_id].projects[record.project_id].ot_details.push({
-        date: record.date,
-        comments: record.comments,
-        total_hours: totalHours
-      });
-
-      // Update the total hours for the project
-      report[record.user_id].projects[record.project_id].total_hours += totalHours;
-    });
-
-    // Format the report
-    const formattedReport = Object.values(report).map(user => {
-      const projects = Object.values(user.projects).map(project => ({
-        project_name: project.project_name,
-        total_hours: project.total_hours,
-        ot_details: project.ot_details
-      }));
+      // Format time array (safeguard against null or invalid array)
+      const formattedTimeArray =
+        Array.isArray(row.time) && row.time.length
+          ? row.time.map((timeString) => {
+              if (timeString) {
+                const timeParts = timeString.split(':'); // Split time into [hh, mm, ss]
+                const timeHours = parseInt(timeParts[0], 10) || 0;
+                const timeMinutes = parseInt(timeParts[1], 10) || 0;
+                return `${timeHours} hrs ${timeMinutes} mins`;
+              }
+              return "0 hrs 0 mins"; // Default for invalid/missing time entries
+            })
+          : ["0 hrs 0 mins"]; // Default if time is empty/null
 
       return {
-        user_name: user.user_name,
-        projects: projects
+        s_no: index + 1,
+        ...row,
+        time: formattedTimeArray, // Replace time with formatted array
+        total_hours: formattedTotalTime, // Replace total_hours with formatted value
       };
     });
 
-    // Handle export case (no pagination)
-    if (export_status == 1) {
-      const json2csvParser = new Parser();
-      const csv = json2csvParser.parse(formattedReport);
-
-      res.header('Content-Type', 'text/csv');
-      res.attachment('ot_report.csv');
-      return res.send(csv);
-    }
-
-    // Pagination logic
-    const totalRecords = formattedReport.length;
-    const offset = (page - 1) * perPage;
-    const paginatedData = formattedReport.slice(offset, offset + parseInt(perPage));
-    const pagination = getPagination(page, perPage, totalRecords);
-
-    // Return the response
     successResponse(
       res,
-      paginatedData,
-      paginatedData.length === 0
-        ? "No overtime records found"
-        : "Overtime records retrieved successfully",
-      200,
-      pagination
+      data,
+      data.length === 0 ? "No OT records found" : "OT report generated successfully",
+      200
     );
   } catch (error) {
-    console.error("Error fetching OT report data:", error);
+    console.error("Error generating OT report:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
+
 
 
 

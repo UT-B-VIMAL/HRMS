@@ -6,7 +6,8 @@ const {
   getAllOts,
   getAllpmemployeeOts,
   getAlltlemployeeOts,
-  approve_reject_OT
+  approve_reject_OT,
+  getOtReportData
 } = require("../api/functions/otFunction");
 const { successResponse, errorResponse } = require("../helpers/responseHelper");
 const Joi = require("joi");
@@ -117,6 +118,14 @@ exports.getAllpmemployeeOtdetails = async (req, res) => {
 exports.getAlltlemployeeOtdetails = async (req, res) => {
   try {
     await getAlltlemployeeOts(req, res);
+  } catch (error) {
+    return errorResponse(res, error.message, "Error retrieving OT detail", 500);
+  }
+};
+
+exports.getOtReport = async (req, res) => {
+  try {
+    await getOtReportData(req, res);
   } catch (error) {
     return errorResponse(res, error.message, "Error retrieving OT detail", 500);
   }
