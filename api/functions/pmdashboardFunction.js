@@ -475,6 +475,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
           return subtask.active_status === 0 && subtask.status === 1 && subtask.reopen_status === 0;
         case "Done":
           return subtask.status === 3;
+          case "Re Open":
+          return subtask.reopen_status === 1;
         default:
           return false;
       }
@@ -540,6 +542,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
       "In Review": [],
       "On Hold": [],
       Done: [],
+      "Re Open": [],
     };
 
     // Track added task IDs for each section
@@ -549,6 +552,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
       "In Review": [],
       "On Hold": [],
       Done: [],
+      "Re Open": [],
     };
 
     // Process each row and categorize tasks
@@ -686,11 +690,13 @@ exports.fetchPmviewproductdata = async (req, res) => {
       InReviewTasks: groupedTasks["In Review"],
       OnHoldTasks: groupedTasks["On Hold"],
       DoneTasks: groupedTasks["Done"],
+      ReOpenTasks: groupedTasks["Re Open"],
       TodoCount: groupedTasks["Pending"].length,
       InProgressCount: groupedTasks["In Progress"].length,
       InReviewCount: groupedTasks["In Review"].length,
       OnHoldCount: groupedTasks["On Hold"].length,
       DoneCount: groupedTasks["Done"].length,
+      ReOpenCount: groupedTasks["Re Open"].length,
       TaskCount: taskCount,
       OverallCompletionPercentage: OverallCompletionPercentage,
       productname: product.name,

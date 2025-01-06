@@ -143,7 +143,7 @@ apiRouter.get('/pmproducts',RoleController.checkRole(['pm','admin']), pmdashboar
 apiRouter.get('/pmutilization',RoleController.checkRole(['pm','admin']), pmdashboardController.pmutilizationsection);
 apiRouter.get('/pmattendance',RoleController.checkRole(['pm','admin']), pmdashboardController.pmattendancesection);
 apiRouter.get('/pmdashboard',RoleController.checkRole(['pm','admin']), pmdashboardController.pmdashboardsection);
-apiRouter.get('/pmviewproduct',RoleController.checkRole(['pm','admin']), pmdashboardController.pmviewproductsection);
+apiRouter.get('/pmviewproduct',RoleController.checkRole(['pm','tl','admin']), pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
 apiRouter.get('/tlattendance',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlattendancesection);
@@ -207,6 +207,10 @@ apiRouter.get('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin',
 apiRouter.put('/expensedetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.updateexpensedetail);
 apiRouter.delete('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.deleteexpensedetail);
 apiRouter.get('/expensedetail',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.getAllexpensedetails);
+apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(['pm','admin']), expensedetailController.getAllpmemployeeexpensedetails);
+apiRouter.post('/approve_reject_expense', RoleController.checkRole(['pm','tl','admin']),expensedetailController.approve_reject_expensedetail);
+
+
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
 
