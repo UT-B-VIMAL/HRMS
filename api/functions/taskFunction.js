@@ -984,8 +984,6 @@ const lastActiveTask = async (userId) => {
     task.assignedTo=task.subtask_id?task.subtask_assigned_to:task.task_assigned_to;
     task.assignedBy=task.subtask_id?task.subtask_assigned_by:task.task_assigned_by;
     task.timeTaken=timeTaken;
-    console.log(task.task_total_hours_worked)
-    console.log(task.estimated_hours)
     const keysToRemove = [
       'subtask_priority',
       'task_priority',
@@ -1087,15 +1085,26 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     if (role_id === 4) {
+      // Check if subtasks exist
       baseQuery += ` AND (
-        tasks.user_id = ? OR 
-        EXISTS (
-          SELECT 1 FROM sub_tasks 
-          WHERE sub_tasks.task_id = tasks.id AND sub_tasks.user_id = ? AND sub_tasks.deleted_at IS NULL
+        (
+          EXISTS (
+            SELECT 1 FROM sub_tasks 
+            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL
+          ) AND EXISTS (
+            SELECT 1 FROM sub_tasks 
+            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.user_id = ? AND sub_tasks.deleted_at IS NULL
+          )
+        ) OR (
+          NOT EXISTS (
+            SELECT 1 FROM sub_tasks 
+            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL
+          ) AND tasks.user_id = ?
         )
       )`;
       params.push(user_id, user_id);
     }
+    
 
     // Additional filters
     if (product_id) {
