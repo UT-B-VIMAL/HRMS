@@ -95,7 +95,8 @@ exports.getTimeListReport = async (req, res) => {
             LEFT JOIN employee_leave el ON el.user_id = u.id
             WHERE u.deleted_at IS NULL
         `);
-        const pagination = getPagination(page, perPage, totalRecords[0].count);
+       
+        const pagination = getPagination(page, perPage, totalRecords[0]?.[0]?.count  || 0);
 
         result.forEach(item => {
             item.total_worked_hours = formatHoursToHHMM(item.total_worked_hours);
