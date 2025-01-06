@@ -5,6 +5,7 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
+const { Parser } = require("json2csv");
 
 // Insert OT
 exports.createOt = async (payload, res) => {
@@ -1102,10 +1103,12 @@ exports.getAlltlemployeeOts = async (req, res) => {
   }
 };
 
+
 exports.getOtReportData = async (queryParams, res) => {
   try {
-    const { from_date, to_date, team_id, search } = queryParams.query;
-    console.log("Query Params:", { from_date, to_date, team_id, search });
+    const { from_date, to_date, team_id, search, export_status, page = 1, perPage = 10 } = queryParams.query;
+
+    const offset = (page - 1) * perPage;
 
     // Base query with filters
     let baseQuery = `
@@ -1132,12 +1135,13 @@ exports.getOtReportData = async (queryParams, res) => {
 
     const params = [from_date, to_date];
 
-    // Add team_id filter if provided
     if (team_id) {
-      baseQuery += ` AND ot_details.team_id = ?`;
-      params.push(team_id);
+      const teamIds = team_id.split(',').map(id => id.trim());
+      if (teamIds.length > 0) {
+        baseQuery += `AND ot_details.team_id IN (${teamIds.map(() => '?').join(',')})`;
+        params.push(...teamIds);
+      }
     }
-
     // Add search filter if provided
     if (search) {
       baseQuery += `
@@ -1156,52 +1160,74 @@ exports.getOtReportData = async (queryParams, res) => {
       GROUP BY 
           user_id, team_name, user_name
     `;
+    if (export_status !== "1") {
+      baseQuery += ` LIMIT ? OFFSET ?`;
+      params.push(parseInt(perPage, 10), parseInt(offset, 10));
+    }
 
-    // Execute the query
     const [results] = await db.query(baseQuery, params);
-    console.log("Query Results:", results);
 
-    // Format response with time in HH hrs MM mins
     const data = results.map((row, index) => {
-      // Format total_hours
       const totalSeconds = row.total_hours ? row.total_hours.split(':') : [0, 0, 0];
       const hours = parseInt(totalSeconds[0], 10) || 0;
       const minutes = parseInt(totalSeconds[1], 10) || 0;
       const formattedTotalTime = `${hours} hrs ${minutes} mins`;
-
-      // Format time array (safeguard against null or invalid array)
-      const formattedTimeArray =
-        Array.isArray(row.time) && row.time.length
-          ? row.time.map((timeString) => {
-              if (timeString) {
-                const timeParts = timeString.split(':'); // Split time into [hh, mm, ss]
-                const timeHours = parseInt(timeParts[0], 10) || 0;
-                const timeMinutes = parseInt(timeParts[1], 10) || 0;
-                return `${timeHours} hrs ${timeMinutes} mins`;
-              }
-              return "0 hrs 0 mins"; // Default for invalid/missing time entries
-            })
-          : ["0 hrs 0 mins"]; // Default if time is empty/null
-
+    
+      const formattedTimeArray = Array.isArray(row.time)
+        ? row.time.map((timeString) => {
+            if (timeString) {
+              const timeParts = timeString.split(':');
+              const timeHours = parseInt(timeParts[0], 10) || 0;
+              const timeMinutes = parseInt(timeParts[1], 10) || 0;
+              return `${timeHours} hrs ${timeMinutes} mins`;
+            }
+            return "0 hrs 0 mins";
+          })
+        : ["0 hrs 0 mins"];
+    
       return {
-        s_no: index + 1,
-        ...row,
-        time: formattedTimeArray, // Replace time with formatted array
-        total_hours: formattedTotalTime, // Replace total_hours with formatted value
+        s_no: export_status === "1" ? index + 1 : offset + index + 1,
+        ...(export_status !== "1" && { user_id: row.user_id }), 
+        employee_id: row.employee_id || "N/A",
+        employee_id: row.employee_id || "N/A",
+        date: export_status === "1" ? row.date.join(", ") : row.date,
+        projects:  export_status === "1"  ? row.projects.join(", ") : row.projects, 
+        time:  export_status === "1" ? formattedTimeArray.join(", "):formattedTimeArray, 
+        work_done:  export_status === "1" ?  row.work_done.join(", ") : row.work_done, 
+        team_name: row.team_name || "N/A",
+        total_hours: formattedTotalTime,
+        user_name: row.user_name || "N/A",
       };
     });
+    
 
+    // Handle CSV export
+    if (export_status === "1") {
+      const json2csvParser = new Parser();
+      const csv = json2csvParser.parse(data);
+      res.header("Content-Type", "text/csv");
+      res.attachment("ot_report_data.csv");
+      return res.send(csv);
+      
+    }
+    const totalRecords = data.length;
+    const pagination = getPagination(page, perPage, totalRecords);
+    // Standard response for non-export requests with pagination
     successResponse(
       res,
       data,
-      data.length === 0 ? "No OT records found" : "OT report generated successfully",
-      200
+      data.length === 0
+        ? "No tasks or subtasks found"
+        : "Tasks and subtasks retrieved successfully",
+      200,
+      pagination
     );
   } catch (error) {
     console.error("Error generating OT report:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
 
 
 
