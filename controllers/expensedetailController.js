@@ -3,7 +3,9 @@ const {
     updateexpenses,
     getexpense,
     deleteExpense,
-    getAllexpense
+    getAllexpense,
+    getAllpmemployeexpense,
+    approve_reject_expense
   } = require("../api/functions/expenseFunction");
   const { errorResponse } = require("../helpers/responseHelper");
   const Joi = require("joi");
@@ -29,11 +31,11 @@ const {
       return errorResponse(res, error.message, "Error creating Expense detail", 500);
     }
   };
-  exports.approve_reject_otdetail = async (req, res) => {
+  exports.approve_reject_expensedetail = async (req, res) => {
     try {
       const payload = req.body;
   
-      await approve_reject_OT(payload, res);
+      await approve_reject_expense(payload, res);
     } catch (error) {
       console.error("Error upadating status:", error.message);
       return errorResponse(res, error.message, "Error upadating status", 500);
@@ -85,14 +87,14 @@ const {
       return errorResponse(res, error.message, "Error retrieving Expense detail", 500);
     }
   };
-  exports.getAllpmemployeeOtdetails = async (req, res) => {
+  exports.getAllpmemployeeexpensedetails = async (req, res) => {
     try {
-      await getAllpmemployeeOts(req, res);
+      await getAllpmemployeexpense(req, res);
     } catch (error) {
-      return errorResponse(res, error.message, "Error retrieving OT detail", 500);
+      return errorResponse(res, error.message, "Error retrieving Expense detail", 500);
     }
   };
-  exports.getAlltlemployeeOtdetails = async (req, res) => {
+  exports.getAlltlemployeexpensedetails = async (req, res) => {
     try {
       await getAlltlemployeeOts(req, res);
     } catch (error) {

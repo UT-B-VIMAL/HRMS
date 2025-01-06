@@ -271,6 +271,7 @@ exports.fetchTLproducts = async (req, res) => {
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
+
     const [rows] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
@@ -297,6 +298,7 @@ exports.fetchTLproducts = async (req, res) => {
     if (product_id) {
       productIds = product_id.split(",").map((id) => parseInt(id.trim(), 10));
     }
+
     // Fetch products (filtered by product_id if provided)
     const productsQuery = productIds.length
       ? "SELECT * FROM products WHERE id IN (?) AND deleted_at IS NULL"
@@ -372,7 +374,7 @@ exports.fetchTLproducts = async (req, res) => {
         let employeeList = [];
         if (workingEmployees.size > 0) {
           const employeeDetailsQuery = `
-                      SELECT id,employee_id, 
+                      SELECT id, employee_id, 
                              COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
                       FROM users 
                       WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
@@ -383,14 +385,15 @@ exports.fetchTLproducts = async (req, res) => {
           ]);
 
           employeeList = employees.map((user) => {
-            const words = user.full_name ? user.full_name.split(" ") : [];
+            const fullName = user.full_name || "N/A";
+            const words = fullName.split(" ");
             const initials =
               words.length > 1
-                ? words.map((word) => word[0].toUpperCase()).join("")
-                : (words[0] || "").slice(0, 2).toUpperCase();
+                ? words.map((word) => (word[0] || "").toUpperCase()).join("")
+                : fullName.slice(0, 2).toUpperCase();
 
             return {
-              employee_name: user.full_name || "N/A",
+              employee_name: fullName,
               employee_id: user.employee_id || "N/A",
               initials: initials,
             };
@@ -422,6 +425,7 @@ exports.fetchTLproducts = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching products", 500);
   }
 };
+
 
 exports.fetchTLresourceallotment = async (req, res) => {
   try {
@@ -845,29 +849,34 @@ exports.fetchTLdatas = async (req, res) => {
         const completionPercentage =
           totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
-        let employeeList = [];
-        if (workingEmployees.size > 0) {
-          const [employees] = await db.query(
-            `
-          SELECT id,employee_id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
-          FROM users WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
-        `,
-            [Array.from(workingEmployees), teamIds]
-          );
-
-          employeeList = employees.map((user) => {
-            const words = user.full_name ? user.full_name.split(" ") : [];
-            const initials =
-              words.length > 1
-                ? words.map((word) => word[0].toUpperCase()).join("")
-                : (words[0] || "").slice(0, 2).toUpperCase();
-            return {
-              employee_name: user.full_name || "N/A",
-              employee_id: user.employee_id || "N/A",
-              initials,
-            };
-          });
-        }
+          let employeeList = [];
+          if (workingEmployees.size > 0) {
+            const employeeDetailsQuery = `
+                        SELECT id, employee_id, 
+                               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
+                        FROM users 
+                        WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
+                    `;
+            const [employees] = await db.query(employeeDetailsQuery, [
+              Array.from(workingEmployees),
+              teamIds,
+            ]);
+  
+            employeeList = employees.map((user) => {
+              const fullName = user.full_name || "N/A";
+              const words = fullName.split(" ");
+              const initials =
+                words.length > 1
+                  ? words.map((word) => (word[0] || "").toUpperCase()).join("")
+                  : fullName.slice(0, 2).toUpperCase();
+  
+              return {
+                employee_name: fullName,
+                employee_id: user.employee_id || "N/A",
+                initials: initials,
+              };
+            });
+          }
 
         return {
           product_id: product.id,

@@ -204,6 +204,10 @@ apiRouter.get('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin',
 apiRouter.put('/expensedetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.updateexpensedetail);
 apiRouter.delete('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.deleteexpensedetail);
 apiRouter.get('/expensedetail',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.getAllexpensedetails);
+apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(['pm','admin']), expensedetailController.getAllpmemployeeexpensedetails);
+apiRouter.post('/approve_reject_expense', RoleController.checkRole(['pm','tl','admin']),expensedetailController.approve_reject_expensedetail);
+
+
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
 

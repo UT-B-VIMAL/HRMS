@@ -505,14 +505,14 @@ exports.deleteExpense = async (id, res) => {
 };
 
 // PM Employee Expense Details
-exports.getAllpmemployeeOts = async (req, res) => {
+exports.getAllpmemployeexpense = async (req, res) => {
   try {
     const {
       team_id,
-      start_date,
-      end_date,
+      date,
       status,
       search,
+      category,
       page = 1,
       perPage = 10,
     } = req.query;
@@ -522,7 +522,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       return errorResponse(
         res,
         "status is required",
-        "Error fetching OT details",
+        "Error fetching Expense details",
         400
       );
     }
@@ -532,124 +532,99 @@ exports.getAllpmemployeeOts = async (req, res) => {
     const otConditions = [];
     const otValues = [];
 
+    // Filter by team_id
     if (team_id) {
       const teamIds = team_id.split(",");
-      if (teamIds.length > 0) {
-        otConditions.push("ot.team_id IN (?)");
-        otValues.push(teamIds);
-      }
+      otConditions.push("et.team_id IN (?)");
+      otValues.push(teamIds);
     }
-    // Handle date filters
-    if (start_date && end_date) {
-      const startDate = new Date(start_date);
-      const endDate = new Date(end_date);
 
-      if (endDate < startDate) {
-        return errorResponse(
-          res,
-          "End date cannot be earlier than start date.",
-          "Error fetching OT details",
-          400
-        );
-      }
-      // Both dates are provided; filter by range
-      otConditions.push("DATE(ot.date) BETWEEN ? AND ?");
-      otValues.push(start_date, end_date);
-    } else if (start_date) {
-      // Only start_date is provided; fetch data from start_date onward
-      otConditions.push("DATE(ot.date) >= ?");
-      otValues.push(start_date);
-    } else if (end_date) {
-      // Only end_date is provided; fetch all data up to and including end_date
-      otConditions.push("DATE(ot.date) <= ?");
-      otValues.push(end_date);
+    // Filter by category
+    if (category) {
+      const categoryMapping = {
+        food: "1",
+        travel: "2",
+        others: "3",
+      };
+      const categoryIds = category
+        .split(",")
+        .map((cat) => categoryMapping[cat.toLowerCase()] || cat);
+      otConditions.push("et.category IN (?)");
+      otValues.push(categoryIds);
+    }
+
+    // Filter by date
+    if (date) {
+      otConditions.push("DATE(et.date) = ?");
+      otValues.push(date);
     }
 
     // Handle search term
     if (search) {
       const searchTerm = `%${search}%`;
       otConditions.push(
-        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
+        "(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
       );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    // Handle status conditions based on the provided status
-    if (status) {
-      if (status.includes(",")) {
+    // Handle status conditions 
+    switch (status) {
+      case "0":
+        otConditions.push("et.tl_status != 0 AND et.pm_status = 0");
+        break;
+      case "1":
+        otConditions.push("(et.tl_status = 1 OR et.tl_status = 2) AND et.pm_status = 0");
+        break;
+      case "2":
+        otConditions.push("et.pm_status = 2 AND et.tl_status = 2 AND et.status = 2");
+        break;
+      default:
         return errorResponse(
           res,
-          "Only a single status value is allowed.",
-          "Error fetching OT details",
+          "Invalid status value.",
+          "Error fetching Expense details",
           400
         );
-      }
-
-      switch (status) {
-        case "0":
-          // All statuses must be 0
-          otConditions.push("ot.tl_status != 0 AND ot.pm_status = 0");
-          break;
-
-        case "1":
-          // ot.status must be 1, and at least one of tl_status or pm_status must be 1
-          otConditions.push(
-            "AND (ot.tl_status = 1 OR ot.pm_status = 1)"
-          );
-          break;
-
-        case "2":
-          // All statuses must be 2
-          otConditions.push("ot.pm_status = 2 AND (ot.tl_status = 2 OR ot.status = 2)");
-          break;
-
-        default:
-          return errorResponse(
-            res,
-            "Invalid status value.",
-            "Error fetching OT details",
-            400
-          );
-      }
     }
 
     // Combine all conditions into a WHERE clause
     const otWhereClause =
       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
 
-    // Prepare the query to fetch OT details
+    // Prepare the query to fetch expense details
     const otQuery = `
-        SELECT 
-          pr.name AS project_name,
-          t.name AS task_name,
-          DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-          ot.time AS employee_time,
-          ot.comments,
-          ot.status,
-          ot.tl_status,
-          ot.pm_status,
-          ot.tledited_time AS tl_time,
-          ot.pmedited_time AS pm_time,
-          ot.id AS ot_id,
-          ot.user_id,
-          u.first_name AS user_first_name,
-          u.last_name AS user_last_name,
-          u.employee_id,
-          d.name AS designation
-        FROM 
-          ot_details ot
-        LEFT JOIN 
-          tasks t ON t.id = ot.task_id
-        LEFT JOIN 
-          projects pr ON pr.id = ot.project_id
-        LEFT JOIN 
-          users u ON u.id = ot.user_id
-        LEFT JOIN 
-          designations d ON d.id = u.designation_id
-        ${otWhereClause}
-        ORDER BY 
-          ot.id
-      `;
+      SELECT 
+        pr.name AS project_name,
+        DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
+        et.description,
+        et.expense_amount AS amount,
+        et.status,
+        et.category,
+        et.tl_status,
+        et.pm_status,
+        et.file,
+        et.id AS et_id,
+        et.user_id,
+        u.first_name AS user_first_name,
+        u.last_name AS user_last_name,
+        u.employee_id,
+        tm.name AS team_name,
+        d.name AS designation
+      FROM 
+        expense_details et
+      LEFT JOIN 
+        projects pr ON pr.id = et.project_id
+      LEFT JOIN 
+        users u ON u.id = et.user_id
+      LEFT JOIN 
+        teams tm ON u.team_id = tm.id
+      LEFT JOIN 
+        designations d ON d.id = u.designation_id
+      ${otWhereClause}
+      ORDER BY 
+        et.id
+    `;
 
     // Execute the query
     const [ots] = await db.query(otQuery, otValues);
@@ -659,95 +634,62 @@ exports.getAllpmemployeeOts = async (req, res) => {
     const paginatedData = ots.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
-    // Group the data by user_id and calculate pending counts for status 0
-    const data = Object.values(
-      paginatedData.reduce((acc, row, index) => {
-        const userId = row.user_id;
-
-        // Initialize user group if not already present
-        if (!acc[userId]) {
-          if (row.status === 0) {
-            acc[userId] = {
-              employee_name: `${row.user_first_name} ${row.user_last_name}`,
-              employee_id: row.employee_id,
-              designation: row.designation,
-              pending_counts: 0,
-              details: [],
-            };
-          } else {
-            acc[userId] = {
-              employee_name: `${row.user_first_name} ${row.user_last_name}`,
-              employee_id: row.employee_id,
-              designation: row.designation,
-              details: [],
-            };
-          }
-        }
-
-        // Increment pending count if status is 0
-        if (row.status === 0) {
-          acc[userId].pending_counts += 1;
-        }
-
-        // Add individual OT details
-        acc[userId].details.push({
-          s_no: offset + index + 1,
-          id: row.ot_id,
-          user_id: row.user_id,
-          date: row.date,
-          employee_time: row.employee_time || "00:00:00",
-          tl_time: row.tl_time || "00:00:00",
-          pm_time: row.pm_time || "00:00:00",
-          project_name: row.project_name,
-          task_name: row.task_name,
-          comments: row.comments,
-          status: row.status,
-          tlstatus: row.tl_status,
-          pmstatus: row.pm_status,
-        });
-
-        return acc;
-      }, {})
-    );
-    const totalPendingCounts = Object.values(data).reduce((sum, user) => sum + user.pending_counts, 0);
-
-    // Format the data for the response
-    const formattedData = data.map((group) => ({
-      employee_name: group.employee_name,
-      employee_id: group.employee_id,
-      designation: group.designation,
-      pending_counts: group.pending_counts,
-      details: group.details,
+    // Format data for the response
+    const formattedData = paginatedData.map((row, index) => ({
+      s_no: offset + index + 1,
+      id: row.et_id,
+      user_id: row.user_id,
+      employee_name: `${row.user_first_name} ${row.user_last_name}`,
+      employee_id: row.employee_id,
+      designation: row.designation,
+      date: row.date,
+      category: row.category,
+      project_name: row.project_name,
+      team_name: row.team_name,
+      task_name: row.task_name,
+      description: row.description,
+      amount: row.amount,
+      file: row.file,
+      status: row.status,
+      tlstatus: row.tl_status,
+      pmstatus: row.pm_status,
     }));
 
-    // Send success response with formatted data and pagination
+    // Send success response
     successResponse(
       res,
       formattedData,
       formattedData.length === 0
-        ? "No OT details found"
-        : "OT details retrieved successfully",
+        ? "No Expense details found"
+        : "Expense details retrieved successfully",
       200,
-      pagination,
-      totalPendingCounts  // Include the totalPendingCounts in the response
+      pagination
     );
   } catch (error) {
-    console.error("Error fetching OT details:", error);
+    console.error("Error fetching Expense details:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
 
 // Approve or reject
-exports.approve_reject_OT = async (payload, res) => {
-  const { user_id, status, updated_by, role } = payload;
+exports.approve_reject_expense = async (payload, res) => {
+  const { id, user_id, status, updated_by, role } = payload;
 
   try {
     // Validate required fields
+    if (!id) {
+      return errorResponse(
+        res,
+        "Expense ID is required",
+        "Error updating expense details",
+        400
+      );
+    }
     if (!status) {
       return errorResponse(
         res,
         "Status is required",
-        "Error updating OT details",
+        "Error updating expense details",
         400
       );
     }
@@ -755,7 +697,7 @@ exports.approve_reject_OT = async (payload, res) => {
       return errorResponse(
         res,
         "Role is required",
-        "Error updating OT details",
+        "Error updating expense details",
         400
       );
     }
@@ -763,23 +705,23 @@ exports.approve_reject_OT = async (payload, res) => {
       return errorResponse(
         res,
         "Updated_by is required",
-        "Error updating OT details",
+        "Error updating expense details",
         400
       );
     }
 
-    // Verify the user exists
-    const userQuery = `
-      SELECT id FROM users 
+    // Verify the expense exists
+    const expenseQuery = `
+      SELECT id FROM expense_details 
       WHERE deleted_at IS NULL AND id = ?
     `;
-    const [userResult] = await db.query(userQuery, [user_id]);
+    const [expenseResult] = await db.query(expenseQuery, [id]);
 
-    if (userResult.length === 0) {
+    if (expenseResult.length === 0) {
       return errorResponse(
         res,
-        "User not found or deleted",
-        "Error fetching OT details",
+        "Expense not found or deleted",
+        "Error fetching expense details",
         404
       );
     }
@@ -795,27 +737,27 @@ exports.approve_reject_OT = async (payload, res) => {
       return errorResponse(
         res,
         "Updated_by user not found or deleted",
-        "Error fetching OT details",
+        "Error fetching expense details",
         404
       );
     }
 
     // Build the update query based on role
     let updateQuery = `
-      UPDATE ot_details
+      UPDATE expense_details
       SET status = ?, updated_by = ?, updated_at = NOW(),`;
 
     if (role === "tl") {
       updateQuery += ` tl_status = ? `;
-      updateQuery += ` WHERE user_id = ? AND status = 0 AND deleted_at IS NULL`;
     } else if (role === "pm") {
       updateQuery += ` pm_status = ? `;
-      updateQuery += ` WHERE user_id = ? AND tl_status != 0 AND deleted_at IS NULL`;
     } else {
-      return errorResponse(res, "Invalid role", "Error updating OT details", 400);
+      return errorResponse(res, "Invalid role", "Error updating expense details", 400);
     }
 
-    const values = [status, updated_by, status, user_id];
+    updateQuery += ` WHERE id = ? AND deleted_at IS NULL`;
+
+    const values = [status, updated_by, status, id];
 
     // Execute the query
     const [result] = await db.query(updateQuery, values);
@@ -824,8 +766,8 @@ exports.approve_reject_OT = async (payload, res) => {
     if (result.affectedRows === 0) {
       return errorResponse(
         res,
-        "No OT records found with status 0 for this user",
-        "Error updating OT status",
+        "No records updated, ensure the expense record exists and matches the criteria",
+        "Error updating expense details",
         400
       );
     }
@@ -834,13 +776,13 @@ exports.approve_reject_OT = async (payload, res) => {
     return successResponse(
       res,
       status === 2
-        ? "OT Approved successfully"
-        : "OT Rejected successfully",
+        ? "Expense Approved successfully"
+        : "Expense Rejected successfully",
       200
     );
   } catch (error) {
-    console.error("Error approving or rejecting OT details:", error.message);
-    return errorResponse(res, error.message, "Error updating OT details", 500);
+    console.error("Error approving or rejecting expense details:", error.message);
+    return errorResponse(res, error.message, "Error updating expense details", 500);
   }
 };
 
