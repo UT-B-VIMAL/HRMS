@@ -143,7 +143,7 @@ apiRouter.get('/pmproducts',RoleController.checkRole(['pm','admin']), pmdashboar
 apiRouter.get('/pmutilization',RoleController.checkRole(['pm','admin']), pmdashboardController.pmutilizationsection);
 apiRouter.get('/pmattendance',RoleController.checkRole(['pm','admin']), pmdashboardController.pmattendancesection);
 apiRouter.get('/pmdashboard',RoleController.checkRole(['pm','admin']), pmdashboardController.pmdashboardsection);
-apiRouter.get('/pmviewproduct',RoleController.checkRole(['pm','admin']), pmdashboardController.pmviewproductsection);
+apiRouter.get('/pmviewproduct',RoleController.checkRole(['pm','tl','admin']), pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
 apiRouter.get('/tlattendance',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlattendancesection);
