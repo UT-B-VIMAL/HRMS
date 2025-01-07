@@ -894,12 +894,9 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       SELECT 
         pr.name AS project_name,
         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
-        et.time AS employee_time,
-        et.comments,
         et.status,
         et.tl_status,
         et.pm_status,
-        et.tledited_time AS tl_time,
         et.id AS et_id,
         et.user_id,
         u.first_name AS user_first_name,
