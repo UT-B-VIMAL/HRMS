@@ -5,7 +5,8 @@ const {
     deleteExpense,
     getAllexpense,
     getAllpmemployeexpense,
-    approve_reject_expense
+    approve_reject_expense,
+    getAlltlemployeeexpense
   } = require("../api/functions/expenseFunction");
   const { errorResponse } = require("../helpers/responseHelper");
   const Joi = require("joi");
@@ -96,9 +97,9 @@ const {
   };
   exports.getAlltlemployeexpensedetails = async (req, res) => {
     try {
-      await getAlltlemployeeOts(req, res);
+      await getAlltlemployeeexpense(req, res);
     } catch (error) {
-      return errorResponse(res, error.message, "Error retrieving OT detail", 500);
+      return errorResponse(res, error.message, "Error retrieving expense detail", 500);
     }
   };
   
