@@ -111,7 +111,7 @@ exports.updateTeam = async (id, payload, res) => {
     const values = [name, user_id,reporting_user_id, id];
     await db.query(query, values);
 
-    return successResponse(res, { id, name }, 'Team updated successfully', 200);
+    return successResponse(res, { id, name,reporting_user_id }, 'Team updated successfully', 200);
   } catch (error) {
     console.error('Error updating team:', error.message);
     return errorResponse(res, error.message, 'Error updating team', 500);
