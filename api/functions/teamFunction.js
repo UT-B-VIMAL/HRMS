@@ -110,8 +110,7 @@ exports.updateTeam = async (id, payload, res) => {
     const query = "UPDATE teams SET name = ?, updated_by = ?, reporting_user_id=? WHERE id = ?";
     const values = [name, user_id,reporting_user_id, id];
     await db.query(query, values);
-
-    return successResponse(res, { id, name,reporting_user_id }, 'Team updated successfully', 200);
+    return successResponse(res, { id, name,reporting_user_id }, 'Teams updated successfully', 200);
   } catch (error) {
     console.error('Error updating team:', error.message);
     return errorResponse(res, error.message, 'Error updating team', 500);
