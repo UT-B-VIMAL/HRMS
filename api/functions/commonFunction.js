@@ -12,7 +12,7 @@ exports.getAllData = async (payload, res) => {
         if (type === "teams") {
             query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
         } else if (type === "users") {
-            query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
+            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
         } else if (type === "products") {
             if(user_id){
             const users = await this.getAuthUserDetails(user_id, res);
