@@ -162,7 +162,7 @@ exports.fetchDailybreakdown = async (req, res) => {
     // Process the results
     const dailyBreakdown = rows.map((record) => {
       const startTime = new Date(record.start_time);
-      const endTime = record.end_time ? new Date(record.end_time) : new Date();
+      const endTime = record.end_time ? new Date(record.end_time) : null;
 
       // Format times as h:i A
       const formattedStartTime = startTime.toLocaleTimeString("en-US", {
@@ -171,11 +171,13 @@ exports.fetchDailybreakdown = async (req, res) => {
         hour12: true,
       });
 
-      const formattedEndTime = endTime.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
+      const formattedEndTime = endTime
+        ? endTime.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : "-";
 
       // Calculate the duration and format as HH:MM:SS
       const durationInSeconds = Math.max((endTime - startTime) / 1000, 0);
