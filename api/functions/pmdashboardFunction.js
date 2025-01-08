@@ -179,14 +179,17 @@ exports.fetchUtilization = async (req, res) => {
         u.employee_id AS employee_id,
         u.team_id AS team_id,
         t.name AS team_name
-      FROM sub_tasks_user_timeline stut
+      FROM (
+        SELECT DISTINCT user_id FROM sub_tasks_user_timeline
+        WHERE DATE(start_time) = CURDATE()
+      ) stut
       JOIN users u ON stut.user_id = u.id
       JOIN teams t ON u.team_id = t.id
-      WHERE DATE(stut.start_time) = CURDATE() 
-        AND u.deleted_at IS NULL 
+      WHERE u.deleted_at IS NULL 
         AND t.deleted_at IS NULL
         ${team_id ? "AND t.id = ?" : ""}
     `;
+
     const [workingEmployeesData] = await db.query(
       workingEmployeesQuery,
       team_id ? [team_id] : []
