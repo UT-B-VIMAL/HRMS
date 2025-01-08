@@ -6,7 +6,8 @@ const {
     getAllexpense,
     getAllpmemployeexpense,
     approve_reject_expense,
-    getAlltlemployeeexpense
+    getAlltlemployeeexpense,
+    getExpenseReport
   } = require("../api/functions/expenseFunction");
   const { errorResponse } = require("../helpers/responseHelper");
   const Joi = require("joi");
@@ -102,4 +103,10 @@ const {
       return errorResponse(res, error.message, "Error retrieving expense detail", 500);
     }
   };
-  
+  exports.getExpenseReports = async (req, res) => {
+    try {
+      await getExpenseReport(req, res);
+    } catch (error) {
+      return errorResponse(res, error.message, "Error retrieving expense detail", 500);
+    }
+  };
