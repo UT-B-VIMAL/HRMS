@@ -292,12 +292,13 @@ exports.fetchStatistics = async (req, res) => {
 
                     const allCompleted = subtasksInCurrentMonth.every(subtask => subtask.status === 3);
                     const allTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 0);
+                    const inprogressTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 1);
 
                     if (allCompleted) {
                         completedTaskCount++;
                     } else if (allTodo) {
                         todoTaskCount++;
-                    } else {
+                    } else if(inprogressTodo) {
                         inProgressTaskCount++;
                     }
                 }
