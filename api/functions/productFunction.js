@@ -93,6 +93,12 @@ exports.updateProduct = async (id, payload, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Product not found or deleted", "Not Found", 404);
     }
+    const checkProductQuery = "SELECT COUNT(*) as count FROM products WHERE name = ? AND id != ? AND deleted_at IS NULL";
+    const [checkProduct] = await db.query(checkProductQuery, [name, id]);
+
+    if (checkProduct[0].count > 0) {
+      return errorResponse(res, "Product with this name already exists", "Duplicate Product Error", 400);
+    }
     const query = "UPDATE products SET name = ?, updated_by = ? WHERE id = ?";
     const values = [name, user_id, id];
     await db.query(query, values);

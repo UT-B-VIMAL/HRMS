@@ -120,6 +120,20 @@ exports.getAllData = async (payload, res) => {
                 queryParams.push(id);
             }
         }
+        if(type==="users" && user_id){
+            const users = await this.getAuthUserDetails(user_id, res);
+            if (!users) return;
+            if (users.role_id === 3) {
+                const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+                const [rows] = await db.query(query1, [user_id]);
+                let teamIds = []; 
+                if(rows.length > 0){
+                    teamIds = rows.map(row => row.id);
+                }
+                query += " AND team_id IN (?) AND id!=?";
+                queryParams.push(teamIds,user_id);
+            }
+        }
 
         query += " ORDER BY `id` DESC";
 

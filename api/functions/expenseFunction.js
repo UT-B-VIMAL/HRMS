@@ -974,13 +974,12 @@ exports.getExpenseReport = async (queryParams, res) => {
           expenses.id AS expense_id,
           expenses.date AS expense_date,
           expenses.expense_amount,
-          expenses.category,
           CASE 
               WHEN expenses.category = 1 THEN 'Food'
               WHEN expenses.category = 2 THEN 'Travel'
               WHEN expenses.category = 3 THEN 'Others'
               ELSE 'Unknown'
-          END AS category_name,
+          END AS category,
           expenses.description,
           expenses.status,
           CASE 
