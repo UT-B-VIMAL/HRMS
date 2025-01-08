@@ -964,92 +964,92 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-// exports.getExpenseReport = async (queryParams, res) => {
-//   try {
-//     const { from_date, to_date, team_id, status, search, page = 1, perPage = 10, export_status } = queryParams.query;
+exports.getExpenseReport = async (queryParams, res) => {
+  try {
+    const { from_date, to_date, team_id, status, search, page = 1, perPage = 10, export_status } = queryParams.query;
 
-//     // Base query with filters
-//     const baseQuery = `
-//       SELECT 
-//           expenses.id AS expense_id,
-//           expenses.date AS expense_date,
-//           expenses.expense_amount,
-//           expenses.category,
-//           CASE 
-//               WHEN expenses.category = 1 THEN 'Food'
-//               WHEN expenses.category = 2 THEN 'Travel'
-//               WHEN expenses.category = 3 THEN 'Others'
-//               ELSE 'Unknown'
-//           END AS category_name,
-//           expenses.description,
-//           expenses.status,
-//           CASE 
-//               WHEN expenses.status = 0 THEN 'Pending'
-//               WHEN expenses.status = 1 THEN 'Rejected'
-//               WHEN expenses.status = 2 THEN 'Approved'
-//               ELSE 'Unknown'
-//           END AS status_name,
-//           users.first_name AS user_name,
-//           users.employee_id AS employee_id,
-//           teams.name AS team_name,
-//           projects.name AS project_name,
-//           expenses.created_at,
-//           expenses.updated_at
-//       FROM 
-//           expenses
-//       LEFT JOIN users ON users.id = expenses.user_id
-//       LEFT JOIN teams ON teams.id = expenses.team_id
-//       LEFT JOIN projects ON projects.id = expenses.project_id
-//       WHERE 
-//           expenses.deleted_at IS NULL
-//           AND (expenses.date BETWEEN ? AND ?)
-//           ${team_id ? 'AND expenses.team_id = ?' : ''}
-//           ${status ? 'AND expenses.status = ?' : ''}
-//           ${search ? 'AND (users.first_name LIKE ?)' : ''}
-//       ORDER BY 
-//           expenses.date DESC
-//       ${export_status === "1" ? '' : 'LIMIT ? OFFSET ?'}; -- No pagination if export_status is "1"
-//     `;
+    // Base query with filters
+    const baseQuery = `
+      SELECT 
+          expenses.id AS expense_id,
+          expenses.date AS expense_date,
+          expenses.expense_amount,
+          expenses.category,
+          CASE 
+              WHEN expenses.category = 1 THEN 'Food'
+              WHEN expenses.category = 2 THEN 'Travel'
+              WHEN expenses.category = 3 THEN 'Others'
+              ELSE 'Unknown'
+          END AS category_name,
+          expenses.description,
+          expenses.status,
+          CASE 
+              WHEN expenses.status = 0 THEN 'Pending'
+              WHEN expenses.status = 1 THEN 'Rejected'
+              WHEN expenses.status = 2 THEN 'Approved'
+              ELSE 'Unknown'
+          END AS status_name,
+          users.first_name AS user_name,
+          users.employee_id AS employee_id,
+          teams.name AS team_name,
+          projects.name AS project_name,
+          expenses.created_at,
+          expenses.updated_at
+      FROM 
+          expense_details AS expenses
+      LEFT JOIN users ON users.id = expenses.user_id
+      LEFT JOIN teams ON teams.id = expenses.team_id
+      LEFT JOIN projects ON projects.id = expenses.project_id
+      WHERE 
+          expenses.deleted_at IS NULL
+          AND (expenses.date BETWEEN ? AND ?)
+          ${team_id ? 'AND expenses.team_id = ?' : ''}
+          ${status ? 'AND expenses.status = ?' : ''}
+          ${search ? 'AND (users.first_name LIKE ?)' : ''}
+      ORDER BY 
+          expenses.date DESC
+      ${export_status === "1" ? '' : 'LIMIT ? OFFSET ?'}; -- No pagination if export_status is "1"
+    `;
 
-//     // Prepare query params
-//     const params = [from_date, to_date];
-//     if (team_id) params.push(team_id);
-//     if (status) params.push(status);
-//     if (search) params.push(`%${search}%`);
-//     if (export_status !== "1") {
-//       // Add pagination params only if it's not export
-//       const offset = (page - 1) * perPage;
-//       params.push(parseInt(perPage, 10), parseInt(offset, 10));
-//     }
+    // Prepare query params
+    const params = [from_date, to_date];
+    if (team_id) params.push(team_id);
+    if (status) params.push(status);
+    if (search) params.push(`%${search}%`);
+    if (export_status !== "1") {
+      // Add pagination params only if it's not export
+      const offset = (page - 1) * perPage;
+      params.push(parseInt(perPage, 10), parseInt(offset, 10));
+    }
 
-//     // Execute query
-//     const [results] = await db.query(baseQuery, params);
+    // Execute query
+    const [results] = await db.query(baseQuery, params);
 
-//     // Handle export case
-//     if (export_status === "1") {
-//       const { Parser } = require("json2csv");
-//       const json2csvParser = new Parser();
-//       const csv = json2csvParser.parse(results);
+    // Handle export case
+    if (export_status === "1") {
+      const { Parser } = require("json2csv");
+      const json2csvParser = new Parser();
+      const csv = json2csvParser.parse(results);
 
-//       res.header("Content-Type", "text/csv");
-//       res.attachment("expense_report.csv");
-//       return res.send(csv);
-//     }
+      res.header("Content-Type", "text/csv");
+      res.attachment("expense_report.csv");
+      return res.send(csv);
+    }
 
-//     // Standard paginated response for normal requests
-//     const pagination = getPagination(page, perPage, results.length);
-//     successResponse(
-//       res,
-//       results,
-//       results.length === 0 ? "No expenses found" : "Expenses retrieved successfully",
-//       200,
-//       pagination
-//     );
-//   } catch (error) {
-//     console.error("Error retrieving expenses:", error);
-//     return errorResponse(res, error.message, "Server error", 500);
-//   }
-// };
+    // Standard paginated response for normal requests
+    const pagination = getPagination(page, perPage, results.length);
+    successResponse(
+      res,
+      results,
+      results.length === 0 ? "No expenses found" : "Expenses retrieved successfully",
+      200,
+      pagination
+    );
+  } catch (error) {
+    console.error("Error retrieving expenses:", error);
+    return errorResponse(res, error.message, "Server error", 500);
+  }
+};
 
 
 
