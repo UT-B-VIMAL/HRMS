@@ -734,7 +734,7 @@ exports.projectRequest = async (req, res) => {
       WHERE 
         t.deleted_at IS NULL
         AND t.status = 2
-        AND t.id NOT IN (SELECT task_id FROM sub_tasks)
+        AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
         ${taskWhereClause}
         ORDER BY 
         t.id

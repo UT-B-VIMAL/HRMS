@@ -1466,6 +1466,7 @@ exports.doneTaskList = async (req, res) => {
         return item;
       })
     );
+    
 
     // Pagination logic
     const totalRecords = processedData.length;
@@ -1480,7 +1481,6 @@ exports.doneTaskList = async (req, res) => {
       s_no: offset + index + 1,
       ...row,
     }));
-
     successResponse(
       res,
       data,

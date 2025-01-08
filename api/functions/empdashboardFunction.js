@@ -162,7 +162,7 @@ exports.fetchDailybreakdown = async (req, res) => {
     // Process the results
     const dailyBreakdown = rows.map((record) => {
       const startTime = new Date(record.start_time);
-      const endTime = record.end_time ? new Date(record.end_time) : new Date();
+      const endTime = record.end_time ? new Date(record.end_time) : null;
 
       // Format times as h:i A
       const formattedStartTime = startTime.toLocaleTimeString("en-US", {
@@ -171,11 +171,13 @@ exports.fetchDailybreakdown = async (req, res) => {
         hour12: true,
       });
 
-      const formattedEndTime = endTime.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
+      const formattedEndTime = endTime
+        ? endTime.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : "-";
 
       // Calculate the duration and format as HH:MM:SS
       const durationInSeconds = Math.max((endTime - startTime) / 1000, 0);
@@ -269,29 +271,35 @@ exports.fetchStatistics = async (req, res) => {
             if (subtasks.length === 0) {
                 // If there are no subtasks, apply the current month condition to the task
                 if (isTaskInCurrentMonth) {
+                  if((task.status === 1 && task.activeStatus === 1) || task.status === 3 || (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0)){
                     totalTaskCount++;
+                }
 
-                    if (task.status === 1) {
+                    if (task.status === 1 && task.activeStatus === 1) {
                         inProgressTaskCount++;
                     } else if (task.status === 3) {
                         completedTaskCount++;
-                    } else if (task.status === 0) {
+                    } else if (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0) {
                         todoTaskCount++;
                     }
                 }
             } else {
                 // Apply the current month condition only to subtasks
                 if (subtasksInCurrentMonth.length > 0) {
+                  if((task.status === 1 && task.activeStatus === 1) || task.status === 3 || (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0)){
+
                     totalTaskCount++;
+                }
 
                     const allCompleted = subtasksInCurrentMonth.every(subtask => subtask.status === 3);
-                    const allTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 0);
+                    const allTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 0 && subtask.reopenStatus === 0 && subtask.activeStatus === 0);
+                    const inprogressTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 1 && subtask.activeStatus === 1);
 
                     if (allCompleted) {
                         completedTaskCount++;
                     } else if (allTodo) {
                         todoTaskCount++;
-                    } else {
+                    } else if(inprogressTodo) {
                         inProgressTaskCount++;
                     }
                 }
@@ -379,7 +387,10 @@ exports.fetchStatisticschart = async (req, res) => {
         const isTaskInCurrentMonth = new Date(task.created_at).getMonth() + 1 === currentMonth;
 
         if (isTaskInCurrentMonth) {
-          weekData.total_task_count++;
+          if(task.status === 1 || task.status === 3 || task.status === 0){
+            weekData.total_task_count++;
+        }
+          
 
           if (task.status === 1) {
             weekData.in_progress_task_count++;
@@ -404,7 +415,10 @@ exports.fetchStatisticschart = async (req, res) => {
           }
 
           const subtaskWeekData = weekTaskCounts[subtaskWeek - 1];
-          subtaskWeekData.total_task_count++;
+          if(subtask.status === 1 || subtask.status === 3 || subtask.status === 0){
+            subtaskWeekData.total_task_count++;
+        }
+          
 
           if (subtask.status === 1) {
             subtaskWeekData.in_progress_task_count++;
