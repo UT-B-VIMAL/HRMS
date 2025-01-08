@@ -271,7 +271,9 @@ exports.fetchStatistics = async (req, res) => {
             if (subtasks.length === 0) {
                 // If there are no subtasks, apply the current month condition to the task
                 if (isTaskInCurrentMonth) {
+                  if(task.status === 1 || task.status === 3 || task.status === 0){
                     totalTaskCount++;
+                }
 
                     if (task.status === 1) {
                         inProgressTaskCount++;
@@ -284,7 +286,9 @@ exports.fetchStatistics = async (req, res) => {
             } else {
                 // Apply the current month condition only to subtasks
                 if (subtasksInCurrentMonth.length > 0) {
+                  if(task.status === 1 || task.status === 3 || task.status === 0){
                     totalTaskCount++;
+                }
 
                     const allCompleted = subtasksInCurrentMonth.every(subtask => subtask.status === 3);
                     const allTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 0);
@@ -381,7 +385,10 @@ exports.fetchStatisticschart = async (req, res) => {
         const isTaskInCurrentMonth = new Date(task.created_at).getMonth() + 1 === currentMonth;
 
         if (isTaskInCurrentMonth) {
-          weekData.total_task_count++;
+          if(task.status === 1 || task.status === 3 || task.status === 0){
+            weekData.total_task_count++;
+        }
+          
 
           if (task.status === 1) {
             weekData.in_progress_task_count++;
@@ -406,7 +413,10 @@ exports.fetchStatisticschart = async (req, res) => {
           }
 
           const subtaskWeekData = weekTaskCounts[subtaskWeek - 1];
-          subtaskWeekData.total_task_count++;
+          if(subtask.status === 1 || subtask.status === 3 || subtask.status === 0){
+            subtaskWeekData.total_task_count++;
+        }
+          
 
           if (subtask.status === 1) {
             subtaskWeekData.in_progress_task_count++;
