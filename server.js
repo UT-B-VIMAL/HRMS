@@ -209,6 +209,7 @@ apiRouter.delete('/expensedetail/:id', RoleController.checkRole(['tl','pm','admi
 apiRouter.get('/expensedetail',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.getAllexpensedetails);
 apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(['pm','admin']), expensedetailController.getAllpmemployeeexpensedetails);
 apiRouter.get('/tlemployeeexpensedetail',RoleController.checkRole(['pm','tl','admin']), expensedetailController.getAlltlemployeexpensedetails);
+apiRouter.get('/getExpenseReport',RoleController.checkRole(['pm','admin']), expensedetailController.getExpenseReports);
 apiRouter.post('/approve_reject_expense', RoleController.checkRole(['pm','tl','admin']),expensedetailController.approve_reject_expensedetail);
 
 
