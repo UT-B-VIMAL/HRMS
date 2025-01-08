@@ -98,6 +98,11 @@ exports.updateProject = async (id, payload, res) => {
     if (checkProductResults[0].count == 0) {
         return errorResponse(res, "Product Not Found", "Product Not Found", 404);
       }
+    const checkProjectQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ? AND id != ? AND deleted_at IS NULL";
+    const [checkProject] = await db.query(checkProjectQuery, [name, id]);
+    if (checkProject[0].count > 0) {
+      return errorResponse(res, "Project with this name already exists", "Duplicate Project Error", 400);
+    }
     const query = "UPDATE projects SET name = ?, product_id = ?, updated_by = ? WHERE id = ?";
     const values = [name, product, user_id, id];
     await db.query(query, values);
