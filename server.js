@@ -115,7 +115,7 @@ apiRouter.get('/designations',RoleController.checkRole(['pm','admin']), designat
 // Task Routes
 apiRouter.post('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.createTask);
 apiRouter.put('/task/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.updateTask);
-apiRouter.delete('/task/:id', RoleController.checkRole(['tl','pm','admin']),taskController.deleteTask);
+apiRouter.delete('/task/:id', RoleController.checkRole(['pm','admin']),taskController.deleteTask);
 apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.getTask);
 apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.updateDatas);
@@ -128,7 +128,7 @@ apiRouter.get('/workReport',RoleController.checkRole(['pm','employee']), taskCon
 // Subtask Routes
 apiRouter.post('/subtask', RoleController.checkRole(['tl','pm','admin','employee']),subtaskController.createSubTask);
 apiRouter.put('/subtask/:id',RoleController.checkRole(['tl','pm','admin']), subtaskController.updateSubTask);
-apiRouter.delete('/subtask/:id', RoleController.checkRole(['tl','pm','admin']),subtaskController.deleteSubTask);
+apiRouter.delete('/subtask/:id', RoleController.checkRole(['pm','admin']),subtaskController.deleteSubTask);
 apiRouter.get('/subtask/:id', RoleController.checkRole(['tl','pm','admin','employee']),subtaskController.getSubTask);
 apiRouter.get('/subtask',RoleController.checkRole(['tl','pm','admin','employee']), subtaskController.getAllSubTasks);
 apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), subtaskController.updateDatas);
