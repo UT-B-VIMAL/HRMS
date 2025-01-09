@@ -602,29 +602,26 @@ exports.projectStatus = async (req, res) => {
       task_duration: task.task_duration,
     }));
 
-    const groupedTasks = [...Subtasks, ...Tasks ];
-
-    // const groupedTasks = processedTasks.map((task) => {
-    //   const relatedSubtasks = processedSubtasks.filter((subtask) => subtask.task_id === task.task_id);
-    //   if (relatedSubtasks.length > 0) {
-    //     return { ...task, subtasks: relatedSubtasks };
-    //   }
-    //   return task; // If no subtasks, return the task itself
-    // });
+    const groupedTasks = [...Subtasks, ...Tasks];
 
     const totalRecords = groupedTasks.length;
     const paginatedData = groupedTasks.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
-
+    
     const data = paginatedData.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
     }));
+    
+    // Now wrap the tasks and pagination inside 'data'
 
-    successResponse(res, {
-      tasks: data,
-      pagination,
-    }, "Tasks and subtasks retrieved successfully", 200);
+      successResponse(
+        res,
+        data,
+        data.length === 0 ? 'No data found' : 'Tasks and subtasks retrieved successfully',
+        200,
+        pagination
+    );
   } catch (error) {
     console.error("Error fetching tasks and subtasks:", error);
     return errorResponse(res, error.message, "Server error", 500);
