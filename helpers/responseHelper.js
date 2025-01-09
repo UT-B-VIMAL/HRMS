@@ -22,7 +22,7 @@ const successResponse = (res, data, message = 'Request successful', status = 200
   if (totalPendingCounts !== null) {
     response.total_pending_counts = totalPendingCounts;
   }
-  res.status(status).json(getResponse(response)); 
+  res.status(status).json(response);
 };
 
 const errorResponse = (res, error, message = 'An error occurred', status = 500) => {
@@ -32,7 +32,9 @@ const errorResponse = (res, error, message = 'An error occurred', status = 500) 
     message,
     error,
   };
-  res.status(status).json(getResponse(response));
+  if (!res.headersSent) {
+    res.status(status).json(response);
+  }
 };
 
 const getPagination = (page, perPage, totalRecords) => {
