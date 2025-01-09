@@ -379,19 +379,6 @@ exports.getAllProjects = async (queryParams, res) => {
 //   }
 // };
 
-// Function to return the status text based on the status id
-const Status = (status) => {
-  return status === 0
-    ? "To Do"
-    : status === 1
-    ? "In Progress"
-    : status === 2
-    ? "In Review"
-    : status === 3
-    ? "Done"
-    : "Unknown";  // Fallback in case of any other status value
-};
-
 exports.projectStatus = async (req, res) => {
   try {
     const {
@@ -410,7 +397,6 @@ exports.projectStatus = async (req, res) => {
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
 
-    // Filter for role 3 (Assuming role_id 3 is a regular user)
     const taskConditions = [];
     const taskValues = [];
     const subtaskConditions = [];
@@ -447,75 +433,43 @@ exports.projectStatus = async (req, res) => {
       subtaskConditions.push("st.created_at = ?");
       subtaskValues.push(date);
     }
-    if (status !== undefined) {
-      taskConditions.push("t.status = ?");
-      taskValues.push(status);
-      subtaskConditions.push("st.status = ?");
-      subtaskValues.push(status);
+    if (status === '0') {
+      taskConditions.push("t.status = 0");
+      taskConditions.push("t.active_status = 0");
+      taskConditions.push("t.reopen_status = 0");
+      subtaskConditions.push("st.status = 0");
+      subtaskConditions.push("st.active_status = 0");
+      subtaskConditions.push("st.reopen_status = 0");
+    } else if (status === '1') {
+      taskConditions.push("t.status = 1");
+      taskConditions.push("t.active_status = 1");
+      taskConditions.push("t.reopen_status = 0");
+      subtaskConditions.push("st.status = 1");
+      subtaskConditions.push("st.active_status = 1");
+      subtaskConditions.push("st.reopen_status = 0");
+    } else if (status === '3') {
+      taskConditions.push("t.status = 3");
+      subtaskConditions.push("st.status = 3");
     }
     if (search) {
       const searchTerm = `%${search}%`;
-    
       taskConditions.push(
-        `(t.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR  CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR t.created_at LIKE ?)`
+        `(t.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR t.created_at LIKE ?)`
       );
       taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
-    
+
       subtaskConditions.push(
-        `(st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR  CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR st.created_at LIKE ?)`
+        `(st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR st.created_at LIKE ?)`
       );
       subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
-    
 
-    // Construct WHERE clauses
     const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
     const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
 
-    // Query to fetch subtasks
-    const subtasksQuery = `
-      SELECT 
-        p.name AS product_name,
-        pr.name AS project_name,
-        t.name AS task_name,
-        st.name AS subtask_name,
-        st.created_at AS date,
-        st.total_hours_worked AS subtask_duration,
-        stut.start_time AS start_time,
-        stut.end_time AS end_time,
-        st.estimated_hours AS estimated_time,
-        st.total_hours_worked AS time_taken,
-        st.rating AS subtask_rating,
-        tm.id AS team_id,
-        tm.name AS team_name,
-        'Subtask' AS type,
-        t.id AS task_id,
-        st.id AS subtask_id,
-        u.id AS user_id,
-        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-        st.status AS subtask_status
-      FROM 
-        sub_tasks st
-      LEFT JOIN 
-        tasks t ON t.id = st.task_id
-      LEFT JOIN 
-        users u ON u.id = st.user_id
-      LEFT JOIN 
-        products p ON p.id = t.product_id
-      LEFT JOIN 
-        projects pr ON pr.id = t.project_id
-      LEFT JOIN 
-        sub_tasks_user_timeline stut ON stut.subtask_id = st.id 
-      LEFT JOIN 
-        teams tm ON tm.id = st.team_id
-      WHERE 
-        st.deleted_at IS NULL
-        ${subtaskWhereClause}
-    `;
-
-    // Query to fetch tasks without subtasks
     const tasksQuery = `
       SELECT 
+        t.id AS task_id,
         t.name AS task_name,
         t.estimated_hours AS estimated_time,
         t.total_hours_worked AS task_duration,
@@ -540,83 +494,145 @@ exports.projectStatus = async (req, res) => {
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = t.team_id
       WHERE t.deleted_at IS NULL
-      AND t.id NOT IN (SELECT task_id FROM sub_tasks)
+      AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
       ${taskWhereClause}
+      GROUP BY 
+        t.id
     `;
 
-    // Execute both queries
-    const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+    const subtasksQuery = `
+      SELECT 
+        p.name AS product_name,
+        pr.name AS project_name,
+        t.name AS task_name,
+        st.name AS subtask_name,
+        st.created_at AS date,
+        st.total_hours_worked AS subtask_duration,
+        stut.start_time AS start_time,
+        stut.end_time AS end_time,
+        st.estimated_hours AS estimated_time,
+        st.total_hours_worked AS time_taken,
+        st.rating AS subtask_rating,
+        tm.id AS team_id,
+        tm.name AS team_name,
+        t.id AS task_id,
+        st.id AS subtask_id,
+        u.id AS user_id,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+        st.status AS subtask_status
+      FROM 
+        sub_tasks st
+      LEFT JOIN 
+        tasks t ON t.id = st.task_id
+      LEFT JOIN 
+        users u ON u.id = st.user_id
+      LEFT JOIN 
+        products p ON p.id = t.product_id
+      LEFT JOIN 
+        projects pr ON pr.id = t.project_id
+      LEFT JOIN 
+        sub_tasks_user_timeline stut ON stut.subtask_id = st.id 
+      LEFT JOIN 
+        teams tm ON tm.id = st.team_id
+      WHERE 
+        st.deleted_at IS NULL
+        ${subtaskWhereClause}
+     GROUP BY 
+        st.id
+    `;
+
+    // First fetch tasks
     const [tasks] = await db.query(tasksQuery, taskValues);
 
-    // Process subtasks and tasks
-    const processedSubtasks = subtasks.map((subtask) => {
-      subtask.status = Status(subtask.subtask_status); // Map subtask status
-      return {
-        type: subtask.type,
-        status: subtask.status,
-        date: subtask.date,
-        product_name: subtask.product_name,
-        project_name: subtask.project_name,
-        task_id: subtask.task_id,
-        task_name: subtask.task_name,
-        subtask_id: subtask.subtask_id,
-        subtask_name: subtask.subtask_name,
-        user_id: subtask.user_id,
-        assignee: subtask.assignee,
-        estimated_time: subtask.estimated_time,
-        time_taken: subtask.time_taken,
-        rating: subtask.subtask_rating,
-        team_id: subtask.team_id,
-        team_name: subtask.team_name,
-        start_time: subtask.start_time,
-        end_time: subtask.end_time,
-        subtask_duration: subtask.subtask_duration,
-      };
-    });
+    // Then fetch subtasks
+    const [subtasks] = await db.query(subtasksQuery, subtaskValues);
 
-    const processedTasks = tasks.map((task) => {
-      task.status = Status(task.task_status); // Map task status
-      return {
-        type: "Task", 
-        status: task.status,
-        date: task.date,
-        product_name: task.product_name,
-        project_name: task.project_name,
-        task_name: task.task_name,
-        subtask_name: null,
-        assignee: task.assignee,
-        estimated_time: task.estimated_time,
-        task_duration: task.task_duration,
-        rating: task.rating,
-        team_id: task.team_id,
-        team_name: task.team_name,
-        start_time: task.start_time,
-        end_time: task.end_time,
-        task_duration: task.task_duration,
-      };
-    });
+    const mapStatus = (statusCode) => {
+      switch (statusCode) {
+        case 0:
+          return "To Do";
+        case 1:
+          return "In Progress";
+        case 3:
+          return "Done";
+        default:
+          return "Unknown";
+      }
+    };
 
-    // Combine subtasks and tasks results
-    const results = [...processedSubtasks, ...processedTasks];
+    const Subtasks = subtasks.map((subtask) => ({
+      type: "SubTask",
+      status: mapStatus(subtask.subtask_status),
+      date: subtask.date,
+      product_name: subtask.product_name,
+      project_name: subtask.project_name,
+      task_id: subtask.task_id,
+      task_name: subtask.task_name,
+      subtask_id: subtask.subtask_id,
+      subtask_name: subtask.subtask_name,
+      user_id: subtask.user_id,
+      assignee: subtask.assignee,
+      estimated_time: subtask.estimated_time,
+      time_taken: subtask.time_taken,
+      rating: subtask.subtask_rating,
+      team_id: subtask.team_id,
+      team_name: subtask.team_name,
+      start_time: subtask.start_time,
+      end_time: subtask.end_time,
+      subtask_duration: subtask.subtask_duration,
+    }));
 
-    // Pagination logic
-    const totalRecords = results.length;
-    const paginatedData = results.slice(offset, offset + parseInt(perPage));
+    const Tasks = tasks.map((task) => ({
+      type: "Task",
+      status: mapStatus(task.task_status),
+      date: task.date,
+      product_name: task.product_name,
+      project_name: task.project_name,
+      task_id: task.task_id,
+      task_name: task.task_name,
+      subtask_name: null,
+      assignee: task.assignee,
+      estimated_time: task.estimated_time,
+      task_duration: task.task_duration,
+      rating: task.rating,
+      team_id: task.team_id,
+      team_name: task.team_name,
+      start_time: task.start_time,
+      end_time: task.end_time,
+      task_duration: task.task_duration,
+    }));
+
+    const groupedTasks = [...Subtasks, ...Tasks ];
+
+    // const groupedTasks = processedTasks.map((task) => {
+    //   const relatedSubtasks = processedSubtasks.filter((subtask) => subtask.task_id === task.task_id);
+    //   if (relatedSubtasks.length > 0) {
+    //     return { ...task, subtasks: relatedSubtasks };
+    //   }
+    //   return task; // If no subtasks, return the task itself
+    // });
+
+    const totalRecords = groupedTasks.length;
+    const paginatedData = groupedTasks.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
-    // Add serial numbers to the paginated data
     const data = paginatedData.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
     }));
 
-    // Send success response
-    successResponse(res, { data, pagination }, "Tasks and subtasks retrieved successfully", 200);
+    successResponse(res, {
+      tasks: data,
+      pagination,
+    }, "Tasks and subtasks retrieved successfully", 200);
   } catch (error) {
     console.error("Error fetching tasks and subtasks:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
+
 
 
 
