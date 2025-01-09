@@ -107,6 +107,11 @@ exports.updateTeam = async (id, payload, res) => {
     if (checkResult[0].count === 0) {
       return errorResponse(res, "Team not found or deleted", "Not Found", 404);
     }
+    const checkTeamQuery = "SELECT COUNT(*) as count FROM teams WHERE name = ? AND id != ? AND deleted_at IS NULL";
+    const [checkTeam] = await db.query(checkTeamQuery, [name, id]);
+    if (checkTeam[0].count > 0) {
+      return errorResponse(res, "Team with this name already exists", "Duplicate Team Error", 400);
+    }
     const query = "UPDATE teams SET name = ?, updated_by = ?, reporting_user_id=? WHERE id = ?";
     const values = [name, user_id,reporting_user_id, id];
     await db.query(query, values);
