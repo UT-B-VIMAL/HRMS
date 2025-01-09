@@ -295,6 +295,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
   // Define the mapping of fields to status_flag values
   const statusFlagMapping = {
     status: 1,
+    active_status:1,
     assigned_user_id: 2,
     user_id: 9 ,
     estimated_hours: 3,
