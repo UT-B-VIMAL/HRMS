@@ -93,7 +93,7 @@ apiRouter.delete('/projects/:id',RoleController.checkRole(['pm','admin']), proje
 apiRouter.get('/projects/:id',RoleController.checkRole(['pm','admin']), projectController.getProject);
 apiRouter.get('/projects',RoleController.checkRole(['pm','admin']), projectController.getAllProjects);
 apiRouter.get('/project_status', projectController.project_status);
-apiRouter.get('/project_request',RoleController.checkRole(['pm','admin']), projectController.project_request);
+apiRouter.get('/project_request',RoleController.checkRole(['pm','tl','admin']), projectController.project_request);
 apiRouter.get('/project_requestupdate',RoleController.checkRole(['pm','admin']), projectController.project_requestupdate);
 apiRouter.put('/project_requestchange/:id',RoleController.checkRole(['pm','admin']), projectController.project_requestchange);
 
