@@ -718,6 +718,7 @@ exports.updateTaskData = async (id, payload, res) => {
 
   const statusFlagMapping = {
     status: 1,
+    active_status:1,
     assigned_user_id: 2,
     user_id: 9 ,
     estimated_hours: 3,

@@ -455,11 +455,18 @@ exports.projectStatus = async (req, res) => {
     }
     if (search) {
       const searchTerm = `%${search}%`;
-      taskConditions.push(`(t.name LIKE ?)`);
-      taskValues.push(searchTerm);
-      subtaskConditions.push(`(st.name LIKE ?)`);
-      subtaskValues.push(searchTerm);
+    
+      taskConditions.push(
+        `(t.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR  CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR t.created_at LIKE ?)`
+      );
+      taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    
+      subtaskConditions.push(
+        `(st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR  CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR st.created_at LIKE ?)`
+      );
+      subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
+    
 
     // Construct WHERE clauses
     const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
