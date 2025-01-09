@@ -1,6 +1,7 @@
 const db = require('../../config/db');
 const { successResponse, errorResponse,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage } = require('../../helpers/responseHelper');
 const moment = require("moment");
+const {startTask ,pauseTask,endTask}=require('../functions/taskFunction')
 const { getAuthUserDetails } = require('./commonFunction');
 
 // Insert Task
@@ -349,30 +350,41 @@ exports.updatesubTaskData = async (id, payload, res) => {
         return;
       }
       if(userDetails.role_id==4){
-        const [existingSubtaskSublime] = await db.query(
-          "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
-          [user_id]
-        );
-        if (existingSubtaskSublime.length > 0) {
-            return errorResponse(res, "You Already have Active Task", 400);
-        }
-        await db.query(
-          "UPDATE sub_tasks SET status = 1, active_status = 1 WHERE id = ?",
-          [ id]
-        );
-        const [timeline] = await db.query(
-          "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
-          [
-            user_id,
-            currentTask.product_id,
-            currentTask.project_id,
-            currentTask.task_id,
-            id,
-            moment().format("YYYY-MM-DD HH:mm:ss"),
-          ]
-        );
+        await startTask( currentTask, "subtask", currentTask.id,res);
       }else{
         return errorResponse(res, "You are not allowed to start task", 400);
+      }
+    }else if(active_status==0 && status==1){
+      const userDetails = await getAuthUserDetails(user_id, res);
+
+      const [existingSubtaskSublime] = await db.query(
+        "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+        [user_id]
+      );
+      if (existingSubtaskSublime.length > 0) {
+
+        const timeline = existingSubtaskSublime[0];
+        if(userDetails.role_id==4){
+        await pauseTask(currentTask, "subtask", currentTask.id, timeline.start_time, timeline.id,res);
+        }else{
+          return errorResponse(res, "You are not allowed to pause task", 400);
+        }
+      }
+
+    }else if(active_status==0 && status==2){
+      const userDetails = await getAuthUserDetails(user_id, res);
+
+      const [existingSubtaskSublime] = await db.query(
+        "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+        [user_id]
+      );
+      if (existingSubtaskSublime.length > 0) {
+        const timeline = existingSubtaskSublime[0];
+        if(userDetails.role_id==4){
+        await endTask(currentTask, "subtask", currentTask.id, timeline.start_time, timeline.id,"completed",res);
+        }else{
+          return errorResponse(res, "You are not allowed to end task", 400);
+        }
       }
     }
     if (estimated_hours) {

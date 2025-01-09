@@ -782,6 +782,10 @@ exports.updateTaskData = async (id, payload, res) => {
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
       [id]
     );
+    const [sub_task_counts] = await db.query(
+      "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",
+      [id]
+    );
     const currentTask = tasks[0];
 
     if (!currentTask) {
@@ -792,37 +796,51 @@ exports.updateTaskData = async (id, payload, res) => {
         404
       );
     }
-    if(active_status==1 && status==1){
-      const userDetails = await getAuthUserDetails(user_id, res);
+    if(sub_task_counts.length===0){
 
-      if (!userDetails || userDetails.id == undefined) {
-        return;
-      }
-      if(userDetails.role_id==4){
+      if(active_status==1 && status==1){
+        const userDetails = await getAuthUserDetails(user_id, res);
+
+        if (!userDetails || userDetails.id == undefined) {
+          return;
+        }
+        if(userDetails.role_id==4){
+          await this.startTask( currentTask, "task", currentTask.id,res);
+        }else{
+          return errorResponse(res, "You are not allowed to start task", 400);
+        }
+      }else if(active_status==0 && status==1){
+        const userDetails = await getAuthUserDetails(user_id, res);
+
         const [existingSubtaskSublime] = await db.query(
           "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
           [user_id]
         );
         if (existingSubtaskSublime.length > 0) {
-            return errorResponse(res, "You Already have Active Task", 400);
+
+          const timeline = existingSubtaskSublime[0];
+          if(userDetails.role_id==4){
+          await this.pauseTask(currentTask, "task", currentTask.id, timeline.start_time, timeline.id,res);
+          }else{
+            return errorResponse(res, "You are not allowed to pause task", 400);
+          }
         }
-        await db.query(
-          "UPDATE tasks SET status = 1, active_status = 1 WHERE id = ?",
-          [ id]
+
+      }else if(active_status==0 && status==2){
+        const userDetails = await getAuthUserDetails(user_id, res);
+
+        const [existingSubtaskSublime] = await db.query(
+          "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+          [user_id]
         );
-        const [timeline] = await db.query(
-          "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
-          [
-            user_id,
-            currentTask.product_id,
-            currentTask.project_id,
-            id,
-            null,
-            moment().format("YYYY-MM-DD HH:mm:ss"),
-          ]
-        );
-      }else{
-        return errorResponse(res, "You are not allowed to start task", 400);
+        if (existingSubtaskSublime.length > 0) {
+          const timeline = existingSubtaskSublime[0];
+          if(userDetails.role_id==4){
+          await this.endTask(currentTask, "task", currentTask.id, timeline.start_time, timeline.id,"completed",res);
+          }else{
+            return errorResponse(res, "You are not allowed to end task", 400);
+          }
+        }
       }
     }
     const updateFields = [];
@@ -1496,14 +1514,116 @@ exports.doneTaskList = async (req, res) => {
   }
 };
 
+
+// Helper functions for task actions
+exports.startTask = async (taskOrSubtask, type, id,res) => {
+  const [existingSubtaskSublime] = await db.query(
+    "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
+    [taskOrSubtask.user_id]
+  );
+  if (existingSubtaskSublime.length > 0) {
+    return errorResponse(res, "You Already have Active Task", 400);
+  }
+
+  await db.query(
+    "UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?",
+    [type === "subtask" ? "sub_tasks" : "tasks", id]
+  );
+  await db.query(
+    "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      taskOrSubtask.user_id,
+      taskOrSubtask.product_id,
+      taskOrSubtask.project_id,
+      type =="subtask" ?taskOrSubtask.task_id :taskOrSubtask.id,
+      type=="subtask" ?taskOrSubtask.id :null,
+      moment().format("YYYY-MM-DD HH:mm:ss"),
+    ]
+  );
+} ;
+
+exports.pauseTask = async (taskOrSubtask, type, id, lastStartTime, timeline_id,res) => {
+  const currentTime = moment();
+  let timeDifference = currentTime.diff(lastStartTime, "seconds");
+
+  // Prevent negative time difference
+  let safeTimeDifference = timeDifference;
+  if (timeDifference < 0) {
+    console.warn("Time difference is negative. Adjusting to 0.");
+    safeTimeDifference = 0;
+  }
+
+  // Calculate new total hours worked
+  const newTotalHoursWorked = calculateNewWorkedTime(
+    taskOrSubtask.total_hours_worked,
+    safeTimeDifference
+  );
+
+  await db.query(
+    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?",
+    [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
+  );
+
+  await db.query(
+    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
+    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+  );
+};
+
+exports.endTask  = async (taskOrSubtask, type, id, lastStartTime, timeline_id, comment,res) => {
+  const currentTime = moment();
+  const timeDifference = currentTime.diff(lastStartTime, "seconds");
+
+  const newTotalHoursWorked = calculateNewWorkedTime(
+    taskOrSubtask.total_hours_worked,
+    timeDifference
+  );
+
+  const estimatedHours = taskOrSubtask.estimated_hours;
+
+  const newTotalHoursWorkedSeconds = convertToSeconds(newTotalHoursWorked);
+  const estimatedHoursSeconds = convertToSeconds(estimatedHours);
+
+  const remainingSeconds = estimatedHoursSeconds - newTotalHoursWorkedSeconds;
+  let extendedHours = "00:00:00";
+
+  if (remainingSeconds < 0) {
+    // Convert absolute seconds to HH:MM:SS
+    const absSeconds = Math.abs(remainingSeconds);
+    const hours = Math.floor(absSeconds / 3600).toString().padStart(2, "0");
+    const minutes = Math.floor((absSeconds % 3600) / 60).toString().padStart(2, "0");
+    const seconds = (absSeconds % 60).toString().padStart(2, "0");
+
+    extendedHours = `${hours}:${minutes}:${seconds}`;
+  }
+
+  await db.query(
+    "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?",
+    [
+      type === "subtask" ? "sub_tasks" : "tasks",
+      newTotalHoursWorked,
+      extendedHours,
+      comment,
+      id,
+    ]
+  );
+
+  await db.query(
+    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
+    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+  );
+};
+
+// Main controller function
 exports.updateTaskTimeLine = async (req, res) => {
   try {
-    const { id, action, type, last_start_time, timeline_id, comment } =
-      req.body;
-    console.log(action);
+    const { id, action, type, last_start_time, timeline_id, comment } = req.body;
+
+    // Validate the request body
     const { error } = updateTimelineShema.validate(req.body, {
       abortEarly: false,
     });
+
     if (error) {
       const errorMessages = error.details.reduce((acc, err) => {
         acc[err.path[0]] = err.message;
@@ -1511,14 +1631,13 @@ exports.updateTaskTimeLine = async (req, res) => {
       }, {});
       return errorResponse(res, errorMessages, "Validation Error", 400);
     }
+
     const lastStartTime = moment(last_start_time);
     let taskOrSubtask;
     let taskId, subtaskId;
 
     if (type === "subtask") {
-      const [subtask] = await db.query("SELECT * FROM sub_tasks WHERE id = ?", [
-        id,
-      ]);
+      const [subtask] = await db.query("SELECT * FROM sub_tasks WHERE id = ?", [id]);
       taskOrSubtask = subtask[0];
       taskId = taskOrSubtask.task_id;
       subtaskId = taskOrSubtask.id;
@@ -1529,102 +1648,17 @@ exports.updateTaskTimeLine = async (req, res) => {
       subtaskId = null;
     }
 
+    // Action-based logic (start, pause, end)
     if (action === "start") {
-      // Check if a record already exists in the sub_tasks_user_timeline table for the current task/subtask
-      const [existingSubtaskSublime] = await db.query(
-        "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
-        [taskOrSubtask.user_id]
-      );
-      if (existingSubtaskSublime.length > 0) {
-          return errorResponse(res, "You Already have Active Task", 400);
-      }
-
-
-      await db.query(
-        "UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?",
-        [type === "subtask" ? "sub_tasks" : "tasks", id]
-      );
-      const [timeline] = await db.query(
-        "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
-        [
-          taskOrSubtask.user_id,
-          taskOrSubtask.product_id,
-          taskOrSubtask.project_id,
-          taskId,
-          subtaskId,
-          moment().format("YYYY-MM-DD HH:mm:ss"),
-        ]
-      );
+      await this.startTask(taskOrSubtask, type, id,res);
     } else if (action === "pause") {
-      const currentTime = moment();
-      const timeDifference =currentTime .diff(lastStartTime, "seconds");
-
-      // Prevent negative time difference
-      let safeTimeDifference = timeDifference;
-      if (timeDifference < 0) {
-        console.warn("Time difference is negative. Adjusting to 0.");
-        safeTimeDifference = 0;
-      }
-
-      // Calculate new total hours worked
-      const newTotalHoursWorked = calculateNewWorkedTime(
-        taskOrSubtask.total_hours_worked,
-        safeTimeDifference
-      );
-      await db.query(
-        "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?",
-        [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
-      );
-
-      await db.query(
-        "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-        [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
-      );
+      await this.pauseTask(taskOrSubtask, type, id, lastStartTime, timeline_id,res);
     } else if (action === "end") {
-      const currentTime = moment();
-      const timeDifference = currentTime.diff(lastStartTime, "seconds");
-      
-      const newTotalHoursWorked = calculateNewWorkedTime(
-        taskOrSubtask.total_hours_worked,
-        timeDifference
-      );
-      
-      const estimatedHours = taskOrSubtask.estimated_hours;
-      
-      const newTotalHoursWorkedSeconds = convertToSeconds(newTotalHoursWorked);
-      const estimatedHoursSeconds = convertToSeconds(estimatedHours);
-      
-      const remainingSeconds = estimatedHoursSeconds - newTotalHoursWorkedSeconds;
-      let extendedHours = "00:00:00";
-      
-      if (remainingSeconds < 0) {
-        // Convert absolute seconds to HH:MM:SS
-        const absSeconds = Math.abs(remainingSeconds);
-        const hours = Math.floor(absSeconds / 3600).toString().padStart(2, "0");
-        const minutes = Math.floor((absSeconds % 3600) / 60).toString().padStart(2, "0");
-        const seconds = (absSeconds % 60).toString().padStart(2, "0");
-      
-        extendedHours = `${hours}:${minutes}:${seconds}`;
-      }
-      
-      await db.query(
-        "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?",
-        [
-          type === "subtask" ? "sub_tasks" : "tasks",
-          newTotalHoursWorked,
-          extendedHours,
-          comment,
-          id,
-        ]
-      );
-
-      await db.query(
-        "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-        [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
-      );
+      await this.endTask(taskOrSubtask, type, id, lastStartTime, timeline_id, comment,res);
     } else {
-      return errorResponse(res, "Invalid Type ", 400);
+      return errorResponse(res, "Invalid Type", 400);
     }
+
     return successResponse(res, "Time updated successfully", 201);
   } catch (error) {
     return errorResponse(res, "Error Updating Time", 400);
@@ -1861,7 +1895,6 @@ try{
   //   { name, user_id },
   //   { abortEarly: false }
   // );
-  console.log(user_id,task_id);
   const user = await getAuthUserDetails(user_id, res);
   if (!user) return;
   // if (error) {

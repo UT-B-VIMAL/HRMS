@@ -70,20 +70,21 @@ exports.get_idleEmployee = async (req, res) => {
     // Count query for pagination
     let countQuery = `
             SELECT COUNT(*) AS total_records
-            FROM users
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM sub_tasks_user_timeline
-                WHERE sub_tasks_user_timeline.user_id = users.id
-                AND DATE(sub_tasks_user_timeline.created_at) = CURRENT_DATE
-                AND sub_tasks_user_timeline.end_time IS NOT NULL
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM employee_leave
-                WHERE employee_leave.user_id = users.id
-                AND DATE(employee_leave.date) = CURRENT_DATE
-            )
+             FROM users
+        LEFT JOIN teams ON users.team_id = teams.id
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM sub_tasks_user_timeline
+            WHERE sub_tasks_user_timeline.user_id = users.id
+            AND DATE(sub_tasks_user_timeline.start_time) = CURRENT_DATE
+            AND sub_tasks_user_timeline.end_time IS NULL
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM employee_leave
+            WHERE employee_leave.user_id = users.id
+            AND DATE(employee_leave.date) = CURRENT_DATE
+        )
         `;
 
     const countQueryParams = [];
