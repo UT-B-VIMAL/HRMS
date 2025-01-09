@@ -428,11 +428,12 @@ exports.projectStatus = async (req, res) => {
       subtaskValues.push(employee_id);
     }
     if (date) {
-      taskConditions.push("t.created_at = ?");
+      taskConditions.push("DATE(t.created_at) = ?");
       taskValues.push(date);
-      subtaskConditions.push("st.created_at = ?");
+      subtaskConditions.push("DATE(st.created_at) = ?");
       subtaskValues.push(date);
     }
+    
     if (status === '0') {
       taskConditions.push("t.status = 0");
       taskConditions.push("t.active_status = 0");
@@ -485,7 +486,7 @@ exports.projectStatus = async (req, res) => {
         u.id AS user_id,
         t.status AS task_status,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-        t.created_at AS date
+        DATE(t.created_at) AS date
       FROM tasks t
       LEFT JOIN 
         users u ON u.id = t.user_id
@@ -506,7 +507,7 @@ exports.projectStatus = async (req, res) => {
         pr.name AS project_name,
         t.name AS task_name,
         st.name AS subtask_name,
-        st.created_at AS date,
+        DATE(st.created_at) AS date, 
         st.total_hours_worked AS subtask_duration,
         stut.start_time AS start_time,
         stut.end_time AS end_time,
@@ -591,6 +592,7 @@ exports.projectStatus = async (req, res) => {
       task_id: task.task_id,
       task_name: task.task_name,
       subtask_name: null,
+      user_id: task.user_id,
       assignee: task.assignee,
       estimated_time: task.estimated_time,
       task_duration: task.task_duration,
