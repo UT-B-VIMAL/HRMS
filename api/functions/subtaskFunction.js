@@ -345,7 +345,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
     }
     
     if(active_status==1 && status==1){
-      const userDetails = await getAuthUserDetails(user_id, res);
+      const userDetails = await getAuthUserDetails(updated_by, res);
 
       if (!userDetails || userDetails.id == undefined) {
         return;
@@ -356,11 +356,11 @@ exports.updatesubTaskData = async (id, payload, res) => {
         return errorResponse(res, "You are not allowed to start task", 400);
       }
     }else if(active_status==0 && status==1){
-      const userDetails = await getAuthUserDetails(user_id, res);
+      const userDetails = await getAuthUserDetails(updated_by, res);
 
       const [existingSubtaskSublime] = await db.query(
         "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
-        [user_id]
+        [updated_by]
       );
       if (existingSubtaskSublime.length > 0) {
 
@@ -373,11 +373,11 @@ exports.updatesubTaskData = async (id, payload, res) => {
       }
 
     }else if(active_status==0 && status==2){
-      const userDetails = await getAuthUserDetails(user_id, res);
+      const userDetails = await getAuthUserDetails(updated_by, res);
 
       const [existingSubtaskSublime] = await db.query(
         "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
-        [user_id]
+        [updated_by]
       );
       if (existingSubtaskSublime.length > 0) {
         const timeline = existingSubtaskSublime[0];
