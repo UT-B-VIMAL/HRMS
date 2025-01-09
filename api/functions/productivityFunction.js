@@ -19,7 +19,6 @@ const convertSecondsToReadableTime = (seconds) => {
 };
 
 
-
 exports.getTeamwiseProductivity = async (req, res) => {
     try {
         const { team_id, month, search, page = 1, perPage = 10 } = req.query;
@@ -56,7 +55,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
                         FROM sub_tasks st 
                         WHERE st.task_id = t.id
                     )
-                    ${search ? `AND t.task_name LIKE ?` : ''}
+                    ${search ? `AND t.name LIKE ?` : ''}
                 UNION ALL
                 -- Subtask data
                 SELECT 
@@ -71,10 +70,11 @@ exports.getTeamwiseProductivity = async (req, res) => {
                     st.deleted_at IS NULL
                     ${team_id ? `AND st.team_id = ?` : ''}
                     ${month ? `AND MONTH(st.created_at) = ?` : ''}
-                    ${search ? `AND st.subtask_name LIKE ?` : ''}
+                    ${search ? `AND st.name LIKE ?` : ''}
             ) AS combined
             ON u.id = combined.user_id
             WHERE u.deleted_at IS NULL
+            ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
             GROUP BY u.id, u.first_name, u.last_name, u.employee_id, combined.team_id
             LIMIT ? OFFSET ?
         `;
@@ -86,18 +86,29 @@ exports.getTeamwiseProductivity = async (req, res) => {
         if (team_id) values.push(team_id);
         if (month) values.push(month);
         if (search) values.push(`%${search}%`);
-        values.push(parseInt(perPage), parseInt(offset));
+        if (search) {
+            values.push(`%${search}%`); // For employee ID
+            values.push(`%${search}%`); // For employee name
+        }
+        values.push(parseInt(perPage)); // Correct LIMIT value
+        values.push(parseInt(offset)); // Correct OFFSET value
 
         // Query to count total users
         const countQuery = `
             SELECT COUNT(DISTINCT u.id) AS total_users
             FROM users u
             WHERE u.deleted_at IS NULL
+            ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
         `;
+        const countValues = [];
+        if (search) {
+            countValues.push(`%${search}%`); // For employee ID
+            countValues.push(`%${search}%`); // For employee name
+        }
 
         // Execute the queries
         const [results] = await db.query(query, values);
-        const [countResults] = await db.query(countQuery);
+        const [countResults] = await db.query(countQuery, countValues);
 
         const totalUsers = countResults[0].total_users;
 
@@ -115,13 +126,21 @@ exports.getTeamwiseProductivity = async (req, res) => {
 
         const pagination = getPagination(page, perPage, totalUsers);
 
-        successResponse(res, data, data.length === 0 ? 'No data found' : 'Teamwise productivity retrieved successfully', 200, pagination);
+        successResponse(
+            res,
+            data,
+            data.length === 0 ? 'No data found' : 'Teamwise productivity retrieved successfully',
+            200,
+            pagination
+        );
 
     } catch (error) {
         console.error('Error:', error.message);
         res.status(500).json({ success: false, message: 'An error occurred', error: error.message });
     }
 };
+
+
 
 
 
