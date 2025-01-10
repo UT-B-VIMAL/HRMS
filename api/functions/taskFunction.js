@@ -1094,13 +1094,18 @@ exports.getTaskList = async (queryParams, res) => {
     `;
 
     const params = [];
-
     if (team_id) {
       baseQuery += ` AND tasks.team_id = ?`;
       params.push(team_id);
     } else if (role_id === 3) {
-      baseQuery += ` AND tasks.team_id = ?`;
-      params.push(userTeamId);
+      const queryteam = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+      const [rowteams] = await db.query(queryteam, [user_id]);
+      let teamIds = []; 
+      if(rowteams.length > 0){
+          teamIds = rowteams.map(row => row.id);
+      }
+      baseQuery += ` AND tasks.team_id IN (?)`;
+      params.push(teamIds);
     }
 
     if (role_id === 4) {
@@ -1154,7 +1159,6 @@ exports.getTaskList = async (queryParams, res) => {
         .join(",")})`;
       params.push(...dropdown_projects);
     }
-
     if (search) {
       const searchTerm = `%${search}%`;
       baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ? AND sub_tasks.deleted_at IS NULL) OR projects.name LIKE ? OR products.name LIKE ? OR users.first_name LIKE ? OR users.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
@@ -1376,7 +1380,7 @@ exports.doneTaskList = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       subtaskConditions.push(
-        `(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
+        `(t.name LIKE ? OR st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
       );
       subtaskValues.push(
         searchTerm,
