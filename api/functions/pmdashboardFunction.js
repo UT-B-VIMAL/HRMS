@@ -293,7 +293,8 @@ exports.fetchAttendance = async (payload, res) => {
       SELECT 
         t.id AS team_id,
         t.name AS team_name,
-        u.id AS employee_id,
+        u.id AS user_id,
+        u.employee_id AS employee_id,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         el.day_type,
         el.half_type 
@@ -307,6 +308,7 @@ exports.fetchAttendance = async (payload, res) => {
       const {
         team_id,
         team_name,
+        user_id,
         employee_id,
         employee_name,
         day_type,
@@ -333,12 +335,14 @@ exports.fetchAttendance = async (payload, res) => {
       if (isAbsent) {
         acc[team_id].team_absent_count++;
         acc[team_id].absent_employees.push({
+          user_id,
           employee_id,
           employee_name,
         });
       } else {
         acc[team_id].team_present_count++;
         acc[team_id].present_employees.push({
+          user_id,
           employee_id,
           employee_name,
         });
