@@ -293,7 +293,8 @@ exports.fetchAttendance = async (payload, res) => {
       SELECT 
         t.id AS team_id,
         t.name AS team_name,
-        u.id AS employee_id,
+        u.id AS user_id,
+        u.employee_id AS employee_id,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         el.day_type,
         el.half_type 
@@ -307,6 +308,7 @@ exports.fetchAttendance = async (payload, res) => {
       const {
         team_id,
         team_name,
+        user_id,
         employee_id,
         employee_name,
         day_type,
@@ -333,12 +335,14 @@ exports.fetchAttendance = async (payload, res) => {
       if (isAbsent) {
         acc[team_id].team_absent_count++;
         acc[team_id].absent_employees.push({
+          user_id,
           employee_id,
           employee_name,
         });
       } else {
         acc[team_id].team_present_count++;
         acc[team_id].present_employees.push({
+          user_id,
           employee_id,
           employee_name,
         });
@@ -390,11 +394,10 @@ exports.fetchPmviewproductdata = async (req, res) => {
       [product_id]
     );
 
-    // Check if no rows are returned
     if (rows.length === 0) {
       return errorResponse(res, null, "Product Not Found", 400);
     }
-    // Build dynamic SQL query for product details
+
     const productQuery = `
       SELECT id, name
       FROM products
@@ -403,61 +406,55 @@ exports.fetchPmviewproductdata = async (req, res) => {
     const [productRows] = await db.query(productQuery, [product_id]);
     const product = productRows[0] || { name: "N/A", id: "N/A" };
 
-    // Build dynamic query for tasks and subtasks
     let tasksQuery = `
-  SELECT 
-    t.id AS task_id,
-    t.name AS task_name,
-    t.status AS task_status,
-    t.active_status AS task_active_status,
-    t.created_at AS task_date,
-    t.priority AS task_priority,
-    t.estimated_hours AS task_estimation_hours,
-    t.description AS task_description,
-    s.id AS subtask_id,
-    s.name AS subtask_name,
-    s.status AS subtask_status,
-    s.active_status AS subtask_active_status,
-    s.reopen_status AS subtask_reopen_status,
-    s.estimated_hours AS subtask_estimation_hours,
-    s.description AS subtask_description,
-    s.deleted_at AS subtask_deleted_at,
-    te.name AS team_name,
-    COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
-    p.name AS project_name
-  FROM tasks t
-  LEFT JOIN sub_tasks s 
-    ON t.id = s.task_id 
-    AND s.deleted_at IS NULL  -- Ensure only subtasks that are not deleted are included
-  LEFT JOIN teams te 
-    ON t.team_id = te.id
-    AND te.deleted_at IS NULL
-  LEFT JOIN users u 
-    ON t.user_id = u.id
-    AND u.deleted_at IS NULL
-  LEFT JOIN projects p 
-    ON t.project_id = p.id
-    AND p.deleted_at IS NULL
-  WHERE t.product_id = ? 
-    AND t.deleted_at IS NULL
-`;
+      SELECT 
+        t.id AS task_id,
+        t.name AS task_name,
+        t.status AS task_status,
+        t.active_status AS task_active_status,
+        t.created_at AS task_date,
+        t.priority AS task_priority,
+        t.estimated_hours AS task_estimation_hours,
+        t.description AS task_description,
+        s.id AS subtask_id,
+        s.name AS subtask_name,
+        s.status AS subtask_status,
+        s.active_status AS subtask_active_status,
+        s.reopen_status AS subtask_reopen_status,
+        s.estimated_hours AS subtask_estimation_hours,
+        s.description AS subtask_description,
+        te.name AS team_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
+        p.name AS project_name
+      FROM tasks t
+      LEFT JOIN sub_tasks s 
+        ON t.id = s.task_id 
+        AND s.deleted_at IS NULL
+      LEFT JOIN teams te 
+        ON t.team_id = te.id
+        AND te.deleted_at IS NULL
+      LEFT JOIN users u 
+        ON t.user_id = u.id
+        AND u.deleted_at IS NULL
+      LEFT JOIN projects p 
+        ON t.project_id = p.id
+        AND p.deleted_at IS NULL
+      WHERE t.product_id = ? 
+        AND t.deleted_at IS NULL
+    `;
 
-    // Filter by project_id if provided
     if (project_id) {
       tasksQuery += ` AND t.project_id = ${db.escape(project_id)}`;
     }
 
-    // Filter by team_id if provided
     if (team_id) {
       tasksQuery += ` AND t.team_id = ${db.escape(team_id)}`;
     }
 
-    // Filter by date if provided (assuming date format as 'YYYY-MM-DD')
     if (date) {
       tasksQuery += ` AND DATE(t.created_at) = ${db.escape(date)}`;
     }
 
-    // Filter by search if provided (search across user, project, team, subtask name)
     if (search) {
       tasksQuery += `
         AND (
@@ -466,96 +463,13 @@ exports.fetchPmviewproductdata = async (req, res) => {
           )} OR
           p.name LIKE ${db.escape("%" + search + "%")} OR
           te.name LIKE ${db.escape("%" + search + "%")} OR
-          s.name LIKE ${db.escape("%" + search + "%")}
+          t.name LIKE ${db.escape("%" + search + "%")}
         )
       `;
     }
 
-    // Execute the query
     const [taskRows] = await db.query(tasksQuery, [product_id]);
 
-    // Helper function to validate subtask inclusion based on status
-    const isValidSubtask = (subtask, status) => {
-      switch (status) {
-        case "Pending":
-          return (
-            subtask.active_status === 0 &&
-            subtask.status === 0 &&
-            subtask.reopen_status === 0
-          );
-        case "In Progress":
-          return subtask.active_status === 1 && subtask.status === 1;
-        case "In Review":
-          return subtask.reopen_status === 0 && subtask.status === 2;
-        case "On Hold":
-          return (
-            subtask.active_status === 0 &&
-            subtask.status === 1 &&
-            subtask.reopen_status === 0
-          );
-        case "Done":
-          return subtask.status === 3;
-        case "Re Open":
-          return subtask.reopen_status === 1;
-        default:
-          return false;
-      }
-    };
-
-    // Helper function to format tasks and subtasks
-    const formatTask = (task, subtasks, status) => {
-      const validSubtasks = [];
-      let totalSubtasks = 0;
-      let completedSubtasks = 0;
-
-      // Collect and validate subtask details
-      subtasks.forEach((subtask) => {
-        if (isValidSubtask(subtask, status)) {
-          validSubtasks.push({
-            SubtaskId: subtask.id || "N/A",
-            SubtaskName: subtask.name || "N/A",
-            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
-            SubtaskDescription: subtask.description || "N/A",
-            SubtaskActiveStatus: subtask.active_status || "N/A",
-            SubtaskStatus: subtask.status || "N/A",
-          });
-        }
-        totalSubtasks++;
-        if (subtask.status === 3) {
-          completedSubtasks++;
-        }
-      });
-
-      // Calculate completion percentage
-      const completionPercentage =
-        totalSubtasks > 0
-          ? Math.round((completedSubtasks / totalSubtasks) * 100)
-          : task.status === 3
-          ? 100
-          : 0;
-
-      // Return the formatted task object
-      return {
-        Date: task.date
-          ? new Date(task.date).toISOString().split("T")[0]
-          : "N/A",
-        Team: task.team_name || "N/A",
-        EmployeeName: task.employee_name || "N/A",
-        Priority: task.priority || "N/A",
-        ProjectName: task.project_name || "N/A",
-        TaskName: task.name || "N/A",
-        TaskId: task.id || "N/A",
-        TotalSubtaskCount: totalSubtasks,
-        CompletedSubtaskCount: completedSubtasks,
-        EstimationHours: task.estimation_hours || "N/A",
-        Description: task.description || "N/A",
-        Subtasks: validSubtasks,
-        CompletionPercentage: completionPercentage,
-        Status: status,
-      };
-    };
-
-    // Group tasks by status
     const groupedTasks = {
       Pending: [],
       "In Progress": [],
@@ -565,18 +479,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
       "Re Open": [],
     };
 
-    // Track added task IDs for each section
-    const addedTaskIds = {
-      Pending: [],
-      "In Progress": [],
-      "In Review": [],
-      "On Hold": [],
-      Done: [],
-      "Re Open": [],
-    };
-
-    // Process each row and categorize tasks
     taskRows.forEach((row) => {
+      const taskKey = row.task_id; // Unique identifier for tasks
       const task = {
         id: row.task_id,
         name: row.task_name,
@@ -590,8 +494,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         employee_name: row.employee_name,
         project_name: row.project_name,
       };
-
-      // Create subtask if applicable
+    
       const subtask = row.subtask_id
         ? {
             id: row.subtask_id,
@@ -603,106 +506,44 @@ exports.fetchPmviewproductdata = async (req, res) => {
             description: row.subtask_description,
           }
         : null;
-
-      // Find category based on task's subtask or status
-      const category = Object.keys(groupedTasks).find((status) =>
-        isValidSubtask(subtask || task, status)
+    
+      const statusCategory = Object.keys(groupedTasks).find(
+        (status) =>
+          (task.status === 0 && status === "Pending") ||
+          (task.status === 1 && status === "In Progress") ||
+          (task.status === 2 && status === "In Review") ||
+          (task.status === 3 && status === "Done")
       );
-
-      // Only add task if it hasn't been added to that category already
-      if (category) {
-        const existingTaskIndex = groupedTasks[category].findIndex(
-          (t) => t.TaskId === task.id
+    
+      if (statusCategory) {
+        let existingTask = groupedTasks[statusCategory].find(
+          (t) => t.TaskId === taskKey
         );
-
-        if (existingTaskIndex === -1) {
-          // Task does not exist in the section, so push the task with its subtask
-          groupedTasks[category].push(
-            formatTask(task, subtask ? [subtask] : [], category)
-          );
-        } else {
-          // Task exists, so add the subtask to the existing task
-          const existingTask = groupedTasks[category][existingTaskIndex];
-
-          // Add the new subtask to the existing task
+    
+        if (!existingTask) {
+          existingTask = {
+            TaskId: task.id,
+            TaskName: task.name,
+            Team: task.team_name,
+            EmployeeName: task.employee_name,
+            Priority: task.priority,
+            ProjectName: task.project_name,
+            Description: task.description,
+            Subtasks: [],
+          };
+          groupedTasks[statusCategory].push(existingTask);
+        }
+    
+        if (subtask) {
           existingTask.Subtasks.push({
-            SubtaskId: subtask.id || "N/A",
-            SubtaskName: subtask.name || "N/A",
-            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
-            SubtaskDescription: subtask.description || "N/A",
-            SubtaskActiveStatus: subtask.active_status || "N/A",
-            SubtaskStatus: subtask.status || "N/A",
+            SubtaskId: subtask.id,
+            SubtaskName: subtask.name,
+            SubtaskStatus: subtask.status,
           });
-
-          // Update the counts for subtasks
-          existingTask.TotalSubtaskCount++; // Increment total subtasks count
-          if (subtask.status === 3) {
-            existingTask.CompletedSubtaskCount++; // Increment completed subtasks count
-          }
-
-          // Recalculate completion percentage
-          const completionPercentage =
-            existingTask.TotalSubtaskCount > 0
-              ? Math.round(
-                  (existingTask.CompletedSubtaskCount /
-                    existingTask.TotalSubtaskCount) *
-                    100
-                )
-              : 0;
-
-          existingTask.CompletionPercentage = completionPercentage;
         }
       }
     });
-
-    // Calculate the overall completion percentage
-    let totalTasksAndSubtasks = 0; // Total count of tasks and subtasks
-    let completedTasksAndSubtasks = 0; // Count of completed tasks and subtasks
-
-    // Loop through all task groups and count
-    Object.keys(groupedTasks).forEach((status) => {
-      groupedTasks[status].forEach((task) => {
-        // Increment total tasks count
-        totalTasksAndSubtasks++;
-
-        // If the task itself is marked as 'Done', increment completed count
-        if (task.Status === "Done") {
-          completedTasksAndSubtasks++;
-        }
-
-        // Count all subtasks within the task
-        task.Subtasks.forEach((subtask) => {
-          totalTasksAndSubtasks++; // Increment for each subtask
-          if (subtask.SubtaskStatus === 3) {
-            completedTasksAndSubtasks++; // Increment if subtask is 'Done'
-          }
-        });
-      });
-    });
-
-    // Calculate the overall completion percentage
-    const OverallCompletionPercentage =
-      totalTasksAndSubtasks > 0
-        ? Math.round((completedTasksAndSubtasks / totalTasksAndSubtasks) * 100)
-        : 0;
-
-    let taskCountQuery = `
-  SELECT COUNT(*) AS task_count
-  FROM tasks
-  WHERE product_id = ? 
-    AND deleted_at IS NULL
-`;
-
-    if (team_id) {
-      taskCountQuery += ` AND team_id = ${db.escape(team_id)}`;
-    }
-
-    const [taskCountResult] = await db.query(taskCountQuery, [product_id]);
-
-    // Access the task count
-    const taskCount = taskCountResult[0]?.task_count || 0;
-
-    // Prepare the response
+    
     const result = {
       PendingTasks: groupedTasks["Pending"],
       InProgressTasks: groupedTasks["In Progress"],
@@ -710,16 +551,6 @@ exports.fetchPmviewproductdata = async (req, res) => {
       OnHoldTasks: groupedTasks["On Hold"],
       DoneTasks: groupedTasks["Done"],
       ReOpenTasks: groupedTasks["Re Open"],
-      TodoCount: groupedTasks["Pending"].length,
-      InProgressCount: groupedTasks["In Progress"].length,
-      InReviewCount: groupedTasks["In Review"].length,
-      OnHoldCount: groupedTasks["On Hold"].length,
-      DoneCount: groupedTasks["Done"].length,
-      ReOpenCount: groupedTasks["Re Open"].length,
-      TaskCount: taskCount,
-      OverallCompletionPercentage: OverallCompletionPercentage,
-      productname: product.name,
-      productid: product.id,
     };
 
     return successResponse(
@@ -738,6 +569,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
     );
   }
 };
+
+
 
 exports.fetchPmdatas = async (req, res) => {
   try {
