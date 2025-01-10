@@ -1376,7 +1376,7 @@ exports.doneTaskList = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       subtaskConditions.push(
-        `(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
+        `(t.name LIKE ? OR st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
       );
       subtaskValues.push(
         searchTerm,
