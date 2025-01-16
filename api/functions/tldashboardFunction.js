@@ -10,7 +10,7 @@ exports.fetchAttendance = async (req, res) => {
     const cutoffTime = new Date();
     cutoffTime.setHours(13, 30, 0, 0); // 1:30 PM cutoff
     const today = new Date().toISOString().split("T")[0];
-    const { user_id } = req.query;
+    const { user_id, employee_id } = req.query;
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -62,8 +62,9 @@ exports.fetchAttendance = async (req, res) => {
           AND u.team_id IN (?)
           AND u.deleted_at IS NULL
           AND e.deleted_at IS NULL
+          ${employee_id ? 'AND u.employee_id = ?' : ''}
       `,
-      [today, currentTime, cutoffTime, teamIds]
+      employee_id ? [today, currentTime, cutoffTime, teamIds, employee_id] : [today, currentTime, cutoffTime, teamIds]
     );
 
     const absentEmployeeIds = absentEmployees.map((emp) => emp.employee_id);
@@ -79,8 +80,9 @@ exports.fetchAttendance = async (req, res) => {
         WHERE team_id IN (?) 
           AND deleted_at IS NULL
           ${absentEmployeeIdsCondition}
+          ${employee_id ? 'AND employee_id = ?' : ''}
       `,
-      absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
+      absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds, employee_id || []] : [teamIds, employee_id || []]
     );
 
     // Combine attendance data
@@ -153,6 +155,7 @@ exports.fetchAttendance = async (req, res) => {
     });
   }
 };
+
 
 exports.fetchTlrating = async (req, res) => {
   try {
