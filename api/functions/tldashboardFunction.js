@@ -1233,7 +1233,7 @@ exports.fetchTlviewproductdata = async (req, res) => {
             SubtaskName: subtask.name || "N/A",
             SubtaskEstimationHours: subtask.estimated_hours || "N/A",
             SubtaskDescription: subtask.description || "N/A",
-            SubtaskActiveStatus: subtask.active_status || "N/A",
+            SubtaskActiveStatus: subtask.subtask_active_status || "N/A",
             SubtaskStatus: subtask.status || "N/A",
           });
         }
