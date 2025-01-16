@@ -383,22 +383,35 @@ exports.fetchAttendance = async (payload, res) => {
 };
 exports.fetchPmviewproductdata = async (req, res) => {
   try {
-    const { product_id, project_id, team_id, date, search } = req.query;
+    const {
+      product_id,
+      project_id,
+      team_id,
+      date,
+      search,
+    } = req.query;
 
+    // Validate if product_id exists
     if (!product_id) {
-      return errorResponse(res, null, "Product ID is required", 400);
+      console.log("Missing product_id in query parameters");
+      return errorResponse(
+        res,
+        "Product ID is required",
+        "Missing product_id in query parameters",
+        400
+      );
     }
 
+    // Validate product existence
     const [rows] = await db.query(
       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
       [product_id]
     );
 
-    // Check if no rows are returned
     if (rows.length === 0) {
       return errorResponse(res, null, "Product Not Found", 400);
     }
-    // Build dynamic SQL query for product details
+
     const productQuery = `
       SELECT id, name
       FROM products
@@ -407,104 +420,137 @@ exports.fetchPmviewproductdata = async (req, res) => {
     const [productRows] = await db.query(productQuery, [product_id]);
     const product = productRows[0] || { name: "N/A", id: "N/A" };
 
-    // Build dynamic query for tasks and subtasks
-    let tasksQuery = `
-  SELECT 
-    t.id AS task_id,
-    t.name AS task_name,
-    t.status AS task_status,
-    t.active_status AS task_active_status,
-    t.created_at AS task_date,
-    t.priority AS task_priority,
-    t.estimated_hours AS task_estimation_hours,
-    t.description AS task_description,
-    s.id AS subtask_id,
-    s.name AS subtask_name,
-    s.status AS subtask_status,
-    s.active_status AS subtask_active_status,
-    s.reopen_status AS subtask_reopen_status,
-    s.estimated_hours AS subtask_estimation_hours,
-    s.description AS subtask_description,
-    s.deleted_at AS subtask_deleted_at,
-    te.name AS team_name,
-    COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
-    p.name AS project_name
-  FROM tasks t
-  LEFT JOIN sub_tasks s 
-    ON t.id = s.task_id 
-    AND s.deleted_at IS NULL  -- Ensure only subtasks that are not deleted are included
-  LEFT JOIN teams te 
-    ON t.team_id = te.id
-    AND te.deleted_at IS NULL
-  LEFT JOIN users u 
-    ON t.user_id = u.id
-    AND u.deleted_at IS NULL
-  LEFT JOIN projects p 
-    ON t.project_id = p.id
-    AND p.deleted_at IS NULL
-  WHERE t.product_id = ? 
-    AND t.deleted_at IS NULL
-`;
+    // Base query for tasks and subtasks
+    let baseQuery = `
+      SELECT 
+        t.id AS task_id,
+        t.name AS task_name,
+        t.status AS task_status,
+        t.active_status AS task_active_status,
+        t.reopen_status AS task_reopen_status,
+        t.created_at AS task_date,
+        t.priority AS task_priority,
+        t.estimated_hours AS task_estimation_hours,
+        t.description AS task_description,
+        s.id AS subtask_id,
+        s.name AS subtask_name,
+        s.status AS subtask_status,
+        s.active_status AS subtask_active_status,
+        s.reopen_status AS subtask_reopen_status,
+        s.estimated_hours AS subtask_estimation_hours,
+        s.description AS subtask_description,
+        te.name AS team_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
+        p.name AS project_name
+      FROM tasks t
+      LEFT JOIN sub_tasks s 
+        ON t.id = s.task_id 
+        AND s.deleted_at IS NULL
+      LEFT JOIN teams te 
+        ON t.team_id = te.id
+        AND te.deleted_at IS NULL
+      LEFT JOIN users u 
+        ON t.user_id = u.id
+        AND u.deleted_at IS NULL
+      LEFT JOIN projects p 
+        ON t.project_id = p.id
+        AND p.deleted_at IS NULL
+      WHERE t.product_id = ? 
+        AND t.deleted_at IS NULL
+    `;
 
-    // Filter by project_id if provided
+    const params = [product_id];
+
     if (project_id) {
-      tasksQuery += ` AND t.project_id = ${db.escape(project_id)}`;
+      baseQuery += ` AND t.project_id = ?`;
+      params.push(project_id);
     }
 
-    // Filter by team_id if provided
     if (team_id) {
-      tasksQuery += ` AND t.team_id = ${db.escape(team_id)}`;
+      baseQuery += ` AND t.team_id = ?`;
+      params.push(team_id);
     }
 
-    // Filter by date if provided (assuming date format as 'YYYY-MM-DD')
     if (date) {
-      tasksQuery += ` AND DATE(t.created_at) = ${db.escape(date)}`;
+      baseQuery += ` AND DATE(t.created_at) = ?`;
+      params.push(date);
     }
 
-    // Filter by search if provided (search across user, project, team, subtask name)
     if (search) {
-      tasksQuery += `
+      const searchTerm = `%${search}%`;
+      baseQuery += `
         AND (
-          COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ${db.escape(
-            "%" + search + "%"
-          )} OR
-          p.name LIKE ${db.escape("%" + search + "%")} OR
-          te.name LIKE ${db.escape("%" + search + "%")} OR
-          s.name LIKE ${db.escape("%" + search + "%")}
+          COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ? OR
+          p.name LIKE ? OR
+          te.name LIKE ? OR
+          s.name LIKE ?
         )
       `;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    // Execute the query
-    const [taskRows] = await db.query(tasksQuery, [product_id]);
+    // Execute the query for tasks
+    const [taskRows] = await db.query(baseQuery, params);
 
-    // Helper function to validate subtask inclusion based on status
-    const isValidSubtask = (subtask, status) => {
-      switch (status) {
-        case "Pending":
-          return (
-            subtask.active_status === 0 &&
-            subtask.status === 0 &&
-            subtask.reopen_status === 0
-          );
-        case "In Progress":
-          return subtask.active_status === 1 && subtask.status === 1;
-        case "In Review":
-          return subtask.reopen_status === 0 && subtask.status === 2;
-        case "On Hold":
-          return (
-            subtask.active_status === 0 &&
-            subtask.status === 1 &&
-            subtask.reopen_status === 0
-          );
-        case "Done":
-          return subtask.status === 3;
-        case "Re Open":
-          return subtask.reopen_status === 1;
-        default:
-          return false;
+    const isValidSubtask = (item, status) => {
+      // Determine if the item is a task or a subtask
+      const isTask = !item.hasOwnProperty('subtask_id');
+      
+      // Task or subtask validation
+      if (isTask) {
+        switch (status) {
+          case "Pending":
+            return (
+              item.active_status === 0 &&
+              item.status === 0 &&
+              item.reopen_status === 0
+            );
+          case "In Progress":
+            return item.active_status === 1 && item.status === 1;
+          case "In Review":
+            return item.reopen_status === 0 && item.status === 2;
+          case "On Hold":
+            return (
+              item.active_status === 0 &&
+              item.status === 1 &&
+              item.reopen_status === 0
+            );
+          case "Done":
+            return item.status === 3;
+          case "Re Open":
+            return item.reopen_status === 1;
+          default:
+            return false;
+        }
+      } else {
+        // This is for subtasks
+        switch (status) {
+          case "Pending":
+            return (
+              item.active_status === 0 &&
+              item.status === 0 &&
+              item.reopen_status === 0
+            );
+          case "In Progress":
+            return item.active_status === 1 && item.status === 1;
+          case "In Review":
+            return item.reopen_status === 0 && item.status === 2;
+          case "On Hold":
+            return (
+              item.active_status === 0 &&
+              item.status === 1 &&
+              item.reopen_status === 0
+            );
+          case "Done":
+            return item.status === 3;
+          case "Re Open":
+            return item.reopen_status === 1;
+          default:
+            return false;
+        }
       }
     };
+    
 
     // Helper function to format tasks and subtasks
     const formatTask = (task, subtasks, status) => {
@@ -586,6 +632,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         name: row.task_name,
         status: row.task_status,
         active_status: row.task_active_status,
+        reopen_status: row.task_reopen_status,
         priority: row.task_priority,
         date: row.task_date,
         estimation_hours: row.task_estimation_hours,
@@ -658,55 +705,23 @@ exports.fetchPmviewproductdata = async (req, res) => {
         }
       }
     });
+    // Calculate task counts and overall completion percentage
+    const taskCount = taskRows.length;
+    let overallCompletion = 0;
+    let totalTasksWithCompletion = 0;
 
-    // Calculate the overall completion percentage
-    let totalTasksAndSubtasks = 0; // Total count of tasks and subtasks
-    let completedTasksAndSubtasks = 0; // Count of completed tasks and subtasks
-
-    // Loop through all task groups and count
     Object.keys(groupedTasks).forEach((status) => {
       groupedTasks[status].forEach((task) => {
-        // Increment total tasks count
-        totalTasksAndSubtasks++;
-
-        // If the task itself is marked as 'Done', increment completed count
-        if (task.Status === "Done") {
-          completedTasksAndSubtasks++;
-        }
-
-        // Count all subtasks within the task
-        task.Subtasks.forEach((subtask) => {
-          totalTasksAndSubtasks++; // Increment for each subtask
-          if (subtask.SubtaskStatus === 3) {
-            completedTasksAndSubtasks++; // Increment if subtask is 'Done'
-          }
-        });
+        overallCompletion += task.CompletionPercentage;
+        totalTasksWithCompletion++;
       });
     });
 
-    // Calculate the overall completion percentage
     const OverallCompletionPercentage =
-      totalTasksAndSubtasks > 0
-        ? Math.round((completedTasksAndSubtasks / totalTasksAndSubtasks) * 100)
+      totalTasksWithCompletion > 0
+        ? Math.round(overallCompletion / totalTasksWithCompletion)
         : 0;
 
-    let taskCountQuery = `
-  SELECT COUNT(*) AS task_count
-  FROM tasks
-  WHERE product_id = ? 
-    AND deleted_at IS NULL
-`;
-
-    if (team_id) {
-      taskCountQuery += ` AND team_id = ${db.escape(team_id)}`;
-    }
-
-    const [taskCountResult] = await db.query(taskCountQuery, [product_id]);
-
-    // Access the task count
-    const taskCount = taskCountResult[0]?.task_count || 0;
-
-    // Prepare the response
     const result = {
       PendingTasks: groupedTasks["Pending"],
       InProgressTasks: groupedTasks["In Progress"],
@@ -726,18 +741,17 @@ exports.fetchPmviewproductdata = async (req, res) => {
       productid: product.id,
     };
 
-    return successResponse(
-      res,
-      result,
-      "Product details retrieved successfully",
-      200
-    );
+    // Send the success response with the result
+    return successResponse(res, result, "Product details retrieved successfully", 200);
+    // Send response with grouped tasks
+    // return successResponse(res, groupedTasks);
+
   } catch (error) {
-    console.error("Error fetching product details:", error);
+    console.error(error);
     return errorResponse(
       res,
+      "Error fetching product task data",
       error.message,
-      "Error fetching product details",
       500
     );
   }
