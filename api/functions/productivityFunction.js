@@ -21,12 +21,43 @@ const convertSecondsToReadableTime = (seconds) => {
 
 exports.getTeamwiseProductivity = async (req, res) => {
     try {
-        const { team_id, month, search, page = 1, perPage = 10 } = req.query;
+        const { team_id, month, user_id, employee_id, search, page = 1, perPage = 10 } = req.query;
 
         const offset = (page - 1) * perPage;
 
-        // Query to fetch grouped data by user_id, including task and subtask
-        const query = `
+        // Task query
+        let taskQuery = `
+            SELECT 
+                t.user_id,
+                t.team_id,
+                TIME_TO_SEC(t.estimated_hours) AS estimated_seconds,
+                TIME_TO_SEC(t.total_hours_worked) AS worked_seconds,
+                TIME_TO_SEC(t.extended_hours) AS extended_seconds,
+                t.created_at
+            FROM 
+                tasks t
+            WHERE 
+                t.deleted_at IS NULL
+        `;
+
+        // Subtask query
+        let subtaskQuery = `
+            SELECT 
+                st.user_id,
+                st.team_id,
+                TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
+                TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
+                TIME_TO_SEC(st.extended_hours) AS extended_seconds,
+                st.created_at
+            FROM 
+                sub_tasks st
+            WHERE 
+                st.deleted_at IS NULL
+           
+        `;
+
+        // Combine task and subtask queries
+        let query = `
             SELECT 
                 u.id AS user_id,
                 COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS employee_name,
@@ -37,77 +68,81 @@ exports.getTeamwiseProductivity = async (req, res) => {
                 COALESCE(SUM(combined.extended_seconds), 0) AS total_extended_seconds
             FROM users u
             LEFT JOIN (
-                -- Task data
-                SELECT 
-                    t.user_id,
-                    t.team_id,
-                    TIME_TO_SEC(t.estimated_hours) AS estimated_seconds,
-                    TIME_TO_SEC(t.total_hours_worked) AS worked_seconds,
-                    TIME_TO_SEC(t.extended_hours) AS extended_seconds
-                FROM 
-                    tasks t
-                WHERE 
-                    t.deleted_at IS NULL
-                    ${team_id ? `AND t.team_id = ?` : ''}
-                    ${month ? `AND MONTH(t.created_at) = ?` : ''}
-                    AND NOT EXISTS (
-                        SELECT 1 
-                        FROM sub_tasks st 
-                        WHERE st.task_id = t.id
-                    )
-                    ${search ? `AND t.name LIKE ?` : ''}
+                (${taskQuery})
                 UNION ALL
-                -- Subtask data
-                SELECT 
-                    st.user_id,
-                    st.team_id,
-                    TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
-                    TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
-                    TIME_TO_SEC(st.extended_hours) AS extended_seconds
-                FROM 
-                    sub_tasks st
-                WHERE 
-                    st.deleted_at IS NULL
-                    ${team_id ? `AND st.team_id = ?` : ''}
-                    ${month ? `AND MONTH(st.created_at) = ?` : ''}
-                    ${search ? `AND st.name LIKE ?` : ''}
+                (${subtaskQuery})
             ) AS combined
             ON u.id = combined.user_id
             WHERE u.deleted_at IS NULL
+            ${team_id ? `AND combined.team_id = ?` : ''}
+            ${month ? `AND MONTH(combined.created_at) = ?` : ''}
+            ${user_id ? `AND u.id = ?` : ''}
+            ${employee_id ? `AND u.employee_id = ?` : ''}
             ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
             GROUP BY u.id, u.first_name, u.last_name, u.employee_id, combined.team_id
             LIMIT ? OFFSET ?
         `;
 
-        const values = [];
-        if (team_id) values.push(team_id);
-        if (month) values.push(month);
-        if (search) values.push(`%${search}%`);
-        if (team_id) values.push(team_id);
-        if (month) values.push(month);
-        if (search) values.push(`%${search}%`);
-        if (search) {
-            values.push(`%${search}%`); // For employee ID
-            values.push(`%${search}%`); // For employee name
+        // Query parameters for task and subtask
+        let queryParams = [];
+        if (team_id) {
+            queryParams.push(team_id);
         }
-        values.push(parseInt(perPage)); // Correct LIMIT value
-        values.push(parseInt(offset)); // Correct OFFSET value
+        if (month) {
+            queryParams.push(month);
+        }
+        if (user_id) {
+            queryParams.push(user_id);
+        }
+        if (employee_id) {
+            queryParams.push(employee_id);
+        }
+        if (search) {
+            queryParams.push(`%${search}%`);
+            queryParams.push(`%${search}%`);
+        }
+
+        // Add pagination limit and offset
+        queryParams.push(parseInt(perPage));
+        queryParams.push(parseInt(offset));
 
         // Query to count total users
         const countQuery = `
             SELECT COUNT(DISTINCT u.id) AS total_users
             FROM users u
+            LEFT JOIN (
+                (${taskQuery})
+                UNION ALL
+                (${subtaskQuery})
+            ) AS combined
+            ON u.id = combined.user_id
             WHERE u.deleted_at IS NULL
+            ${team_id ? `AND combined.team_id = ?` : ''}
+            ${month ? `AND MONTH(combined.created_at) = ?` : ''}
+            ${user_id ? `AND u.id = ?` : ''}
+            ${employee_id ? `AND u.employee_id = ?` : ''}
             ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
         `;
         const countValues = [];
+        if (team_id) {
+            countValues.push(team_id);
+        }
+        if (month) {
+            countValues.push(month);
+        }
+        if (user_id) {
+            countValues.push(user_id);
+        }
+        if (employee_id) {
+            countValues.push(employee_id);
+        }
         if (search) {
-            countValues.push(`%${search}%`); // For employee ID
-            countValues.push(`%${search}%`); // For employee name
+            countValues.push(`%${search}%`);
+            countValues.push(`%${search}%`);
         }
 
         // Execute the queries
-        const [results] = await db.query(query, values);
+        const [results] = await db.query(query, queryParams);
         const [countResults] = await db.query(countQuery, countValues);
 
         const totalUsers = countResults[0].total_users;
