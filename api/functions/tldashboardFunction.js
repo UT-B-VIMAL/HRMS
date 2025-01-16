@@ -369,6 +369,8 @@ exports.fetchTLproducts = async (req, res) => {
 
         const completionPercentage =
           totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+          console.log(completedItems,totalItems,completionPercentage);
+          
 
         // Fetch employee details for working employees
         let employeeList = [];
@@ -1357,20 +1359,35 @@ exports.fetchTlviewproductdata = async (req, res) => {
     });
 
     const taskCount = taskRows.length;
-    let overallCompletion = 0;
-    let totalTasksWithCompletion = 0;
-
+    // Track totals for tasks and subtasks
+    let totalItems = 0;
+    let completedItems = 0;
+    
     Object.keys(groupedTasks).forEach((status) => {
       groupedTasks[status].forEach((task) => {
-        overallCompletion += task.CompletionPercentage;
-        totalTasksWithCompletion++;
+        // If the task has subtasks, count the subtasks
+        if (task.Subtasks.length > 0) {
+          task.Subtasks.forEach((subtask) => {
+            totalItems++;
+            if (subtask.SubtaskStatus === 3) { // Assuming 3 is the "Done" status
+              completedItems++;
+            }
+          });
+        } else {
+          // Otherwise, count the task itself
+          totalItems++;
+          if (task.CompletionPercentage === 100) {
+            completedItems++;
+          }
+        }
       });
     });
-
-    const OverallCompletionPercentage =
-      totalTasksWithCompletion > 0
-        ? Math.round(overallCompletion / totalTasksWithCompletion)
-        : 0;
+    
+    // Calculate overall completion based on total task and subtask counts
+    const overallCompletionPercentage = totalItems > 0
+      ? Math.round((completedItems / totalItems) * 100)
+      : 0;
+  
 
     const result = {
       PendingTasks: groupedTasks["Pending"],
@@ -1386,7 +1403,7 @@ exports.fetchTlviewproductdata = async (req, res) => {
       DoneCount: groupedTasks["Done"].length,
       ReOpenCount: groupedTasks["Re Open"].length,
       TaskCount: taskCount,
-      OverallCompletionPercentage: OverallCompletionPercentage,
+      OverallCompletionPercentage: overallCompletionPercentage,
       productname: product.name,
       productid: product.id,
     };
