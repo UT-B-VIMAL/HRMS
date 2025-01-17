@@ -105,6 +105,43 @@ exports.createTask = async (payload, res) => {
       );
     }
 
+    if (estimated_hours) {
+      const timeMatch = estimated_hours.match(
+        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      );
+    
+      if (!timeMatch) {
+        return errorResponse(
+          res,
+          null,
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          400
+        );
+      }
+    
+      const days = parseInt(timeMatch[2] || '0', 10);
+      const hours = parseInt(timeMatch[4] || '0', 10);
+      const minutes = parseInt(timeMatch[6] || '0', 10);
+      const seconds = parseInt(timeMatch[8] || '0', 10);
+    
+      if (
+        days < 0 ||
+        hours < 0 ||
+        minutes < 0 ||
+        seconds < 0 ||
+        minutes >= 60 ||
+        seconds >= 60
+      ) {
+        return errorResponse(res, null, 'Invalid time values in estimated_hours', 400);
+      }
+    
+      // Convert days to hours and calculate total hours
+      const totalHours = days * 24 + hours;
+    
+      // Format as "HH:MM:SS"
+      payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
     const query = `
         INSERT INTO tasks (
           product_id, project_id, user_id, name, estimated_hours,
@@ -494,6 +531,43 @@ exports.updateTask = async (id, payload, res) => {
     if (currentTask.length === 0) {
       return errorResponse(res, null, "Task not found", 200);
     }
+
+    if (estimated_hours) {
+      const timeMatch = estimated_hours.match(
+        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      );
+    
+      if (!timeMatch) {
+        return errorResponse(
+          res,
+          null,
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          400
+        );
+      }
+    
+      const days = parseInt(timeMatch[2] || '0', 10);
+      const hours = parseInt(timeMatch[4] || '0', 10);
+      const minutes = parseInt(timeMatch[6] || '0', 10);
+      const seconds = parseInt(timeMatch[8] || '0', 10);
+    
+      if (
+        days < 0 ||
+        hours < 0 ||
+        minutes < 0 ||
+        seconds < 0 ||
+        minutes >= 60 ||
+        seconds >= 60
+      ) {
+        return errorResponse(res, null, 'Invalid time values in estimated_hours', 400);
+      }
+    
+      // Convert days to hours and calculate total hours
+      const totalHours = days * 24 + hours;
+    
+      // Format as "HH:MM:SS"
+      payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
     // Update query
     const query = `
       UPDATE tasks SET
@@ -844,6 +918,44 @@ exports.updateTaskData = async (id, payload, res) => {
         }
       }
     }
+
+    if (estimated_hours) {
+      const timeMatch = estimated_hours.match(
+        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      );
+    
+      if (!timeMatch) {
+        return errorResponse(
+          res,
+          null,
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          400
+        );
+      }
+    
+      const days = parseInt(timeMatch[2] || '0', 10);
+      const hours = parseInt(timeMatch[4] || '0', 10);
+      const minutes = parseInt(timeMatch[6] || '0', 10);
+      const seconds = parseInt(timeMatch[8] || '0', 10);
+    
+      if (
+        days < 0 ||
+        hours < 0 ||
+        minutes < 0 ||
+        seconds < 0 ||
+        minutes >= 60 ||
+        seconds >= 60
+      ) {
+        return errorResponse(res, null, 'Invalid time values in estimated_hours', 400);
+      }
+    
+      // Convert days to hours and calculate total hours
+      const totalHours = days * 24 + hours;
+    
+      // Format as "HH:MM:SS"
+      payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
     const updateFields = [];
     const updateValues = [];
 

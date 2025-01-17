@@ -228,6 +228,43 @@ exports.updateSubTask = async (id, payload, res) => {
     } = payload;
 
     try {
+
+      if (estimated_hours) {
+        const timeMatch = estimated_hours.match(
+          /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+        );
+      
+        if (!timeMatch) {
+          return errorResponse(
+            res,
+            null,
+            'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+            400
+          );
+        }
+      
+        const days = parseInt(timeMatch[2] || '0', 10);
+        const hours = parseInt(timeMatch[4] || '0', 10);
+        const minutes = parseInt(timeMatch[6] || '0', 10);
+        const seconds = parseInt(timeMatch[8] || '0', 10);
+      
+        if (
+          days < 0 ||
+          hours < 0 ||
+          minutes < 0 ||
+          seconds < 0 ||
+          minutes >= 60 ||
+          seconds >= 60
+        ) {
+          return errorResponse(res, null, 'Invalid time values in estimated_hours', 400);
+        }
+      
+        // Convert days to hours and calculate total hours
+        const totalHours = days * 24 + hours;
+      
+        // Format as "HH:MM:SS"
+        payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
         const query = `
             UPDATE sub_tasks SET
                 product_id = ?, project_id = ?,task_id = ?, user_id = ?, name = ?, estimated_hours = ?,
@@ -389,20 +426,42 @@ exports.updatesubTaskData = async (id, payload, res) => {
       }
     }
     if (estimated_hours) {
-      const timeMatch = estimated_hours.match(/^((\d+)h\s*)?((\d+)m)?$/);
+      const timeMatch = estimated_hours.match(
+        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      );
+    
       if (!timeMatch) {
-        return errorResponse(res, null, 'Invalid format for estimated_hours. Use formats like "12h 30m", "12h", or "30m".', 400);
+        return errorResponse(
+          res,
+          null,
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          400
+        );
       }
-
-      const hours = parseInt(timeMatch[2] || '0', 10);
-      const minutes = parseInt(timeMatch[4] || '0', 10);
-
-      if (hours < 0 || minutes < 0 || minutes >= 60) {
+    
+      const days = parseInt(timeMatch[2] || '0', 10);
+      const hours = parseInt(timeMatch[4] || '0', 10);
+      const minutes = parseInt(timeMatch[6] || '0', 10);
+      const seconds = parseInt(timeMatch[8] || '0', 10);
+    
+      if (
+        days < 0 ||
+        hours < 0 ||
+        minutes < 0 ||
+        seconds < 0 ||
+        minutes >= 60 ||
+        seconds >= 60
+      ) {
         return errorResponse(res, null, 'Invalid time values in estimated_hours', 400);
       }
-
-      payload.estimated_hours = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+    
+      // Convert days to hours and calculate total hours
+      const totalHours = days * 24 + hours;
+    
+      // Format as "HH:MM:SS"
+      payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
+    
 
     const updateFields = [];
     const updateValues = [];
