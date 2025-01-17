@@ -177,7 +177,7 @@ apiRouter.get('/getAttendanceReport', RoleController.checkRole(['tl','admin']), 
 // Comments
 apiRouter.post('/comments',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. addComments);
 apiRouter.put('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. updateComments);
-apiRouter.delete('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. deleteComments);
+apiRouter.delete('/comments',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. deleteComments);
 
 //tickets
 apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getAlltickets);
