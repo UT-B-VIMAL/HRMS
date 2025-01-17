@@ -42,10 +42,13 @@ const validationshems = {
       'string.empty': 'Subtask name is required',
       'any.required': 'Subtask name is required',
     }),
-    estimated_hours: Joi.string().pattern(/^([0-9]{2}):([0-9]{2}):([0-9]{2})$/).required().messages({
-      'string.pattern.base': 'Estimated hours must be in the format HH:MM:SS (e.g., 00:00:00)',
+    estimated_hours: Joi.string()
+    .pattern(/^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'Estimated hours must be in the format "1d 2h 45m" or "2h 30m"',
       'any.required': 'Estimated hours is required',
-    }),
+    }),  
     start_date: Joi.date().optional().messages({
       'date.base': 'Start date must be a valid date',
     }),
