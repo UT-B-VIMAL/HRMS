@@ -80,10 +80,16 @@ exports.addComments = async (payload, res) => {
     const { comments, updated_by } = payload;
   
     try {
-      const [comment] = await db.query('SELECT id FROM task_comments WHERE id = ? AND deleted_at IS NULL', [id]);
-      if (comment.length === 0) {
+
+      const [existingComment] = await db.query(
+        'SELECT id, comments AS old_comments, task_id, subtask_id FROM task_comments WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
+  
+      if (existingComment.length === 0) {
         return errorResponse(res, null, 'Comment not found or has been deleted', 404);
       }
+      const { old_comments, task_id, subtask_id } = existingComment[0];
         
        const query = `
         UPDATE task_comments
@@ -97,6 +103,29 @@ exports.addComments = async (payload, res) => {
       if (result.affectedRows === 0) {
         return errorResponse(res, null, "Comment update failed", 400);
       }
+
+      const historyQuery = `
+        INSERT INTO task_histories (
+          old_data, new_data, task_id, subtask_id, text,
+          updated_by, status_flag, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+      `;
+      const historyValues = [
+        old_comments,
+        comments, 
+        task_id,
+        subtask_id,
+        'Comment Updated',
+        updated_by,
+        12 // Default flag for updated comments
+      ];
+  
+      const [historyResult] = await db.query(historyQuery, historyValues);
+  
+      if (historyResult.affectedRows === 0) {
+        return errorResponse(res, null, 'Failed to log history for task comment', 500);
+      }
+
       return successResponse(res, { id, ...payload }, "Task comment updated successfully");
   
     } catch (error) {
@@ -105,16 +134,37 @@ exports.addComments = async (payload, res) => {
   };
   
 
-  exports.deleteComments = async (id, res) => {
+  exports.deleteComments = async (req, res) => {
+    const { id, updated_by } = req.query;
+    
     try {
-      const [comment] = await db.query(
-        'SELECT id FROM task_comments WHERE id = ? AND deleted_at IS NULL',
+      if (!updated_by) {
+        return errorResponse(
+          res,
+          "Updated_by is required",
+          "Missing Updated_by in query parameters",
+          400
+        );
+      }
+
+      const [rows] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [updated_by]
+      );
+  
+      // Check if no rows are returned
+      if (rows.length === 0) {
+        return errorResponse(res, null, "User Not Found", 400);
+      }
+      const [existingComment] = await db.query(
+        'SELECT id, comments AS old_comments, task_id, subtask_id FROM task_comments WHERE id = ? AND deleted_at IS NULL',
         [id]
       );
   
-      if (comment.length === 0) {
+      if (existingComment.length === 0) {
         return errorResponse(res, null, 'Comment not found or has been deleted', 404);
       }
+      const { task_id, subtask_id } = existingComment[0];
   
       const query = `
         UPDATE task_comments
@@ -127,6 +177,28 @@ exports.addComments = async (payload, res) => {
   
       if (result.affectedRows === 0) {
         return errorResponse(res, null, "Comment deletion failed", 400);
+      }
+
+      const historyQuery = `
+        INSERT INTO task_histories (
+          old_data, new_data, task_id, subtask_id, text,
+          updated_by, status_flag, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+      `;
+      const historyValues = [
+        null,
+        null, 
+        task_id,
+        subtask_id,
+        'Comment Deleted',
+        updated_by,
+        13 // Default flag for deleted comments
+      ];
+  
+      const [historyResult] = await db.query(historyQuery, historyValues);
+  
+      if (historyResult.affectedRows === 0) {
+        return errorResponse(res, null, 'Failed to log history for task comment', 500);
       }
   
       return successResponse(res, null, "Task comment deleted successfully");
