@@ -354,18 +354,93 @@ exports.getTask = async (id, res) => {
       }))
     : [];
 
-    const historiesData =
-      Array.isArray(histories) && histories[0].length > 0
-        ? histories[0].map((history) => ({
-            old_data: history.old_data,
-            new_data: history.new_data,
-            description: history.status_description || "N/A",
+    const getStatusGroup = (status, reopenStatus, activeStatus) => {
+      status = Number(status);
+      reopenStatus = Number(reopenStatus);
+      activeStatus = Number(activeStatus);
+      console.log(`Checking Status: status=${status}, reopenStatus=${reopenStatus}, activeStatus=${activeStatus}`);
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+        return "To_Do";
+      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+        return "On_Hold";
+      } else if (status === 2 && reopenStatus === 0) {
+        return "Pending_Approval";
+      } else if (reopenStatus === 1 && activeStatus === 0) {
+        return "Reopen";
+      } else if (status === 1 && activeStatus === 1) {
+        return "In_Progress";
+      } else if (status === 3) {
+        return "Done";
+      }
+      return ""; // Default case if status doesn't match any known group
+    };
+
+    const getUsername = async (userId) => {
+      try {
+        const [user] = await db.query("SELECT first_name, last_name FROM users WHERE id = ?", [userId]);
+        return user.length > 0 ? `${user[0].first_name} ${user[0].last_name}` : "";
+      } catch (error) {
+        console.error('Error fetching user:', error);
+        return "Error fetching user";
+      }
+    };
+
+    const getTeamName = async (teamId) => {
+      try {
+        const [team] = await db.query("SELECT name FROM teams WHERE id = ?", [teamId]);
+        return team.length > 0 ? team[0].name : "";  // Return team name or "N/A" if not found
+      } catch (error) {
+        console.error('Error fetching team:', error);
+        return "Error fetching team";
+      }
+    };
+    
+    async function processStatusData(statusFlag, data, taskId, subtaskId) {
+     
+      let task_data;
+      
+      if (!subtaskId) {
+        task_data = await db.query("SELECT * FROM tasks WHERE id = ?", [taskId]);
+      } else {
+        task_data = await db.query("SELECT * FROM sub_tasks WHERE id = ?", [subtaskId]);
+      }
+    
+      if (!task_data || task_data.length === 0) {
+        return "Task/Subtask not found";
+      }
+     
+      const task = task_data[0][0];
+      
+      switch (statusFlag) {
+        
+        case 0:
+          return getStatusGroup(data, task.reopen_status, task.active_status);
+        case 1:
+          return getStatusGroup(data, task.reopen_status, task.active_status);
+        case 2:
+          return getUsername(data);
+        case 9:
+          return getUsername(data);
+        case 10:
+          return getTeamName(data);
+        default:
+          return data;
+      }
+    }
+    
+    const historiesData = Array.isArray(histories) && histories[0].length > 0
+      ? await Promise.all(
+          histories[0].map(async (history) => ({
+            old_data: await processStatusData(history.status_flag, history.old_data, history.task_id, history.subtask_id),
+            new_data: await processStatusData(history.status_flag, history.new_data, history.task_id, history.subtask_id),
+            description: history.status_description || "Changed the status",
             updated_by: history.updated_by,
-            shortName:history.updated_by.substr(0, 2),
-            // time: history.created_at,
+            shortName: history.updated_by.substr(0, 2),
             time: moment(history.updated_at).fromNow(),
           }))
-        : [];
+        )
+      : [];
+    
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
@@ -800,8 +875,7 @@ exports.updateTaskData = async (id, payload, res) => {
     start_date: 5,
     description: 6,
     team_id: 10,
-    priority: 11,
-    updated_by: 12,
+    priority: 11
   };
 
   const fieldMapping = {
