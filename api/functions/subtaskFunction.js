@@ -340,8 +340,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
     start_date: 5,
     description: 6,
     team_id: 10,
-    priority: 11,
-    updated_by: 12,
+    priority: 11
   };
 
   const fieldMapping = {
