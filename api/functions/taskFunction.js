@@ -371,7 +371,7 @@ exports.getTask = async (id, res) => {
       } else if (status === 3) {
         return "Done";
       }
-      return ""; // Default case if status doesn't match any known group
+      return ""; 
     };
 
     const getUsername = async (userId) => {
@@ -387,7 +387,7 @@ exports.getTask = async (id, res) => {
     const getTeamName = async (teamId) => {
       try {
         const [team] = await db.query("SELECT name FROM teams WHERE id = ?", [teamId]);
-        return team.length > 0 ? team[0].name : "";  // Return team name or "N/A" if not found
+        return team.length > 0 ? team[0].name : ""; 
       } catch (error) {
         console.error('Error fetching team:', error);
         return "Error fetching team";
