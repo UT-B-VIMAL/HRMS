@@ -262,14 +262,22 @@ exports.getTask = async (id, res) => {
 
     // // Histories query
     const historiesQuery = `
-      SELECT h.*, COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,  
-      s.description as status_description
-      FROM task_histories h
-      LEFT JOIN users u ON h.updated_by = u.id
-      LEFT JOIN task_status_flags s ON h.status_flag = s.id
-      WHERE h.task_id = ?
-       AND h.deleted_at IS NULL
-      ORDER BY h.id DESC;
+      SELECT h.*, 
+    COALESCE(
+        CASE 
+            WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL THEN CONCAT(SUBSTRING(u.first_name, 1, 1), SUBSTRING(u.last_name, 1, 1)) 
+            WHEN u.first_name IS NOT NULL THEN SUBSTRING(u.first_name, 1, 2) 
+            ELSE 'Unknown' 
+        END, ' ') AS short_name, 
+    COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,  
+    s.description as status_description
+FROM task_histories h
+LEFT JOIN users u ON h.updated_by = u.id
+LEFT JOIN task_status_flags s ON h.status_flag = s.id
+WHERE h.task_id = ? 
+    AND h.deleted_at IS NULL
+ORDER BY h.id DESC;
+
     `;
     const histories = await db.query(historiesQuery, [id]);
 
@@ -434,7 +442,7 @@ exports.getTask = async (id, res) => {
             new_data: await processStatusData(history.status_flag, history.new_data, history.task_id, history.subtask_id),
             description: history.status_description || "Changed the status",
             updated_by: history.updated_by,
-            shortName: history.updated_by.substr(0, 2),
+            shortName: history.short_name,
             time: moment(history.updated_at).fromNow(),
           }))
         )
