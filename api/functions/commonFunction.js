@@ -13,6 +13,9 @@ exports.getAllData = async (payload, res) => {
             query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
         } else if (type === "users") {
             query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
+        }
+        else if (type === "tl") {
+            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
         } else if (type === "products") {
             // if(user_id){
             const users = await this.getAuthUserDetails(user_id, res);
