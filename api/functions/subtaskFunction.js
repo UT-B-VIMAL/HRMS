@@ -417,6 +417,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
   const statusFlagMapping = {
     status: 1,
     active_status:1,
+    reopen_status:1,
     assigned_user_id: 2,
     user_id: 9 ,
     estimated_hours: 3,
@@ -546,29 +547,6 @@ exports.updatesubTaskData = async (id, payload, res) => {
     }
     
 
-    const updateFields = [];
-    const updateValues = [];
-
-    for (const key in payload) {
-      if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
-        const fieldName = fieldMapping[key] || key;
-        updateFields.push(`${fieldName} = ?`);
-        updateValues.push(payload[key]);
-      }
-    }
-
-    if (updateFields.length === 0) {
-      return errorResponse(res, null, 'No fields to update', 400);
-    }
-
-    updateValues.push(id);
-
-    const updateQuery = `UPDATE sub_tasks SET ${updateFields.join(', ')} WHERE id = ?`;
-    const [updateResult] = await db.query(updateQuery, updateValues);
-
-    if (updateResult.affectedRows === 0) {
-      return errorResponse(res, null, 'SubTask not updated', 400);
-    }
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
       status = Number(status);
       reopenStatus = Number(reopenStatus);
@@ -641,13 +619,42 @@ exports.updatesubTaskData = async (id, payload, res) => {
           return data;
       }
     }
+    async function processStatusData1(statusFlag, data) {
+     
+      
+      
+      switch (statusFlag) {
+        
+        case 0:
+          return getStatusGroup(status, reopen_status, active_status);
+        case 1:
+          return getStatusGroup(status, reopen_status, active_status);
+        case 2:
+          return getUsername(data);
+        case 9:
+          return getUsername(data);
+        case 10:
+          return getTeamName(data);
+        default:
+          return data;
+      }
+    }
+
+    const fieldsToRemove =[
+      'updated_by',
+      'reopen_status',
+      'active_status'
+    ];
+    const cleanedPayload = Object.fromEntries(
+      Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
+    );
     const taskHistoryEntries = [];
-    for (const key in payload) {
+    for (const key in cleanedPayload) {
       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
         const flag = statusFlagMapping[key] || null;
         taskHistoryEntries.push([
           await processStatusData( flag, currentTask[key], id, null),
-          await processStatusData( flag,  payload[key], id, null),
+          await processStatusData1( flag,  payload[key]),
           currentTask.task_id,
           id,
           `Changed ${key}`,
@@ -669,6 +676,35 @@ exports.updatesubTaskData = async (id, payload, res) => {
       `;
       await db.query(historyQuery, [taskHistoryEntries]);
     }
+
+    payload.updated_by = updated_by;
+    payload.reopen_status = reopen_status;
+    payload.active_status = active_status;
+    const updateFields = [];
+    const updateValues = [];
+
+    for (const key in payload) {
+      if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
+        const fieldName = fieldMapping[key] || key;
+        updateFields.push(`${fieldName} = ?`);
+        updateValues.push(payload[key]);
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return errorResponse(res, null, 'No fields to update', 400);
+    }
+
+    updateValues.push(id);
+
+    const updateQuery = `UPDATE sub_tasks SET ${updateFields.join(', ')} WHERE id = ?`;
+    const [updateResult] = await db.query(updateQuery, updateValues);
+
+    if (updateResult.affectedRows === 0) {
+      return errorResponse(res, null, 'SubTask not updated', 400);
+    }
+
+
 
     return successResponse(res, { id, ...payload }, 'Task updated successfully');
   } catch (error) {
