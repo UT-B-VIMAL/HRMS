@@ -76,12 +76,17 @@ exports.getSubTask = async (id, res) => {
     // // Histories query
     const historiesQuery = `
     SELECT h.*, 
-  COALESCE(
-      CASE 
-          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL THEN CONCAT(SUBSTRING(u.first_name, 1, 1), SUBSTRING(u.last_name, 1, 1)) 
-          WHEN u.first_name IS NOT NULL THEN SUBSTRING(u.first_name, 1, 2) 
-          ELSE 'Unknown' 
-      END, ' ') AS short_name, 
+ COALESCE(
+    CASE 
+        WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
+            UPPER(CONCAT(SUBSTRING(u.first_name, 1, 1), SUBSTRING(u.last_name, 1, 1)))
+        WHEN u.first_name IS NOT NULL THEN 
+            UPPER(SUBSTRING(u.first_name, 1, 2))
+        ELSE 
+            'UNKNOWN'
+    END, 
+    ' '
+) AS short_name,
   COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,  
   s.description as status_description
 FROM task_histories h
