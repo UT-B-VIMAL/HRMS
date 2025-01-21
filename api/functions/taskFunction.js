@@ -136,10 +136,11 @@ exports.createTask = async (payload, res) => {
       }
     
       // Convert days to hours and calculate total hours
-      const totalHours = days * 24 + hours;
+      const totalHours = days * 8 + hours;
     
       // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      
     }
 
     const query = `
@@ -157,7 +158,7 @@ exports.createTask = async (payload, res) => {
       project_id,
       user_id,
       name,
-      estimated_hours,
+      payload.estimated_hours,
       start_date,
       end_date,
       extended_status,
@@ -236,7 +237,7 @@ exports.getTask = async (id, res) => {
     `;
     const [task] = await db.query(taskQuery, [id]);
 
-    console.log(task);
+    // console.log(task);
 
     if (!task || task.length === 0) {
       return errorResponse(res, "Task not found", "Error retrieving task", 404);
@@ -317,9 +318,7 @@ ORDER BY h.id DESC;
       // Calculate percentage for hours
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours); 
       const timeTakenInSeconds = convertToSeconds(timeTaken);
-      const remainingInSeconds = convertToSeconds(remainingHours);
-      console.log(task.status);
-      
+      const remainingInSeconds = convertToSeconds(remainingHours);      
     
       return {
         task_id: task.id || "N/A",
@@ -622,8 +621,8 @@ exports.updateTask = async (id, payload, res) => {
       user_id,
       name,
       name,
-      estimated_hours,
-      estimated_hours,
+      payload.estimated_hours ,
+      payload.estimated_hours ,
       start_date,
       start_date,
       end_date,
