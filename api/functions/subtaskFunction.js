@@ -290,7 +290,7 @@ exports.updateSubTask = async (id, payload, res) => {
         `;
 
         const values = [
-            product_id, project_id,task_id, user_id, name, estimated_hours,
+            product_id, project_id,task_id, user_id, name, payload.estimated_hours ,
             start_date, end_date, extended_status, extended_hours,
             active_status, status, total_hours_worked, rating, command,
             assigned_user_id, remark, reopen_status, description,
