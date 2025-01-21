@@ -576,7 +576,7 @@ exports.updateTask = async (id, payload, res) => {
       }
     
       // Convert days to hours and calculate total hours
-      const totalHours = days * 24 + hours;
+      const totalHours = days * 8 + hours;
     
       // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -963,7 +963,7 @@ exports.updateTaskData = async (id, payload, res) => {
       }
     
       // Convert days to hours and calculate total hours
-      const totalHours = days * 24 + hours;
+      const totalHours = days * 8 + hours;
     
       // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
