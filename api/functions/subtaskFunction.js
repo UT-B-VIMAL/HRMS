@@ -2,7 +2,7 @@ const db = require('../../config/db');
 const { successResponse, errorResponse,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage } = require('../../helpers/responseHelper');
 const moment = require("moment");
 const {startTask ,pauseTask,endTask}=require('../functions/taskFunction')
-const { getAuthUserDetails } = require('./commonFunction');
+const { getAuthUserDetails,formatTimeDHMS } = require('./commonFunction');
 
 // Insert Task
 exports.createSubTask = async (payload, res) => {
@@ -145,11 +145,11 @@ ORDER BY h.id DESC;
         team: subtask.team_name || "N/A",
         assignee_id: subtask.assigned_user_id || "N/A",
         assignee: subtask.assignee_name?.trim() ? subtask.assignee_name : "N/A",
-        estimated_hours: totalEstimatedHours,
+        estimated_hours: formatTimeDHMS(totalEstimatedHours),
         estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
-        time_taken: timeTaken,
+        time_taken: formatTimeDHMS(timeTaken),
         time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
-        remaining_hours: remainingHours,
+        remaining_hours: formatTimeDHMS(remainingHours),
         remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
         start_date: subtask.start_date || "N/A",
         end_date: subtask.end_date || "N/A",

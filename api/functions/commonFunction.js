@@ -190,7 +190,34 @@ exports.getAuthUserDetails = async (authUserId, res) => {
       return errorResponse(res, error.message, 'Error fetching User', 500);
     }
   };
-  
+
+  exports.formatTimeDHMS = (time) => {
+    if (time === "00:00:00") {
+        return "0m";
+    }
+
+    const [hours, minutes] = time.split(":").map(Number);
+    const totalMinutes = hours * 60 + minutes;
+
+    const days = Math.floor(totalMinutes / (8 * 60)); // 8 hours per day
+    const remainingMinutes = totalMinutes % (8 * 60);
+
+    const remainingHours = Math.floor(remainingMinutes / 60);
+    const finalMinutes = remainingMinutes % 60;
+
+    let result = '';
+    if (days > 0) {
+        result += `${days}d `;
+    }
+    if (remainingHours > 0) {
+        result += `${remainingHours}h `;
+    }
+    if (finalMinutes > 0 || result === '') {
+        result += `${finalMinutes}m`;
+    }
+
+    return result.trim();
+};
   
   
   

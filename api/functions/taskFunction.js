@@ -3,7 +3,7 @@ const mysql = require("mysql2");
 const {
   successResponse, errorResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage
 } = require("../../helpers/responseHelper");
-const { getAuthUserDetails,processStatusData } = require("../../api/functions/commonFunction");
+const { getAuthUserDetails,processStatusData,formatTimeDHMS} = require("../../api/functions/commonFunction");
 const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
 const { Parser } = require('json2csv');
@@ -321,26 +321,26 @@ ORDER BY h.id DESC;
       const remainingInSeconds = convertToSeconds(remainingHours);      
     
       return {
-        task_id: task.id || "N/A",
-        name: task.name || "N/A",
+        task_id: task.id || "",
+        name: task.name || "",
         status: task.status,
         active_status: task.active_status,
         reopen_status: task.reopen_status,
-        project_id: task.project_id || "N/A",
-        project: task.project_name || "N/A",
-        product_id: task.product_id || "N/A",
-        product: task.product_name || "N/A",
-        owner_id: task.user_id || "N/A",
-        owner: task.owner_name || "N/A",
-        team_id: task.team_id || "N/A",
-        team: task.team_name || "N/A",
-        assignee_id: task.assigned_user_id || "N/A",
-        assignee: task.assignee_name || "N/A",
-        estimated_hours: totalEstimatedHours,
+        project_id: task.project_id || "",
+        project: task.project_name || "",
+        product_id: task.product_id || "",
+        product: task.product_name || "",
+        owner_id: task.user_id || "",
+        owner: task.owner_name || "",
+        team_id: task.team_id || "",
+        team: task.team_name || "",
+        assignee_id: task.assigned_user_id || "",
+        assignee: task.assignee_name || "",
+        estimated_hours: formatTimeDHMS(totalEstimatedHours),
         estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
-        time_taken: timeTaken,
+        time_taken: formatTimeDHMS(timeTaken),
         time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
-        remaining_hours: remainingHours,
+        remaining_hours:formatTimeDHMS(remainingHours),
         remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
         start_date: task.start_date,
         end_date: task.end_date,
@@ -359,9 +359,9 @@ ORDER BY h.id DESC;
         status: subtask.status,
         active_status: subtask.active_status,
         assignee: subtask.user_id,
-        assigneename: subtask.assignee_name || "N/A",
+        assigneename: subtask.assignee_name || "",
         reopen_status: subtask.reopen_status,
-        short_name: (subtask.assignee_name || "N/A").substr(0, 2),
+        short_name: (subtask.assignee_name || "").substr(0, 2),
         status_text: statusMap[subtask.status] || "Unknown",
       }))
     : [];
@@ -385,7 +385,7 @@ ORDER BY h.id DESC;
         ? comments[0].map((comment) => ({
             comment_id: comment.id ,
             comments: comment.comments,
-            updated_by: comment.updated_by || "N/A",
+            updated_by: comment.updated_by || "",
             shortName:comment. updated_by.substr(0, 2),
             time: moment(comment.updated_at).fromNow(),
           }))
