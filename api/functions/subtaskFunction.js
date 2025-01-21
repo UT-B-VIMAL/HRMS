@@ -653,7 +653,7 @@ exports.updatesubTaskData = async (id, payload, res) => {
       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
         const flag = statusFlagMapping[key] || null;
         taskHistoryEntries.push([
-          await processStatusData( flag, currentTask[key], id, null),
+          await processStatusData( flag, currentTask[key], null, id),
           await processStatusData1( flag,  payload[key]),
           currentTask.task_id,
           id,
