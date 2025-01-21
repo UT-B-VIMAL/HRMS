@@ -303,6 +303,8 @@ exports.fetchAttendance = async (payload, res) => {
       LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE() AND t.deleted_at IS NULL AND u.deleted_at IS NULL AND el.deleted_at IS NULL
     `;
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
+    console.log(teamWiseAttendanceData);
+    
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
       const {
@@ -314,7 +316,8 @@ exports.fetchAttendance = async (payload, res) => {
         day_type,
         half_type,
       } = row;
-
+    
+      
       if (!acc[team_id]) {
         acc[team_id] = {
           team_id,
@@ -326,31 +329,42 @@ exports.fetchAttendance = async (payload, res) => {
           present_employees: [],
         };
       }
-
-      const isAbsent =
-        day_type === 1 ||
-        (day_type === 2 && half_type === 1 && currentTime < cutoffTime) ||
-        (day_type === 2 && half_type === 2 && currentTime >= cutoffTime);
-
-      if (isAbsent) {
-        acc[team_id].team_absent_count++;
-        acc[team_id].absent_employees.push({
-          user_id,
-          employee_id,
-          employee_name,
-        });
-      } else {
-        acc[team_id].team_present_count++;
-        acc[team_id].present_employees.push({
-          user_id,
-          employee_id,
-          employee_name,
-        });
+    
+      // Check if the current row has no employee (user_id is null)
+      if (!user_id) { 
+        return acc; 
       }
-
-      acc[team_id].total_team_count++;
+    
+      
+      if (user_id) {
+        acc[team_id].total_team_count++; 
+    
+        const isAbsent =
+          day_type === 1 ||
+          (day_type === 2 && half_type === 1 && currentTime < cutoffTime) ||
+          (day_type === 2 && half_type === 2 && currentTime >= cutoffTime);
+    
+        if (isAbsent) {
+          acc[team_id].team_absent_count++; // Increment absent count
+          acc[team_id].absent_employees.push({
+            user_id,
+            employee_id,
+            employee_name,
+          });
+        } else {
+          acc[team_id].team_present_count++; // Increment present count
+          acc[team_id].present_employees.push({
+            user_id,
+            employee_id,
+            employee_name,
+          });
+        }
+      }
+    
       return acc;
     }, {});
+    
+    
 
     const teamWiseAttendanceArray = Object.values(teamWiseAttendance);
 
