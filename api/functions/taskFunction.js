@@ -1197,6 +1197,7 @@ const lastActiveTask = async (userId) => {
         LEFT JOIN 
             users u4 ON t.assigned_user_id = u4.id
         WHERE stut.user_id = ? AND stut.end_time IS NULL
+        AND t.deleted_at IS NULL AND s.deleted_at IS NULL
         ORDER BY stut.start_time DESC
         LIMIT 1;
     `;
