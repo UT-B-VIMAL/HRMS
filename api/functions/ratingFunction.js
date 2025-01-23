@@ -399,7 +399,7 @@ exports.getRatingById = async (req, res) => {
 
 exports.getRatings = async (req, res) => {
   try {
-    const { team_id, month, user_id, search, page, perPage = 10 } = req;
+    const { team_id, month, user_id, search, page = 1, perPage = 10 } = req;
     const offset = (page - 1) * perPage;
 
     // Validate and format the month
@@ -416,22 +416,7 @@ exports.getRatings = async (req, res) => {
     if (!users) return;
 
     // Base query
-    let query = `
-      SELECT 
-        users.id as user_id,
-        users.first_name,
-        users.team_id,
-        users.employee_id,
-        teams.name AS team_name,
-        r.month as month,
-        r.id as rating_id,
-        r.rater, 
-        r.quality, 
-        r.timelines, 
-        r.agility, 
-        r.attitude, 
-        r.responsibility,
-        ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average
+    let baseQuery = `
       FROM 
         users
       LEFT JOIN 
@@ -447,7 +432,7 @@ exports.getRatings = async (req, res) => {
 
     // Filter by team ID
     if (team_id) {
-      query += ' AND users.team_id = ?';
+      baseQuery += ' AND users.team_id = ?';
       values.push(team_id);
     }
 
@@ -460,13 +445,13 @@ exports.getRatings = async (req, res) => {
       const [rows] = await db.query(query1, [user_id]);
 
       const teamIds = rows.length > 0 ? rows.map((row) => row.id) : [users.team_id];
-      query += ' AND users.team_id IN (?)';
+      baseQuery += ' AND users.team_id IN (?)';
       values.push(teamIds);
     }
 
     // Search functionality
     if (search) {
-      query += `
+      baseQuery += `
         AND (users.first_name LIKE ? 
         OR users.employee_id LIKE ? 
         OR teams.name LIKE ?)`;
@@ -474,12 +459,34 @@ exports.getRatings = async (req, res) => {
       values.push(searchPattern, searchPattern, searchPattern);
     }
 
-    // Pagination
-    query += ` ORDER BY users.id LIMIT ? OFFSET ?`;
-    values.push(parseInt(perPage, 10), parseInt(offset, 10));
+    // Count Query
+    const countQuery = `SELECT COUNT(*) as total ${baseQuery}`;
+    const [countResult] = await db.query(countQuery, values);
+    const totalRecords = countResult[0].total;
 
-    // Execute query
-    const [results] = await db.query(query, values);
+    // Paginated Query
+    const paginatedQuery = `
+      SELECT 
+        users.id as user_id,
+        users.first_name,
+        users.team_id,
+        users.employee_id,
+        teams.name AS team_name,
+        r.month as month,
+        r.id as rating_id,
+        r.rater, 
+        r.quality, 
+        r.timelines, 
+        r.agility, 
+        r.attitude, 
+        r.responsibility,
+        ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average
+      ${baseQuery}
+      ORDER BY users.id 
+      LIMIT ? OFFSET ?`;
+
+    values.push(parseInt(perPage, 10), parseInt(offset, 10));
+    const [results] = await db.query(paginatedQuery, values);
 
     // Group and format results
     const groupedResults = results.reduce((acc, curr, index) => {
@@ -538,7 +545,6 @@ exports.getRatings = async (req, res) => {
     }
 
     // Pagination metadata
-    const totalRecords = results.length;
     const pagination = getPagination(page, perPage, totalRecords);
 
     return successResponse(res, groupedResults, 'Ratings fetched successfully', 200, pagination);
