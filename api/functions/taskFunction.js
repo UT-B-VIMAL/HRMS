@@ -1340,9 +1340,13 @@ exports.getTaskList = async (queryParams, res) => {
       let teamIds = []; 
       if(rowteams.length > 0){
           teamIds = rowteams.map(row => row.id);
+          baseQuery += ` AND tasks.team_id IN (?)`;
+          params.push(teamIds);
+          console.log("teamIds",teamIds);
+      }else{
+        return errorResponse(res, "No Teams assigned for this Team leader", 500);
       }
-      baseQuery += ` AND tasks.team_id IN (?)`;
-      params.push(teamIds);
+ 
     }
 
     if (role_id === 4) {
