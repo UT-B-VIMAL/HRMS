@@ -125,6 +125,87 @@ exports.updateRating = async (payload, res) => {
 
 
 // phase 2
+
+exports.getAnnualRatings = async (queryParamsval, res) => {
+  const { search, year, page = 1, perPage = 10 } = queryParamsval;
+  const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
+  const currentMonth = new Date().getMonth() + 1; // JavaScript months are zero-based
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const monthColumns = months.slice(0, currentMonth).map((month, index) => {
+    const monthNum = (index + 1).toString().padStart(2, '0');
+    return `COALESCE(SUM(CASE WHEN SUBSTRING(ratings.month, 6, 2) = '${monthNum}' THEN ratings.average END), '-') AS ${month}`;
+  }).join(', ');
+  // Base query with dynamic month columns
+  let query = `
+    SELECT
+      users.id AS user_id,
+      users.first_name AS employee_name,
+      users.employee_id,
+      teams.name AS team_name,
+      ${monthColumns},
+      CASE
+          WHEN COUNT(DISTINCT CASE WHEN ratings.average IS NOT NULL THEN SUBSTRING(ratings.month, 1, 7) END) = 0 THEN '-'
+          ELSE
+              ROUND(
+                  SUM(ratings.average) /
+                  COUNT(DISTINCT CASE WHEN ratings.average IS NOT NULL THEN SUBSTRING(ratings.month, 1, 7) END),
+                  2
+              )
+      END AS overall_average
+    FROM
+      users
+    LEFT JOIN
+      teams ON users.team_id = teams.id
+    LEFT JOIN
+      ratings ON users.id = ratings.user_id
+      AND SUBSTRING(ratings.month, 1, 4) = ?  -- Use the provided year parameter here
+    WHERE
+      users.role_id != 2
+      AND users.deleted_at IS NULL
+    GROUP BY
+      users.id, users.first_name, users.employee_id, teams.name
+    HAVING
+      ${months.slice(0, currentMonth).map(month => `${month} IS NOT NULL`).join(' OR ')}
+  `;
+  const queryParams = [year];
+  // Apply search filter
+  if (search && search.trim() !== "") {
+    const searchWildcard = `%${search.trim()}%`;
+    query += `
+      AND (
+        users.first_name LIKE ?
+        OR users.employee_id LIKE ?
+        OR teams.name LIKE ?
+      )
+    `;
+    queryParams.push(searchWildcard, searchWildcard, searchWildcard);
+  }
+  // Group and paginate
+  query += ` LIMIT ? OFFSET ?`;
+  queryParams.push(parseInt(perPage, 10), offset);
+  try {
+    const [result] = await db.query(query, queryParams);
+    const totalRecords = result.length > 0 ? result.length : 0;
+    const rowsWithSerialNo = result.map((row, index) => ({
+      s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
+      ...row,
+    }));
+    const pagination = getPagination(page, perPage, totalRecords);
+    // Return paginated data with results
+    return successResponse(
+      res,
+      rowsWithSerialNo,
+      rowsWithSerialNo.length === 0 ? 'No Ratings found' : 'Ratings fetched successfully',
+      200,
+      pagination
+    );
+  } catch (error) {
+    return errorResponse(res, error.message, "Error fetching ratings", 500);
+  }
+};
 exports.ratingUpdation = async (payload, res) => {
   const { month,rater, quality, timelines,agility,attitude,responsibility,remarks,user_id,updated_by } = payload;
 
@@ -225,8 +306,10 @@ exports.getRatingById = async (req, res) => {
 
 exports.getRatings = async (req, res) => {
   try {
-    const { team_id, month,user_id,search } = req;
-    
+    const { team_id, month, user_id, search, page, perPage = 10 } = req;
+    const offset = (page - 1) * perPage;
+
+    // Validate and format the month
     const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
     const currentMonth = new Date().toISOString().slice(0, 7);
     const selectedMonth = month || currentMonth;
@@ -234,9 +317,11 @@ exports.getRatings = async (req, res) => {
     if (!monthRegex.test(selectedMonth)) {
       return errorResponse(res, 'Month should be in the format YYYY-MM', 'Bad Request', 400);
     }
+
+    // Get authenticated user details
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
-    
+
     // Base query
     let query = `
       SELECT 
@@ -247,7 +332,6 @@ exports.getRatings = async (req, res) => {
         teams.name AS team_name,
         r.month as month,
         r.id as rating_id,
-        r.month,
         r.rater, 
         r.quality, 
         r.timelines, 
@@ -261,36 +345,51 @@ exports.getRatings = async (req, res) => {
         teams ON users.team_id = teams.id
       LEFT JOIN 
         ratings r ON users.id = r.user_id 
-        AND r.month = ? 
-        WHERE users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL    `;
+        AND r.month = ?
+      WHERE 
+        users.role_id NOT IN (1, 2) 
+        AND users.deleted_at IS NULL`;
 
-    const values = [selectedMonth]; 
+    const values = [selectedMonth];
 
+    // Filter by team ID
     if (team_id) {
       query += ' AND users.team_id = ?';
       values.push(team_id);
     }
+
+    // Filter by role and teams for role_id === 3
     if (users.role_id === 3) {
-        const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-        const [rows] = await db.query(query1, [user_id]);
-        let teamIds = []; 
-        if(rows.length > 0){
-            teamIds = rows.map(row => row.id);
-        }else{
-            teamIds = [users.team_id];
-        }
-        query += " AND users.team_id IN (?)";
-        values.push(teamIds);
+      const query1 = `
+        SELECT id 
+        FROM teams 
+        WHERE deleted_at IS NULL AND reporting_user_id = ?`;
+      const [rows] = await db.query(query1, [user_id]);
+
+      const teamIds = rows.length > 0 ? rows.map((row) => row.id) : [users.team_id];
+      query += ' AND users.team_id IN (?)';
+      values.push(teamIds);
     }
+
+    // Search functionality
     if (search) {
-      query += ` AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR teams.name LIKE ?)`;
+      query += `
+        AND (users.first_name LIKE ? 
+        OR users.employee_id LIKE ? 
+        OR teams.name LIKE ?)`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
     }
-    query += ' ORDER BY users.id';
 
+    // Pagination
+    query += ` ORDER BY users.id LIMIT ? OFFSET ?`;
+    values.push(parseInt(perPage, 10), parseInt(offset, 10));
+
+    // Execute query
     const [results] = await db.query(query, values);
-    const groupedResults = results.reduce((acc, curr) => {
+
+    // Group and format results
+    const groupedResults = results.reduce((acc, curr, index) => {
       const {
         employee_id,
         user_id,
@@ -306,14 +405,13 @@ exports.getRatings = async (req, res) => {
         average,
         month,
       } = curr;
-    
-      // Find if the employee already exists
+
       let employee = acc.find((e) => e.employee_id === employee_id);
       if (!employee) {
-        // If not found, create a new employee entry
         employee = {
-          employee_id: employee_id,
-          user_id: user_id,
+          s_no: offset + index + 1,
+          employee_id,
+          user_id,
           month: month || selectedMonth,
           employee_name: first_name,
           team: team_name,
@@ -321,36 +419,39 @@ exports.getRatings = async (req, res) => {
             { rater: "TL", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
             { rater: "PM", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
           ],
-          overall_score: 0, 
+          overall_score: 0,
         };
         acc.push(employee);
       }
-    
-      // Update the "TL" or "PM" rater in the employee's raters array
+
       if (rater === "TL") {
         employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility, average, rating_id };
       } else if (rater === "PM") {
         employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility, average, rating_id };
       }
-    
-      // Update overall score if the rating exists
+
       if (average !== null && average !== "-") {
         employee.overall_score += average;
       }
-    
+
       return acc;
     }, []);
-    
+
+    // Filter raters for role_id === 3
     if (users.role_id === 3) {
       groupedResults.forEach((employee) => {
-          employee.raters = employee.raters.filter((rater) => rater.rater === "TL");
+        employee.raters = employee.raters.filter((rater) => rater.rater === "TL");
       });
     }
 
-    
-    return successResponse(res, groupedResults, 'Ratings fetched successfully', 200);
+    // Pagination metadata
+    const totalRecords = results.length;
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    return successResponse(res, groupedResults, 'Ratings fetched successfully', 200, pagination);
   } catch (error) {
     console.error('Error fetching ratings:', error);
     return errorResponse(res, 'An error occurred while fetching ratings', 'Internal Server Error', 500);
   }
 };
+
