@@ -149,6 +149,7 @@ exports.updateUser = async (id, payload, res) => {
     keycloak_id,
     email,
     phone,
+    employee_id,
     password,
     team_id,
     role_id,
@@ -167,7 +168,7 @@ exports.updateUser = async (id, payload, res) => {
 
   let query = `
     UPDATE users SET
-      first_name = ?, last_name = ?, email = ?, phone = ?,
+      first_name = ?, last_name = ?, email = ?, phone = ?,employee_id = ?,
       team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = NOW() 
     WHERE id = ?
   `;
@@ -178,6 +179,7 @@ exports.updateUser = async (id, payload, res) => {
     last_name,
     email,
     phone,
+    employee_id,
     team_id,
     role_id,
     designation_id,
@@ -208,6 +210,7 @@ exports.updateUser = async (id, payload, res) => {
 
     // Prepare the payload for Keycloak
     const userPayload = {
+      username: employee_id,
       firstName: first_name,
       lastName: last_name,
       email: email,
