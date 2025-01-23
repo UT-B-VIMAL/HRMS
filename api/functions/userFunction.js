@@ -208,7 +208,6 @@ exports.updateUser = async (id, payload, res) => {
     return errorResponse(res, null, 'No rows were updated. Please check the provided ID.', 404);
   }
 
-    // Prepare the payload for Keycloak
     const userPayload = {
       username: employee_id,
       firstName: first_name,
@@ -218,7 +217,6 @@ exports.updateUser = async (id, payload, res) => {
         roleName: roleName})
     };
 
-    // Update user in Keycloak
     await editUserInKeycloak(keycloak_id, userPayload);
 
     return successResponse(res, { id, ...payload }, 'User updated successfully');

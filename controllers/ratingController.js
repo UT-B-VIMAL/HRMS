@@ -51,7 +51,6 @@ exports.getRating = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching ratings", statusCode);
   }
 };
-
 exports.getAllUserRating = async (req, res) => {
   try {
     const reqbody = req.query;

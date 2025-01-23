@@ -170,7 +170,6 @@ apiRouter.get('/getAllRatings', RoleController.checkRole(['pm','admin']),ratingC
 apiRouter.post('/ratingUpdation', RoleController.checkRole(['pm','admin']), ratingController.ratingUpdation);
 
 //phase -2
-
 apiRouter.post('/updateRating', RoleController.checkRole(['tl','pm','admin']), ratingController.ratingUpdations);
 apiRouter.get('/getRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getRating);
 apiRouter.get('/getAllUserRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getAllUserRating);

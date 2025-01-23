@@ -80,10 +80,8 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
   const { search, year, page = 1, perPage = 10 } = queryParamsval;
   const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
 
-  // Get current month
   const currentMonth = new Date().getMonth() + 1; // JavaScript months are zero-based
 
-  // Dynamically generate month columns up to the current month
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
