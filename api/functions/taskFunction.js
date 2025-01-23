@@ -1383,19 +1383,21 @@ exports.getTaskList = async (queryParams, res) => {
       params.push(priority);
     }
 
-    if (dropdown_products && dropdown_products.length > 0) {
-      baseQuery += ` AND tasks.product_id IN (${dropdown_products
-        .map(() => "?")
-        .join(",")})`;
-      params.push(...dropdown_products);
+    if (dropdown_products) {
+      const dropDownProducts = dropdown_products.split(',').map(id => id.trim());
+      if (dropDownProducts.length > 0) {
+        baseQuery += `AND tasks.product_id IN (${dropDownProducts.map(() => '?').join(',')})`;
+        params.push(...dropDownProducts);
+      }
+    }
+    if (dropdown_projects) {
+      const dropDownProjects = dropdown_projects.split(',').map(id => id.trim());
+      if (dropDownProjects.length > 0) {
+        baseQuery += `AND tasks.project_id IN (${dropDownProjects.map(() => '?').join(',')})`;
+        params.push(...dropDownProjects);
+      }
     }
 
-    if (dropdown_projects && dropdown_projects.length > 0) {
-      baseQuery += ` AND tasks.project_id IN (${dropdown_projects
-        .map(() => "?")
-        .join(",")})`;
-      params.push(...dropdown_projects);
-    }
     if (search) {
       const searchTerm = `%${search}%`;
       baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ? AND sub_tasks.deleted_at IS NULL) OR projects.name LIKE ? OR products.name LIKE ? OR users.first_name LIKE ? OR users.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;

@@ -173,7 +173,7 @@ apiRouter.post('/ratingUpdation', RoleController.checkRole(['pm','admin']), rati
 apiRouter.post('/updateRating', RoleController.checkRole(['tl','pm','admin']), ratingController.ratingUpdations);
 apiRouter.get('/getRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getRating);
 apiRouter.get('/getAllUserRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getAllUserRating);
-
+apiRouter.get('/getAnnualRatings', RoleController.checkRole(['pm','tl','admin']),ratingController.getAnnualRatings);
 
 //Attendance
 apiRouter.get('/getAttendanceList', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceList);
