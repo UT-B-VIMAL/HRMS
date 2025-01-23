@@ -1109,7 +1109,9 @@ exports.getOtReportData = async (queryParams, res) => {
     const { from_date, to_date, team_id, search, export_status, page = 1, perPage = 10 } = queryParams.query;
 
     const offset = (page - 1) * perPage;
-
+    if (!from_date || !to_date) {
+      return errorResponse(res, "Both 'from_date' and 'to_date' are required", "Validation error", 400);
+    }
     // Base query with filters
     let baseQuery = `
       SELECT 
@@ -1128,7 +1130,8 @@ exports.getOtReportData = async (queryParams, res) => {
       LEFT JOIN teams ON teams.id = ot_details.team_id
       LEFT JOIN users ON users.id = ot_details.user_id
       WHERE 
-          ot_details.deleted_at IS NULL
+          ot_details.deleted_at IS NULL AND
+          users.deleted_at IS NULL
           AND ot_details.pm_status = 2
           AND (ot_details.date BETWEEN ? AND ?)
     `;

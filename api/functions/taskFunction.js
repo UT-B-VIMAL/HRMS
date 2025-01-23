@@ -2182,8 +2182,8 @@ exports.getWorkReportData = async (queryParams, res) => {
   try {
     const {
       team_id,
-      fromDate,
-      toDate,
+      from_date,
+      to_date,
       search,
       export_status,
       page = 1,
@@ -2198,17 +2198,17 @@ exports.getWorkReportData = async (queryParams, res) => {
         tasks.estimated_hours,
         tasks.total_hours_worked,
         tasks.status AS task_status,
-        tasks.reopen_status,
-        tasks.active_status,
         tasks.product_id,
         tasks.project_id,
         tasks.team_id,
         projects.name AS project_name,
-        users.first_name AS assignee_name
+        users.first_name AS assignee_name,
+        users.employee_id AS employee_id
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN users ON tasks.user_id = users.id
       WHERE tasks.deleted_at IS NULL
+      AND tasks.status = 3 
     `;
 
     const params = [];
@@ -2220,9 +2220,9 @@ exports.getWorkReportData = async (queryParams, res) => {
         params.push(...teamIds);
       }
     }
-    if (fromDate && toDate) {
+    if (from_date && to_date) {
       baseQuery += ` AND tasks.created_at BETWEEN ? AND ?`;
-      params.push(fromDate, toDate);
+      params.push(from_date, to_date);
     }
 
     if (search) {
