@@ -1,5 +1,5 @@
 const db = require("../../config/db");
-const { ratingSchema } = require("../../validators/ratingValidator");
+const { ratingSchema, UpdateRatingSchema } = require("../../validators/ratingValidator");
 const {
   errorResponse,
   successResponse,
@@ -120,4 +120,237 @@ exports.updateRating = async (payload, res) => {
     await db.query(insertQuery, values);
   }
   return successResponse(res, null, "Rating Updated successfully", 200);
+};
+
+
+
+// phase 2
+exports.ratingUpdation = async (payload, res) => {
+  const { month,rater, quality, timelines,agility,attitude,responsibility,remarks,user_id,updated_by } = payload;
+
+  const { error } = UpdateRatingSchema.validate(
+    { month,rater, quality, timelines,agility,attitude,responsibility,user_id,updated_by,remarks },
+    { abortEarly: false }
+  );
+  if (error) {
+    const errorMessages = error.details.reduce((acc, err) => {
+      acc[err.path[0]] = err.message;
+      return acc;
+    }, {});
+
+    return errorResponse(res, errorMessages, "Validation Error", 400);
+  }
+  const user = await getAuthUserDetails(updated_by, res);
+  if (!user) return;
+
+  const checkUserQuery = "SELECT COUNT(*) as count FROM users WHERE id = ? AND deleted_at IS NULL";
+  const [checkUserResult] = await db.query(checkUserQuery, [user_id]);
+  if (checkUserResult[0].count == 0) {
+    return errorResponse(res, "User not found or already deleted", "Not Found", 404);
+  }
+  // Check if a rating exists for the user and month
+  const checkQuery =
+    "SELECT COUNT(*) as count FROM ratings WHERE user_id = ? AND month = ? AND rater = ?";
+  const [checkResult] = await db.query(checkQuery, [user_id, month,rater]);
+const average = (quality + timelines + agility + attitude + responsibility)/5;
+  if (checkResult[0].count > 0) {
+    const updateQuery = `
+        UPDATE ratings
+        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?,remarks = ?
+        WHERE user_id = ? AND month = ? AND rater = ?`;
+    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, user_id, month, rater];
+    await db.query(updateQuery, values);
+  } else {
+    const insertQuery = `
+        INSERT INTO ratings 
+        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks];
+    await db.query(insertQuery, values);
+  }
+  return successResponse(res, null, "Rating Updated successfully", 200);
+};
+
+exports.getRatingById = async (req, res) => {
+  try {
+    // Extract rating_id from the request body
+    const { rating_id } = req;
+
+
+    // Query to fetch the rating by ID
+    const query = `
+      SELECT id AS rating_id, user_id, quality, timelines, agility, attitude, responsibility, remarks 
+      FROM ratings 
+      WHERE id = ?
+    `;
+    const values = [rating_id];
+
+    const [ratings] = await db.query(query, values);
+
+    // If no record is found, return default values
+    if (ratings.length === 0) {
+      return successResponse(
+        res,
+        {
+          rating_id: 0,
+          user_id: 0,
+          quality: 0,
+          timelines: 0,
+          agility: 0,
+          attitude: 0,
+          responsibility: 0,
+          remarks: null
+        },
+        "No rating found. Default values returned.",
+        200
+      );
+    }
+
+    return successResponse(
+      res,
+      ratings[0],
+      "Rating fetched successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Error fetching rating by ID:", error);
+    return errorResponse(
+      res,
+      "An error occurred while fetching the rating.",
+      "Internal Server Error",
+      500
+    );
+  }
+};
+
+exports.getRatings = async (req, res) => {
+  try {
+    const { team_id, month,user_id,search } = req;
+    
+    const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const selectedMonth = month || currentMonth;
+
+    if (!monthRegex.test(selectedMonth)) {
+      return errorResponse(res, 'Month should be in the format YYYY-MM', 'Bad Request', 400);
+    }
+    const users = await getAuthUserDetails(user_id, res);
+    if (!users) return;
+    
+    // Base query
+    let query = `
+      SELECT 
+        users.id as user_id,
+        users.first_name,
+        users.team_id,
+        users.employee_id,
+        teams.name AS team_name,
+        r.month as month,
+        r.id as rating_id,
+        r.month,
+        r.rater, 
+        r.quality, 
+        r.timelines, 
+        r.agility, 
+        r.attitude, 
+        r.responsibility,
+        ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average
+      FROM 
+        users
+      LEFT JOIN 
+        teams ON users.team_id = teams.id
+      LEFT JOIN 
+        ratings r ON users.id = r.user_id 
+        AND r.month = ? 
+        WHERE users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL    `;
+
+    const values = [selectedMonth]; 
+
+    if (team_id) {
+      query += ' AND users.team_id = ?';
+      values.push(team_id);
+    }
+    if (users.role_id === 3) {
+        const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+        const [rows] = await db.query(query1, [user_id]);
+        let teamIds = []; 
+        if(rows.length > 0){
+            teamIds = rows.map(row => row.id);
+        }else{
+            teamIds = [users.team_id];
+        }
+        query += " AND users.team_id IN (?)";
+        values.push(teamIds);
+    }
+    if (search) {
+      query += ` AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR teams.name LIKE ?)`;
+      const searchPattern = `%${search}%`;
+      values.push(searchPattern, searchPattern, searchPattern);
+    }
+    query += ' ORDER BY users.id';
+
+    const [results] = await db.query(query, values);
+    const groupedResults = results.reduce((acc, curr) => {
+      const {
+        employee_id,
+        user_id,
+        rating_id,
+        first_name,
+        team_name,
+        rater,
+        quality,
+        timelines,
+        agility,
+        attitude,
+        responsibility,
+        average,
+        month,
+      } = curr;
+    
+      // Find if the employee already exists
+      let employee = acc.find((e) => e.employee_id === employee_id);
+      if (!employee) {
+        // If not found, create a new employee entry
+        employee = {
+          employee_id: employee_id,
+          user_id: user_id,
+          month: month || selectedMonth,
+          employee_name: first_name,
+          team: team_name,
+          raters: [
+            { rater: "TL", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
+            { rater: "PM", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
+          ],
+          overall_score: 0, 
+        };
+        acc.push(employee);
+      }
+    
+      // Update the "TL" or "PM" rater in the employee's raters array
+      if (rater === "TL") {
+        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility, average, rating_id };
+      } else if (rater === "PM") {
+        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility, average, rating_id };
+      }
+    
+      // Update overall score if the rating exists
+      if (average !== null && average !== "-") {
+        employee.overall_score += average;
+      }
+    
+      return acc;
+    }, []);
+    
+    if (users.role_id === 3) {
+      groupedResults.forEach((employee) => {
+          employee.raters = employee.raters.filter((rater) => rater.rater === "TL");
+      });
+    }
+
+    
+    return successResponse(res, groupedResults, 'Ratings fetched successfully', 200);
+  } catch (error) {
+    console.error('Error fetching ratings:', error);
+    return errorResponse(res, 'An error occurred while fetching ratings', 'Internal Server Error', 500);
+  }
 };

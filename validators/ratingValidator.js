@@ -40,4 +40,104 @@ const ratingSchema = Joi.object({
     }),
 });
 
-module.exports = { ratingSchema };
+const UpdateRatingSchema = Joi.object({
+  month: Joi.string()
+  .pattern(/^\d{4}-(0[1-9]|1[0-2])$/)
+  .required()
+  .messages({
+    "string.pattern.base": "Month must be in the format YYYY-MM.",
+    "any.required": "The month field is required.",
+  }),
+
+  rater: Joi.string()
+  .valid('TL', 'PM') // Restrict values to 'tl' and 'pm'
+  .required()
+  .messages({
+    "any.only": "Rater must be either 'TL' or 'PM'.", // Custom error message for invalid values
+    "any.required": "The rater field is required.",
+  }),
+
+quality: Joi.number()
+  .min(1)
+  .max(5)
+  .precision(1) // Allows up to one decimal place
+  .required()
+  .messages({
+    "number.base": "Quality must be a valid number.",
+    "number.min": "Quality must be at least 1.",
+    "number.max": "Quality must be at most 5.",
+    "number.precision": "Quality must have at most one decimal place.",
+    "any.required": "The quality field is required.",
+  }),
+
+timelines: Joi.number()
+  .min(1)
+  .max(5)
+  .precision(1) // Allows up to one decimal place
+  .required()
+  .messages({
+    "number.base": "Timelines must be a valid number.",
+    "number.min": "Timelines must be at least 1.",
+    "number.max": "Timelines must be at most 5.",
+    "number.precision": "Timelines must have at most one decimal place.",
+    "any.required": "The timelines field is required.",
+  }),
+
+agility: Joi.number()
+  .min(1)
+  .max(5)
+  .precision(1) // Allows up to one decimal place
+  .required()
+  .messages({
+    "number.base": "Agility must be a valid number.",
+    "number.min": "Agility must be at least 1.",
+    "number.max": "Agility must be at most 5.",
+    "number.precision": "Agility must have at most one decimal place.",
+    "any.required": "The agility field is required.",
+  }),
+
+attitude: Joi.number()
+  .min(1)
+  .max(5)
+  .precision(1) // Allows up to one decimal place
+  .required()
+  .messages({
+    "number.base": "Attitude must be a valid number.",
+    "number.min": "Attitude must be at least 1.",
+    "number.max": "Attitude must be at most 5.",
+    "number.precision": "Attitude must have at most one decimal place.",
+    "any.required": "The attitude field is required.",
+  }),
+
+responsibility: Joi.number()
+  .min(1)
+  .max(5)
+  .precision(1) // Allows up to one decimal place
+  .required()
+  .messages({
+    "number.base": "Responsibility must be a valid number.",
+    "number.min": "Responsibility must be at least 1.",
+    "number.max": "Responsibility must be at most 5.",
+    "number.precision": "Responsibility must have at most one decimal place.",
+    "any.required": "The responsibility field is required.",
+  }),
+
+user_id: Joi
+  .required()
+  .messages({
+    "any.required": "The user_id field is required.",
+  }),
+
+updated_by: Joi
+  .required()
+  .messages({
+    "any.required": "The updated_by field is required.",
+  }),
+remarks: Joi.string()
+  .required()
+  .messages({
+    "any.required": "The remarks field is required.",
+  }),
+});
+
+module.exports = { UpdateRatingSchema,ratingSchema };
