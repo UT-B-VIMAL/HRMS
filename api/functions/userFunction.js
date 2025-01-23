@@ -149,7 +149,7 @@ exports.updateUser = async (id, payload, res) => {
     keycloak_id,
     email,
     phone,
-    password,
+    employee_id,
     team_id,
     role_id,
     designation_id,
@@ -167,7 +167,7 @@ exports.updateUser = async (id, payload, res) => {
 
   let query = `
     UPDATE users SET
-      first_name = ?, last_name = ?, email = ?, phone = ?,
+      first_name = ?, last_name = ?, email = ?, phone = ?,employee_id = ?,
       team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = NOW() 
     WHERE id = ?
   `;
@@ -178,6 +178,7 @@ exports.updateUser = async (id, payload, res) => {
     last_name,
     email,
     phone,
+    employee_id,
     team_id,
     role_id,
     designation_id,
@@ -185,19 +186,6 @@ exports.updateUser = async (id, payload, res) => {
     id,
   ];
 
-  if (password) {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    query = `
-      UPDATE users SET
-        first_name = ?, last_name = ?, password = ?, email = ?, phone = ?,
-        team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = NOW() 
-      WHERE id = ?
-    `;
-    values.splice(2, 0, hashedPassword);
-  }
-
-  console.log('Update query:', query);
-  console.log('Values:', values);
 
   const result = await db.query(query, values);
   const roleName = await getRoleName(role_id);
@@ -206,16 +194,14 @@ exports.updateUser = async (id, payload, res) => {
     return errorResponse(res, null, 'No rows were updated. Please check the provided ID.', 404);
   }
 
-    // Prepare the payload for Keycloak
     const userPayload = {
+      username: employee_id,
       firstName: first_name,
       lastName: last_name,
       email: email,
-      ...(password && { credentials: [{ type: "password", value: password, temporary: false }] ,
-        roleName: roleName})
+      roleName: roleName
     };
 
-    // Update user in Keycloak
     await editUserInKeycloak(keycloak_id, userPayload);
 
     return successResponse(res, { id, ...payload }, 'User updated successfully');
