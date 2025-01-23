@@ -122,7 +122,7 @@ apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin','emp
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
 apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin','employee']), taskController.doneTask);
 apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
-apiRouter.get('/workReport',RoleController.checkRole(['pm','employee']), taskController.workReport);
+apiRouter.get('/getWorkReport',RoleController.checkRole(['pm','employee']), taskController.workReport);
 
 
 // Subtask Routes
@@ -169,6 +169,13 @@ apiRouter.get('/getAnnualRatings', RoleController.checkRole(['pm','tl','admin'])
 apiRouter.get('/getAllRatings', RoleController.checkRole(['pm','admin']),ratingController.getAllRatings);
 apiRouter.post('/ratingUpdation', RoleController.checkRole(['pm','admin']), ratingController.ratingUpdation);
 
+//phase -2
+
+apiRouter.post('/updateRating', RoleController.checkRole(['tl','pm','admin']), ratingController.ratingUpdations);
+apiRouter.get('/getRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getRating);
+apiRouter.get('/getAllUserRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getAllUserRating);
+
+
 //Attendance
 apiRouter.get('/getAttendanceList', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceList);
 apiRouter.post('/updateAttendance', RoleController.checkRole(['tl','admin']), attendanceController.updateAttendance);
@@ -199,7 +206,7 @@ apiRouter.get('/pmemployeeotdetail',RoleController.checkRole(['pm','admin']), ot
 apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(['pm','tl','admin']), otdetailController.getAlltlemployeeOtdetails);
 apiRouter.put('/tlotdetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.updatetlOtdetail);
 apiRouter.post('/approve_reject_ot', RoleController.checkRole(['pm','tl','admin']),otdetailController.approve_reject_otdetail);
-apiRouter.get('/otReport', RoleController.checkRole(['pm','admin']),otdetailController.getOtReport);
+apiRouter.get('/getOtReport', RoleController.checkRole(['pm','admin']),otdetailController.getOtReport);
 
 
 // Expense

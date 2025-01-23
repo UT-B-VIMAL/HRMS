@@ -1197,6 +1197,7 @@ const lastActiveTask = async (userId) => {
         LEFT JOIN 
             users u4 ON t.assigned_user_id = u4.id
         WHERE stut.user_id = ? AND stut.end_time IS NULL
+        AND t.deleted_at IS NULL AND s.deleted_at IS NULL
         ORDER BY stut.start_time DESC
         LIMIT 1;
     `;
@@ -1479,7 +1480,7 @@ exports.getTaskList = async (queryParams, res) => {
         project_name: task.project_name,
         product_name: task.product_name,
         priority: task.priority,
-        estimated_hours: task.estimated_hours,
+        estimated_hours: formatTimeDHMS(task.estimated_hours),
         assignee_name: task.assignee_name,
         team_name: task.team_name,
         team_id: task.team_id,
@@ -1503,7 +1504,7 @@ exports.getTaskList = async (queryParams, res) => {
             groupedSubtasks[group].push({
               subtask_id: subtask.subtask_id,
               subtask_name: subtask.subtask_name,
-              estimated_hours: subtask.estimated_hours,
+              estimated_hours: formatTimeDHMS(subtask.estimated_hours),
             });
           }
         });
