@@ -402,7 +402,6 @@ exports.getRatings = async (req, res) => {
     const { team_id, month, user_id, search, page = 1, perPage = 10 } = req;
     const offset = (page - 1) * perPage;
 
-    // Validate and format the month
     const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
     const currentMonth = new Date().toISOString().slice(0, 7);
     const selectedMonth = month || currentMonth;
@@ -411,7 +410,6 @@ exports.getRatings = async (req, res) => {
       return errorResponse(res, 'Month should be in the format YYYY-MM', 'Bad Request', 400);
     }
 
-    // Get authenticated user details
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
 
@@ -436,7 +434,6 @@ exports.getRatings = async (req, res) => {
       values.push(team_id);
     }
 
-    // Filter by role and teams for role_id === 3
     if (users.role_id === 3) {
       const query1 = `
         SELECT id 
@@ -449,7 +446,6 @@ exports.getRatings = async (req, res) => {
       values.push(teamIds);
     }
 
-    // Search functionality
     if (search) {
       baseQuery += `
         AND (users.first_name LIKE ? 
@@ -488,7 +484,6 @@ exports.getRatings = async (req, res) => {
     values.push(parseInt(perPage, 10), parseInt(offset, 10));
     const [results] = await db.query(paginatedQuery, values);
 
-    // Group and format results
     const groupedResults = results.reduce((acc, curr, index) => {
       const {
         employee_id,
@@ -525,24 +520,27 @@ exports.getRatings = async (req, res) => {
       }
 
       if (rater === "TL") {
-        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility, average, rating_id };
+        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id };
       } else if (rater === "PM") {
-        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility, average, rating_id };
+        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id };
       }
 
       if (average !== null && average !== "-") {
-        employee.overall_score += average;
+        employee.overall_score += parseFloat(average);
       }
 
       return acc;
     }, []);
 
+    
     // Filter raters for role_id === 3
-    if (users.role_id === 3) {
       groupedResults.forEach((employee) => {
+      employee.overall_score = employee.overall_score > 0 ? employee.overall_score.toFixed(1) : "-";
+      if (users.role_id === 3) {
+
         employee.raters = employee.raters.filter((rater) => rater.rater === "TL");
+      }
       });
-    }
 
     // Pagination metadata
     const pagination = getPagination(page, perPage, totalRecords);
