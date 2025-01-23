@@ -12,6 +12,17 @@ exports.getAllRatings = async (req, res) => {
   }
 };
 
+exports.getAnnualRatings = async (req, res) => {
+  try {
+    const queryParams = req.query;
+    await getAnnualRatings(queryParams,res);
+  
+  } catch (error) {
+    const statusCode = error.status || 500;
+    return errorResponse(res, error.message, "Error fetching ratings", statusCode);
+  }
+};
+
 exports.ratingUpdation = async (req, res) => {
   try {
     const payload = req.body;
@@ -40,7 +51,6 @@ exports.getRating = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching ratings", statusCode);
   }
 };
-
 exports.getAllUserRating = async (req, res) => {
   try {
     const reqbody = req.query;
