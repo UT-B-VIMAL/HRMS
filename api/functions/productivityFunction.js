@@ -206,7 +206,7 @@ exports.get_individualStatus = async (req, res) => {
 
         let whereConditions = [];
         whereConditions.push(`users.deleted_at IS NULL`);
-        whereConditions.push(`(tasks.deleted_at IS NULL OR tasks.deleted_at IS NULL)`);
+        whereConditions.push(`(tasks.deleted_at IS NULL)`);
 
         if (team_id) whereConditions.push(`users.team_id = ?`);
         if (month) whereConditions.push(`MONTH(tasks.created_at) = ?`);
