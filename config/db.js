@@ -11,12 +11,4 @@ const db = mysql.createPool({
     queueLimit: 0, 
 }).promise(); 
 
-
-db.query('SELECT 1')
-    .then(() => console.log('Database connected!'))
-    .catch((err) => {
-        console.error('Error connecting to the database:', err.message);
-        throw err;
-    });
-
 module.exports = db;
