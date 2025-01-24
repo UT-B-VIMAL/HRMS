@@ -1,4 +1,4 @@
-require('dotenv').config(); 
+require('dotenv').config({ path: __dirname + '/../.env' });
 
 module.exports = {
     serverUrl: process.env.SERVER_URL,
