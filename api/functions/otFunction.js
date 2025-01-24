@@ -1109,21 +1109,22 @@ exports.getOtReportData = async (queryParams, res) => {
     const { from_date, to_date, team_id, search, export_status, page = 1, perPage = 10 } = queryParams.query;
 
     const offset = (page - 1) * perPage;
+
     if (!from_date || !to_date) {
       return errorResponse(res, "Both 'from_date' and 'to_date' are required", "Validation error", 400);
     }
-    // Base query with filters
+
+    // Base query for fetching data
     let baseQuery = `
       SELECT 
           user_id,
           JSON_ARRAYAGG(DATE(date)) AS date,
-          JSON_ARRAYAGG(projects.name) AS projects,
-          JSON_ARRAYAGG(time) AS time,
-          JSON_ARRAYAGG(comments) AS work_done,
-          teams.name AS team_name,
-          SEC_TO_TIME(SUM(TIME_TO_SEC(time))) AS total_hours,
+          users.employee_id AS employee_id,
           users.first_name AS user_name,
-          users.employee_id AS employee_id
+          JSON_ARRAYAGG(time) AS time,
+          JSON_ARRAYAGG(projects.name) AS projects,
+          JSON_ARRAYAGG(comments) AS work_done,
+          SEC_TO_TIME(SUM(TIME_TO_SEC(time))) AS total_hours
       FROM 
           ot_details
       LEFT JOIN projects ON projects.id = ot_details.project_id
@@ -1136,16 +1137,15 @@ exports.getOtReportData = async (queryParams, res) => {
           AND (ot_details.date BETWEEN ? AND ?)
     `;
 
+    // Query parameters
     const params = [from_date, to_date];
 
     if (team_id) {
-      const teamIds = team_id.split(',').map(id => id.trim());
-      if (teamIds.length > 0) {
-        baseQuery += `AND ot_details.team_id IN (${teamIds.map(() => '?').join(',')})`;
-        params.push(...teamIds);
-      }
+      const teamIds = team_id.split(',').map((id) => id.trim());
+      baseQuery += `AND users.team_id IN (${teamIds.map(() => '?').join(',')}) `;
+      params.push(...teamIds);
     }
-    // Add search filter if provided
+
     if (search) {
       baseQuery += `
         AND (
@@ -1159,23 +1159,35 @@ exports.getOtReportData = async (queryParams, res) => {
       params.push(searchParam, searchParam, searchParam, searchParam);
     }
 
-    baseQuery += `
-      GROUP BY 
-          user_id, team_name, user_name
+    // Base query for total count (without pagination)
+    const countQuery = `
+      SELECT COUNT(DISTINCT user_id) AS total_records
+      FROM (${baseQuery} GROUP BY user_id, user_name) AS temp
     `;
+
+    // Get total records
+    const [countResult] = await db.query(countQuery, params);
+    const totalRecords = countResult[0]?.total_records || 0;
+
+    // Add GROUP BY to base query
+    baseQuery += `GROUP BY user_id, user_name `;
+
+    // Add pagination if not exporting
     if (export_status !== "1") {
-      baseQuery += ` LIMIT ? OFFSET ?`;
+      baseQuery += `LIMIT ? OFFSET ? `;
       params.push(parseInt(perPage, 10), parseInt(offset, 10));
     }
 
+    // Execute data query
     const [results] = await db.query(baseQuery, params);
 
+    // Format data
     const data = results.map((row, index) => {
       const totalSeconds = row.total_hours ? row.total_hours.split(':') : [0, 0, 0];
       const hours = parseInt(totalSeconds[0], 10) || 0;
       const minutes = parseInt(totalSeconds[1], 10) || 0;
       const formattedTotalTime = `${hours} hrs ${minutes} mins`;
-    
+
       const formattedTimeArray = Array.isArray(row.time)
         ? row.time.map((timeString) => {
             if (timeString) {
@@ -1187,22 +1199,20 @@ exports.getOtReportData = async (queryParams, res) => {
             return "0 hrs 0 mins";
           })
         : ["0 hrs 0 mins"];
-    
+
       return {
         s_no: export_status === "1" ? index + 1 : offset + index + 1,
-        ...(export_status !== "1" && { user_id: row.user_id }), 
-        employee_id: row.employee_id || "N/A",
+        ...(export_status !== "1" && { user_id: row.user_id }),
         employee_id: row.employee_id || "N/A",
         date: export_status === "1" ? row.date.join(", ") : row.date,
-        projects:  export_status === "1"  ? row.projects.join(", ") : row.projects, 
-        time:  export_status === "1" ? formattedTimeArray.join(", "):formattedTimeArray, 
-        work_done:  export_status === "1" ?  row.work_done.join(", ") : row.work_done, 
+        projects: export_status === "1" ? row.projects.join(", ") : row.projects,
+        time: export_status === "1" ? formattedTimeArray.join(", ") : formattedTimeArray,
+        work_done: export_status === "1" ? row.work_done.join(", ") : row.work_done,
         team_name: row.team_name || "N/A",
         total_hours: formattedTotalTime,
         user_name: row.user_name || "N/A",
       };
     });
-    
 
     // Handle CSV export
     if (export_status === "1") {
@@ -1211,17 +1221,16 @@ exports.getOtReportData = async (queryParams, res) => {
       res.header("Content-Type", "text/csv");
       res.attachment("ot_report_data.csv");
       return res.send(csv);
-      
     }
-    const totalRecords = data.length;
+
+    // Pagination metadata
     const pagination = getPagination(page, perPage, totalRecords);
-    // Standard response for non-export requests with pagination
+
+    // Standard response
     successResponse(
       res,
       data,
-      data.length === 0
-        ? "No tasks or subtasks found"
-        : "Tasks and subtasks retrieved successfully",
+      data.length === 0 ? "No OT records found" : "OT records successfully",
       200,
       pagination
     );
