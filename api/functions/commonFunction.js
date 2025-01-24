@@ -99,7 +99,12 @@ exports.getAllData = async (payload, res) => {
             query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id != 4";
         } else if (type === "assignee") {
             query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
-        } else {
+        } 
+        
+        else if (type === "issue") {
+            query = "SELECT id, issue_name FROM issue_types WHERE deleted_at IS NULL";
+        } 
+        else {
             return errorResponse(res, "Invalid type provided", "Invalid type provided", 500);
         }
         // Append additional conditions based on `id`

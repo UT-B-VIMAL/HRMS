@@ -1,9 +1,12 @@
+require('dotenv').config({ path: __dirname + '/../.env' });
+
 module.exports = {
-    serverUrl: "https://frontendnode.hrms.utwebapps.com:8443/",
-    realm: "hrmsRealm",
-    clientId: "hrmsClient",
-    clientSecret: "M1Y0DpEE7v4klGdNkbzIBotwwNitYKzi",
-    adminUsername: "nathishma.n@theunitytech.com",
-    adminPassword: "admin",
-  };
+    serverUrl: process.env.SERVER_URL,
+    realm: process.env.REALM,
+    clientId: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    adminUsername: process.env.ADMIN_USERNAME,
+    adminPassword: process.env.ADMIN_PASSWORD
+};
+
   
