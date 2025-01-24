@@ -258,8 +258,8 @@ exports.updateAttendanceData = async (req, res) => {
 
   exports.getEmployeeAttendance = async (req, res) => {
     const {
-        fromDate,
-        toDate,
+        from_date,
+        to_date,
         team_id,
         search,
         page = 1,
@@ -272,7 +272,9 @@ exports.updateAttendanceData = async (req, res) => {
         let dateFilter = '';
         let teamFilter = '';
         let searchFilter = '';
-
+        if (!from_date || !to_date) {
+          return errorResponse(res, "Both 'from_date' and 'to_date' are required", "Validation error", 400);
+        }
         dateFilter = `
             WITH RECURSIVE date_range AS (
                 SELECT ? AS date
@@ -282,7 +284,7 @@ exports.updateAttendanceData = async (req, res) => {
                 WHERE date < ?
             )
         `;
-        queryParams.push(fromDate, toDate);
+        queryParams.push(from_date, to_date);
 
         if (team_id) {
             const teamIds = team_id.split(',').map(id => id.trim());
