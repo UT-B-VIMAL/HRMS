@@ -260,7 +260,7 @@ exports.updateAttendanceData = async (req, res) => {
     const {
       from_date,
       to_date,
-      team_name, // Use team_name instead of team_id
+      team_id, // Use team_name instead of team_id
       search,
       page = 1,
       perPage = 10,
@@ -290,13 +290,14 @@ exports.updateAttendanceData = async (req, res) => {
       queryParams.push(from_date, to_date);
   
       // Team filter
-      if (team_name) {
-        const teamNames = team_name.split(',').map((name) => name.trim());
-        if (teamNames.length > 0) {
-          teamFilter = `AND t.name IN (${teamNames.map(() => '?').join(',')})`;
-          queryParams.push(...teamNames);
+      if (team_id) {
+        const teamIds = team_id.split(',').map((id) => id.trim());
+        if (teamIds.length > 0) {
+          teamFilter = `AND t.id IN (${teamIds.map(() => '?').join(',')})`;
+          queryParams.push(...teamIds);
         }
       }
+      
   
       // Search filter
       if (search) {
