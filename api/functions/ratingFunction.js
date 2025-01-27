@@ -537,8 +537,8 @@ exports.getRatings = async (req, res) => {
           employee_name: first_name,
           team: team_name,
           raters: [
-            { rater: "TL", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
-            { rater: "PM", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
+            { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
+            { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
           ],
           overall_score: 0,
         };
