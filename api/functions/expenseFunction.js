@@ -971,7 +971,7 @@ exports.getExpenseReport = async (queryParams, res) => {
     // Base query with filters
     const baseQuery = `
       SELECT 
-          expenses.date AS expense_date,
+         DATE_FORMAT(expenses.date, '%d-%m-%Y') AS expense_date,
           expenses.expense_amount,
           expenses.description AS reason,
           expenses.file AS proof,
