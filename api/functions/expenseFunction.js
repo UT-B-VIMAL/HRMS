@@ -1023,26 +1023,28 @@ exports.getExpenseReport = async (queryParams, res) => {
       ORDER BY 
           expenses.date DESC;
     `;
+
     // Prepare query params
     const params = [from_date, to_date];
     if (search) params.push(`%${search}%`);
 
-
-    const [countResult] = await db.query(countQuery,params); // Exclude LIMIT and OFFSET params
-    const totalRecords = countResult.length;
-
-
-    if (export_status !== "1") {
-      // Add pagination params only if it's not export
-      const offset = (page - 1) * perPage;
-      params.push(parseInt(perPage, 10), parseInt(offset, 10));
-    }
+    // Handle category filter
     if (category) {
-      // Parse category into an array if it's a comma-separated string
       const categoryArray = Array.isArray(category) ? category : category.split(',');
       params.push(categoryArray);
     }
-    // Execute query
+
+    // Handle pagination
+    if (export_status !== "1") {
+      const offset = (page - 1) * perPage;
+      params.push(parseInt(perPage, 10), parseInt(offset, 10));
+    }
+
+    // Execute count query for total records
+    const [countResult] = await db.query(countQuery, params.slice(0, params.length - 2)); // Exclude LIMIT and OFFSET params for count query
+    const totalRecords = countResult.length;
+
+    // Execute main query
     const [results] = await db.query(baseQuery, params);
 
     // Handle export case
@@ -1070,6 +1072,7 @@ exports.getExpenseReport = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
 
 
 
