@@ -56,6 +56,7 @@ exports.getTickets = async (id, res) => {
         let query = `
             SELECT 
                 (@rownum := @rownum + 1) AS s_no,
+                t.id,
                 t.user_id,
                 COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS name, 
                 t.created_at,
