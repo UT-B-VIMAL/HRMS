@@ -997,9 +997,41 @@ exports.getExpenseReport = async (queryParams, res) => {
       ${export_status === "1" ? '' : 'LIMIT ? OFFSET ?'}; -- No pagination if export_status is "1"
     `;
 
+    const countQuery = `
+      SELECT 
+          expenses.date AS expense_date,
+          expenses.expense_amount,
+          expenses.description AS reason,
+          expenses.file AS proof,
+          CASE 
+              WHEN expenses.category = 1 THEN 'Food'
+              WHEN expenses.category = 2 THEN 'Travel'
+              WHEN expenses.category = 3 THEN 'Others'
+              ELSE 'Unknown'
+          END AS category,
+          users.first_name,
+          users.employee_id AS employee_id
+      FROM 
+          expense_details AS expenses
+      LEFT JOIN users ON users.id = expenses.user_id
+      WHERE 
+          expenses.deleted_at IS NULL AND
+          users.deleted_at IS NULL
+          AND (expenses.date BETWEEN ? AND ?)
+          ${search ? 'AND (users.first_name LIKE ?)' : ''}
+          ${category ? 'AND expenses.category IN (?)' : ''}
+      ORDER BY 
+          expenses.date DESC;
+    `;
     // Prepare query params
     const params = [from_date, to_date];
     if (search) params.push(`%${search}%`);
+
+
+    const [countResult] = await db.query(countQuery,params); // Exclude LIMIT and OFFSET params
+    const totalRecords = countResult.length;
+
+
     if (export_status !== "1") {
       // Add pagination params only if it's not export
       const offset = (page - 1) * perPage;
@@ -1025,7 +1057,7 @@ exports.getExpenseReport = async (queryParams, res) => {
     }
 
     // Standard paginated response for normal requests
-    const pagination = getPagination(page, perPage, results.length);
+    const pagination = getPagination(page, perPage, totalRecords);
     successResponse(
       res,
       results,
