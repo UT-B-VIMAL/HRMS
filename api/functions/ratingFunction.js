@@ -364,7 +364,7 @@ const average = (quality + timelines + agility + attitude + responsibility)/5;
     const insertQuery = `
         INSERT INTO ratings 
         (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks];
     await db.query(insertQuery, values);
   }
