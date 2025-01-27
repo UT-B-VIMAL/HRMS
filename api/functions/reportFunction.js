@@ -11,7 +11,7 @@ function formatHoursToHHMM(hours) {
 
 exports.getTimeListReport = async (req, res) => {
     try {
-        const { fromDate, toDate, teamId, search, exportType, page = 1, perPage = 10 } = req.query;
+        const { from_date, to_date, team_id, search, export_status, page = 1, perPage = 10 } = req.query;
         const offset = (page - 1) * perPage;
 
         // Base Query for fetching data
@@ -47,12 +47,12 @@ exports.getTimeListReport = async (req, res) => {
             LEFT JOIN teams tm ON u.team_id = tm.id  
             WHERE u.deleted_at IS NULL`;
 
-        const values = [fromDate, toDate, fromDate, toDate];
+        const values = [from_date, to_date, from_date, to_date];
 
         // Add Team Filter
-        if (teamId) {
+        if (team_id) {
             query += ` AND u.team_id = ?`;
-            values.push(teamId);
+            values.push(team_id);
         }
 
         // Add Search Filter
@@ -65,20 +65,17 @@ exports.getTimeListReport = async (req, res) => {
         query += ` GROUP BY u.id, u.team_id, el.date`;
 
         // Handle Pagination for Non-Export
-        if (exportType != 1) {
+        if (export_status != 1) {
             query += ` LIMIT ? OFFSET ?`;
             values.push(parseInt(perPage), parseInt(offset));
         }
 
-        // Debugging: Log the generated query and parameters
-        console.log('Generated Query:', query);
-        console.log('Query Parameters:', values);
 
         // Fetch data from the database
         const [result] = await db.query(query, values);
 
         // If Export Type is CSV
-        if (exportType == 1) {
+        if (export_status == 1) {
             const { Parser } = require('json2csv');
             const json2csvParser = new Parser();
             const csv = json2csvParser.parse(result);
@@ -103,9 +100,9 @@ exports.getTimeListReport = async (req, res) => {
         const totalRecordsParams = [];
 
         // Add dynamic filter for teamId
-        if (teamId) {
+        if (team_id) {
             totalRecordsQuery += ` AND u.team_id = ?`;
-            totalRecordsParams.push(teamId);
+            totalRecordsParams.push(team_id);
         }
 
         // Add dynamic filter for search
