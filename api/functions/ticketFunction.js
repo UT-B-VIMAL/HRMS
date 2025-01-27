@@ -56,6 +56,7 @@ exports.getTickets = async (id, res) => {
         let query = `
             SELECT 
                 (@rownum := @rownum + 1) AS s_no,
+                t.id,
                 t.user_id,
                 COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS name, 
                 t.created_at,
@@ -72,7 +73,7 @@ exports.getTickets = async (id, res) => {
                 t.file_name
             FROM tickets t
             LEFT JOIN users u ON t.user_id = u.id 
-            LEFT JOIN issue_type i ON t.issue_type = i.id 
+            LEFT JOIN issue_types i ON t.issue_type = i.id 
             , (SELECT @rownum := 0) AS r
             WHERE t.deleted_at IS NULL`;
 
@@ -80,7 +81,7 @@ exports.getTickets = async (id, res) => {
             SELECT COUNT(*) AS total_records
             FROM tickets t
             LEFT JOIN users u ON t.user_id = u.id
-            LEFT JOIN issue_type i ON t.issue_type = i.id
+            LEFT JOIN issue_types i ON t.issue_type = i.id
             WHERE t.deleted_at IS NULL`;
 
         let values = [];

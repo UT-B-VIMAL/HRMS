@@ -364,11 +364,25 @@ const average = (quality + timelines + agility + attitude + responsibility)/5;
     const insertQuery = `
         INSERT INTO ratings 
         (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks];
     await db.query(insertQuery, values);
   }
-  return successResponse(res, null, "Rating Updated successfully", 200);
+  const responsePayload = {
+    user_id,
+    month,
+    rater,
+    ratings: {
+      quality,
+      timelines,
+      agility,
+      attitude,
+      responsibility,
+    },
+    remarks,
+    updated_by,
+  };
+  return successResponse(res, responsePayload, "Rating Updated successfully", 200);
 };
 
 exports.getRatingById = async (req, res) => {
@@ -537,8 +551,8 @@ exports.getRatings = async (req, res) => {
           employee_name: first_name,
           team: team_name,
           raters: [
-            { rater: "TL", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
-            { rater: "PM", quality: "-", timelines: "-", agility: "-", attitude: "-", responsibility: "-", average: "-", rating_id: null },
+            { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
+            { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
           ],
           overall_score: 0,
         };

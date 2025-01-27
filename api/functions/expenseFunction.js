@@ -966,62 +966,52 @@ exports.getAlltlemployeeexpense = async (req, res) => {
 };
 exports.getExpenseReport = async (queryParams, res) => {
   try {
-    const { from_date, to_date, team_id, status, search, page = 1, perPage = 10, export_status } = queryParams.query;
+    const { from_date, to_date, category, search, page = 1, perPage = 10, export_status } = queryParams.query;
 
     // Base query with filters
     const baseQuery = `
       SELECT 
-          expenses.id AS expense_id,
-          expenses.date AS expense_date,
+         DATE_FORMAT(expenses.date, '%d-%m-%Y') AS expense_date,
           expenses.expense_amount,
+          expenses.description AS reason,
+          expenses.file AS proof,
           CASE 
               WHEN expenses.category = 1 THEN 'Food'
               WHEN expenses.category = 2 THEN 'Travel'
               WHEN expenses.category = 3 THEN 'Others'
               ELSE 'Unknown'
           END AS category,
-          expenses.description,
-          expenses.status,
-          CASE 
-              WHEN expenses.status = 0 THEN 'Pending'
-              WHEN expenses.status = 1 THEN 'Rejected'
-              WHEN expenses.status = 2 THEN 'Approved'
-              ELSE 'Unknown'
-          END AS status_name,
-          users.first_name AS user_name,
-          users.employee_id AS employee_id,
-          teams.name AS team_name,
-          projects.name AS project_name,
-          expenses.created_at,
-          expenses.updated_at
+          users.first_name,
+          users.employee_id AS employee_id
       FROM 
           expense_details AS expenses
       LEFT JOIN users ON users.id = expenses.user_id
-      LEFT JOIN teams ON teams.id = expenses.team_id
-      LEFT JOIN projects ON projects.id = expenses.project_id
       WHERE 
-          expenses.deleted_at IS NULL
+          expenses.deleted_at IS NULL AND
+          users.deleted_at IS NULL
           AND (expenses.date BETWEEN ? AND ?)
-          ${team_id ? 'AND expenses.team_id = ?' : ''}
-          ${status ? 'AND expenses.status = ?' : ''}
           ${search ? 'AND (users.first_name LIKE ?)' : ''}
+          ${category ? 'AND expenses.category IN (?)' : ''}
       ORDER BY 
           expenses.date DESC
       ${export_status === "1" ? '' : 'LIMIT ? OFFSET ?'}; -- No pagination if export_status is "1"
     `;
 
     // Prepare query params
-    const params = [from_date, to_date];
-    if (team_id) params.push(team_id);
-    if (status) params.push(status);
+    let params = [from_date, to_date];
     if (search) params.push(`%${search}%`);
+    if (category) {
+      const categoryArray = Array.isArray(category) ? category : category.split(',');
+      params.push(categoryArray);
+    }
+
+    // Add pagination only if export_status is not "1"
     if (export_status !== "1") {
-      // Add pagination params only if it's not export
       const offset = (page - 1) * perPage;
       params.push(parseInt(perPage, 10), parseInt(offset, 10));
     }
 
-    // Execute query
+    // Execute main query
     const [results] = await db.query(baseQuery, params);
 
     // Handle export case
@@ -1036,7 +1026,21 @@ exports.getExpenseReport = async (queryParams, res) => {
     }
 
     // Standard paginated response for normal requests
-    const pagination = getPagination(page, perPage, results.length);
+    const totalRecordsQuery = `
+      SELECT COUNT(*) AS total
+      FROM expense_details AS expenses
+      LEFT JOIN users ON users.id = expenses.user_id
+      WHERE 
+          expenses.deleted_at IS NULL AND
+          users.deleted_at IS NULL
+          AND (expenses.date BETWEEN ? AND ?)
+          ${search ? 'AND (users.first_name LIKE ?)' : ''}
+          ${category ? 'AND expenses.category IN (?)' : ''}
+    `;
+    const [totalRecordsResult] = await db.query(totalRecordsQuery, params.slice(0, params.length - 2));
+    const totalRecords = totalRecordsResult[0].total || 0;
+
+    const pagination = getPagination(page, perPage, totalRecords);
     successResponse(
       res,
       results,
@@ -1049,6 +1053,8 @@ exports.getExpenseReport = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
 
 
 
