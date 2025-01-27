@@ -1,6 +1,6 @@
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");  
 const path = require('path');  
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/../.env' });
 
 const s3Client = new S3Client({
   region: "ap-south-1", 
