@@ -2317,7 +2317,7 @@ baseQuery += ` GROUP BY su.task_id, su.subtask_id, su.user_id, DATE(su.start_tim
       return {
         s_no: offset + index + 1,
         ...task,
-        total_hours_worked: task.total_hours_worked, // Format if needed
+        total_hours_worked: task.total_hours_worked, 
       };
     });
 
