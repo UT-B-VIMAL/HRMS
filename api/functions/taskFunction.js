@@ -2246,16 +2246,13 @@ WHERE
 
 `;
 
-// Array to hold query parameters
 const params = [];
 
-// Add condition for user_id if provided
 if (user_id) {
   baseQuery += ` AND su.user_id = ?`;
   params.push(user_id);
 }
 
-// Add condition for team_id if provided
 if (team_id) {
   const teamId = team_id.trim();  // Single team_id value
   if (teamId) {
