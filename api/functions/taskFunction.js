@@ -2181,6 +2181,7 @@ try{
 exports.getWorkReportData = async (queryParams, res) => {
   try {
     const {
+      user_id,
       team_id,
       from_date,
       to_date,
@@ -2191,84 +2192,108 @@ exports.getWorkReportData = async (queryParams, res) => {
     } = queryParams;
 
     let baseQuery = `
-      SELECT 
-        tasks.id AS task_id, 
-        tasks.name AS task_name,
-        tasks.priority,
-        tasks.estimated_hours,
-        tasks.total_hours_worked,
-        tasks.status AS task_status,
-        tasks.product_id,
-        tasks.project_id,
-        tasks.team_id,
-        projects.name AS project_name,
-        users.first_name AS assignee_name,
-        users.employee_id AS employee_id
-      FROM tasks
-      LEFT JOIN projects ON tasks.project_id = projects.id
-      LEFT JOIN users ON tasks.user_id = users.id
-      WHERE tasks.deleted_at IS NULL
-      AND tasks.status = 3 
-    `;
+   SELECT 
+ DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
+  u.employee_id,  -- Fetching employee_id from users table
+  CONCAT(u.first_name, ' ', u.last_name) AS name,
+  COALESCE(p.name, '') AS project_name,  -- Fetching project_name from projects table
+  -- COALESCE(CASE WHEN su.subtask_id IS NULL THEN t.name ELSE st.name END, '') AS task_name,
+ 
+  -- Check if status and active_status are both 1, mark as in progress
+  CASE 
+    WHEN (
+      (su.subtask_id IS NULL AND t.status = 1 AND t.active_status = 1) 
+      OR (su.subtask_id IS NOT NULL AND st.status = 1 AND st.active_status = 1)
+    ) THEN 
+      CASE 
+        WHEN su.subtask_id IS NULL THEN t.name
+        ELSE st.name
+      END
+    ELSE NULL
+  END AS in_progress,
 
-    const params = [];
+  -- Mark as completed if status or active_status is not 1 (not in progress)
+  CASE 
+    WHEN (
+      (su.subtask_id IS NULL AND t.active_status != 1) 
+      OR (su.subtask_id IS NOT NULL AND st.active_status != 1)
+    ) THEN 
+      CASE 
+        WHEN su.subtask_id IS NULL THEN t.name
+        ELSE st.name
+      END
+    ELSE NULL
+  END AS completed,
+   SEC_TO_TIME(
+    SUM(
+      TIMESTAMPDIFF(SECOND, su.start_time, COALESCE(su.end_time, NOW()))
+    )
+  ) AS total_hours_worked
 
-    if (team_id) {
-      const teamIds = team_id.split(',').map(id => id.trim());
-      if (teamIds.length > 0) {
-        baseQuery += `AND tasks.team_id IN (${teamIds.map(() => '?').join(',')})`;
-        params.push(...teamIds);
-      }
-    }
-    if (from_date && to_date) {
-      baseQuery += ` AND tasks.created_at BETWEEN ? AND ?`;
-      params.push(from_date, to_date);
-    }
+FROM 
+  sub_tasks_user_timeline su
+LEFT JOIN 
+  tasks t ON su.task_id = t.id
+LEFT JOIN 
+  sub_tasks st ON su.subtask_id = st.id
+LEFT JOIN 
+  projects p ON t.project_id = p.id  -- Join projects table to get project_name
+LEFT JOIN 
+  users u ON su.user_id = u.id  -- Join users table to get employee_id and first_name
+WHERE 
+  su.deleted_at IS NULL
 
-    if (search) {
-      baseQuery += ` AND tasks.name LIKE ?`;
-      params.push(`%${search}%`);
-    }
 
-    // Fetch tasks data
-    const [tasks] = await db.query(baseQuery, params);
+`;
 
-    // Fetch subtasks data
-    const subtaskQuery = `
-      SELECT 
-       task_id,
-       total_hours_worked
-      FROM sub_tasks
-    `;
-    
-    const [subtasks] = await db.query(subtaskQuery);
+// Array to hold query parameters
+const params = [];
 
-    // Create a map of task_id to total work hours
-    const subtaskMap = subtasks.reduce((acc, subtask) => {
-      const seconds = convertToSeconds(subtask.total_hours_worked);
-      acc[subtask.task_id] = (acc[subtask.task_id] || 0) + seconds;
-      return acc;
-    }, {});
+// Add condition for user_id if provided
+if (user_id) {
+  baseQuery += ` AND su.user_id = ?`;
+  params.push(user_id);
+}
 
-    // Function to convert time (HH:MM:SS) to seconds
-    
+// Add condition for team_id if provided
+if (team_id) {
+  const teamId = team_id.trim();  // Single team_id value
+  if (teamId) {
+    baseQuery += ` AND u.team_id = ?`;
+    params.push(teamId);  // Push the single team_id value
+  }
+}
+
+// Add condition for date range if provided
+if (from_date && to_date) {
+  baseQuery += ` AND su.start_time BETWEEN ? AND ?`;
+  params.push(from_date, to_date);
+}
+
+// Add search condition if provided
+if (search) {
+  baseQuery += ` AND (t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ?)`;
+  params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+}
+
+// Add GROUP BY clause
+baseQuery += ` GROUP BY su.task_id, su.subtask_id, su.user_id, DATE(su.start_time), p.name, t.name, st.name, u.employee_id, u.first_name`;
+
+    // Fetch tasks and subtasks data
+    const [results] = await db.query(baseQuery, params);
 
     // Handle export case (no pagination)
     if (export_status == 1) {
-      const result = tasks.map((task ,index) => {
-        const subtaskSeconds = subtaskMap[task.task_id] || 0;
-        const taskSeconds = task.total_hours_worked ? convertToSeconds(task.total_hours_worked) : 0;
-        const totalSeconds = subtaskSeconds + taskSeconds;
-
+      const result = results.map((task, index) => {
         return {
           s_no: index + 1,
           ...task,
-          total_work_hours: convertSecondsToHHMMSS(totalSeconds),
+          total_hours_worked: task.total_hours_worked, // Format if needed
         };
       });
 
-      // Convert data to CSV
-      const json2csvParser = new Parser();
+      // Convert data to CSV if required
+      const json2csvParser = new (require('json2csv')).Parser();
       const csv = json2csvParser.parse(result);
 
       res.header('Content-Type', 'text/csv');
@@ -2276,31 +2301,30 @@ exports.getWorkReportData = async (queryParams, res) => {
       return res.send(csv);
     }
 
-    // Pagination logic (only applied when no exportType)
-    const totalRecords = tasks.length;
+    // Pagination logic
+    const totalRecords = results.length;
     const offset = (page - 1) * perPage;
-    const paginatedData = tasks.slice(offset, offset + parseInt(perPage));
-    const pagination = getPagination(page, perPage, totalRecords);
+    const paginatedData = results.slice(offset, offset + parseInt(perPage));
 
-    // Process data with total work hours calculated
+    const pagination = {
+      currentPage: page,
+      totalRecords,
+      totalPages: Math.ceil(totalRecords / perPage),
+    };
+
+    // Process data with total work hours
     const data = paginatedData.map((task, index) => {
-      const subtaskSeconds = subtaskMap[task.task_id] || 0;
-      const taskSeconds = task.total_hours_worked ? convertToSeconds(task.total_hours_worked) : 0;
-      const totalSeconds = subtaskSeconds + taskSeconds;
-
       return {
         s_no: offset + index + 1,
         ...task,
-        total_work_hours: convertSecondsToHHMMSS(totalSeconds),
+        total_hours_worked: task.total_hours_worked, // Format if needed
       };
     });
 
     successResponse(
       res,
       data,
-      data.length === 0
-        ? "No tasks or subtasks found"
-        : "Tasks and subtasks retrieved successfully",
+      data.length === 0 ? "No tasks or subtasks found" : "Work report data retrieved successfully",
       200,
       pagination
     );
