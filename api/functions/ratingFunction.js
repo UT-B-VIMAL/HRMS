@@ -368,7 +368,7 @@ const average = (quality + timelines + agility + attitude + responsibility)/5;
     const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks];
     await db.query(insertQuery, values);
   }
-  return successResponse(res, null, "Rating Updated successfully", 200);
+  return successResponse(res, payload, "Rating Updated successfully", 200);
 };
 
 exports.getRatingById = async (req, res) => {
