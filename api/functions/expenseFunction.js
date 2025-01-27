@@ -997,52 +997,19 @@ exports.getExpenseReport = async (queryParams, res) => {
       ${export_status === "1" ? '' : 'LIMIT ? OFFSET ?'}; -- No pagination if export_status is "1"
     `;
 
-    const countQuery = `
-      SELECT 
-          expenses.date AS expense_date,
-          expenses.expense_amount,
-          expenses.description AS reason,
-          expenses.file AS proof,
-          CASE 
-              WHEN expenses.category = 1 THEN 'Food'
-              WHEN expenses.category = 2 THEN 'Travel'
-              WHEN expenses.category = 3 THEN 'Others'
-              ELSE 'Unknown'
-          END AS category,
-          users.first_name,
-          users.employee_id AS employee_id
-      FROM 
-          expense_details AS expenses
-      LEFT JOIN users ON users.id = expenses.user_id
-      WHERE 
-          expenses.deleted_at IS NULL AND
-          users.deleted_at IS NULL
-          AND (expenses.date BETWEEN ? AND ?)
-          ${search ? 'AND (users.first_name LIKE ?)' : ''}
-          ${category ? 'AND expenses.category IN (?)' : ''}
-      ORDER BY 
-          expenses.date DESC;
-    `;
-
     // Prepare query params
-    const params = [from_date, to_date];
+    let params = [from_date, to_date];
     if (search) params.push(`%${search}%`);
-
-    // Handle category filter
     if (category) {
       const categoryArray = Array.isArray(category) ? category : category.split(',');
       params.push(categoryArray);
     }
 
-    // Handle pagination
+    // Add pagination only if export_status is not "1"
     if (export_status !== "1") {
       const offset = (page - 1) * perPage;
       params.push(parseInt(perPage, 10), parseInt(offset, 10));
     }
-
-    // Execute count query for total records
-    const [countResult] = await db.query(countQuery, params.slice(0, params.length - 2)); // Exclude LIMIT and OFFSET params for count query
-    const totalRecords = countResult.length;
 
     // Execute main query
     const [results] = await db.query(baseQuery, params);
@@ -1059,6 +1026,20 @@ exports.getExpenseReport = async (queryParams, res) => {
     }
 
     // Standard paginated response for normal requests
+    const totalRecordsQuery = `
+      SELECT COUNT(*) AS total
+      FROM expense_details AS expenses
+      LEFT JOIN users ON users.id = expenses.user_id
+      WHERE 
+          expenses.deleted_at IS NULL AND
+          users.deleted_at IS NULL
+          AND (expenses.date BETWEEN ? AND ?)
+          ${search ? 'AND (users.first_name LIKE ?)' : ''}
+          ${category ? 'AND expenses.category IN (?)' : ''}
+    `;
+    const [totalRecordsResult] = await db.query(totalRecordsQuery, params.slice(0, params.length - 2));
+    const totalRecords = totalRecordsResult[0].total || 0;
+
     const pagination = getPagination(page, perPage, totalRecords);
     successResponse(
       res,
@@ -1072,6 +1053,7 @@ exports.getExpenseReport = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
 
 
 
