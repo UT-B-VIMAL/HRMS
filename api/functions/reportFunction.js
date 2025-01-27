@@ -14,41 +14,38 @@ exports.getTimeListReport = async (req, res) => {
         const { fromDate, toDate, teamId, search, exportType, page = 1, perPage = 10 } = req.query;
         const offset = (page - 1) * perPage;
 
-        // Base Query
-        let query = `SELECT 
-                        u.id AS user_id, 
-                        u.employee_id, 
-                        COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS user_name, 
-                        u.email AS user_email,
-                        u.team_id,
-                        tm.name AS team_name, 
-                        el.date AS leave_date,                        
-                        SUM(CASE 
-                            WHEN el.day_type = 1 THEN 1 
-                            WHEN el.day_type = 2 THEN 0.5 
-                            ELSE 0 
-                        END) AS leave_type,
-                        COALESCE(SUM(CASE 
-                            WHEN el.day_type = 1 THEN 0 
-                            WHEN el.day_type = 2 THEN 4 
-                            ELSE TIMESTAMPDIFF(SECOND, sut.start_time, sut.end_time) / 3600 
-                        END), 0) AS total_worked_hours,
-                        COALESCE(SUM(CASE 
-                            WHEN el.day_type = 1 THEN 0 
-                            WHEN el.day_type = 2 THEN 4 
-                            ELSE (8 - (TIMESTAMPDIFF(SECOND, sut.start_time, sut.end_time) / 3600)) 
-                        END), 0) AS total_idle_hours
-                    FROM users u
-                    LEFT JOIN tasks t ON t.user_id = u.id 
-                    AND t.deleted_at IS NULL
-                    LEFT JOIN sub_tasks st ON st.user_id = u.id
-                    AND st.deleted_at IS NULL
-                    LEFT JOIN employee_leave el ON el.user_id = u.id 
-                    AND el.date BETWEEN ? AND ?  
-                    LEFT JOIN sub_tasks_user_timeline sut ON sut.user_id = u.id
-                    AND sut.created_at BETWEEN ? AND ? 
-                    LEFT JOIN teams tm ON u.team_id = tm.id  
-                    WHERE u.deleted_at IS NULL`;
+        // Base Query for fetching data
+        let query = `
+            SELECT 
+                u.id AS user_id, 
+                u.employee_id, 
+                COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS user_name, 
+                u.email AS user_email,
+                u.team_id,
+                tm.name AS team_name, 
+                el.date AS leave_date,                        
+                SUM(CASE 
+                    WHEN el.day_type = 1 THEN 1 
+                    WHEN el.day_type = 2 THEN 0.5 
+                    ELSE 0 
+                END) AS leave_type,
+                COALESCE(SUM(CASE 
+                    WHEN el.day_type = 1 THEN 0 
+                    WHEN el.day_type = 2 THEN 4 
+                    ELSE TIMESTAMPDIFF(SECOND, sut.start_time, sut.end_time) / 3600 
+                END), 0) AS total_worked_hours,
+                COALESCE(SUM(CASE 
+                    WHEN el.day_type = 1 THEN 0 
+                    WHEN el.day_type = 2 THEN 4 
+                    ELSE (8 - (TIMESTAMPDIFF(SECOND, sut.start_time, sut.end_time) / 3600)) 
+                END), 0) AS total_idle_hours
+            FROM users u
+            LEFT JOIN tasks t ON t.user_id = u.id AND t.deleted_at IS NULL
+            LEFT JOIN sub_tasks st ON st.user_id = u.id AND st.deleted_at IS NULL
+            LEFT JOIN employee_leave el ON el.user_id = u.id AND el.date BETWEEN ? AND ?  
+            LEFT JOIN sub_tasks_user_timeline sut ON sut.user_id = u.id AND DATE(sut.start_time) BETWEEN ? AND ?
+            LEFT JOIN teams tm ON u.team_id = tm.id  
+            WHERE u.deleted_at IS NULL`;
 
         const values = [fromDate, toDate, fromDate, toDate];
 
@@ -61,7 +58,7 @@ exports.getTimeListReport = async (req, res) => {
         // Add Search Filter
         if (search) {
             query += ` AND (u.first_name LIKE ? OR u.email LIKE ?)`;
-            values.push('%' + search + '%', '%' + search + '%');
+            values.push(`%${search}%`, `%${search}%`);
         }
 
         // Add Group By Clause
@@ -73,13 +70,14 @@ exports.getTimeListReport = async (req, res) => {
             values.push(parseInt(perPage), parseInt(offset));
         }
 
-        // Debug: Log the query and values
+        // Debugging: Log the generated query and parameters
         console.log('Generated Query:', query);
         console.log('Query Parameters:', values);
 
+        // Fetch data from the database
         const [result] = await db.query(query, values);
 
-        // Export CSV Logic
+        // If Export Type is CSV
         if (exportType == 1) {
             const { Parser } = require('json2csv');
             const json2csvParser = new Parser();
@@ -97,39 +95,45 @@ exports.getTimeListReport = async (req, res) => {
 
         // Get Total Record Count for Pagination
         let totalRecordsQuery = `
-        SELECT COUNT(DISTINCT u.id) AS count
-        FROM users u
-        LEFT JOIN employee_leave el ON el.user_id = u.id
-        WHERE u.deleted_at IS NULL`;
-    
-    const totalRecordsParams = [];
-    
-    // Add dynamic filter for teamId
-    if (teamId) {
-        totalRecordsQuery += ` AND u.team_id = ?`;
-        totalRecordsParams.push(teamId);
-    }
-    
-    // Add dynamic filter for search
-    if (search) {
-        totalRecordsQuery += ` AND (u.first_name LIKE ? OR u.email LIKE ?)`;
-        totalRecordsParams.push(`%${search}%`, `%${search}%`);
-    }
-    
-    // Execute the query
-    const [totalRecordsResult] = await db.query(totalRecordsQuery, totalRecordsParams);
-    const totalRecords = totalRecordsResult[0]?.count || 0;
-    
-        // Format Pagination
+            SELECT COUNT(DISTINCT u.id) AS count
+            FROM users u
+            LEFT JOIN employee_leave el ON el.user_id = u.id
+            WHERE u.deleted_at IS NULL`;
+
+        const totalRecordsParams = [];
+
+        // Add dynamic filter for teamId
+        if (teamId) {
+            totalRecordsQuery += ` AND u.team_id = ?`;
+            totalRecordsParams.push(teamId);
+        }
+
+        // Add dynamic filter for search
+        if (search) {
+            totalRecordsQuery += ` AND (u.first_name LIKE ? OR u.email LIKE ?)`;
+            totalRecordsParams.push(`%${search}%`, `%${search}%`);
+        }
+
+        // Execute the query to get total records
+        const [totalRecordsResult] = await db.query(totalRecordsQuery, totalRecordsParams);
+        const totalRecords = totalRecordsResult[0]?.count || 0;
+
+        // Format Pagination Data
         const pagination = getPagination(page, perPage, totalRecords);
 
-        // Format Hours
         result.forEach(item => {
-            item.total_worked_hours = formatHoursToHHMM(item.total_worked_hours);
-            item.total_idle_hours = formatHoursToHHMM(item.total_idle_hours);
+            let workedHours = item.total_worked_hours;  
+            let idleHours = 8 - workedHours;
+            
+            if (idleHours < 0) {
+                idleHours = 0;  
+            }
+        
+            item.total_idle_hours = formatHoursToHHMM(idleHours);
+            item.total_worked_hours = formatHoursToHHMM(workedHours); 
         });
 
-        // Success Response
+        // Success Response with formatted data
         successResponse(
             res,
             result,
