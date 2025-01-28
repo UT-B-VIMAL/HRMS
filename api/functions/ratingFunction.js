@@ -512,6 +512,7 @@ exports.getRatings = async (req, res) => {
         r.id as rating_id,
         r.rater, 
         r.quality, 
+        r.remarks, 
         r.timelines, 
         r.agility, 
         r.attitude, 
@@ -532,6 +533,7 @@ exports.getRatings = async (req, res) => {
         first_name,
         team_name,
         rater,
+        remarks,
         quality,
         timelines,
         agility,
@@ -540,52 +542,53 @@ exports.getRatings = async (req, res) => {
         average,
         month,
       } = curr;
-
+    
       let employee = acc.find((e) => e.employee_id === employee_id);
       if (!employee) {
         employee = {
-          s_no: offset + index + 1,
+          s_no: offset + acc.length + 1, // Sequence number starts from (offset + 1)
           employee_id,
           user_id,
           month: month || selectedMonth,
           employee_name: first_name,
           team: team_name,
           raters: [
-            { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
-            { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
+            { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: remarks && remarks.trim() ? remarks : "-" },
+            { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: remarks && remarks.trim() ? remarks : "-" },
           ],
           overall_score: 0,
         };
         acc.push(employee);
       }
-
+    
       if (rater === "TL") {
-        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id };
+        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility, average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id, remarks: remarks && remarks.trim() ? remarks : "-" };
       } else if (rater === "PM") {
-        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id };
+        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility, average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id, remarks: remarks && remarks.trim() ? remarks : "-" };
       }
-
+    
       if (average !== null && average !== "-") {
         employee.overall_score += parseFloat(average);
       }
-
+    
       return acc;
     }, []);
-
     
-    // Filter raters for role_id === 3
-      groupedResults.forEach((employee) => {
+    // Ensure `s_no` is based on pagination and calculated dynamically
+    groupedResults.forEach((employee, index) => {
+      employee.s_no = offset + index + 1; // Correct sequence based on offset and index
       employee.overall_score = employee.overall_score > 0 ? employee.overall_score.toFixed(1) : "-";
+    
       if (users.role_id === 3) {
-
         employee.raters = employee.raters.filter((rater) => rater.rater === "TL");
       }
-      });
-
+    });
+    
     // Pagination metadata
     const pagination = getPagination(page, perPage, totalRecords);
-
+    
     return successResponse(res, groupedResults, 'Ratings fetched successfully', 200, pagination);
+    
   } catch (error) {
     console.error('Error fetching ratings:', error);
     return errorResponse(res, 'An error occurred while fetching ratings', 'Internal Server Error', 500);
