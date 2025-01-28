@@ -2179,7 +2179,7 @@ try{
 };
 
 const formatDate = (date) => {
-  const [day, month, year] = date.split("-");
+  const [year, month, day] = date.split("-");
   return `${year}-${month}-${day}`; // Convert to YYYY-MM-DD
 };
 
