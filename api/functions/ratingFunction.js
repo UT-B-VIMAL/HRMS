@@ -546,7 +546,7 @@ exports.getRatings = async (req, res) => {
       let employee = acc.find((e) => e.employee_id === employee_id);
       if (!employee) {
         employee = {
-          s_no: 0, // Temporary value; will be updated later
+          s_no: offset + acc.length + 1, // Sequence number starts from (offset + 1)
           employee_id,
           user_id,
           month: month || selectedMonth,
@@ -574,9 +574,9 @@ exports.getRatings = async (req, res) => {
       return acc;
     }, []);
     
-    
+    // Ensure `s_no` is based on pagination and calculated dynamically
     groupedResults.forEach((employee, index) => {
-      employee.s_no = index + 1;
+      employee.s_no = offset + index + 1; // Correct sequence based on offset and index
       employee.overall_score = employee.overall_score > 0 ? employee.overall_score.toFixed(1) : "-";
     
       if (users.role_id === 3) {
