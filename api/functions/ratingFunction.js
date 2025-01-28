@@ -512,6 +512,7 @@ exports.getRatings = async (req, res) => {
         r.id as rating_id,
         r.rater, 
         r.quality, 
+        r.remarks, 
         r.timelines, 
         r.agility, 
         r.attitude, 
@@ -532,6 +533,7 @@ exports.getRatings = async (req, res) => {
         first_name,
         team_name,
         rater,
+        remarks,
         quality,
         timelines,
         agility,
@@ -551,8 +553,8 @@ exports.getRatings = async (req, res) => {
           employee_name: first_name,
           team: team_name,
           raters: [
-            { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
-            { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null },
+            { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: remarks && remarks.trim() ? remarks : "-"},
+            { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: remarks && remarks.trim() ? remarks : "-"},
           ],
           overall_score: 0,
         };
@@ -560,9 +562,9 @@ exports.getRatings = async (req, res) => {
       }
 
       if (rater === "TL") {
-        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id };
+        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id, remarks: remarks && remarks.trim() ? remarks : "-" };
       } else if (rater === "PM") {
-        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id };
+        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility,   average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id, remarks: remarks && remarks.trim() ? remarks : "-" };
       }
 
       if (average !== null && average !== "-") {
