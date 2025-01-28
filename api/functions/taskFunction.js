@@ -2328,7 +2328,6 @@ baseQuery += ` GROUP BY su.task_id, su.subtask_id, su.user_id, DATE(su.start_tim
     const paginatedData = results.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
     
-    // Add serial numbers to the paginated data
     const data = paginatedData.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
