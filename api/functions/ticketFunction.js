@@ -88,7 +88,8 @@ exports.getTickets = async (id, res) => {
         let countValues = [];
 
         // Check role and filter tickets accordingly
-        if (users && users.role_id !== 1 && users.role_id !== 2) {
+        if (users) {
+        // if (users && users.role_id !== 1 && users.role_id !== 2) {
           query += ` AND t.user_id = ?`;  
           countQuery += ` AND t.user_id = ?`;
           values.push(users.id); 
