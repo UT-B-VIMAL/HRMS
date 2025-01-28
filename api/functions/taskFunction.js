@@ -2336,7 +2336,7 @@ baseQuery += ` GROUP BY su.task_id, su.subtask_id, su.user_id, DATE(su.start_tim
     
     successResponse(
       res,
-      data,  // Send the 'data' with serial numbers instead of 'paginatedData'
+      data,
       paginatedData.length === 0
         ? "No tasks or subtasks found"
         : "Work report data retrieved successfully",
