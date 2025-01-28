@@ -1,148 +1,115 @@
-const db = require('../../config/db'); 
-const { successResponse, errorResponse ,getPagination} = require('../../helpers/responseHelper');
+const db = require('../../config/db');
+const { successResponse, errorResponse, getPagination } = require('../../helpers/responseHelper');
 const moment = require('moment');
 
 
 function formatHoursToHHMM(hours) {
-    const h = Math.floor(hours); 
-    const m = Math.round((hours - h) * 60); 
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
     return `${h} hours and ${m} minutes`;
 }
 
 exports.getTimeListReport = async (req, res) => {
+    const { from_date, to_date, team_id, search, export_status, page = 1, perPage = 10 } = req.query;
+
+    // Ensure pagination values are integers
+    const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
+    const limit = parseInt(perPage, 10);
+
     try {
-        const { from_date, to_date, team_id, search, export_status, page = 1, perPage = 10 } = req.query;
-        const offset = (page - 1) * perPage;
-
-        // Base Query for fetching data
+        // Start building the query with pagination support
         let query = `
-            SELECT 
-                u.id AS user_id, 
-                u.employee_id, 
-                COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS user_name, 
-                u.email AS user_email,
-                u.team_id,
-                tm.name AS team_name, 
-                el.date AS leave_date,                        
-                SUM(CASE 
-                    WHEN el.day_type = 1 THEN 1 
-                    WHEN el.day_type = 2 THEN 0.5 
-                    ELSE 0 
-                END) AS leave_type,
-                COALESCE(SUM(CASE 
-                    WHEN el.day_type = 1 THEN 0 
-                    WHEN el.day_type = 2 THEN 4 
-                    ELSE TIMESTAMPDIFF(SECOND, sut.start_time, sut.end_time) / 3600 
-                END), 0) AS total_worked_hours,
-                COALESCE(SUM(CASE 
-                    WHEN el.day_type = 1 THEN 0 
-                    WHEN el.day_type = 2 THEN 4 
-                    ELSE (8 - (TIMESTAMPDIFF(SECOND, sut.start_time, sut.end_time) / 3600)) 
-                END), 0) AS total_idle_hours
-            FROM users u
-            LEFT JOIN tasks t ON t.user_id = u.id AND t.deleted_at IS NULL
-            LEFT JOIN sub_tasks st ON st.user_id = u.id AND st.deleted_at IS NULL
-            LEFT JOIN employee_leave el ON el.user_id = u.id AND el.date BETWEEN ? AND ?  
-            LEFT JOIN sub_tasks_user_timeline sut ON sut.user_id = u.id AND DATE(sut.start_time) BETWEEN ? AND ?
-            LEFT JOIN teams tm ON u.team_id = tm.id  
-            WHERE u.deleted_at IS NULL`;
+            WITH date_range AS (
+                SELECT ADDDATE('${from_date}', t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1) AS date
+                FROM (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t1,
+                     (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t2,
+                     (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t3,
+                     (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t4
+                WHERE ADDDATE('${from_date}', t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1) <= '${to_date}'
+            )
+            SELECT u.id AS user_id,
+                   CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+                   u.employee_id,
+                   t.name AS team_name,  -- Corrected column name here
+                   DATE_FORMAT(dr.date, '%Y-%m-%d') AS date,
+                   COALESCE(ROUND(SUM(TIMESTAMPDIFF(SECOND, stut.start_time, stut.end_time)) / 3600, 2), 0) AS logged_hours,
+                   CASE
+                       WHEN el.id IS NOT NULL AND el.day_type = 1 THEN 0 -- Full day leave
+                       WHEN el.id IS NOT NULL AND el.day_type = 2 THEN 4 -- Half day leave
+                       ELSE 8 -- Default working hours for present users
+                   END AS total_work_hours,
+                   CASE
+    WHEN el.id IS NOT NULL AND el.day_type = 1 THEN 0 -- Full day leave
+    ELSE CASE
+        WHEN el.id IS NOT NULL AND el.day_type = 2 THEN GREATEST(4 - COALESCE(ROUND(SUM(TIMESTAMPDIFF(SECOND, stut.start_time, stut.end_time)) / 3600, 2), 0), 0)
+        ELSE GREATEST(8 - COALESCE(ROUND(SUM(TIMESTAMPDIFF(SECOND, stut.start_time, stut.end_time)) / 3600, 2), 0), 0)
+    END
+END AS idle_hours
+            FROM date_range dr
+            CROSS JOIN users u
+            LEFT JOIN teams t ON u.team_id = t.id  -- Join with teams table for team name
+            LEFT JOIN employee_leave el ON u.id = el.user_id AND el.date = dr.date
+            LEFT JOIN sub_tasks_user_timeline stut ON u.id = stut.user_id AND DATE(stut.start_time) = dr.date
+            WHERE dr.date BETWEEN '${from_date}' AND '${to_date}'`;
 
-        const values = [from_date, to_date, from_date, to_date];
-
-        // Add Team Filter
+        // Add team_id filter if provided
         if (team_id) {
-            query += ` AND u.team_id = ?`;
-            values.push(team_id);
+            query += ` AND u.team_id = '${team_id}'`; // Apply filter based on team_id
         }
 
-        // Add Search Filter
-        if (search) {
-            query += ` AND (u.first_name LIKE ? OR u.email LIKE ?)`;
-            values.push(`%${search}%`, `%${search}%`);
-        }
+        query += `
+            GROUP BY u.id, dr.date, el.day_type, el.id, t.name  -- Group by team name now
+            ORDER BY dr.date, u.id
+            LIMIT ${limit} OFFSET ${offset};
+        `;
 
-        // Add Group By Clause
-        query += ` GROUP BY u.id, u.team_id, el.date`;
+        // Execute the query to get the paginated data
+        const [rows] = await db.query(query);
 
-        // Handle Pagination for Non-Export
-        if (export_status != 1) {
-            query += ` LIMIT ? OFFSET ?`;
-            values.push(parseInt(perPage), parseInt(offset));
-        }
-
-
-        // Fetch data from the database
-        const [result] = await db.query(query, values);
-
-        // If Export Type is CSV
-        if (export_status == 1) {
-            const { Parser } = require('json2csv');
-            const json2csvParser = new Parser();
-            const csv = json2csvParser.parse(result);
-
-            res.header('Content-Type', 'text/csv');
-            res.attachment('work_report_data.csv');
-            return res.send(csv);
-        }
-
-        // Check if no records are found
-        if (!result || result.length === 0) {
-            return successResponse(res, [], "No records found", 200, { page, perPage });
-        }
-
-        // Get Total Record Count for Pagination
+        // Updated query to calculate total records count without using CTE
         let totalRecordsQuery = `
-            SELECT COUNT(DISTINCT u.id) AS count
+            SELECT COUNT(DISTINCT u.id) AS total
             FROM users u
-            LEFT JOIN employee_leave el ON el.user_id = u.id
-            WHERE u.deleted_at IS NULL`;
+            LEFT JOIN employee_leave el ON u.id = el.user_id
+            LEFT JOIN sub_tasks_user_timeline stut ON u.id = stut.user_id
+            WHERE DATE(stut.start_time) BETWEEN '${from_date}' AND '${to_date}'
+        `;
 
-        const totalRecordsParams = [];
-
-        // Add dynamic filter for teamId
+        // Add team_id filter to total records query if provided
         if (team_id) {
-            totalRecordsQuery += ` AND u.team_id = ?`;
-            totalRecordsParams.push(team_id);
+            totalRecordsQuery += ` AND u.team_id = '${team_id}'`; // Apply filter to total records query
         }
 
-        // Add dynamic filter for search
-        if (search) {
-            totalRecordsQuery += ` AND (u.first_name LIKE ? OR u.email LIKE ?)`;
-            totalRecordsParams.push(`%${search}%`, `%${search}%`);
-        }
+        const [totalRecordsResult] = await db.query(totalRecordsQuery);
+        const totalRecords = totalRecordsResult[0].total;
+        const totalPages = Math.ceil(totalRecords / perPage);
 
-        // Execute the query to get total records
-        const [totalRecordsResult] = await db.query(totalRecordsQuery, totalRecordsParams);
-        const totalRecords = totalRecordsResult[0]?.count || 0;
+        // Paginated response
+        const pagination = {
+            total_records: totalRecords,
+            total_pages: totalPages,
+            current_page: parseInt(page, 10),
+            per_page: perPage,
+            range_from: `Showing ${(offset + 1)}-${Math.min(offset + perPage, totalRecords)} of ${totalRecords} entries`,
+            next_page: page < totalPages ? page + 1 : null,
+            prev_page: page > 1 ? page - 1 : null,
+        };
 
-        // Format Pagination Data
-        const pagination = getPagination(page, perPage, totalRecords);
-
-        result.forEach(item => {
-            let workedHours = item.total_worked_hours;  
-            let idleHours = 8 - workedHours;
-            
-            if (idleHours < 0) {
-                idleHours = 0;  
-            }
-        
-            item.total_idle_hours = formatHoursToHHMM(idleHours);
-            item.total_worked_hours = formatHoursToHHMM(workedHours); 
+        return res.json({
+            data: rows,
+            pagination,
+            message: rows.length === 0 ? "No data found" : "Time list report retrieved successfully",
         });
 
-        // Success Response with formatted data
-        successResponse(
-            res,
-            result,
-            "Time list report retrieved successfully",
-            200,
-            pagination
-        );
-    } catch (error) {
-        console.error('Error:', error.message);
-        return errorResponse(res, 'An error occurred', error.message, 500);
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+
+
+
 
 
 
