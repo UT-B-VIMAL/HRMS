@@ -258,109 +258,153 @@ exports.updateAttendanceData = async (req, res) => {
 
   exports.getEmployeeAttendance = async (req, res) => {
     const {
-        from_date,
-        to_date,
-        team_id,
-        search,
-        page = 1,
-        perPage = 10,
-        export_status, // Parameter to trigger export
+      from_date,
+      to_date,
+      team_id, // Use team_name instead of team_id
+      search,
+      page = 1,
+      perPage = 10,
+      export_status, // Parameter to trigger export
     } = req.query;
-
+  
     try {
-        const queryParams = [];
-        let dateFilter = '';
-        let teamFilter = '';
-        let searchFilter = '';
-        if (!from_date || !to_date) {
-          return errorResponse(res, "Both 'from_date' and 'to_date' are required", "Validation error", 400);
+      const queryParams = [];
+      let dateFilter = '';
+      let teamFilter = '';
+      let searchFilter = '';
+      
+      if (!from_date || !to_date) {
+        return errorResponse(res, "Both 'from_date' and 'to_date' are required", "Validation error", 400);
+      }
+  
+      // Define date filter
+      dateFilter = `
+        WITH RECURSIVE date_range AS (
+          SELECT ? AS date
+          UNION ALL
+          SELECT DATE_ADD(date, INTERVAL 1 DAY)
+          FROM date_range
+          WHERE date < ?
+        )
+      `;
+      queryParams.push(from_date, to_date);
+  
+      // Team filter
+      if (team_id) {
+        const teamIds = team_id.split(',').map((id) => id.trim());
+        if (teamIds.length > 0) {
+          teamFilter = `AND t.id IN (${teamIds.map(() => '?').join(',')})`;
+          queryParams.push(...teamIds);
         }
-        dateFilter = `
-            WITH RECURSIVE date_range AS (
-                SELECT ? AS date
-                UNION ALL
-                SELECT DATE_ADD(date, INTERVAL 1 DAY)
-                FROM date_range
-                WHERE date < ?
-            )
-        `;
-        queryParams.push(from_date, to_date);
-
-        if (team_id) {
-            const teamIds = team_id.split(',').map(id => id.trim());
-            if (teamIds.length > 0) {
-                teamFilter = `AND u.team_id IN (${teamIds.map(() => '?').join(',')})`;
-                queryParams.push(...teamIds);
-            }
-        }
-        if (search) {
-            searchFilter = `AND u.first_name LIKE ?`;
-            queryParams.push(`%${search}%`);
-        }
-
-        const query = `
-            ${dateFilter}
-            SELECT 
-                u.first_name AS employee_name, employee_id,
-                dr.date AS date,u.team_id,
-                CASE 
-                    WHEN el.user_id IS NOT NULL THEN 'Absent'
-                    ELSE 'Present'
-                END AS status,
-                CASE 
-                    WHEN el.day_type = 1 OR el.day_type IS NULL THEN 'Full Day'
-                    WHEN el.day_type = 2 THEN 'Half Day'
-                    ELSE '-'
-                END AS day_type,
-                CASE 
-                    WHEN el.half_type = 1 THEN 'First Half'
-                    WHEN el.half_type = 2 THEN 'Second Half'
-                    ELSE '-'
-                END AS half_type
-            FROM 
-                date_range dr
-            CROSS JOIN users u
-            LEFT JOIN employee_leave el
-                ON el.user_id = u.id AND el.date = dr.date
-            WHERE u.deleted_at IS NULL AND u.role_id != 1 
-            ${teamFilter}
-            ${searchFilter}
-            ORDER BY u.first_name, dr.date
-            ${export_status ==1 ? '' : 'LIMIT ? OFFSET ?'}; -- Skip pagination for export
-        `;
-
-        if (export_status ==  0) {
-            const offset = (page - 1) * perPage;
-            queryParams.push(Number(perPage), Number(offset));
-        }
-
-        const [result] = await db.query(query, queryParams);
-
-        // Add serial number (s_no) to the rows
-        const rowsWithSerialNo = result.map((row, index) => ({
-            s_no: export_status ? index + 1 : (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1,
-            ...row,
-        }));
-
-        if (export_status == 1) {
-            // Convert data to CSV
-            const json2csvParser = new Parser();
-            const csv = json2csvParser.parse(rowsWithSerialNo);
-
-            res.header('Content-Type', 'text/csv');
-            res.attachment('attendance_data.csv');
-            return res.send(csv);
-        }
-
-        // Add pagination metadata for normal fetch
-        const totalRecords = result.length > 0 ? result.length : 0;
-        const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
-
-        return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No Records found' : 'Records fetched successfully', 200, pagination);
+      }
+      
+  
+      // Search filter
+      if (search) {
+        searchFilter = `AND u.first_name LIKE ?`;
+        queryParams.push(`%${search}%`);
+      }
+  
+      // Main query
+      const query = `
+        ${dateFilter}
+        SELECT 
+          u.first_name AS employee_name,
+          u.employee_id,
+          dr.date AS date,
+          t.name AS team_name,
+          CASE 
+            WHEN el.user_id IS NOT NULL THEN 'Absent'
+            ELSE 'Present'
+          END AS status,
+          CASE 
+            WHEN el.day_type = 1 OR el.day_type IS NULL THEN 'Full Day'
+            WHEN el.day_type = 2 THEN 'Half Day'
+            ELSE '-'
+          END AS day_type,
+          CASE 
+            WHEN el.half_type = 1 THEN 'First Half'
+            WHEN el.half_type = 2 THEN 'Second Half'
+            ELSE '-'
+          END AS half_type
+        FROM 
+          date_range dr
+        CROSS JOIN users u
+        LEFT JOIN teams t ON t.id = u.team_id AND t.deleted_at IS NULL
+        LEFT JOIN employee_leave el
+          ON el.user_id = u.id AND el.date = dr.date
+        WHERE u.deleted_at IS NULL AND u.role_id != 1 
+        ${teamFilter}
+        ${searchFilter}
+        ORDER BY u.first_name, dr.date
+        ${export_status == 1 ? '' : 'LIMIT ? OFFSET ?'}; -- Skip pagination for export
+      `;
+  
+      // Add pagination if not exporting
+      if (export_status == 0) {
+        const offset = (page - 1) * perPage;
+        queryParams.push(Number(perPage), Number(offset));
+      }
+  
+      // Execute main query
+      const [result] = await db.query(query, queryParams);
+  
+      // Add serial number (s_no) to the rows
+      const rowsWithSerialNo = result.map((row, index) => ({
+        s_no: export_status
+          ? index + 1
+          : (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1,
+        ...row,
+      }));
+  
+      // Handle export
+      if (export_status == 1) {
+        const { Parser } = require("json2csv");
+        const json2csvParser = new Parser();
+        const csv = json2csvParser.parse(rowsWithSerialNo);
+  
+        res.header('Content-Type', 'text/csv');
+        res.attachment('attendance_data.csv');
+        return res.send(csv);
+      }
+  
+      // Count total records
+      const totalRecordsQuery = `
+        ${dateFilter}
+        SELECT COUNT(*) AS total
+        FROM 
+          date_range dr
+        CROSS JOIN users u
+        LEFT JOIN teams t ON t.id = u.team_id -- Join teams table
+        LEFT JOIN employee_leave el
+          ON el.user_id = u.id AND el.date = dr.date
+        WHERE u.deleted_at IS NULL AND u.role_id != 1 
+        ${teamFilter}
+        ${searchFilter};
+      `;
+      const [totalRecordsResult] = await db.query(
+        totalRecordsQuery,
+        queryParams.slice(0, queryParams.length - 2) // Exclude LIMIT and OFFSET params
+      );
+  
+      const totalRecords = totalRecordsResult[0]?.total || 0;
+  
+      // Pagination metadata
+      const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
+  
+      return successResponse(
+        res,
+        rowsWithSerialNo,
+        rowsWithSerialNo.length === 0 ? 'No Records found' : 'Records fetched successfully',
+        200,
+        pagination
+      );
     } catch (error) {
-        return errorResponse(res, error, "Error fetching Attendance Report", 500);
+      return errorResponse(res, error.message, "Error fetching Attendance Report", 500);
     }
-};
+  };
+  
+  
 
   
 
