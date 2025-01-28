@@ -2178,6 +2178,11 @@ try{
 }
 };
 
+const formatDate = (date) => {
+  const [year, month, day] = date.split("-");
+  return `${year}-${month}-${day}`; // Convert to YYYY-MM-DD
+};
+
 exports.getWorkReportData = async (queryParams, res) => {
   try {
     const {
@@ -2254,18 +2259,23 @@ if (user_id) {
 }
 
 if (team_id) {
-  const teamId = team_id.trim();  // Single team_id value
-  if (teamId) {
+  const teamId = team_id.trim(); // Trim any whitespace
+  if (teamId !== "") {
     baseQuery += ` AND u.team_id = ?`;
-    params.push(teamId);  // Push the single team_id value
+    params.push(teamId); // Push the non-empty team_id value
   }
 }
 
-// Add condition for date range if provided
 if (from_date && to_date) {
-  baseQuery += ` AND su.start_time BETWEEN ? AND ?`;
-  params.push(from_date, to_date);
+  const formattedFromDate = formatDate(from_date);
+  const formattedToDate = formatDate(to_date);
+
+  baseQuery += ` AND DATE(su.start_time) BETWEEN ? AND ?`;
+  params.push(formattedFromDate, formattedToDate);
+
 }
+
+
 
 // Add search condition if provided
 if (search) {
@@ -2281,50 +2291,58 @@ baseQuery += ` GROUP BY su.task_id, su.subtask_id, su.user_id, DATE(su.start_tim
 
     // Handle export case (no pagination)
     if (export_status == 1) {
-      const result = results.map((task, index) => {
-        return {
-          s_no: index + 1,
-          ...task,
-          total_hours_worked: task.total_hours_worked, // Format if needed
-        };
-      });
-
-      // Convert data to CSV if required
-      const json2csvParser = new (require('json2csv')).Parser();
+      if (results.length === 0) {
+        return errorResponse(res, "No data available for export", "No data found", 404);
+      }
+    
+      // Define fields explicitly
+      const fields = [
+        { label: 'S.No', value: 's_no' },
+        { label: 'Date', value: 'date' },
+        { label: 'Employee ID', value: 'employee_id' },
+        { label: 'Name', value: 'name' },
+        { label: 'Project Name', value: 'project_name' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Completed', value: 'completed' },
+        { label: 'Total Hours Worked', value: 'total_hours_worked' },
+      ];
+    
+      const result = results.map((task, index) => ({
+        s_no: index + 1,
+        ...task,
+        total_hours_worked: task.total_hours_worked, // Format if needed
+      }));
+    
+      // Convert data to CSV
+      const { Parser } = require('json2csv');
+      const json2csvParser = new Parser({ fields });
       const csv = json2csvParser.parse(result);
-
+    
       res.header('Content-Type', 'text/csv');
       res.attachment('work_report_data.csv');
       return res.send(csv);
     }
 
-    // Pagination logic
     const totalRecords = results.length;
     const offset = (page - 1) * perPage;
     const paginatedData = results.slice(offset, offset + parseInt(perPage));
-
-    const pagination = {
-      currentPage: page,
-      totalRecords,
-      totalPages: Math.ceil(totalRecords / perPage),
-    };
-
-    // Process data with total work hours
-    const data = paginatedData.map((task, index) => {
-      return {
-        s_no: offset + index + 1,
-        ...task,
-        total_hours_worked: task.total_hours_worked, 
-      };
-    });
-
+    const pagination = getPagination(page, perPage, totalRecords);
+    
+    const data = paginatedData.map((row, index) => ({
+      s_no: offset + index + 1,
+      ...row,
+    }));
+    
     successResponse(
       res,
       data,
-      data.length === 0 ? "No tasks or subtasks found" : "Work report data retrieved successfully",
+      paginatedData.length === 0
+        ? "No tasks or subtasks found"
+        : "Work report data retrieved successfully",
       200,
       pagination
     );
+    
   } catch (error) {
     console.error("Error fetching tasks and subtasks:", error);
     return errorResponse(res, error.message, "Server error", 500);
