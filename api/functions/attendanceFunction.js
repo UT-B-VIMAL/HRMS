@@ -318,8 +318,9 @@ exports.updateAttendanceData = async (req, res) => {
             ELSE 'Present'
           END AS status,
           CASE 
-            WHEN el.day_type = 1 OR el.day_type IS NULL THEN 'Full Day'
+            WHEN el.day_type = 1 THEN 'Full Day'
             WHEN el.day_type = 2 THEN 'Half Day'
+            WHEN el.day_type IS NULL THEN '-'
             ELSE '-'
           END AS day_type,
           CASE 
