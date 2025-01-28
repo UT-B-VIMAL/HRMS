@@ -65,7 +65,7 @@ exports.getTickets = async (id, res) => {
                 t.status,
                 CASE 
                     WHEN t.status = 0 THEN 'Pending'
-                    WHEN t.status = 1 THEN 'In Progress'
+                    WHEN t.status = 1 THEN 'Pending'
                     WHEN t.status = 2 THEN 'Approved'
                     WHEN t.status = 3 THEN 'Rejected'
                     ELSE 'Unknown'
