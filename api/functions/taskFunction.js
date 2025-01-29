@@ -1947,13 +1947,7 @@ exports.updateTaskTimeLine = async (req, res) => {
 
 exports.deleteTaskList = async (req, res) => {
   try {
-    const {
-      product_id,
-      project_id,
-      search,
-      page = 1,
-      perPage = 10,
-    } = req.query;
+    const { product_id, project_id, team_id, priority, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
     const taskConditions = [];
@@ -1962,98 +1956,82 @@ exports.deleteTaskList = async (req, res) => {
     const subtaskConditions = [];
     const subtaskValues = [];
 
-    // Task-specific filters
+    // Handle product_id and project_id using WHERE IN
     if (product_id) {
-      taskConditions.push("t.product_id = ?");
-      taskValues.push(product_id);
+      const productIds = product_id.split(','); // Ensure it's an array
+      const placeholders = productIds.map(() => '?').join(', ');
+      taskConditions.push(`t.product_id IN (${placeholders})`);
+      subtaskConditions.push(`st.product_id IN (${placeholders})`);
+      taskValues.push(...productIds);
+      subtaskValues.push(...productIds);
     }
+
     if (project_id) {
-      taskConditions.push("t.project_id = ?");
-      taskValues.push(project_id);
+      const projectIds = project_id.split(',');
+      const placeholders = projectIds.map(() => '?').join(', ');
+      taskConditions.push(`t.project_id IN (${placeholders})`);
+      subtaskConditions.push(`st.project_id IN (${placeholders})`);
+      taskValues.push(...projectIds);
+      subtaskValues.push(...projectIds);
     }
 
+    // Additional filters
+    if (team_id) {
+      taskConditions.push("tm.id = ?");
+      subtaskConditions.push("tm.id = ?");
+      taskValues.push(team_id);
+      subtaskValues.push(team_id);
+    }
 
+    if (priority) {
+      taskConditions.push("t.priority = ?");
+      subtaskConditions.push("st.priority = ?");
+      taskValues.push(priority);
+      subtaskValues.push(priority);
+    }
+
+    // Search filter
     if (search) {
       const searchTerm = `%${search}%`;
-      taskConditions.push(
-        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
-      );
-      taskValues.push(
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm
-      );
+      const searchQuery = `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ? OR p.name LIKE ?)`;
+
+      taskConditions.push(searchQuery);
+      subtaskConditions.push(searchQuery);
+
+      taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    // Subtask-specific filters
-    if (product_id) {
-      subtaskConditions.push("st.product_id = ?");
-      subtaskValues.push(product_id);
-    }
-    if (project_id) {
-      subtaskConditions.push("st.project_id = ?");
-      subtaskValues.push(project_id);
-    }
-    if (search) {
-      const searchTerm = `%${search}%`;
-      subtaskConditions.push(
-        `(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
-      );
-      subtaskValues.push(
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm
-      );
-    }
+    // Generate WHERE clauses
+    const taskWhereClause = taskConditions.length ? `AND ${taskConditions.join(" AND ")}` : "";
+    const subtaskWhereClause = subtaskConditions.length ? `AND ${subtaskConditions.join(" AND ")}` : "";
 
-    const taskWhereClause =
-      taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
-    const subtaskWhereClause =
-      subtaskConditions.length > 0
-        ? `AND ${subtaskConditions.join(" AND ")}`
-        : "";
-
-    // Query to fetch subtasks with status = 2
+    // Query to fetch deleted subtasks
     const subtasksQuery = `
-    SELECT 
-      p.name AS product_name,
-      pr.name AS project_name,
-      t.name AS task_name,
-      st.name AS subtask_name,
-      st.estimated_hours AS estimated_time,
-      st.total_hours_worked AS time_taken,
-      st.rating AS subtask_rating,
-      tm.name AS team_name,
-      'Subtask' AS type,
-      t.id AS task_id,
-      st.id AS subtask_id,
-      st.user_id AS subtask_user_id
-    FROM 
-      sub_tasks st
-    LEFT JOIN 
-      tasks t ON t.id = st.task_id
-    LEFT JOIN 
-      users u ON u.id = st.user_id
-    LEFT JOIN 
-      products p ON p.id = t.product_id
-    LEFT JOIN 
-      projects pr ON pr.id = t.project_id
-    LEFT JOIN 
-      teams tm ON tm.id = u.team_id
-    LEFT JOIN 
-      users u_assigned ON u_assigned.id = t.assigned_user_id
-    WHERE 
-      st.deleted_at IS NOT NULL
-      ${subtaskWhereClause}
-  `;
+      SELECT 
+        p.name AS product_name,
+        pr.name AS project_name,
+        t.name AS task_name,
+        st.name AS subtask_name,
+        st.estimated_hours AS estimated_time,
+        st.total_hours_worked AS time_taken,
+        st.rating AS subtask_rating,
+        tm.name AS team_name,
+        'Subtask' AS type,
+        t.id AS task_id,
+        st.id AS subtask_id,
+        st.priority AS priority,
+        st.user_id AS subtask_user_id
+      FROM sub_tasks st
+      LEFT JOIN tasks t ON t.id = st.task_id
+      LEFT JOIN users u ON u.id = st.user_id
+      LEFT JOIN products p ON p.id = t.product_id
+      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN teams tm ON tm.id = u.team_id
+      WHERE st.deleted_at IS NOT NULL ${subtaskWhereClause}
+    `;
 
-    // Query to fetch tasks without subtasks
+    // Query to fetch deleted tasks (not linked to subtasks)
     const tasksQuery = `
       SELECT 
         p.name AS product_name,
@@ -2065,24 +2043,16 @@ exports.deleteTaskList = async (req, res) => {
         tm.name AS team_name,
         'Task' AS type,
         t.id AS task_id,
+        t.priority AS priority,
         NULL AS subtask_id,
         t.user_id AS task_user_id
-      FROM 
-        tasks t
-      LEFT JOIN 
-        users u ON u.id = t.user_id
-              LEFT JOIN 
-        products p ON p.id = t.product_id
-      LEFT JOIN 
-        projects pr ON pr.id = t.project_id
-      LEFT JOIN 
-        teams tm ON tm.id = u.team_id
-      LEFT JOIN 
-        users u_assigned ON u_assigned.id = t.assigned_user_id
-
-      WHERE 
-        t.deleted_at IS NOT NULL
-        AND t.id NOT IN (SELECT task_id FROM sub_tasks)
+      FROM tasks t
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN products p ON p.id = t.product_id
+      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN teams tm ON tm.id = u.team_id
+      WHERE t.deleted_at IS NOT NULL 
+        AND t.id NOT IN (SELECT task_id FROM sub_tasks) 
         ${taskWhereClause}
     `;
 
@@ -2096,9 +2066,7 @@ exports.deleteTaskList = async (req, res) => {
     // Fetch assignee names and remove user_id
     const processedData = await Promise.all(
       mergedResults.map(async (item) => {
-        const assigneeUserId = item.subtask_id
-          ? item.subtask_user_id
-          : item.task_user_id;
+        const assigneeUserId = item.subtask_id ? item.subtask_user_id : item.task_user_id;
         const assigneeNameQuery = `SELECT COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS assignee_name FROM users WHERE id = ?`;
         const [results] = await db.query(assigneeNameQuery, [assigneeUserId]);
         item.assignee_name = results[0] ? results[0].assignee_name : "Unknown";
@@ -2109,10 +2077,7 @@ exports.deleteTaskList = async (req, res) => {
 
     // Pagination logic
     const totalRecords = processedData.length;
-    const paginatedData = processedData.slice(
-      offset,
-      offset + parseInt(perPage)
-    );
+    const paginatedData = processedData.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
     // Add serial numbers to the paginated data
@@ -2124,9 +2089,7 @@ exports.deleteTaskList = async (req, res) => {
     successResponse(
       res,
       data,
-      data.length === 0
-        ? "No tasks or subtasks found"
-        : "Deleted Tasks and subtasks retrieved successfully",
+      data.length === 0 ? "No tasks or subtasks found" : "Deleted tasks and subtasks retrieved successfully",
       200,
       pagination
     );
@@ -2135,6 +2098,7 @@ exports.deleteTaskList = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
 
 exports.restoreTasks = async ( req, res) => {
 try{
