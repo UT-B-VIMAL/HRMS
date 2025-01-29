@@ -439,7 +439,7 @@ exports.getRatingById = async (req, res) => {
 
 exports.getRatings = async (req, res) => {
   try {
-    const { team_id, month, user_id, search, page = 1, perPage = 10 } = req;
+    const { team_id, month, user_id, search, page = 1, perPage = 3 } = req;
     const offset = (page - 1) * perPage;
 
     const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -453,142 +453,96 @@ exports.getRatings = async (req, res) => {
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
 
-    // Base query
-    let baseQuery = `
-      FROM 
-        users
-      LEFT JOIN 
-        teams ON users.team_id = teams.id
-      LEFT JOIN 
-        ratings r ON users.id = r.user_id 
-        AND r.month = ?
-      WHERE 
-        users.role_id NOT IN (1, 2) 
-        AND users.deleted_at IS NULL`;
+    const values = [];
+    let whereClause = " WHERE users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
 
-    const values = [selectedMonth];
-
-    // Filter by team ID
     if (team_id) {
-      baseQuery += ' AND users.team_id = ?';
+      whereClause += ' AND users.team_id = ?';
       values.push(team_id);
     }
 
     if (users.role_id === 3) {
-      const query1 = `
-        SELECT id 
-        FROM teams 
-        WHERE deleted_at IS NULL AND reporting_user_id = ?`;
-      const [rows] = await db.query(query1, [user_id]);
-
-      const teamIds = rows.length > 0 ? rows.map((row) => row.id) : [users.team_id];
-      baseQuery += ' AND users.team_id IN (?)';
+      const [teamRows] = await db.query(
+        `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
+        [user_id]
+      );
+      const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
+      whereClause += ' AND users.team_id IN (?)';
       values.push(teamIds);
     }
 
     if (search) {
-      baseQuery += `
-        AND (users.first_name LIKE ? 
-        OR users.employee_id LIKE ? 
-        OR teams.name LIKE ?)`;
+      whereClause += ` AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR teams.name LIKE ?)`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
     }
 
-    // Count Query
-    const countQuery = `SELECT COUNT(*) as total ${baseQuery}`;
+    // Get total records count
+    const countQuery = `SELECT COUNT(*) as total FROM users LEFT JOIN teams ON users.team_id = teams.id ${whereClause}`;
     const [countResult] = await db.query(countQuery, values);
     const totalRecords = countResult[0].total;
 
-    // Paginated Query
-    const paginatedQuery = `
-      SELECT 
-        users.id as user_id,
-        users.first_name,
-        users.team_id,
-        users.employee_id,
-        teams.name AS team_name,
-        r.month as month,
-        r.id as rating_id,
-        r.rater, 
-        r.quality, 
-        r.remarks, 
-        r.timelines, 
-        r.agility, 
-        r.attitude, 
-        r.responsibility,
-        ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average
-      ${baseQuery}
-      ORDER BY users.id 
+    // Get paginated users
+    const userQuery = `
+      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name
+      FROM users
+      LEFT JOIN teams ON users.team_id = teams.id
+      ${whereClause}
+      ORDER BY users.id
       LIMIT ? OFFSET ?`;
-
     values.push(parseInt(perPage, 10), parseInt(offset, 10));
-    const [results] = await db.query(paginatedQuery, values);
 
-    const groupedResults = results.reduce((acc, curr, index) => {
-      const {
-        employee_id,
-        user_id,
-        rating_id,
-        first_name,
-        team_name,
-        rater,
-        remarks,
-        quality,
-        timelines,
-        agility,
-        attitude,
-        responsibility,
-        average,
-        month,
-      } = curr;
-    
-      let employee = acc.find((e) => e.employee_id === employee_id);
-      if (!employee) {
-        employee = {
-          s_no: offset + acc.length + 1, // Sequence number starts from (offset + 1)
-          employee_id,
-          user_id,
-          month: month || selectedMonth,
-          employee_name: first_name,
-          team: team_name,
-          raters: [
-            { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: remarks && remarks.trim() ? remarks : "-" },
-            { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: remarks && remarks.trim() ? remarks : "-" },
-          ],
-          overall_score: 0,
+    const [userResults] = await db.query(userQuery, values);
+    if (userResults.length === 0) {
+      return successResponse(res, [], 'No ratings found', 200, getPagination(page, perPage, totalRecords));
+    }
+
+    const userIds = userResults.map(user => user.user_id);
+    const ratingQuery = `
+      SELECT r.*, ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average
+      FROM ratings r 
+      WHERE r.user_id IN (?) AND r.month = ?`;
+    const [ratingResults] = await db.query(ratingQuery, [userIds, selectedMonth]);
+
+    const groupedResults = userResults.map((user, index) => {
+      const employeeRatings = ratingResults.filter(rating => rating.user_id === user.user_id);
+      const defaultRatings = [
+        { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-" },
+        { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-" }
+      ];
+
+      employeeRatings.forEach(rating => {
+        const index = rating.rater === "TL" ? 0 : 1;
+        defaultRatings[index] = {
+          rater: rating.rater,
+          quality: rating.quality,
+          timelines: rating.timelines,
+          agility: rating.agility,
+          attitude: rating.attitude,
+          responsibility: rating.responsibility,
+          average: rating.average !== null ? parseFloat(rating.average).toFixed(1) : "-",
+          rating_id: rating.id,
+          remarks: rating.remarks && rating.remarks.trim() ? rating.remarks : "-"
         };
-        acc.push(employee);
-      }
-    
-      if (rater === "TL") {
-        employee.raters[0] = { rater, quality, timelines, agility, attitude, responsibility, average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id, remarks: remarks && remarks.trim() ? remarks : "-" };
-      } else if (rater === "PM") {
-        employee.raters[1] = { rater, quality, timelines, agility, attitude, responsibility, average: average !== null ? parseFloat(average).toFixed(1) : "-", rating_id, remarks: remarks && remarks.trim() ? remarks : "-" };
-      }
-    
-      if (average !== null && average !== "-") {
-        employee.overall_score += parseFloat(average);
-      }
-    
-      return acc;
-    }, []);
-    
-    // Ensure `s_no` is based on pagination and calculated dynamically
-    groupedResults.forEach((employee, index) => {
-      employee.s_no = offset + index + 1; // Correct sequence based on offset and index
-      employee.overall_score = employee.overall_score > 0 ? employee.overall_score.toFixed(1) : "-";
-    
-      if (users.role_id === 3) {
-        employee.raters = employee.raters.filter((rater) => rater.rater === "TL");
-      }
+      });
+
+      const overallScore = employeeRatings.length
+        ? (employeeRatings.reduce((acc, curr) => acc + (curr.average || 0), 0) / employeeRatings.length).toFixed(1)
+        : "-";
+
+      return {
+        s_no: offset + index + 1,
+        employee_id: user.employee_id,
+        user_id: user.user_id,
+        month: selectedMonth,
+        employee_name: user.first_name,
+        team: user.team_name,
+        raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
+        overall_score: overallScore
+      };
     });
-    
-    // Pagination metadata
-    const pagination = getPagination(page, perPage, totalRecords);
-    
-    return successResponse(res, groupedResults, 'Ratings fetched successfully', 200, pagination);
-    
+
+    return successResponse(res, groupedResults, 'Ratings fetched successfully', 200, getPagination(page, perPage, totalRecords));
   } catch (error) {
     console.error('Error fetching ratings:', error);
     return errorResponse(res, 'An error occurred while fetching ratings', 'Internal Server Error', 500);
