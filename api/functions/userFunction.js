@@ -102,24 +102,54 @@ exports.getAllUsers = async (req, res) => {
 
     let query = `
       SELECT 
-        id, first_name, last_name, keycloak_id, employee_id, email, phone,
-        email_verified_at, password, team_id, role_id, designation_id 
-      FROM users 
-      WHERE deleted_at IS NULL
-      ${search ? 'AND (first_name LIKE ? OR email LIKE ?)' : ''}
-      ORDER BY id DESC
+        u.id, 
+        u.employee_id, 
+        CONCAT(u.first_name, ' ', u.last_name) AS employee_name, 
+        r.name AS role_name, 
+        u.designation_id AS designation_name, 
+        u.email, 
+        t.name AS team_name
+      FROM users u
+      LEFT JOIN teams t ON t.id = u.team_id
+      LEFT JOIN roles r ON r.id = u.role_id
+      LEFT JOIN designations d ON d.id = u.designation_id
+      WHERE u.deleted_at IS NULL
+      ${search ? `AND (
+        u.first_name LIKE ? OR 
+        u.last_name LIKE ? OR 
+        u.email LIKE ? OR 
+        r.name LIKE ? OR 
+        d.name LIKE ? OR 
+        t.name LIKE ?
+      )` : ''}
+      ORDER BY u.id DESC
       LIMIT ? OFFSET ?
     `;
 
     let countQuery = `
       SELECT COUNT(*) AS total_records 
-      FROM users 
-      WHERE deleted_at IS NULL
-      ${search ? 'AND (first_name LIKE ? OR email LIKE ?)' : ''}
+      FROM users u
+      LEFT JOIN teams t ON t.id = u.team_id
+      LEFT JOIN roles r ON r.id = u.role_id
+      
+      WHERE u.deleted_at IS NULL
+      ${search ? `AND (
+        u.first_name LIKE ? OR 
+        u.last_name LIKE ? OR 
+        u.email LIKE ? OR 
+        r.name LIKE ? OR 
+        d.name LIKE ? OR 
+        t.name LIKE ?
+      )` : ''}
     `;
 
-    const values = search ? [`%${search}%`, `%${search}%`, parseInt(perPage), parseInt(offset)] : [parseInt(perPage), parseInt(offset)];
-    const countValues = search ? [`%${search}%`, `%${search}%`] : [];
+    const values = search 
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, parseInt(perPage), parseInt(offset)]
+      : [parseInt(perPage), parseInt(offset)];
+
+    const countValues = search 
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
+      : [];
 
     const [rows] = await db.query(query, values);
     const [countResult] = await db.query(countQuery, countValues);
@@ -138,6 +168,7 @@ exports.getAllUsers = async (req, res) => {
     return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
+
 
 
 
