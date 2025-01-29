@@ -4,12 +4,67 @@ const {
   errorResponse,
   getPagination,
 } = require("../../helpers/responseHelper");
-const { uploadexpenseFileToS3, deleteFileFromS3  } = require('../../config/s3');
-
+const { uploadexpenseFileToS3, deleteFileFromS3 } = require("../../config/s3");
 
 // Insert Expense
 exports.createexpense = async (req, res) => {
-  const { date, category, amount, project_id, user_id, description, created_by } = req.body;
+  const {
+    date,
+    category,
+    amount,
+    project_id,
+    user_id,
+    description,
+    created_by,
+  } = req.body;
+  const allowedExtensions = ["jpg", "jpeg", "png", "pdf", "doc", "docx"];
+  const missingFields = [];
+  if (!category) missingFields.push("category");
+  if (!date) missingFields.push("date");
+  if (!amount) missingFields.push("amount");
+  if (!project_id) missingFields.push("project_id");
+  if (!user_id) missingFields.push("user_id");
+  if (!description) missingFields.push("description");
+  if (!req.files?.file) missingFields.push("file");
+
+  // If any field is missing, return an error response
+  if (missingFields.length > 0) {
+    return errorResponse(
+      res,
+      `Missing required fields: ${missingFields.join(", ")}`,
+      "Validation Error",
+      400
+    );
+  }
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!date.match(dateRegex) || isNaN(Date.parse(date))) {
+    return errorResponse(
+      res,
+      "Invalid date format. Expected format: YYYY-MM-DD",
+      "Validation Error",
+      400
+    );
+  }
+  let fileUrl = null;
+  if (req.files && req.files.file) {
+    const file = req.files.file;
+    const fileBuffer = file.data;
+    const originalFileName = file.name;
+    const fileExtension = originalFileName.split(".").pop().toLowerCase();
+
+    // Check if extension is allowed
+    if (!allowedExtensions.includes(fileExtension)) {
+      return errorResponse(
+        res,
+        `Invalid file type. Allowed types: ${allowedExtensions.join(", ")}`,
+        "Validation Error",
+        400
+      );
+    }
+    const uniqueFileName = `${Date.now()}_${originalFileName}`;
+    fileUrl = await uploadexpenseFileToS3(fileBuffer, uniqueFileName);
+  }
+
   try {
     const projectQuery = `
         SELECT product_id 
@@ -61,15 +116,6 @@ exports.createexpense = async (req, res) => {
       );
     }
 
-    let fileUrl = null;
-      if (req.files && req.files.file) {
-              const file = req.files.file;
-              const fileBuffer = file.data;  
-              const originalFileName = file.name;
-              const uniqueFileName = `${Date.now()}_${originalFileName}`;  
-             fileUrl = await uploadexpenseFileToS3(fileBuffer, uniqueFileName);
-            }
-
     const insertQuery = `
         INSERT INTO expense_details (
           user_id, category, product_id, project_id, team_id, description, expense_amount, date, file, created_by, updated_by, created_at, updated_at
@@ -115,7 +161,12 @@ exports.createexpense = async (req, res) => {
     );
   } catch (error) {
     console.error("Error inserting Expense detail:", error.message);
-    return errorResponse(res, error.message, "Error inserting Expense detail", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error inserting Expense detail",
+      500
+    );
   }
 };
 // Show Expense
@@ -159,13 +210,25 @@ exports.getexpense = async (id, res) => {
       200
     );
   } catch (error) {
-    return errorResponse(res, error.message, "Error retrieving expense detail", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error retrieving expense detail",
+      500
+    );
   }
 };
 // Show All Expense
 exports.getAllexpense = async (req, res) => {
   try {
-    const { user_id, status, search, page = 1, perPage = 10, project_id } = req.query;
+    const {
+      user_id,
+      status,
+      search,
+      page = 1,
+      perPage = 10,
+      project_id,
+    } = req.query;
 
     if (!user_id) {
       return errorResponse(
@@ -227,7 +290,9 @@ exports.getAllexpense = async (req, res) => {
     }
 
     const expenseWhereClause =
-      expenseConditions.length > 0 ? `WHERE ${expenseConditions.join(" AND ")}` : "";
+      expenseConditions.length > 0
+        ? `WHERE ${expenseConditions.join(" AND ")}`
+        : "";
 
     // Main query
     const expenseQuery = `
@@ -269,7 +334,10 @@ exports.getAllexpense = async (req, res) => {
       LEFT JOIN users u ON u.id = et.user_id
       ${expenseWhereClause}
     `;
-    const [totalRecordsResult] = await db.query(countQuery, expenseValues.slice(0, -2));
+    const [totalRecordsResult] = await db.query(
+      countQuery,
+      expenseValues.slice(0, -2)
+    );
     const totalRecords = totalRecordsResult[0]?.total || 0;
 
     const pagination = getPagination(page, perPage, totalRecords);
@@ -308,7 +376,15 @@ exports.getAllexpense = async (req, res) => {
 
 // Update Expense
 exports.updateexpenses = async (id, req, res) => {
-  const { date, category, amount, project_id, user_id, description, updated_by } = req.body;
+  const {
+    date,
+    category,
+    amount,
+    project_id,
+    user_id,
+    description,
+    updated_by,
+  } = req.body;
 
   try {
     const expenseQuery = `
@@ -451,7 +527,12 @@ exports.updateexpenses = async (id, req, res) => {
     );
   } catch (error) {
     console.error("Error updating expense detail:", error.message);
-    return errorResponse(res, error.message, "Error updating expense detail", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error updating expense detail",
+      500
+    );
   }
 };
 
@@ -502,7 +583,12 @@ exports.deleteExpense = async (id, res) => {
     return successResponse(res, null, "Expense detail deleted successfully");
   } catch (error) {
     console.error("Error deleting expense detail:", error.message);
-    return errorResponse(res, error.message, "Error deleting Expense detail", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error deleting Expense detail",
+      500
+    );
   }
 };
 
@@ -567,19 +653,31 @@ exports.getAllpmemployeexpense = async (req, res) => {
       otConditions.push(
         "(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
       );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      otValues.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
     }
 
-    // Handle status conditions 
+    // Handle status conditions
     switch (status) {
       case "0":
         otConditions.push("et.tl_status != 0 AND et.pm_status = 0");
         break;
       case "1":
-        otConditions.push("(et.tl_status = 1 OR et.tl_status = 2) AND et.pm_status = 0");
+        otConditions.push(
+          "(et.tl_status = 1 OR et.tl_status = 2) AND et.pm_status = 0"
+        );
         break;
       case "2":
-        otConditions.push("et.pm_status = 2 AND et.tl_status = 2 AND et.status = 2");
+        otConditions.push(
+          "et.pm_status = 2 AND et.tl_status = 2 AND et.status = 2"
+        );
         break;
       default:
         return errorResponse(
@@ -754,7 +852,12 @@ exports.approve_reject_expense = async (payload, res) => {
     } else if (role === "pm") {
       updateQuery += ` pm_status = ? `;
     } else {
-      return errorResponse(res, "Invalid role", "Error updating expense details", 400);
+      return errorResponse(
+        res,
+        "Invalid role",
+        "Error updating expense details",
+        400
+      );
     }
 
     updateQuery += ` WHERE id = ? AND deleted_at IS NULL`;
@@ -783,11 +886,18 @@ exports.approve_reject_expense = async (payload, res) => {
       200
     );
   } catch (error) {
-    console.error("Error approving or rejecting expense details:", error.message);
-    return errorResponse(res, error.message, "Error updating expense details", 500);
+    console.error(
+      "Error approving or rejecting expense details:",
+      error.message
+    );
+    return errorResponse(
+      res,
+      error.message,
+      "Error updating expense details",
+      500
+    );
   }
 };
-
 
 // TL Employee Expense Details
 exports.getAlltlemployeeexpense = async (req, res) => {
@@ -833,7 +943,12 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       return errorResponse(res, null, "Status is required", 400);
     }
     if (status.includes(",")) {
-      return errorResponse(res, null, "Only a single status value is allowed", 400);
+      return errorResponse(
+        res,
+        null,
+        "Only a single status value is allowed",
+        400
+      );
     }
 
     const offset = (page - 1) * perPage;
@@ -870,7 +985,14 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       otConditions.push(
         "(u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
       );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      otValues.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
     }
 
     // Status-based filtering
@@ -885,11 +1007,17 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         otConditions.push("et.tl_status = 2");
         break;
       default:
-        return errorResponse(res, "Invalid status value", "Error fetching expenses", 400);
+        return errorResponse(
+          res,
+          "Invalid status value",
+          "Error fetching expenses",
+          400
+        );
     }
 
     // Build the WHERE clause
-    const otWhereClause = otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
+    const otWhereClause =
+      otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
 
     // Query to fetch expenses
     const otQuery = `
@@ -968,7 +1096,15 @@ exports.getAlltlemployeeexpense = async (req, res) => {
 };
 exports.getExpenseReport = async (queryParams, res) => {
   try {
-    const { from_date, to_date, category, search, page = 1, perPage = 10, export_status } = queryParams.query;
+    const {
+      from_date,
+      to_date,
+      category,
+      search,
+      page = 1,
+      perPage = 10,
+      export_status,
+    } = queryParams.query;
 
     // Base query with filters
     const baseQuery = `
@@ -992,18 +1128,22 @@ exports.getExpenseReport = async (queryParams, res) => {
           expenses.deleted_at IS NULL AND
           users.deleted_at IS NULL
           AND (expenses.date BETWEEN ? AND ?)
-          ${search ? 'AND (users.first_name LIKE ?)' : ''}
-          ${category ? 'AND expenses.category IN (?)' : ''}
+          ${search ? "AND (users.first_name LIKE ?)" : ""}
+          ${category ? "AND expenses.category IN (?)" : ""}
       ORDER BY 
           expenses.date DESC
-      ${export_status === "1" ? '' : 'LIMIT ? OFFSET ?'}; -- No pagination if export_status is "1"
+      ${
+        export_status === "1" ? "" : "LIMIT ? OFFSET ?"
+      }; -- No pagination if export_status is "1"
     `;
 
     // Prepare query params
     let params = [from_date, to_date];
     if (search) params.push(`%${search}%`);
     if (category) {
-      const categoryArray = Array.isArray(category) ? category : category.split(',');
+      const categoryArray = Array.isArray(category)
+        ? category
+        : category.split(",");
       params.push(categoryArray);
     }
 
@@ -1036,17 +1176,22 @@ exports.getExpenseReport = async (queryParams, res) => {
           expenses.deleted_at IS NULL AND
           users.deleted_at IS NULL
           AND (expenses.date BETWEEN ? AND ?)
-          ${search ? 'AND (users.first_name LIKE ?)' : ''}
-          ${category ? 'AND expenses.category IN (?)' : ''}
+          ${search ? "AND (users.first_name LIKE ?)" : ""}
+          ${category ? "AND expenses.category IN (?)" : ""}
     `;
-    const [totalRecordsResult] = await db.query(totalRecordsQuery, params.slice(0, params.length - 2));
+    const [totalRecordsResult] = await db.query(
+      totalRecordsQuery,
+      params.slice(0, params.length - 2)
+    );
     const totalRecords = totalRecordsResult[0].total || 0;
 
     const pagination = getPagination(page, perPage, totalRecords);
     successResponse(
       res,
       results,
-      results.length === 0 ? "No expenses found" : "Expenses retrieved successfully",
+      results.length === 0
+        ? "No expenses found"
+        : "Expenses retrieved successfully",
       200,
       pagination
     );
@@ -1055,8 +1200,3 @@ exports.getExpenseReport = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
-
-
-
-
