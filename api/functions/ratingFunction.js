@@ -439,7 +439,7 @@ exports.getRatingById = async (req, res) => {
 
 exports.getRatings = async (req, res) => {
   try {
-    const { team_id, month, user_id, search, page = 1, perPage = 3 } = req;
+    const { team_id, month, user_id, search, page = 1, perPage = 10 } = req;
     const offset = (page - 1) * perPage;
 
     const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
