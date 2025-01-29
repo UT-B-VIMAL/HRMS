@@ -63,7 +63,7 @@ exports.getAttendance = async (req, res) => {
             AND u.id NOT IN (
                 SELECT user_id 
                 FROM employee_leave 
-                WHERE date = ? AND day_type = 1
+                WHERE date = ? 
             )
             ${search ? 'AND (u.first_name LIKE ? OR u.employee_id LIKE ?)' : ''}  
         LIMIT ?, ?
@@ -82,7 +82,7 @@ exports.getAttendance = async (req, res) => {
       const dynamicDate = date || today; 
       // Fetch records from the employee leave table only
       query = `SELECT  el.user_id,u.first_name, u.employee_id, 
-              el.date,  
+              el.date, el.day_type as day_type_val, el.half_type as half_type_val,
           CASE 
               WHEN el.day_type = 1 THEN 'Full Day' 
               WHEN el.day_type = 2 THEN 'Half Day' 
