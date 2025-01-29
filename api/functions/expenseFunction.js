@@ -157,7 +157,7 @@ exports.createexpense = async (req, res) => {
         created_by,
       },
       "Expense detail added successfully",
-      201
+      200
     );
   } catch (error) {
     console.error("Error inserting Expense detail:", error.message);
