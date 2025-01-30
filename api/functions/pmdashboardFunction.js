@@ -442,7 +442,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         t.status AS task_status,
         t.active_status AS task_active_status,
         t.reopen_status AS task_reopen_status,
-        t.created_at AS task_date,
+        t.start_date AS task_date,
         t.priority AS task_priority,
         t.estimated_hours AS task_estimation_hours,
         t.description AS task_description,
@@ -497,10 +497,12 @@ exports.fetchPmviewproductdata = async (req, res) => {
           COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) LIKE ? OR
           p.name LIKE ? OR
           te.name LIKE ? OR
+          t.name LIKE ? OR
+          t.priority LIKE ? OR
           s.name LIKE ?
         )
       `;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // Execute the query for tasks
