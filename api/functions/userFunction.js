@@ -119,7 +119,7 @@ exports.getAllUsers = async (req, res) => {
         u.last_name LIKE ? OR 
         u.email LIKE ? OR 
         r.name LIKE ? OR 
-        d.name LIKE ? OR 
+        u.designation_id LIKE ? OR 
         t.name LIKE ?
       )` : ''}
       ORDER BY u.id DESC
@@ -138,7 +138,7 @@ exports.getAllUsers = async (req, res) => {
         u.last_name LIKE ? OR 
         u.email LIKE ? OR 
         r.name LIKE ? OR 
-        d.name LIKE ? OR 
+        u.designation_id LIKE ? OR 
         t.name LIKE ?
       )` : ''}
     `;
