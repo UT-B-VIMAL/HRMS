@@ -118,7 +118,8 @@ apiRouter.put('/task/:id',RoleController.checkRole(['tl','pm','admin','employee'
 apiRouter.delete('/task/:id', RoleController.checkRole(['pm','admin']),taskController.deleteTask);
 apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.getTask);
 apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.getAllTasks);
-apiRouter.get('/deletedTaskList', RoleController.checkRole(['tl','pm','admin','employee']),taskController.deletedTaskList);
+apiRouter.post('/deletedTaskList', RoleController.checkRole(['tl','pm','admin','employee']),taskController.deletedTaskList);
+apiRouter.post('/restoreTasks', RoleController.checkRole(['pm','admin']),taskController.taskRestore);
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.updateDatas);
 apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
 apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin','employee']), taskController.doneTask);
