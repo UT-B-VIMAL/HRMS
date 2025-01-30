@@ -184,6 +184,7 @@ exports.getexpense = async (id, res) => {
     ed.tl_status,
     ed.pm_status,
     ed.expense_amount,
+    ed.category AS categoryID,
     CASE 
         WHEN ed.category = 1 THEN 'food'
         WHEN ed.category = 2 THEN 'travel'
