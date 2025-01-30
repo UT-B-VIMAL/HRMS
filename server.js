@@ -360,7 +360,7 @@ if (isProduction) {
     cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
   };
 
-  servers.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Secure server is running on https://${DOMAIN}:${PORT}`);
   });
 } else {
