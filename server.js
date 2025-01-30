@@ -37,6 +37,125 @@ const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.u
 const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
 const PORT = isProduction ? 8085 : 3000;
 
+
+// Socket-----------------------------------------------------------------------------
+const socketIo = require('socket.io');
+
+let server;
+
+if (isProduction) {
+  const options = {
+    key: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem"),
+    cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
+  };
+
+  server = https.createServer(options, app);
+} else {
+  server = http.createServer(app);
+}
+
+// Initialize socket.io
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+
+const db = require('./config/db');
+app.use(express.static('public'));
+const connectedUsers = {}; 
+
+io.on('connection', (socket) => {
+  console.log('Connected User:', socket.id);
+
+
+  socket.on('register', async (id) => {
+    console.log('Received user ID:', id); 
+    
+    try {
+      const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [id]);
+      if (results.length > 0) {
+        connectedUsers[id] = socket.id;
+        console.log(`User ${id} registered with socket ID ${socket.id}`);
+      } else {
+        console.log(`User ID ${id} not found.`);
+      }
+    } catch (err) {
+      console.error('Error fetching user:', err);
+    }
+  });
+
+  // Load messages from ticket_comments table
+  socket.on('load messages', async (ticket_id) => {
+      try {
+          const [comments] = await db.execute(
+              `SELECT 
+                  tc.id,
+                  tc.ticket_id,
+                  tc.sender_id,
+                  tc.receiver_id,
+                  tc.comments,
+                  CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) AS sender_name,
+                  CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) AS receiver_name,
+                  tc.created_at
+              FROM ticket_comments tc
+              JOIN users sender ON tc.sender_id = sender.id
+              JOIN users receiver ON tc.receiver_id = receiver.id
+              WHERE tc.ticket_id = ? AND tc.deleted_at IS NULL
+              ORDER BY tc.created_at ASC`,
+              [ticket_id]
+          );
+
+          socket.emit('load messages', comments);
+      } catch (error) {
+          console.error('Error fetching ticket history:', error.message);
+      }
+  });
+
+  socket.on('chat message', async (data) => {
+    try {
+        const { ticket_id, sender_id, receiver_id, comments } = data;
+
+        
+        console.log('Received data:', data);
+
+        if (!ticket_id || !sender_id || !receiver_id || !comments) {
+            throw new Error('Missing required fields.');
+        }
+
+        const [result] = await db.execute(
+            `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
+            VALUES (?, ?, ?, ?, NOW(), NOW(), NULL)`,
+            [ticket_id, sender_id, receiver_id, comments]
+        );
+
+        console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
+
+        const recipientSocketId = connectedUsers[receiver_id];
+        if (recipientSocketId) {
+            io.to(recipientSocketId).emit('chat message', { ticket_id, sender_id, comments });
+        }
+    } catch (error) {
+        console.error('Error saving message:', error);
+    }
+});
+
+
+  // Handle user disconnect
+  socket.on('disconnect', () => {
+      console.log('User disconnected:', socket.id);
+      // Remove user from connected users
+      Object.keys(connectedUsers).forEach((key) => {
+          if (connectedUsers[key] === socket.id) {
+              delete connectedUsers[key];
+          }
+      });
+  });
+});
+
+// Socket-----------------------------------------------------------------------------
 const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
@@ -241,12 +360,12 @@ if (isProduction) {
     cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
   };
 
-  https.createServer(options, app).listen(PORT, () => {
+  servers.listen(PORT, () => {
     console.log(`Secure server is running on https://${DOMAIN}:${PORT}`);
   });
 } else {
   // Development server (non-SSL)
-  http.createServer(app).listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Development server is running on http://${DOMAIN}:${PORT}`);
   });
 }

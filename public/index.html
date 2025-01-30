@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        ul { list-style-type: none; padding: 0; }
+        li { padding: 8px; margin-bottom: 2px; background-color: #f3f3f3; }
+        input, select { padding: 10px; width: 30%; margin-right: 10px; }
+        button { padding: 10px; }
+    </style>
+</head>
+<body>
+    <div>
+        <input id="fromID" placeholder="Enter your userid" />
+        <button id="register">connect</button>
+    </div>
+    <div>
+        <input id="toID" placeholder="Recipient userid" />
+        <input id="comment" placeholder="Type your comment" />
+        <button id="send">Send</button>
+    </div>
+    <ul id="messages"></ul>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const ticketId = '1';
+        document.getElementById('register').addEventListener('click', () => {
+            const username = document.getElementById('fromID').value;
+            if (username) {
+                socket.emit('register', username);
+            }
+        });
+
+        document.getElementById('send').addEventListener('click', () => {
+            const fromID = document.getElementById('fromID').value;
+            const comment = document.getElementById('comment').value;
+            const toID = document.getElementById('toID').value;
+
+            if (fromID && comment && toID && ticketId) {
+                socket.emit('chat message', { ticket_id: ticketId, receiver_id: toID, sender_id: fromID, comments:comment });
+                // document.getElementById('message').value = '';
+            }
+        });
+
+        socket.emit('load messages', ticketId);
+
+        socket.on('load messages', (comments) => {
+            // const messagesElement = document.getElementById('messages');
+            console.log(comments);
+            
+            // messages.forEach(msg => {
+            //     const item = document.createElement('li');
+            //     item.textContent = `${msg.timestamp}: ${msg.text}`;
+            //     messagesElement.appendChild(item);
+            // });
+            // window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        socket.on('chat message', (data) => {
+            console.log(data);
+            
+            const { from, message } = data;
+            const item = document.createElement('li');
+            item.textContent = `${from}: ${message}`;
+            document.getElementById('messages').appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+    </script>
+</body>
+</html>
