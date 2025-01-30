@@ -174,21 +174,36 @@ exports.getexpense = async (id, res) => {
   try {
     const expensedetailQuery = `
         SELECT 
-          id, 
-          DATE_FORMAT(date, '%Y-%m-%d') AS date,
-          description, 
-          product_id, 
-          project_id,
-          user_id,
-          status,
-          tl_status,
-          pm_status,
-          file
-        FROM 
-          expense_details
-        WHERE 
-          id = ?
-          AND deleted_at IS NULL;
+    ed.id, 
+    DATE_FORMAT(ed.date, '%Y-%m-%d') AS date,
+    ed.description, 
+    ed.product_id, 
+    ed.project_id,
+    ed.user_id,
+    ed.status,
+    ed.tl_status,
+    ed.pm_status,
+    ed.expense_amount,
+    ed.category AS categoryID,
+    CASE 
+        WHEN ed.category = 1 THEN 'food'
+        WHEN ed.category = 2 THEN 'travel'
+        WHEN ed.category = 3 THEN 'others'
+        ELSE 'unknown' 
+    END AS category,
+    ed.file,
+    p.name AS product_name,
+    pr.name AS project_name
+FROM 
+    expense_details ed
+JOIN 
+    products p ON ed.product_id = p.id
+JOIN 
+    projects pr ON ed.project_id = pr.id
+WHERE 
+    ed.id = ? 
+    AND ed.deleted_at IS NULL;
+
       `;
     const [expensedetail] = await db.query(expensedetailQuery, [id]);
 

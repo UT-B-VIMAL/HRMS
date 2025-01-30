@@ -100,6 +100,7 @@ exports.getAllUsers = async (req, res) => {
     const { search = '', page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
+    // Construct the query with proper handling of search terms
     let query = `
       SELECT 
         u.id, 
@@ -115,59 +116,66 @@ exports.getAllUsers = async (req, res) => {
       LEFT JOIN designations d ON d.id = u.designation_id
       WHERE u.deleted_at IS NULL
       ${search ? `AND (
+        CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
         u.first_name LIKE ? OR 
         u.last_name LIKE ? OR 
         u.email LIKE ? OR 
         r.name LIKE ? OR 
-        d.name LIKE ? OR 
+        u.designation_id LIKE ? OR 
         t.name LIKE ?
       )` : ''}
       ORDER BY u.id DESC
       LIMIT ? OFFSET ?
     `;
 
+    // Query to count the total records
     let countQuery = `
       SELECT COUNT(*) AS total_records 
       FROM users u
       LEFT JOIN teams t ON t.id = u.team_id
       LEFT JOIN roles r ON r.id = u.role_id
-      
       WHERE u.deleted_at IS NULL
       ${search ? `AND (
+        CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
         u.first_name LIKE ? OR 
         u.last_name LIKE ? OR 
         u.email LIKE ? OR 
         r.name LIKE ? OR 
-        d.name LIKE ? OR 
+        u.designation_id LIKE ? OR 
         t.name LIKE ?
       )` : ''}
     `;
 
+    // Prepare the values to be used in the query
     const values = search 
-      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, parseInt(perPage), parseInt(offset)]
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, parseInt(perPage), parseInt(offset)]
       : [parseInt(perPage), parseInt(offset)];
 
     const countValues = search 
-      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
       : [];
 
+    // Execute the queries
     const [rows] = await db.query(query, values);
     const [countResult] = await db.query(countQuery, countValues);
 
     const totalRecords = countResult[0].total_records;
     const pagination = await getPagination(page, perPage, totalRecords);
 
+    // Map the rows with serial number
     const data = rows.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
     }));
 
+    // Send the response
     successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
   } catch (error) {
     console.error('Error retrieving users:', error.message);
     return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
+
 
 
 
