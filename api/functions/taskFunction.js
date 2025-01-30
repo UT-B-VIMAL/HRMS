@@ -1770,7 +1770,12 @@ exports.startTask = async (taskOrSubtask, type, id,res) => {
     [taskOrSubtask.user_id]
   );
   if (existingSubtaskSublime.length > 0) {
-    return errorResponse(res, "You Already have Active Task", 400);
+    throw {
+      status: 500,
+      success: false,
+      message: 400,
+      error: "You Already have Active Task"
+  };
   }
 
   await db.query(
