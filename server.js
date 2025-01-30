@@ -355,11 +355,6 @@ app.use(globalErrorHandler);
 
 
 if (isProduction) {
-  // SSL Configuration for production
-  const options = {
-    key: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem"),
-    cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
-  };
 
   server.listen(PORT, () => {
     console.log(`Secure server is running on https://${DOMAIN}:${PORT}`);
