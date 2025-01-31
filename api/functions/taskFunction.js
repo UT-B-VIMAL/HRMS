@@ -793,6 +793,7 @@ exports.updateTaskData = async (id, payload, res) => {
     active_status,
     reopen_status,
     assigned_user_id,
+    user_id,
     team_id,
     owner_id,
     estimated_hours,
@@ -821,10 +822,10 @@ exports.updateTaskData = async (id, payload, res) => {
     due_date: 'end_date',
   };
   try {
-    if (assigned_user_id) {
+    if (user_id) {
       const [assigned_user] = await db.query(
         "SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL",
-        [assigned_user_id]
+        [user_id]
       );
       if (assigned_user.length === 0) {
         return errorResponse(
@@ -834,7 +835,7 @@ exports.updateTaskData = async (id, payload, res) => {
           404
         );
       }
-      // payload.team_id = assigned_user[0].team_id;
+      payload.team_id = assigned_user[0].team_id;
     }
 
     if (owner_id) {
