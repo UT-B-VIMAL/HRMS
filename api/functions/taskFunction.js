@@ -330,11 +330,11 @@ ORDER BY h.id DESC;
         project: task.project_name || "",
         product_id: task.product_id || "",
         product: task.product_name || "",
-        owner_id: task.user_id || "",
+        owner_id: task.assigned_user_id || "",
         owner: task.owner_name || "",
         team_id: task.team_id || "",
         team: task.team_name || "",
-        assignee_id: task.assigned_user_id || "",
+        assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
         estimated_hours: formatTimeDHMS(totalEstimatedHours),
         estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
@@ -795,7 +795,6 @@ exports.updateTaskData = async (id, payload, res) => {
     assigned_user_id,
     user_id,
     team_id,
-    owner_id,
     estimated_hours,
     start_date,
     due_date,
@@ -838,10 +837,10 @@ exports.updateTaskData = async (id, payload, res) => {
       payload.team_id = assigned_user[0].team_id;
     }
 
-    if (owner_id) {
+    if (assigned_user_id) {
       const [user] = await db.query(
         "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-        [owner_id]
+        [assigned_user_id]
       );
       if (user.length === 0) {
         return errorResponse(
