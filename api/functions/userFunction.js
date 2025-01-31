@@ -105,10 +105,12 @@ exports.getAllUsers = async (req, res) => {
       SELECT 
         u.id, 
         u.employee_id, 
-        CONCAT(u.first_name, ' ', u.last_name) AS employee_name, 
+        u.first_name, u.last_name, 
+        u.role_id,
         r.name AS role_name, 
         u.designation_id AS designation_name, 
-        u.email, 
+        u.email,
+        u.team_id, 
         t.name AS team_name
       FROM users u
       LEFT JOIN teams t ON t.id = u.team_id
