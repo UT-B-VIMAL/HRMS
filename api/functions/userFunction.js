@@ -13,6 +13,13 @@ exports.createUser = async (payload, res) => {
   } = payload;
 
   try {
+
+    const duplicateCheckQuery = `SELECT id FROM users WHERE email = ? OR employee_id = ? AND deleted_at IS NULL`;
+    const [existingUsers] = await db.query(duplicateCheckQuery, [email, employee_id]);
+
+    if (existingUsers.length > 0) {
+      return errorResponse(res, "Email or Employee ID already exists", "Duplicate entry", 400);
+    }
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -105,10 +112,13 @@ exports.getAllUsers = async (req, res) => {
       SELECT 
         u.id, 
         u.employee_id, 
-        CONCAT(u.first_name, ' ', u.last_name) AS employee_name, 
+        u.first_name, u.last_name, 
+        u.role_id,
         r.name AS role_name, 
         u.designation_id AS designation_name, 
-        u.email, 
+        u.email,
+        u.team_id,
+        u.keycloak_id, 
         t.name AS team_name
       FROM users u
       LEFT JOIN teams t ON t.id = u.team_id
