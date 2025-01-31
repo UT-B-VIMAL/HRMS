@@ -115,7 +115,7 @@ exports.getAllUsers = async (req, res) => {
         u.first_name, u.last_name, 
         u.role_id,
         r.name AS role_name, 
-        u.designation_id AS designation_name, 
+        u.designation_id, 
         u.email,
         u.team_id,
         u.keycloak_id, 
