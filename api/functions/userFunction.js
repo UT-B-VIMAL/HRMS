@@ -110,7 +110,8 @@ exports.getAllUsers = async (req, res) => {
         r.name AS role_name, 
         u.designation_id AS designation_name, 
         u.email,
-        u.team_id, 
+        u.team_id,
+        u.keycloak_id, 
         t.name AS team_name
       FROM users u
       LEFT JOIN teams t ON t.id = u.team_id
