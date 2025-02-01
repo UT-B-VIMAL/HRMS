@@ -188,165 +188,164 @@ app.use(fileUpload());
 //authentication
 apiRouter.post('/login', loginController.login);
 apiRouter.post('/logout', loginController.logout);
-apiRouter.put('/change_password/:id',RoleController.checkRole(['pm','admin','tl','employee']),loginController.changePassword);
+apiRouter.put('/change_password/:id',RoleController.checkRole(),loginController.changePassword);
 apiRouter.post('/forgot_password',loginController.forgotPassword);
 apiRouter.post('/reset_password',loginController.reset_password);
 
 // User Routes
-apiRouter.post('/user',RoleController.checkRole(['admin','tl','pm']), userController.createUser);
-apiRouter.put('/user/:id',RoleController.checkRole(['admin','tl','pm']), userController.updateUser);
-apiRouter.delete('/user/:id',RoleController.checkRole(['admin','tl','pm']), userController.deleteUser);
-apiRouter.get('/user/:id',RoleController.checkRole(['admin','tl','pm']), userController.getUser);
-apiRouter.get('/user',RoleController.checkRole(['admin','tl','pm']), userController.getAllUsers);
+apiRouter.post('/user',RoleController.checkRole(), userController.createUser);
+apiRouter.put('/user/:id',RoleController.checkRole(), userController.updateUser);
+apiRouter.delete('/user/:id',RoleController.checkRole(), userController.deleteUser);
+apiRouter.get('/user/:id',RoleController.checkRole(), userController.getUser);
+apiRouter.get('/user',RoleController.checkRole(), userController.getAllUsers);
 
 // Product Routes
-apiRouter.post('/products',RoleController.checkRole(['pm','admin']), productController.createProduct);
-apiRouter.put('/products/:id',RoleController.checkRole(['pm','admin']), productController.updateProduct);
-apiRouter.delete('/products/:id',RoleController.checkRole(['pm','admin']), productController.deleteProduct);
-apiRouter.get('/products/:id',RoleController.checkRole(['pm','admin']), productController.getProduct);
-apiRouter.get('/products',RoleController.checkRole(['pm','admin']), productController.getAllProducts);
+apiRouter.post('/products',RoleController.checkRole(), productController.createProduct);
+apiRouter.put('/products/:id',RoleController.checkRole(), productController.updateProduct);
+apiRouter.delete('/products/:id',RoleController.checkRole(), productController.deleteProduct);
+apiRouter.get('/products/:id',RoleController.checkRole(), productController.getProduct);
+apiRouter.get('/products',RoleController.checkRole(), productController.getAllProducts);
 
 // Project Routes
-apiRouter.post('/projects',RoleController.checkRole(['pm','admin']), projectController.createProject);
-apiRouter.put('/projects/:id',RoleController.checkRole(['pm','admin']), projectController.updateProject);
-apiRouter.delete('/projects/:id',RoleController.checkRole(['pm','admin']), projectController.deleteProject);
-apiRouter.get('/projects/:id',RoleController.checkRole(['pm','admin']), projectController.getProject);
-apiRouter.get('/projects',RoleController.checkRole(['pm','admin']), projectController.getAllProjects);
+apiRouter.post('/projects',RoleController.checkRole(), projectController.createProject);
+apiRouter.put('/projects/:id',RoleController.checkRole(), projectController.updateProject);
+apiRouter.delete('/projects/:id',RoleController.checkRole(), projectController.deleteProject);
+apiRouter.get('/projects/:id',RoleController.checkRole(), projectController.getProject);
+apiRouter.get('/projects',RoleController.checkRole(), projectController.getAllProjects);
 apiRouter.get('/project_status', projectController.project_status);
-apiRouter.get('/project_request',RoleController.checkRole(['pm','tl','admin']), projectController.project_request);
-apiRouter.get('/project_requestupdate',RoleController.checkRole(['pm','tl','admin']), projectController.project_requestupdate);
-apiRouter.put('/project_requestchange/:id',RoleController.checkRole(['pm','admin']), projectController.project_requestchange);
+apiRouter.get('/project_request',RoleController.checkRole(), projectController.project_request);
+apiRouter.get('/project_requestupdate',RoleController.checkRole(), projectController.project_requestupdate);
+apiRouter.put('/project_requestchange/:id',RoleController.checkRole(), projectController.project_requestchange);
 
 // Team Routes
-apiRouter.post('/team',RoleController.checkRole(['pm','admin']), teamController.createTeam);
-apiRouter.put('/team/:id',RoleController.checkRole(['pm','admin']), teamController.updateTeam);
-apiRouter.delete('/team/:id',RoleController.checkRole(['pm','admin']), teamController.deleteTeam);
-apiRouter.get('/team/:id',RoleController.checkRole(['pm','admin']), teamController.getTeam);
-apiRouter.get('/team',RoleController.checkRole(['pm','admin']), teamController.getAllTeams);
+apiRouter.post('/team',RoleController.checkRole(), teamController.createTeam);
+apiRouter.put('/team/:id',RoleController.checkRole(), teamController.updateTeam);
+apiRouter.delete('/team/:id',RoleController.checkRole(), teamController.deleteTeam);
+apiRouter.get('/team/:id',RoleController.checkRole(), teamController.getTeam);
+apiRouter.get('/team',RoleController.checkRole(), teamController.getAllTeams);
 
 // Designation Routes
-apiRouter.post('/designations',RoleController.checkRole(['pm','admin']), designationController.createDesignation);
-apiRouter.put('/designations/:id',RoleController.checkRole(['pm','admin']), designationController.updateDesignation);
-apiRouter.delete('/designations/:id',RoleController.checkRole(['pm','admin']), designationController.deleteDesignation);
-apiRouter.get('/designations/:id',RoleController.checkRole(['pm','admin']), designationController.getDesignation);
-apiRouter.get('/designations',RoleController.checkRole(['pm','admin']), designationController.getAllDesignations);
+apiRouter.post('/designations',RoleController.checkRole(), designationController.createDesignation);
+apiRouter.put('/designations/:id',RoleController.checkRole(), designationController.updateDesignation);
+apiRouter.delete('/designations/:id',RoleController.checkRole(), designationController.deleteDesignation);
+apiRouter.get('/designations/:id',RoleController.checkRole(), designationController.getDesignation);
+apiRouter.get('/designations',RoleController.checkRole(), designationController.getAllDesignations);
 
 
 // Task Routes
-apiRouter.post('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.createTask);
-apiRouter.put('/task/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.updateTask);
-apiRouter.delete('/task/:id', RoleController.checkRole(['pm','admin']),taskController.deleteTask);
-apiRouter.get('/task/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.getTask);
-apiRouter.get('/task', RoleController.checkRole(['tl','pm','admin','employee']),taskController.getAllTasks);
-apiRouter.get('/deletedTaskList', RoleController.checkRole(['tl','pm','admin','employee']),taskController.deletedTaskList);
-apiRouter.post('/restoreTasks', RoleController.checkRole(['pm','admin']),taskController.taskRestore);
-apiRouter.put('/taskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), taskController.updateDatas);
-apiRouter.get('/getTaskDatas',RoleController.checkRole(['pm','admin','tl','employee']), taskController.getTaskDatas);
-apiRouter.get('/doneTask',RoleController.checkRole(['tl','pm','admin','employee']), taskController.doneTask);
-apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(['admin','employee']), taskController.updateTaskTimeLineStatus);
-apiRouter.get('/getWorkReport',RoleController.checkRole(['pm','employee']), taskController.workReport);
-
+apiRouter.post('/task', RoleController.checkRole(),taskController.createTask);
+apiRouter.put('/task/:id',RoleController.checkRole(), taskController.updateTask);
+apiRouter.delete('/task/:id', RoleController.checkRole(),taskController.deleteTask);
+apiRouter.get('/task/:id',RoleController.checkRole(), taskController.getTask);
+apiRouter.get('/task', RoleController.checkRole(),taskController.getAllTasks);
+apiRouter.put('/taskupdate/:id',RoleController.checkRole(), taskController.updateDatas);
+apiRouter.get('/getTaskDatas',RoleController.checkRole(), taskController.getTaskDatas);
+apiRouter.get('/doneTask',RoleController.checkRole(), taskController.doneTask);
+apiRouter.post('/updateTaskTimeLineStatus',RoleController.checkRole(), taskController.updateTaskTimeLineStatus);
+apiRouter.get('/getWorkReport', RoleController.checkRole(),taskController.workReport);
+apiRouter.get('/deletedTaskList', RoleController.checkRole(),taskController.deletedTaskList);
+apiRouter.post('/restoreTasks', RoleController.checkRole(),taskController.taskRestore);
 
 // Subtask Routes
-apiRouter.post('/subtask', RoleController.checkRole(['tl','pm','admin','employee']),subtaskController.createSubTask);
-apiRouter.put('/subtask/:id',RoleController.checkRole(['tl','pm','admin']), subtaskController.updateSubTask);
-apiRouter.delete('/subtask/:id', RoleController.checkRole(['pm','admin']),subtaskController.deleteSubTask);
-apiRouter.get('/subtask/:id', RoleController.checkRole(['tl','pm','admin','employee']),subtaskController.getSubTask);
-apiRouter.get('/subtask',RoleController.checkRole(['tl','pm','admin','employee']), subtaskController.getAllSubTasks);
-apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(['tl','pm','admin','employee']), subtaskController.updateDatas);
+apiRouter.post('/subtask', RoleController.checkRole(),subtaskController.createSubTask);
+apiRouter.put('/subtask/:id',RoleController.checkRole(), subtaskController.updateSubTask);
+apiRouter.delete('/subtask/:id', RoleController.checkRole(),subtaskController.deleteSubTask);
+apiRouter.get('/subtask/:id', RoleController.checkRole(),subtaskController.getSubTask);
+apiRouter.get('/subtask',RoleController.checkRole(), subtaskController.getAllSubTasks);
+apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(), subtaskController.updateDatas);
 
 
 
 // Idle Employee Route
-apiRouter.get('/idleEmployee', RoleController.checkRole(['tl','pm','admin']),idleEmployeeController.get_idleEmployee);
+apiRouter.get('/idleEmployee', RoleController.checkRole(),idleEmployeeController.get_idleEmployee);
 
 // PM Dashboard Routes
-apiRouter.get('/pmproducts',RoleController.checkRole(['pm','admin']), pmdashboardController.pmproductsection);
-apiRouter.get('/pmutilization',RoleController.checkRole(['pm','admin']), pmdashboardController.pmutilizationsection);
-apiRouter.get('/pmattendance',RoleController.checkRole(['pm','admin']), pmdashboardController.pmattendancesection);
-apiRouter.get('/pmdashboard',RoleController.checkRole(['pm','admin']), pmdashboardController.pmdashboardsection);
-apiRouter.get('/pmviewproduct',RoleController.checkRole(['pm','tl','admin']), pmdashboardController.pmviewproductsection);
+apiRouter.get('/pmproducts',RoleController.checkRole(), pmdashboardController.pmproductsection);
+apiRouter.get('/pmutilization',RoleController.checkRole(), pmdashboardController.pmutilizationsection);
+apiRouter.get('/pmattendance',RoleController.checkRole(), pmdashboardController.pmattendancesection);
+apiRouter.get('/pmdashboard',RoleController.checkRole(), pmdashboardController.pmdashboardsection);
+apiRouter.get('/pmviewproduct',RoleController.checkRole(), pmdashboardController.pmviewproductsection);
 
 // TL Dashboard Routes
-apiRouter.get('/tlattendance',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlattendancesection);
-apiRouter.get('/tlrating',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlratingsection);
-apiRouter.get('/tlproducts',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlproductsection);
-apiRouter.get('/tlresourceallotment',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlresourceallotmentsection);
-apiRouter.get('/tldashboard',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tldashboardsection);
-apiRouter.get('/tlviewproduct',RoleController.checkRole(['tl','pm','admin']), tldashboardController.tlviewproductsection);
+apiRouter.get('/tlattendance',RoleController.checkRole(), tldashboardController.tlattendancesection);
+apiRouter.get('/tlrating',RoleController.checkRole(), tldashboardController.tlratingsection);
+apiRouter.get('/tlproducts',RoleController.checkRole(), tldashboardController.tlproductsection);
+apiRouter.get('/tlresourceallotment',RoleController.checkRole(), tldashboardController.tlresourceallotmentsection);
+apiRouter.get('/tldashboard',RoleController.checkRole(), tldashboardController.tldashboardsection);
+apiRouter.get('/tlviewproduct',RoleController.checkRole(), tldashboardController.tlviewproductsection);
 
 // Employee Dashboard Routes
-apiRouter.get('/emppendingtask',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.emppendingtasksection);
-apiRouter.get('/empdailybreakdown',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empdailybreakdownsection);
-apiRouter.get('/empstatistics',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empstatisticssection);
-apiRouter.get('/empstatisticschart',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empstatisticschartsection);
-apiRouter.get('/empratings',RoleController.checkRole(['tl','pm','admin','employee']), empdashboardController.empratingsection);
+apiRouter.get('/emppendingtask',RoleController.checkRole(), empdashboardController.emppendingtasksection);
+apiRouter.get('/empdailybreakdown',RoleController.checkRole(), empdashboardController.empdailybreakdownsection);
+apiRouter.get('/empstatistics',RoleController.checkRole(), empdashboardController.empstatisticssection);
+apiRouter.get('/empstatisticschart',RoleController.checkRole(), empdashboardController.empstatisticschartsection);
+apiRouter.get('/empratings',RoleController.checkRole(), empdashboardController.empratingsection);
 
 // Productivity
-apiRouter.get('/teamwise_productivity', RoleController.checkRole(['pm','admin']),productivityController.get_teamwiseProductivity);
-apiRouter.get('/individual_status', RoleController.checkRole(['pm','admin']),productivityController.get_individualProductivity);
+apiRouter.get('/teamwise_productivity', RoleController.checkRole(),productivityController.get_teamwiseProductivity);
+apiRouter.get('/individual_status', RoleController.checkRole(),productivityController.get_individualProductivity);
 
 //Rating
-apiRouter.get('/getAnnualRatings', RoleController.checkRole(['pm','tl','admin']),ratingController.getAnnualRatings);
-apiRouter.get('/getAllRatings', RoleController.checkRole(['pm','admin']),ratingController.getAllRatings);
-apiRouter.post('/ratingUpdation', RoleController.checkRole(['pm','admin']), ratingController.ratingUpdation);
+apiRouter.get('/getAnnualRatings', RoleController.checkRole(),ratingController.getAnnualRatings);
+apiRouter.get('/getAllRatings', RoleController.checkRole(),ratingController.getAllRatings);
+apiRouter.post('/ratingUpdation', RoleController.checkRole(), ratingController.ratingUpdation);
 
 //phase -2
-apiRouter.post('/updateRating', RoleController.checkRole(['tl','pm','admin']), ratingController.ratingUpdations);
-apiRouter.get('/getRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getRating);
-apiRouter.get('/getAllUserRating', RoleController.checkRole(['tl','pm','admin']), ratingController.getAllUserRating);
-apiRouter.get('/getAnnualRatings', RoleController.checkRole(['pm','tl','admin']),ratingController.getAnnualRatings);
+apiRouter.post('/updateRating', RoleController.checkRole(), ratingController.ratingUpdations);
+apiRouter.get('/getRating', RoleController.checkRole(), ratingController.getRating);
+apiRouter.get('/getAllUserRating', RoleController.checkRole(), ratingController.getAllUserRating);
+apiRouter.get('/getAnnualRatings', RoleController.checkRole(),ratingController.getAnnualRatings);
 
 //Attendance
-apiRouter.get('/getAttendanceList', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceList);
-apiRouter.post('/updateAttendance', RoleController.checkRole(['tl','admin']), attendanceController.updateAttendance);
-apiRouter.get('/getAttendanceReport', RoleController.checkRole(['tl','admin']), attendanceController.getAttendanceListReport);
+apiRouter.get('/getAttendanceList', RoleController.checkRole(), attendanceController.getAttendanceList);
+apiRouter.post('/updateAttendance', RoleController.checkRole(), attendanceController.updateAttendance);
+apiRouter.get('/getAttendanceReport', RoleController.checkRole(), attendanceController.getAttendanceListReport);
 
 
 // Comments
-apiRouter.post('/comments',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. addComments);
-apiRouter.put('/comments/:id',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. updateComments);
-apiRouter.delete('/comments',RoleController.checkRole(['tl','pm','admin','employee']),commentsController. deleteComments);
+apiRouter.post('/comments',RoleController.checkRole(),commentsController. addComments);
+apiRouter.put('/comments/:id',RoleController.checkRole(),commentsController. updateComments);
+apiRouter.delete('/comments',RoleController.checkRole(),commentsController. deleteComments);
 
 //tickets
-apiRouter.get('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getAlltickets);
-apiRouter.get('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. getTickets);
-apiRouter.post('/tickets',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController.createTicket);
-apiRouter.put('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. updateTickets);
-apiRouter.post('/ticket-comments',RoleController.checkRole(['tl', 'pm', 'admin', 'employee']),(req, res) => ticketsController.ticketComments(req, res, wss));
+apiRouter.get('/tickets',RoleController.checkRole(),ticketsController. getAlltickets);
+apiRouter.get('/tickets/:id',RoleController.checkRole(),ticketsController. getTickets);
+apiRouter.post('/tickets',RoleController.checkRole(),ticketsController.createTicket);
+apiRouter.put('/tickets/:id',RoleController.checkRole(),ticketsController. updateTickets);
+apiRouter.post('/ticket-comments',RoleController.checkRole(),(req, res) => ticketsController.ticketComments(req, res, wss));
 
- //apiRouter.delete('/tickets/:id',RoleController.checkRole(['tl','pm','admin','employee']),ticketsController. deleteTickets);
+ //apiRouter.delete('/tickets/:id',RoleController.checkRole(),ticketsController. deleteTickets);
 
 // OT Details
-apiRouter.post('/otdetail', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.createOtdetail);
-apiRouter.put('/otdetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.updateOtdetail);
-apiRouter.delete('/otdetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.deleteOtdetail);
-apiRouter.get('/otdetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),otdetailController.getOtdetail);
-apiRouter.get('/otdetail',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.getAllOtdetails);
-apiRouter.get('/pmemployeeotdetail',RoleController.checkRole(['pm','admin']), otdetailController.getAllpmemployeeOtdetails);
-apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(['pm','tl','admin']), otdetailController.getAlltlemployeeOtdetails);
-apiRouter.put('/tlotdetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), otdetailController.updatetlOtdetail);
-apiRouter.post('/approve_reject_ot', RoleController.checkRole(['pm','tl','admin']),otdetailController.approve_reject_otdetail);
-apiRouter.get('/getOtReport', RoleController.checkRole(['pm','admin']),otdetailController.getOtReport);
+apiRouter.post('/otdetail', RoleController.checkRole(),otdetailController.createOtdetail);
+apiRouter.put('/otdetail/:id',RoleController.checkRole(), otdetailController.updateOtdetail);
+apiRouter.delete('/otdetail/:id', RoleController.checkRole(),otdetailController.deleteOtdetail);
+apiRouter.get('/otdetail/:id', RoleController.checkRole(),otdetailController.getOtdetail);
+apiRouter.get('/otdetail',RoleController.checkRole(), otdetailController.getAllOtdetails);
+apiRouter.get('/pmemployeeotdetail',RoleController.checkRole(), otdetailController.getAllpmemployeeOtdetails);
+apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(), otdetailController.getAlltlemployeeOtdetails);
+apiRouter.put('/tlotdetail/:id',RoleController.checkRole(), otdetailController.updatetlOtdetail);
+apiRouter.post('/approve_reject_ot', RoleController.checkRole(),otdetailController.approve_reject_otdetail);
+apiRouter.get('/getOtReport', RoleController.checkRole(),otdetailController.getOtReport);
 
 
 // Expense
-apiRouter.post('/expensedetail', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.createexpensedetail);
-apiRouter.get('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.getexpensedetail);
-apiRouter.put('/expensedetail/:id',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.updateexpensedetail);
-apiRouter.delete('/expensedetail/:id', RoleController.checkRole(['tl','pm','admin','employee']),expensedetailController.deleteexpensedetail);
-apiRouter.get('/expensedetail',RoleController.checkRole(['tl','pm','admin','employee']), expensedetailController.getAllexpensedetails);
-apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(['pm','admin']), expensedetailController.getAllpmemployeeexpensedetails);
-apiRouter.get('/tlemployeeexpensedetail',RoleController.checkRole(['pm','tl','admin']), expensedetailController.getAlltlemployeexpensedetails);
-apiRouter.get('/getExpenseReport',RoleController.checkRole(['pm','admin']), expensedetailController.getExpenseReports);
-apiRouter.post('/approve_reject_expense', RoleController.checkRole(['pm','tl','admin']),expensedetailController.approve_reject_expensedetail);
+apiRouter.post('/expensedetail', RoleController.checkRole(),expensedetailController.createexpensedetail);
+apiRouter.get('/expensedetail/:id', RoleController.checkRole(),expensedetailController.getexpensedetail);
+apiRouter.put('/expensedetail/:id',RoleController.checkRole(), expensedetailController.updateexpensedetail);
+apiRouter.delete('/expensedetail/:id', RoleController.checkRole(),expensedetailController.deleteexpensedetail);
+apiRouter.get('/expensedetail',RoleController.checkRole(), expensedetailController.getAllexpensedetails);
+apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAllpmemployeeexpensedetails);
+apiRouter.get('/tlemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAlltlemployeexpensedetails);
+apiRouter.get('/getExpenseReport',RoleController.checkRole(), expensedetailController.getExpenseReports);
+apiRouter.post('/approve_reject_expense', RoleController.checkRole(),expensedetailController.approve_reject_expensedetail);
 
 
 //common
-apiRouter.get('/getDropDownList',RoleController.checkRole(['tl','pm','admin','employee']),commonController.getDropDownList);
+apiRouter.get('/getDropDownList',RoleController.checkRole(),commonController.getDropDownList);
 
 //reports
-apiRouter.get('/getTimeReport', RoleController.checkRole(['tl','admin']), reportController.getTimeListReport);
+apiRouter.get('/getTimeReport', RoleController.checkRole(), reportController.getTimeListReport);
 
 
 // Use `/api` as a common prefix
