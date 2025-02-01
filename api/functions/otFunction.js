@@ -131,14 +131,17 @@ exports.createOt = async (payload, res) => {
 exports.getOt = async (id, res) => {
   try {
     const otdetailQuery = `
-        SELECT 
+       SELECT 
     od.id, 
     DATE_FORMAT(od.date, '%Y-%m-%d') AS date, 
     IFNULL(od.time, '00:00:00') AS time, 
     od.comments, 
     od.product_id, 
+    p.name AS product_name, 
     od.project_id, 
-    od.task_id,
+    pr.name AS project_name, 
+    od.task_id, 
+    t.name AS task_name,
     od.user_id, 
     CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS user_name,
     IFNULL(od.tledited_time, '00:00:00') AS tl_edited_time,
@@ -148,12 +151,17 @@ exports.getOt = async (id, res) => {
     od.pm_status
 FROM 
     ot_details od
-JOIN 
+LEFT JOIN 
     users u ON od.user_id = u.id
+LEFT JOIN 
+    products p ON od.product_id = p.id
+LEFT JOIN 
+    projects pr ON od.project_id = pr.id
+LEFT JOIN 
+    tasks t ON od.task_id = t.id
 WHERE 
     od.id = ? 
     AND od.deleted_at IS NULL;
-
       `;
     const [otdetail] = await db.query(otdetailQuery, [id]);
 
