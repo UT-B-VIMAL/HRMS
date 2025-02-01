@@ -236,6 +236,14 @@ async function createUserInKeycloak(userData) {
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
+        console.log(roleName+'Group');
+        const groupResponse = await assignGroupToUser(userId, roleName+'Group');
+        
+        if (groupResponse.error) {
+          console.error("Group assignment failed:", groupResponse.details);
+        } else {
+          console.log(groupResponse.message);
+        }
         console.log("Role assigned successfully");
         response['roleresponse'] = roleres;
       } catch (roleError) {
@@ -277,6 +285,14 @@ async function editUserInKeycloak(userId, userData) {
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
+        console.log(roleName+'Group');
+        const groupResponse = await assignGroupToUser(userId, roleName+'Group');
+        
+        if (groupResponse.error) {
+          console.error("Group assignment failed:", groupResponse.details);
+        } else {
+          console.log(groupResponse.message);
+        }
         console.log("Role assigned successfully");
         response['roleresponse'] = roleres;
       } catch (roleError) {
@@ -376,6 +392,53 @@ async function assignRoleToUser(userId, roleName) {
     return { error: "Failed to assign or reassign role", details: error.response?.data || error.message };
   }
 }
+
+async function assignGroupToUser(userId, groupName) {
+  try {
+    const token = await getAdminToken();
+
+    // Get the group to be assigned
+    const groupResponse = await axios.get(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const group = groupResponse.data.find((g) => g.name === groupName);
+
+    if (!group) {
+      return { error: `Group '${groupName}' not found` };
+    }
+
+    // Get currently assigned groups for the user
+    const assignedGroupsResponse = await axios.get(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/groups`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const assignedGroups = assignedGroupsResponse.data;
+
+    // Remove the user from any groups that do not match the new group
+    const groupsToRemove = assignedGroups.filter((assignedGroup) => assignedGroup.id !== group.id);
+
+    for (const groupToRemove of groupsToRemove) {
+      await axios.delete(
+        `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/groups/${groupToRemove.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    }
+
+    // Assign the user to the new group
+    await axios.put(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${userId}/groups/${group.id}`,
+      null, // No body is required for this request
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    return { message: 'Group assigned successfully' };
+
+  } catch (error) {
+    return { error: "Failed to assign or reassign group", details: error.response?.data || error.message };
+  }
+}
+
 
 
 
