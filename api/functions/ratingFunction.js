@@ -273,6 +273,7 @@ const average = (quality + timelines + agility + attitude + responsibility)/5;
       responsibility,
     },
     remarks,
+    average,
     updated_by,
   };
   return successResponse(res, responsePayload, "Rating Updated successfully", 200);
