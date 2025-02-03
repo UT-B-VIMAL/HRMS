@@ -281,6 +281,7 @@ exports.getAllOts = async (req, res) => {
           ot.status,
           ot.id AS ot_id,
           ot.user_id,
+          u.employee_id,
           u.first_name AS user_first_name,
           u.last_name AS user_last_name
         FROM 
@@ -308,6 +309,7 @@ exports.getAllOts = async (req, res) => {
       s_no: offset + index + 1,
       id: row.ot_id,
       user_id: row.user_id,
+      employee_id: row.employee_id,
       date: row.date,
       time: row.time,
       project_name: row.project_name,
