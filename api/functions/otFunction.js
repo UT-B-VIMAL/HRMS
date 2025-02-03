@@ -143,6 +143,7 @@ exports.getOt = async (id, res) => {
     od.task_id, 
     t.name AS task_name,
     od.user_id, 
+    u.employee_id, 
     CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS user_name,
     IFNULL(od.tledited_time, '00:00:00') AS tl_edited_time,
     IFNULL(od.pmedited_time, '00:00:00') AS pm_edited_time,
@@ -280,6 +281,7 @@ exports.getAllOts = async (req, res) => {
           ot.status,
           ot.id AS ot_id,
           ot.user_id,
+          u.employee_id,
           u.first_name AS user_first_name,
           u.last_name AS user_last_name
         FROM 
@@ -307,6 +309,7 @@ exports.getAllOts = async (req, res) => {
       s_no: offset + index + 1,
       id: row.ot_id,
       user_id: row.user_id,
+      employee_id: row.employee_id,
       date: row.date,
       time: row.time,
       project_name: row.project_name,
