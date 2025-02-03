@@ -2,7 +2,7 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 
 exports.getAllData = async (payload, res) => {
-    const { type, id, user_id } = payload;
+    const { type, id, user_id ,task_user_id} = payload;
 
     let query = "";
     let queryParams = [];
@@ -119,6 +119,10 @@ exports.getAllData = async (payload, res) => {
         if (type === "tasks" && id) {
             query += " AND project_id = ?";
             queryParams.push(id);
+            if(task_user_id){
+                query += " AND user_id = ?";
+                queryParams.push(task_user_id);
+            }
         }
         if (type === "teams" && id) {
             const users = await this.getAuthUserDetails(id, res);
