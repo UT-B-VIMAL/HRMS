@@ -3,8 +3,10 @@ const fileUpload = require("express-fileupload");
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
+require('dotenv').config({ path: __dirname + '/../.env' });
 const cors = require('cors');
 const bodyParser = require("./middleware/bodyParser");
+
 const globalErrorHandler = require("./middleware/errorHandler");
 const loginController = require('./controllers/loginController');
 const userController = require('./controllers/userController');
@@ -33,7 +35,7 @@ const reportController = require('./controllers/reportController')
 const multer = require('multer');
 const upload = multer();
 const app = express();
-const isProduction = fs.existsSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem");
+const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
 const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
 const PORT = isProduction ? 8085 : 3000;
 
@@ -45,8 +47,8 @@ let server;
 
 if (isProduction) {
   const options = {
-    key: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/privkey1.pem"),
-    cert: fs.readFileSync("/etc/letsencrypt/archive/frontendnode.hrms.utwebapps.com/cert1.pem"),
+    key: fs.readFileSync(process.env.PRIVATE_KEY_LINK),
+    cert: fs.readFileSync(process.env.PRIVATE_CERTIFICATE_LINK),
   };
 
   server = https.createServer(options, app);

@@ -131,26 +131,37 @@ exports.createOt = async (payload, res) => {
 exports.getOt = async (id, res) => {
   try {
     const otdetailQuery = `
-        SELECT 
-          id, 
-          DATE_FORMAT(date, '%Y-%m-%d') AS date, 
-          IFNULL(time, '00:00:00') AS time, 
-          comments, 
-          product_id, 
-          project_id, 
-          task_id,
-          user_id, 
-          IFNULL(tledited_time, '00:00:00') AS tl_edited_time,
-          IFNULL(pmedited_time, '00:00:00') AS pm_edited_time,
-          user_id, 
-          status,
-          tl_status,
-          pm_status
-        FROM 
-          ot_details
-        WHERE 
-          id = ?
-          AND deleted_at IS NULL;
+       SELECT 
+    od.id, 
+    DATE_FORMAT(od.date, '%Y-%m-%d') AS date, 
+    IFNULL(od.time, '00:00:00') AS time, 
+    od.comments, 
+    od.product_id, 
+    p.name AS product_name, 
+    od.project_id, 
+    pr.name AS project_name, 
+    od.task_id, 
+    t.name AS task_name,
+    od.user_id, 
+    CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS user_name,
+    IFNULL(od.tledited_time, '00:00:00') AS tl_edited_time,
+    IFNULL(od.pmedited_time, '00:00:00') AS pm_edited_time,
+    od.status,
+    od.tl_status,
+    od.pm_status
+FROM 
+    ot_details od
+LEFT JOIN 
+    users u ON od.user_id = u.id
+LEFT JOIN 
+    products p ON od.product_id = p.id
+LEFT JOIN 
+    projects pr ON od.project_id = pr.id
+LEFT JOIN 
+    tasks t ON od.task_id = t.id
+WHERE 
+    od.id = ? 
+    AND od.deleted_at IS NULL;
       `;
     const [otdetail] = await db.query(otdetailQuery, [id]);
 
@@ -312,7 +323,7 @@ exports.getAllOts = async (req, res) => {
         ? "No OT details found"
         : "OT details retrieved successfully",
       200,
-      pagination,
+      pagination
     );
   } catch (error) {
     console.error("Error fetching OT details:", error);
@@ -321,8 +332,17 @@ exports.getAllOts = async (req, res) => {
 };
 // Update OT
 exports.updateOt = async (id, payload, res) => {
-  const { date, time, tltime, pmtime, project_id, task_id, user_id, comments, updated_by } =
-    payload;
+  const {
+    date,
+    time,
+    tltime,
+    pmtime,
+    project_id,
+    task_id,
+    user_id,
+    comments,
+    updated_by,
+  } = payload;
 
   try {
     const checkQuery = `
@@ -461,7 +481,7 @@ exports.updateOt = async (id, payload, res) => {
       {
         id,
         task_id,
-        project_id, 
+        project_id,
         product_id,
         status,
         user_id,
@@ -599,7 +619,9 @@ exports.getAllpmemployeeOts = async (req, res) => {
           break;
 
         case "2":
-          otConditions.push("ot.pm_status = 2 AND (ot.tl_status = 2 OR ot.status = 2)");
+          otConditions.push(
+            "ot.pm_status = 2 AND (ot.tl_status = 2 OR ot.status = 2)"
+          );
           break;
 
         default:
@@ -690,13 +712,19 @@ exports.getAllpmemployeeOts = async (req, res) => {
         });
 
         const currentHours = row.employee_time || "00:00:00";
-        acc[userId].total_hours = addTimes(acc[userId].total_hours, currentHours);
+        acc[userId].total_hours = addTimes(
+          acc[userId].total_hours,
+          currentHours
+        );
 
         return acc;
       }, {})
     );
 
-    const totalPendingCounts = data.reduce((sum, user) => sum + user.pending_counts, 0);
+    const totalPendingCounts = data.reduce(
+      (sum, user) => sum + user.pending_counts,
+      0
+    );
 
     const formattedData = data.map((group) => ({
       employee_name: group.employee_name,
@@ -735,9 +763,11 @@ const addTimes = (time1, time2) => {
   seconds %= 60;
   minutes %= 60;
 
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0"
+  )}:${String(seconds).padStart(2, "0")}`;
 };
-
 
 // Approve or reject
 exports.approve_reject_OT = async (payload, res) => {
@@ -814,7 +844,12 @@ exports.approve_reject_OT = async (payload, res) => {
       updateQuery += ` pm_status = ? `;
       updateQuery += ` WHERE user_id = ? AND tl_status != 0 AND deleted_at IS NULL`;
     } else {
-      return errorResponse(res, "Invalid role", "Error updating OT details", 400);
+      return errorResponse(
+        res,
+        "Invalid role",
+        "Error updating OT details",
+        400
+      );
     }
 
     const values = [status, updated_by, status, user_id];
@@ -835,9 +870,7 @@ exports.approve_reject_OT = async (payload, res) => {
     // Return success response
     return successResponse(
       res,
-      status === 2
-        ? "OT Approved successfully"
-        : "OT Rejected successfully",
+      status === 2 ? "OT Approved successfully" : "OT Rejected successfully",
       200
     );
   } catch (error) {
@@ -845,7 +878,6 @@ exports.approve_reject_OT = async (payload, res) => {
     return errorResponse(res, error.message, "Error updating OT details", 500);
   }
 };
-
 
 // TL Employee OT Details
 exports.getAlltlemployeeOts = async (req, res) => {
@@ -859,7 +891,6 @@ exports.getAlltlemployeeOts = async (req, res) => {
       page = 1,
       perPage = 10,
     } = req.query;
-
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -902,10 +933,8 @@ exports.getAlltlemployeeOts = async (req, res) => {
     const otConditions = [];
     const otValues = [];
 
-
     otConditions.push(`ot.team_id IN (?)`);
     otValues.push(teamIds);
-
 
     // Handle date filters
     if (start_date && end_date) {
@@ -961,9 +990,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
 
         case "1":
           // ot.status must be 1, and at least one of tl_status or pm_status must be 1
-          otConditions.push(
-            "ot.tl_status = 1 OR ot.pm_status = 1"
-          );
+          otConditions.push("ot.tl_status = 1 OR ot.pm_status = 1");
           break;
 
         case "2":
@@ -1075,7 +1102,10 @@ exports.getAlltlemployeeOts = async (req, res) => {
         return acc;
       }, {})
     );
-    const totalPendingCounts = Object.values(data).reduce((sum, user) => sum + user.pending_counts, 0);
+    const totalPendingCounts = Object.values(data).reduce(
+      (sum, user) => sum + user.pending_counts,
+      0
+    );
 
     // Format the data for the response
     const formattedData = data.map((group) => ({
@@ -1095,7 +1125,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
         : "OT details retrieved successfully",
       200,
       pagination,
-      totalPendingCounts  // Include the totalPendingCounts in the response
+      totalPendingCounts // Include the totalPendingCounts in the response
     );
   } catch (error) {
     console.error("Error fetching OT details:", error);
@@ -1103,15 +1133,27 @@ exports.getAlltlemployeeOts = async (req, res) => {
   }
 };
 
-
 exports.getOtReportData = async (queryParams, res) => {
   try {
-    const { from_date, to_date, team_id, search, export_status, page = 1, perPage = 10 } = queryParams.query;
+    const {
+      from_date,
+      to_date,
+      team_id,
+      search,
+      export_status,
+      page = 1,
+      perPage = 10,
+    } = queryParams.query;
 
     const offset = (page - 1) * perPage;
 
     if (!from_date || !to_date) {
-      return errorResponse(res, "Both 'from_date' and 'to_date' are required", "Validation error", 400);
+      return errorResponse(
+        res,
+        "Both 'from_date' and 'to_date' are required",
+        "Validation error",
+        400
+      );
     }
 
     // Base query for fetching data
@@ -1141,8 +1183,10 @@ exports.getOtReportData = async (queryParams, res) => {
     const params = [from_date, to_date];
 
     if (team_id) {
-      const teamIds = team_id.split(',').map((id) => id.trim());
-      baseQuery += `AND users.team_id IN (${teamIds.map(() => '?').join(',')}) `;
+      const teamIds = team_id.split(",").map((id) => id.trim());
+      baseQuery += `AND users.team_id IN (${teamIds
+        .map(() => "?")
+        .join(",")}) `;
       params.push(...teamIds);
     }
 
@@ -1183,7 +1227,9 @@ exports.getOtReportData = async (queryParams, res) => {
 
     // Format data
     const data = results.map((row, index) => {
-      const totalSeconds = row.total_hours ? row.total_hours.split(':') : [0, 0, 0];
+      const totalSeconds = row.total_hours
+        ? row.total_hours.split(":")
+        : [0, 0, 0];
       const hours = parseInt(totalSeconds[0], 10) || 0;
       const minutes = parseInt(totalSeconds[1], 10) || 0;
       const formattedTotalTime = `${hours} hrs ${minutes} mins`;
@@ -1191,7 +1237,7 @@ exports.getOtReportData = async (queryParams, res) => {
       const formattedTimeArray = Array.isArray(row.time)
         ? row.time.map((timeString) => {
             if (timeString) {
-              const timeParts = timeString.split(':');
+              const timeParts = timeString.split(":");
               const timeHours = parseInt(timeParts[0], 10) || 0;
               const timeMinutes = parseInt(timeParts[1], 10) || 0;
               return `${timeHours} hrs ${timeMinutes} mins`;
@@ -1205,9 +1251,14 @@ exports.getOtReportData = async (queryParams, res) => {
         ...(export_status !== "1" && { user_id: row.user_id }),
         employee_id: row.employee_id || "N/A",
         date: export_status === "1" ? row.date.join(", ") : row.date,
-        projects: export_status === "1" ? row.projects.join(", ") : row.projects,
-        time: export_status === "1" ? formattedTimeArray.join(", ") : formattedTimeArray,
-        work_done: export_status === "1" ? row.work_done.join(", ") : row.work_done,
+        projects:
+          export_status === "1" ? row.projects.join(", ") : row.projects,
+        time:
+          export_status === "1"
+            ? formattedTimeArray.join(", ")
+            : formattedTimeArray,
+        work_done:
+          export_status === "1" ? row.work_done.join(", ") : row.work_done,
         team_name: row.team_name || "N/A",
         total_hours: formattedTotalTime,
         user_name: row.user_name || "N/A",
@@ -1239,10 +1290,3 @@ exports.getOtReportData = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
-
-
-
-
-
-
