@@ -641,7 +641,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
     const otWhereClause =
       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
 
-    const otQuery = `
+      const otQuery = `
       SELECT 
         pr.name AS project_name,
         t.name AS task_name,
@@ -658,7 +658,8 @@ exports.getAllpmemployeeOts = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
-        d.name AS designation
+        d.name AS designation,
+        te.name AS team_name
       FROM 
         ot_details ot
       LEFT JOIN 
@@ -668,12 +669,15 @@ exports.getAllpmemployeeOts = async (req, res) => {
       LEFT JOIN 
         users u ON u.id = ot.user_id
       LEFT JOIN 
+        teams te ON te.id = u.team_id
+      LEFT JOIN 
         designations d ON d.id = u.designation_id
-      ${otWhereClause}
-      AND ot.deleted_at IS NULL
+      ${otWhereClause} 
+      AND ot.deleted_at IS NULL 
       ORDER BY 
         ot.id
     `;
+
 
     const [ots] = await db.query(otQuery, otValues);
 
@@ -690,6 +694,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
             employee_name: `${row.user_first_name} ${row.user_last_name}`,
             employee_id: row.employee_id,
             designation: row.designation,
+            team_name: row.team_name,
             total_hours: "00:00:00",
             pending_counts: 0,
             details: [],
@@ -735,6 +740,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       employee_name: group.employee_name,
       employee_id: group.employee_id,
       designation: group.designation,
+      team_name: group.team_name,
       total_hours: group.total_hours,
       pending_counts: group.pending_counts,
       details: group.details,
