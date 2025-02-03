@@ -179,7 +179,6 @@ exports.getAllUsers = async (req, res) => {
     const totalRecords = countResult[0].total_records;
     const pagination = await getPagination(page, perPage, totalRecords);
 
-    // Map the rows with serial number
     const data = rows.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
@@ -214,7 +213,6 @@ exports.updateUser = async (id, payload, res) => {
   } = payload;
 
   try {
-    // Check if the user exists
     const [user] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
   if (user.length === 0) {
     console.log('User not found for ID:', id);
