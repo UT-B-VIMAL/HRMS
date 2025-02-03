@@ -214,6 +214,13 @@ exports.updateUser = async (id, payload, res) => {
     return errorResponse(res, null, 'User not found', 404);
   }
 
+  const duplicateCheckQuery = `SELECT id FROM users WHERE (email = ? OR employee_id = ?) AND id != ? AND deleted_at IS NULL`;
+    const [existingUsers] = await db.query(duplicateCheckQuery, [email, employee_id, id]);
+
+    if (existingUsers.length > 0) {
+      return errorResponse(res, "Email or Employee ID already exists", "Duplicate entry", 400);
+    }
+
   let query = `
     UPDATE users SET
       first_name = ?, last_name = ?, email = ?, phone = ?,employee_id = ?,
