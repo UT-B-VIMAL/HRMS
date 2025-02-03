@@ -143,6 +143,7 @@ exports.getOt = async (id, res) => {
     od.task_id, 
     t.name AS task_name,
     od.user_id, 
+    u.employee_id, 
     CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS user_name,
     IFNULL(od.tledited_time, '00:00:00') AS tl_edited_time,
     IFNULL(od.pmedited_time, '00:00:00') AS pm_edited_time,
