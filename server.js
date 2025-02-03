@@ -159,15 +159,10 @@ io.on('connection', (socket) => {
 });
 
 // Socket-----------------------------------------------------------------------------
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:81',
-      'http://localhost', 
-      'http://frontend.utwebapps.com',
-      'https://main.detwo6merrv1m.amplifyapp.com' 
-    ];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
