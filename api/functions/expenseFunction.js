@@ -203,7 +203,6 @@ JOIN
 WHERE 
     ed.id = ? 
     AND ed.deleted_at IS NULL;
-
       `;
     const [expensedetail] = await db.query(expensedetailQuery, [id]);
 
@@ -332,6 +331,7 @@ exports.getAllexpense = async (req, res) => {
       LEFT JOIN 
         users u ON u.id = et.user_id
       ${expenseWhereClause}
+      AND et.deleted_at IS NULL
       ORDER BY 
         et.id
       LIMIT ?, ?
@@ -348,6 +348,7 @@ exports.getAllexpense = async (req, res) => {
       LEFT JOIN projects pr ON pr.id = et.project_id
       LEFT JOIN users u ON u.id = et.user_id
       ${expenseWhereClause}
+      AND et.deleted_at IS NULL
     `;
     const [totalRecordsResult] = await db.query(
       countQuery,
@@ -737,6 +738,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
       LEFT JOIN 
         designations d ON d.id = u.designation_id
       ${otWhereClause}
+      AND et.deleted_at IS NULL
       ORDER BY 
         et.id
     `;
@@ -1061,6 +1063,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       LEFT JOIN 
         designations d ON d.id = u.designation_id
       ${otWhereClause}
+      AND et.deleted_at IS NULL
       ORDER BY 
         et.id
     `;
