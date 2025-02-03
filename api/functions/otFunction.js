@@ -293,6 +293,7 @@ exports.getAllOts = async (req, res) => {
         LEFT JOIN 
           users u ON u.id = ot.user_id
         ${otWhereClause}
+        AND ot.deleted_at IS NULL
         ORDER BY 
           ot.id
       `;
@@ -669,6 +670,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       LEFT JOIN 
         designations d ON d.id = u.designation_id
       ${otWhereClause}
+      AND ot.deleted_at IS NULL
       ORDER BY 
         ot.id
     `;
@@ -1044,6 +1046,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
         LEFT JOIN 
           designations d ON d.id = u.designation_id
         ${otWhereClause}
+        AND ot.deleted_at IS NULL
         ORDER BY 
           ot.id
       `;
