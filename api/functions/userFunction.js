@@ -112,7 +112,9 @@ exports.getUser = async (id, res) => {
 exports.getAllUsers = async (req, res) => {
   try {
       const { search = '', page = 1, perPage = 10 } = req.query;
-      const offset = (parseInt(page) - 1) * parseInt(perPage);
+      const currentPage = parseInt(page, 10);
+      const perPageLimit = parseInt(perPage, 10);
+      const offset = (currentPage - 1) * perPageLimit;
 
       let query = `
           SELECT 
@@ -134,7 +136,7 @@ exports.getAllUsers = async (req, res) => {
       `;
 
       let params = [];
-      let searchValue = `%${search}%`; // ✅ Declare it before using inside the condition
+      let searchValue = `%${search}%`;
 
       if (search.trim() !== '') {
           query += ` AND (
@@ -151,11 +153,9 @@ exports.getAllUsers = async (req, res) => {
           params.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
       }
 
-      // Add ORDER BY, LIMIT, and OFFSET
       query += ` ORDER BY u.id DESC LIMIT ? OFFSET ?`;
-      params.push(parseInt(perPage), parseInt(offset));
+      params.push(perPageLimit, offset);
 
-      // Query to count total records
       let countQuery = `
           SELECT COUNT(*) AS total_records 
           FROM users u
@@ -165,7 +165,6 @@ exports.getAllUsers = async (req, res) => {
       `;
 
       let countParams = [];
-
       if (search.trim() !== '') {
           countQuery += ` AND (
               CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
@@ -179,28 +178,25 @@ exports.getAllUsers = async (req, res) => {
           countParams.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
       }
 
-
-      // Execute Queries
-      const [rows] = await db.query(query, params);
+      // Execute the queries
+      const [users] = await db.query(query, params);
       const [countResult] = await db.query(countQuery, countParams);
 
       const totalRecords = countResult[0].total_records;
-      const totalPages = Math.ceil(totalRecords / perPage);
+      const pagination = getPagination(currentPage, perPageLimit, totalRecords);
 
-      const pagination = {
-          currentPage: parseInt(page),
-          perPage: parseInt(perPage),
-          totalRecords,
-          totalPages
-      };
+      const data = users.map((user, index) => ({
+          s_no: offset + index + 1,
+          ...user,
+      }));
 
-      // Send Response
-      return successResponse(res, rows, rows.length ? 'Users retrieved successfully' : 'No users found', 200, pagination);
+      return successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
   } catch (error) {
       console.error('Error retrieving users:', error.message);
       return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
+
 
 
 
