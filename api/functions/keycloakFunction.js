@@ -455,7 +455,7 @@ async function getUserByEmployeeId(employeeId) {
     designations.name AS designation_name
   FROM users
   LEFT JOIN designations ON users.designation_id = designations.id
-  WHERE users.employee_id = ?`;
+  WHERE users.employee_id = ? AND users.deleted_at IS NULL`;
 const params = [employeeId];
 
   try {
