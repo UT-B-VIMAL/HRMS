@@ -789,7 +789,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       ${otWhereClause} 
       AND ot.deleted_at IS NULL 
       ORDER BY 
-        ot.id
+        ot.id DESC
     `;
 
 
