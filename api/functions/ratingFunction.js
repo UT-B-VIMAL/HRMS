@@ -361,7 +361,7 @@ exports.getRatings = async (req, res) => {
         [user_id]
       );
       const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
-      whereClause += ' AND users.team_id IN (?)';
+      whereClause += ' AND users.team_id IN (?) AND users.role_id != 3';
       values.push(teamIds);
     }
 

@@ -105,8 +105,7 @@ exports.createexpense = async (req, res) => {
         WHERE deleted_at IS NULL AND id = ?
       `;
     const [userResult] = await db.query(userQuery, [user_id]);
-    const { team_id } = userResult[0];
-
+    
     if (userResult.length === 0) {
       return errorResponse(
         res,
@@ -115,11 +114,13 @@ exports.createexpense = async (req, res) => {
         404
       );
     }
+    const { team_id,role_id } = userResult[0];
+    let tl_status = (role_id == 2) ? 2 : 0;
 
     const insertQuery = `
         INSERT INTO expense_details (
-          user_id, category, product_id, project_id, team_id, description, expense_amount, date, file, created_by, updated_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+          user_id, category, product_id, project_id, team_id, description, expense_amount, date, file, tl_status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
     const values = [
       user_id,
@@ -131,6 +132,7 @@ exports.createexpense = async (req, res) => {
       amount,
       date,
       fileUrl,
+      tl_status,
       created_by,
       created_by,
     ];
