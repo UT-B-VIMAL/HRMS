@@ -9,6 +9,23 @@ const {getAlltickets,getTickets,updateTickets}= require("../api/functions/ticket
 exports.createTicket = async (req, res) => {
     try {
       const { user_id, issue_type, description, created_by } = req.body;
+
+
+      const missingFields = [];
+  if (!issue_type) missingFields.push("issue_type");
+  if (!description) missingFields.push("description");
+  if (!user_id) missingFields.push("user_id");
+
+  // If any field is missing, return an error response
+  if (missingFields.length > 0) {
+    return errorResponse(
+      res,
+      `Missing required fields: ${missingFields.join(", ")}`,
+      "Validation Error",
+      400
+    );
+  }
+
       let fileUrl = null;
   
       if (req.files && req.files.file) {

@@ -12,6 +12,69 @@ exports.createOt = async (payload, res) => {
   const { date, time, project_id, task_id, user_id, comments, created_by } =
     payload;
 
+    const missingFields = [];
+  if (!date) missingFields.push("date");
+  if (!project_id) missingFields.push("project_id");
+  if (!task_id) missingFields.push("task_id");
+  if (!user_id) missingFields.push("user_id");
+
+  // If any field is missing, return an error response
+  if (missingFields.length > 0) {
+    return errorResponse(
+      res,
+      `Missing required fields: ${missingFields.join(", ")}`,
+      "Validation Error",
+      400
+    );
+  }
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!date.match(dateRegex) || isNaN(Date.parse(date))) {
+    return errorResponse(
+      res,
+      "Invalid date format. Expected format: YYYY-MM-DD",
+      "Validation Error",
+      400
+    );
+  }
+
+  if (time) {
+    const timeMatch = time.match(
+      /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+    );
+  
+    if (!timeMatch) {
+      return errorResponse(
+        res,
+        null,
+        'Invalid format for time. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+        400
+      );
+    }
+  
+    const days = parseInt(timeMatch[2] || '0', 10);
+    const hours = parseInt(timeMatch[4] || '0', 10);
+    const minutes = parseInt(timeMatch[6] || '0', 10);
+    const seconds = parseInt(timeMatch[8] || '0', 10);
+  
+    if (
+      days < 0 ||
+      hours < 0 ||
+      minutes < 0 ||
+      seconds < 0 ||
+      minutes >= 60 ||
+      seconds >= 60
+    ) {
+      return errorResponse(res, null, 'Invalid time values in time', 400);
+    }
+  
+    // Convert days to hours and calculate total hours
+    const totalHours = days * 8 + hours;
+  
+    // Format as "HH:MM:SS"
+    payload.time = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    
+  }
+
   try {
     const projectQuery = `
         SELECT product_id 
@@ -97,7 +160,7 @@ let tl_status = (role_id == 2) ? 2 : 0;
       comments,
       tl_status,
       date,
-      time,
+      payload.time,
       created_by,
       created_by,
   ];
@@ -301,7 +364,7 @@ exports.getAllOts = async (req, res) => {
         ${otWhereClause}
         AND ot.deleted_at IS NULL
         ORDER BY 
-          ot.id
+          ot.id DESC
       `;
 
     const [ots] = await db.query(otQuery, otValues);
@@ -353,6 +416,51 @@ exports.updateOt = async (id, payload, res) => {
     comments,
     updated_by,
   } = payload;
+
+  const formatTime = (timeValue, fieldName) => {
+    if (timeValue) {
+        const timeMatch = timeValue.match(
+            /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+        );
+
+        if (!timeMatch) {
+            return errorResponse(
+                res,
+                null,
+                `Invalid format for ${fieldName}. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".`,
+                400
+            );
+        }
+
+        const days = parseInt(timeMatch[2] || '0', 10);
+        const hours = parseInt(timeMatch[4] || '0', 10);
+        const minutes = parseInt(timeMatch[6] || '0', 10);
+        const seconds = parseInt(timeMatch[8] || '0', 10);
+
+        if (
+            days < 0 ||
+            hours < 0 ||
+            minutes < 0 ||
+            seconds < 0 ||
+            minutes >= 60 ||
+            seconds >= 60
+        ) {
+            return errorResponse(res, null, `Invalid time values in ${fieldName}`, 400);
+        }
+
+        // Convert days to hours and calculate total hours
+        const totalHours = days * 8 + hours;
+
+        // Format as "HH:MM:SS"
+        return `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    return null; // If timeValue is null/undefined, return null
+};
+
+// Apply the function to time, pmtime, and tltime
+payload.time = formatTime(time, "time");
+payload.pmtime = formatTime(pmtime, "pmtime");
+payload.tltime = formatTime(tltime, "tltime");
 
   try {
     const checkQuery = `
@@ -459,9 +567,9 @@ exports.updateOt = async (id, payload, res) => {
       task_id,
       comments,
       date,
-      time,
-      tltime,
-      pmtime,
+      payload.time,
+      payload.tltime,
+      payload.pmtime,
       updated_by,
       id,
     ];
@@ -681,7 +789,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       ${otWhereClause} 
       AND ot.deleted_at IS NULL 
       ORDER BY 
-        ot.id
+        ot.id DESC
     `;
 
 
