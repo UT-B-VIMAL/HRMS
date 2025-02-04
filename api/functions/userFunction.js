@@ -14,11 +14,18 @@ exports.createUser = async (payload, res) => {
 
   try {
 
-    const duplicateCheckQuery = `SELECT id FROM users WHERE email = ? OR employee_id = ? AND deleted_at IS NULL`;
-    const [existingUsers] = await db.query(duplicateCheckQuery, [email, employee_id]);
+    const duplicateCheckQuery = `SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL`;
+    const [existingUsers] = await db.query(duplicateCheckQuery, [employee_id]);
 
     if (existingUsers.length > 0) {
-      return errorResponse(res, "Email or Employee ID already exists", "Duplicate entry", 400);
+      return errorResponse(res, "Employee ID already exists", "Duplicate entry", 400);
+    }
+
+    const duplicateemailCheckQuery = `SELECT id FROM users WHERE email = ? AND deleted_at IS NULL`;
+    const [existingemail] = await db.query(duplicateemailCheckQuery, [email]);
+
+    if (existingemail.length > 0) {
+      return errorResponse(res, "Email already exists", "Duplicate entry", 400);
     }
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -172,7 +179,6 @@ exports.getAllUsers = async (req, res) => {
     const totalRecords = countResult[0].total_records;
     const pagination = await getPagination(page, perPage, totalRecords);
 
-    // Map the rows with serial number
     const data = rows.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
@@ -207,12 +213,25 @@ exports.updateUser = async (id, payload, res) => {
   } = payload;
 
   try {
-    // Check if the user exists
     const [user] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
   if (user.length === 0) {
     console.log('User not found for ID:', id);
     return errorResponse(res, null, 'User not found', 404);
   }
+
+  const duplicateCheckQuery = `SELECT id FROM users WHERE employee_id = ? AND id != ? AND deleted_at IS NULL`;
+    const [existingUsers] = await db.query(duplicateCheckQuery, [employee_id, id]);
+
+    if (existingUsers.length > 0) {
+      return errorResponse(res, "Employee ID already exists", "Duplicate entry", 400);
+    }
+
+    const duplicateemailCheckQuery = `SELECT id FROM users WHERE email = ? AND id != ? AND deleted_at IS NULL`;
+    const [existingemail] = await db.query(duplicateemailCheckQuery, [email, id]);
+
+    if (existingemail.length > 0) {
+      return errorResponse(res, "Email already exists", "Duplicate entry", 400);
+    }
 
   let query = `
     UPDATE users SET

@@ -22,7 +22,7 @@ exports.getTickets = async (id, res) => {
             t.file_name
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id 
-        LEFT JOIN issue_type i ON t.issue_type = i.id 
+        LEFT JOIN issue_types i ON t.issue_type = i.id 
         WHERE t.deleted_at IS NULL AND t.id = ?;
       `;
   

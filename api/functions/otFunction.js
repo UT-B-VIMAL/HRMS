@@ -63,13 +63,13 @@ exports.createOt = async (payload, res) => {
     }
 
     const userQuery = `
-        SELECT id,team_id 
+        SELECT id,team_id,role_id 
         FROM users 
         WHERE deleted_at IS NULL AND id = ?
       `;
     const [userResult] = await db.query(userQuery, [user_id]);
-    const { team_id } = userResult[0];
-
+    
+    
     if (userResult.length === 0) {
       return errorResponse(
         res,
@@ -78,24 +78,30 @@ exports.createOt = async (payload, res) => {
         404
       );
     }
+    const { team_id, role_id } = userResult[0];
 
-    const insertQuery = `
-        INSERT INTO ot_details (
-          user_id, product_id, project_id, task_id, team_id, comments, date, time, created_by, updated_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `;
-    const values = [
+let tl_status = (role_id == 2) ? 2 : 0;
+  
+  
+  const insertQuery = `
+      INSERT INTO ot_details (
+        user_id, product_id, project_id, task_id, team_id, comments, tl_status, date, time, created_by, updated_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+  const values = [
       user_id,
       product_id,
       project_id,
       task_id,
       team_id,
       comments,
+      tl_status,
       date,
       time,
       created_by,
       created_by,
-    ];
+  ];
+  
 
     const [result] = await db.query(insertQuery, values);
     const selectQuery = `
@@ -143,6 +149,7 @@ exports.getOt = async (id, res) => {
     od.task_id, 
     t.name AS task_name,
     od.user_id, 
+    u.employee_id, 
     CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS user_name,
     IFNULL(od.tledited_time, '00:00:00') AS tl_edited_time,
     IFNULL(od.pmedited_time, '00:00:00') AS pm_edited_time,
@@ -280,6 +287,7 @@ exports.getAllOts = async (req, res) => {
           ot.status,
           ot.id AS ot_id,
           ot.user_id,
+          u.employee_id,
           u.first_name AS user_first_name,
           u.last_name AS user_last_name
         FROM 
@@ -291,6 +299,7 @@ exports.getAllOts = async (req, res) => {
         LEFT JOIN 
           users u ON u.id = ot.user_id
         ${otWhereClause}
+        AND ot.deleted_at IS NULL
         ORDER BY 
           ot.id
       `;
@@ -307,6 +316,7 @@ exports.getAllOts = async (req, res) => {
       s_no: offset + index + 1,
       id: row.ot_id,
       user_id: row.user_id,
+      employee_id: row.employee_id,
       date: row.date,
       time: row.time,
       project_name: row.project_name,
@@ -637,7 +647,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
     const otWhereClause =
       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
 
-    const otQuery = `
+      const otQuery = `
       SELECT 
         pr.name AS project_name,
         t.name AS task_name,
@@ -654,7 +664,8 @@ exports.getAllpmemployeeOts = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
-        d.name AS designation
+        d.name AS designation,
+        te.name AS team_name
       FROM 
         ot_details ot
       LEFT JOIN 
@@ -664,11 +675,15 @@ exports.getAllpmemployeeOts = async (req, res) => {
       LEFT JOIN 
         users u ON u.id = ot.user_id
       LEFT JOIN 
+        teams te ON te.id = u.team_id
+      LEFT JOIN 
         designations d ON d.id = u.designation_id
-      ${otWhereClause}
+      ${otWhereClause} 
+      AND ot.deleted_at IS NULL 
       ORDER BY 
         ot.id
     `;
+
 
     const [ots] = await db.query(otQuery, otValues);
 
@@ -685,6 +700,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
             employee_name: `${row.user_first_name} ${row.user_last_name}`,
             employee_id: row.employee_id,
             designation: row.designation,
+            team_name: row.team_name,
             total_hours: "00:00:00",
             pending_counts: 0,
             details: [],
@@ -730,6 +746,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       employee_name: group.employee_name,
       employee_id: group.employee_id,
       designation: group.designation,
+      team_name: group.team_name,
       total_hours: group.total_hours,
       pending_counts: group.pending_counts,
       details: group.details,
@@ -1041,6 +1058,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
         LEFT JOIN 
           designations d ON d.id = u.designation_id
         ${otWhereClause}
+        AND ot.deleted_at IS NULL
         ORDER BY 
           ot.id
       `;
