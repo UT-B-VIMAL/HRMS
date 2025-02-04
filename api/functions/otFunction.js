@@ -63,13 +63,13 @@ exports.createOt = async (payload, res) => {
     }
 
     const userQuery = `
-        SELECT id,team_id 
+        SELECT id,team_id,role_id 
         FROM users 
         WHERE deleted_at IS NULL AND id = ?
       `;
     const [userResult] = await db.query(userQuery, [user_id]);
-    const { team_id } = userResult[0];
-
+    
+    
     if (userResult.length === 0) {
       return errorResponse(
         res,
@@ -78,24 +78,30 @@ exports.createOt = async (payload, res) => {
         404
       );
     }
+    const { team_id, role_id } = userResult[0];
 
-    const insertQuery = `
-        INSERT INTO ot_details (
-          user_id, product_id, project_id, task_id, team_id, comments, date, time, created_by, updated_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `;
-    const values = [
+let tl_status = (role_id == 2) ? 2 : 0;
+  
+  
+  const insertQuery = `
+      INSERT INTO ot_details (
+        user_id, product_id, project_id, task_id, team_id, comments, tl_status, date, time, created_by, updated_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+  const values = [
       user_id,
       product_id,
       project_id,
       task_id,
       team_id,
       comments,
+      tl_status,
       date,
       time,
       created_by,
       created_by,
-    ];
+  ];
+  
 
     const [result] = await db.query(insertQuery, values);
     const selectQuery = `
