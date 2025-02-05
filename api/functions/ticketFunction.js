@@ -90,8 +90,8 @@ exports.getTickets = async (id, res) => {
         // Check role and filter tickets accordingly
         if (users) {
         // if (users && users.role_id !== 1 && users.role_id !== 2) {
-          query += ` AND t.user_id = ?`;  
-          countQuery += ` AND t.user_id = ?`;
+          query += ` AND t.created_by = ?`;  
+          countQuery += ` AND t.created_by = ?`;
           values.push(users.id); 
           countValues.push(users.id);
       }
