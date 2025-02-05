@@ -27,7 +27,7 @@ exports.createProject = async (payload, res) => {
   try {
     const user = await getAuthUserDetails(user_id, res);
     if (!user) return;
-    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ?";
+    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [name]);
 
     if (checkResult[0].count > 0) {
