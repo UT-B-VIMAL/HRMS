@@ -75,19 +75,25 @@ io.on('connection', (socket) => {
 
 
   socket.on('register', async (id) => {
-    console.log('Received user ID:', id); 
-    
-    try {
-      const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [id]);
-      if (results.length > 0) {
-        connectedUsers[id] = socket.id;
-        console.log(`User ${id} registered with socket ID ${socket.id}`);
-      } else {
-        console.log(`User ID ${id} not found.`);
+    // let ids = (id == 0)? 'a' : id;
+    if(id != 0){
+      try {
+        const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [id]);
+        if (results.length > 0) {
+          connectedUsers[id] = socket.id;
+          console.log(`User ${id} registered with socket ID ${socket.id}`);
+        } else {
+          console.log(`User ID ${id} not found.`);
+        }
+      } catch (err) {
+        console.error('Error fetching user:', err);
       }
-    } catch (err) {
-      console.error('Error fetching user:', err);
+    }else{
+      connectedUsers[id] = socket.id;
+      console.log(`User ${id} registered with socket ID ${socket.id}`);
+
     }
+    
   });
 
   // Load messages from ticket_comments table
@@ -100,12 +106,18 @@ io.on('connection', (socket) => {
                   tc.sender_id,
                   tc.receiver_id,
                   tc.comments,
-                  CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) AS sender_name,
-                  CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) AS receiver_name,
+                  CASE 
+                  WHEN tc.sender_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) 
+              END AS sender_name,
+              CASE 
+                  WHEN tc.receiver_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
+              END AS receiver_name,
                   tc.created_at
               FROM ticket_comments tc
-              JOIN users sender ON tc.sender_id = sender.id
-              JOIN users receiver ON tc.receiver_id = receiver.id
+              LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
+          LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
               WHERE tc.ticket_id = ? AND tc.deleted_at IS NULL
               ORDER BY tc.created_at ASC`,
               [ticket_id]
@@ -124,7 +136,7 @@ io.on('connection', (socket) => {
         
         console.log('Received data:', data);
 
-        if (!ticket_id || !sender_id || !receiver_id || !comments) {
+      if (!ticket_id || !sender_id || !receiver_id || !comments) {
             throw new Error('Missing required fields.');
         }
 
@@ -136,9 +148,33 @@ io.on('connection', (socket) => {
 
         console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
 
+        const [resultData] = await db.execute(
+          `SELECT 
+              tc.id,
+              tc.ticket_id,
+              tc.sender_id,
+              tc.receiver_id,
+              tc.comments,
+              CASE 
+                  WHEN tc.sender_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) 
+              END AS sender_name,
+              CASE 
+                  WHEN tc.receiver_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
+              END AS receiver_name,
+              tc.created_at
+          FROM ticket_comments tc
+          LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
+          LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
+          WHERE tc.id = ? AND tc.deleted_at IS NULL`, 
+          [result.insertId]
+      );
+      
+
         const recipientSocketId = connectedUsers[receiver_id];
         if (recipientSocketId) {
-            io.to(recipientSocketId).emit('chat message', { ticket_id, sender_id, comments });
+          io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
         }
     } catch (error) {
         console.error('Error saving message:', error);

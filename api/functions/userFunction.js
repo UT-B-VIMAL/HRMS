@@ -111,87 +111,91 @@ exports.getUser = async (id, res) => {
 // Get All Users
 exports.getAllUsers = async (req, res) => {
   try {
-    const { search = '', page = 1, perPage = 10 } = req.query;
-    const offset = (page - 1) * perPage;
+      const { search = '', page = 1, perPage = 10 } = req.query;
+      const currentPage = parseInt(page, 10);
+      const perPageLimit = parseInt(perPage, 10);
+      const offset = (currentPage - 1) * perPageLimit;
 
-    // Construct the query with proper handling of search terms
-    let query = `
-      SELECT 
-        u.id, 
-        u.employee_id, 
-        u.first_name, u.last_name, 
-        u.role_id,
-        r.name AS role_name, 
-        u.designation_id, 
-        u.email,
-        u.team_id,
-        u.keycloak_id, 
-        t.name AS team_name
-      FROM users u
-      LEFT JOIN teams t ON t.id = u.team_id
-      LEFT JOIN roles r ON r.id = u.role_id
-      LEFT JOIN designations d ON d.id = u.designation_id
-      WHERE u.deleted_at IS NULL
-      ${search ? `AND (
-        CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
-        u.first_name LIKE ? OR 
-        u.last_name LIKE ? OR 
-        u.email LIKE ? OR 
-        r.name LIKE ? OR 
-        u.designation_id LIKE ? OR 
-        t.name LIKE ?
-      )` : ''}
-      ORDER BY u.id DESC
-      LIMIT ? OFFSET ?
-    `;
+      let query = `
+          SELECT 
+              u.id, 
+              u.employee_id, 
+              u.first_name, u.last_name, 
+              u.role_id,
+              r.name AS role_name, 
+              u.designation_id, 
+              u.email,
+              u.team_id,
+              u.keycloak_id, 
+              t.name AS team_name
+          FROM users u
+          LEFT JOIN teams t ON t.id = u.team_id
+          LEFT JOIN roles r ON r.id = u.role_id
+          LEFT JOIN designations d ON d.id = u.designation_id
+          WHERE u.deleted_at IS NULL
+      `;
 
-    // Query to count the total records
-    let countQuery = `
-      SELECT COUNT(*) AS total_records 
-      FROM users u
-      LEFT JOIN teams t ON t.id = u.team_id
-      LEFT JOIN roles r ON r.id = u.role_id
-      WHERE u.deleted_at IS NULL
-      ${search ? `AND (
-        CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
-        u.first_name LIKE ? OR 
-        u.last_name LIKE ? OR 
-        u.email LIKE ? OR 
-        r.name LIKE ? OR 
-        u.designation_id LIKE ? OR 
-        t.name LIKE ?
-      )` : ''}
-    `;
+      let params = [];
+      let searchValue = `%${search}%`;
 
-    // Prepare the values to be used in the query
-    const values = search 
-      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, parseInt(perPage), parseInt(offset)]
-      : [parseInt(perPage), parseInt(offset)];
+      if (search.trim() !== '') {
+          query += ` AND (
+              CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
+              u.first_name LIKE ? OR 
+              u.last_name LIKE ? OR 
+              u.email LIKE ? OR 
+              r.name LIKE ? OR 
+              u.designation_id LIKE ? OR 
+              u.employee_id LIKE ? OR 
+              t.name LIKE ?
+          )`;
 
-    const countValues = search 
-      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
-      : [];
+          params.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
+      }
 
-    // Execute the queries
-    const [rows] = await db.query(query, values);
-    const [countResult] = await db.query(countQuery, countValues);
+      query += ` ORDER BY u.id DESC LIMIT ? OFFSET ?`;
+      params.push(perPageLimit, offset);
 
-    const totalRecords = countResult[0].total_records;
-    const pagination = await getPagination(page, perPage, totalRecords);
+      let countQuery = `
+          SELECT COUNT(*) AS total_records 
+          FROM users u
+          LEFT JOIN teams t ON t.id = u.team_id
+          LEFT JOIN roles r ON r.id = u.role_id
+          WHERE u.deleted_at IS NULL
+      `;
 
-    const data = rows.map((row, index) => ({
-      s_no: offset + index + 1,
-      ...row,
-    }));
+      let countParams = [];
+      if (search.trim() !== '') {
+          countQuery += ` AND (
+              CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
+              u.first_name LIKE ? OR 
+              u.last_name LIKE ? OR 
+              u.email LIKE ? OR 
+              r.name LIKE ? OR 
+              u.designation_id LIKE ? OR 
+              t.name LIKE ?
+          )`;
+          countParams.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
+      }
 
-    // Send the response
-    successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
+      // Execute the queries
+      const [users] = await db.query(query, params);
+      const [countResult] = await db.query(countQuery, countParams);
+
+      const totalRecords = countResult[0].total_records;
+      const pagination = getPagination(currentPage, perPageLimit, totalRecords);
+
+      const data = users.map((user, index) => ({
+          s_no: offset + index + 1,
+          ...user,
+      }));
+
+      return successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
   } catch (error) {
-    console.error('Error retrieving users:', error.message);
-    return errorResponse(res, error.message, 'Error retrieving users', 500);
+      console.error('Error retrieving users:', error.message);
+      return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
-
 
 
 
@@ -205,6 +209,7 @@ exports.updateUser = async (id, payload, res) => {
     email,
     phone,
     employee_id,
+    password,
     team_id,
     role_id,
     designation_id,
@@ -213,25 +218,38 @@ exports.updateUser = async (id, payload, res) => {
   } = payload;
 
   try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+console.log(hashedPassword);
     const [user] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
   if (user.length === 0) {
     console.log('User not found for ID:', id);
     return errorResponse(res, null, 'User not found', 404);
   }
+  const duplicateupdateCheckQuery = `
+  SELECT id FROM users 
+  WHERE employee_id = ? AND id != ? AND deleted_at IS NULL 
+  LIMIT 1
+`;
+const [existingUsers] = await db.query(duplicateupdateCheckQuery, [employee_id, id]);
 
-  const duplicateCheckQuery = `SELECT id FROM users WHERE employee_id = ? AND id != ? AND deleted_at IS NULL`;
-    const [existingUsers] = await db.query(duplicateCheckQuery, [employee_id, id]);
+if (existingUsers.length > 0) {
+  return errorResponse(res, "Employee ID already exists", "Duplicate entry", 400);
+}
 
-    if (existingUsers.length > 0) {
-      return errorResponse(res, "Employee ID already exists", "Duplicate entry", 400);
-    }
 
-    const duplicateemailCheckQuery = `SELECT id FROM users WHERE email = ? AND id != ? AND deleted_at IS NULL`;
-    const [existingemail] = await db.query(duplicateemailCheckQuery, [email, id]);
 
-    if (existingemail.length > 0) {
-      return errorResponse(res, "Email already exists", "Duplicate entry", 400);
-    }
+// Check for duplicate email
+const duplicateemailCheckQuery = `
+  SELECT id FROM users 
+  WHERE email = ? AND id != ? AND deleted_at IS NULL 
+  LIMIT 1
+`;
+const [existingemail] = await db.query(duplicateemailCheckQuery, [email, id]);
+
+if (existingemail.length > 0) {
+  return errorResponse(res, "Email already exists", "Duplicate entry", 400);
+}
 
   let query = `
     UPDATE users SET
