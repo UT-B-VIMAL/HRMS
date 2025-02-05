@@ -82,6 +82,7 @@ io.on('connection', (socket) => {
         if (results.length > 0) {
           connectedUsers[id] = socket.id;
           console.log(`User ${id} registered with socket ID ${socket.id}`);
+          socket.emit('register',`User ${id} registered with socket ID ${socket.id}`);
         } else {
           console.log(`User ID ${id} not found.`);
         }
@@ -91,7 +92,7 @@ io.on('connection', (socket) => {
     }else{
       connectedUsers[id] = socket.id;
       console.log(`User ${id} registered with socket ID ${socket.id}`);
-
+      socket.emit('register',`User ${id} registered with socket ID ${socket.id}`);
     }
     
   });
