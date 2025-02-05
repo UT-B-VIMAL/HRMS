@@ -136,9 +136,26 @@ io.on('connection', (socket) => {
 
         console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
 
+        const [resultData] = await db.execute(
+          `SELECT 
+              tc.id,
+              tc.ticket_id,
+              tc.sender_id,
+              tc.receiver_id,
+              tc.comments,
+              CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) AS sender_name,
+              CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) AS receiver_name,
+              tc.created_at
+          FROM ticket_comments tc
+          JOIN users sender ON tc.sender_id = sender.id
+          JOIN users receiver ON tc.receiver_id = receiver.id
+          WHERE tc.id = ? AND tc.deleted_at IS NULL`, 
+          [result.insertId]
+      );
+
         const recipientSocketId = connectedUsers[receiver_id];
         if (recipientSocketId) {
-            io.to(recipientSocketId).emit('chat message', { ticket_id, sender_id, comments });
+          io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
         }
     } catch (error) {
         console.error('Error saving message:', error);
