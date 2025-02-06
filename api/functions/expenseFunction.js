@@ -100,7 +100,7 @@ exports.createexpense = async (req, res) => {
     }
 
     const userQuery = `
-        SELECT id,team_id 
+        SELECT id,team_id,role_id 
         FROM users 
         WHERE deleted_at IS NULL AND id = ?
       `;
@@ -115,7 +115,13 @@ exports.createexpense = async (req, res) => {
       );
     }
     const { team_id,role_id } = userResult[0];
-    let tl_status = (role_id == 2) ? 2 : 0;
+    let tl_status; 
+
+if (role_id == 2 || role_id == 3) {
+  tl_status = 2; 
+} else {
+  tl_status = 0;
+}
 
     const insertQuery = `
         INSERT INTO expense_details (
@@ -1126,44 +1132,50 @@ exports.getExpenseReport = async (queryParams, res) => {
       export_status,
     } = queryParams.query;
 
+    // Get the current date in YYYY-MM-DD format
+    const today = new Date().toISOString().split("T")[0];
+
+    // If dates are not provided, use the current date
+    const fromDate = from_date ? new Date(from_date).toISOString().split("T")[0] : today;
+    const toDate = to_date ? new Date(to_date).toISOString().split("T")[0] : today;
+
     // Base query with filters
     const baseQuery = `
       SELECT 
          DATE_FORMAT(expenses.date, '%d-%m-%Y') AS expense_date,
-          expenses.expense_amount,
-          expenses.description AS reason,
-          expenses.file AS proof,
-          CASE 
-              WHEN expenses.category = 1 THEN 'Food'
-              WHEN expenses.category = 2 THEN 'Travel'
-              WHEN expenses.category = 3 THEN 'Others'
-              ELSE 'Unknown'
-          END AS category,
-          users.first_name,
-          users.employee_id AS employee_id
+         expenses.expense_amount,
+         expenses.description AS reason,
+         expenses.file AS proof,
+         CASE 
+            WHEN expenses.category = 1 THEN 'Food'
+            WHEN expenses.category = 2 THEN 'Travel'
+            WHEN expenses.category = 3 THEN 'Others'
+            ELSE 'Unknown'
+         END AS category,
+         users.first_name,
+         users.employee_id AS employee_id
       FROM 
-          expense_details AS expenses
+         expense_details AS expenses
       LEFT JOIN users ON users.id = expenses.user_id
       WHERE 
-          expenses.deleted_at IS NULL AND
-          users.deleted_at IS NULL
-          AND (expenses.date BETWEEN ? AND ?)
-          ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expense_date LIKE ?)" : ""}
-          ${category ? "AND expenses.category IN (?)" : ""}
+         expenses.deleted_at IS NULL AND
+         users.deleted_at IS NULL
+         AND expenses.pm_status = 2
+         AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
+         ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)" : ""}
+         ${category ? "AND expenses.category IN (?)" : ""}
       ORDER BY 
-          expenses.date DESC
+         expenses.date DESC
       ${
         export_status === "1" ? "" : "LIMIT ? OFFSET ?"
-      }; -- No pagination if export_status is "1"
+      };
     `;
 
     // Prepare query params
-    let params = [from_date, to_date];
+    let params = [fromDate, toDate];
     if (search) params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     if (category) {
-      const categoryArray = Array.isArray(category)
-        ? category
-        : category.split(",");
+      const categoryArray = Array.isArray(category) ? category : category.split(",");
       params.push(categoryArray);
     }
 
@@ -1172,6 +1184,10 @@ exports.getExpenseReport = async (queryParams, res) => {
       const offset = (page - 1) * perPage;
       params.push(parseInt(perPage, 10), parseInt(offset, 10));
     }
+
+    // Debugging logs
+    console.log("Executing SQL Query:", baseQuery);
+    console.log("With Parameters:", params);
 
     // Execute main query
     const [results] = await db.query(baseQuery, params);
@@ -1193,12 +1209,13 @@ exports.getExpenseReport = async (queryParams, res) => {
       FROM expense_details AS expenses
       LEFT JOIN users ON users.id = expenses.user_id
       WHERE 
-          expenses.deleted_at IS NULL AND
-          users.deleted_at IS NULL
-          AND (expenses.date BETWEEN ? AND ?)
-          ${search ? "AND (users.first_name LIKE ?)" : ""}
-          ${category ? "AND expenses.category IN (?)" : ""}
+         expenses.deleted_at IS NULL AND
+         users.deleted_at IS NULL
+         AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
+         ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)" : ""}
+         ${category ? "AND expenses.category IN (?)" : ""}
     `;
+
     const [totalRecordsResult] = await db.query(
       totalRecordsQuery,
       params.slice(0, params.length - 2)
@@ -1209,9 +1226,7 @@ exports.getExpenseReport = async (queryParams, res) => {
     successResponse(
       res,
       results,
-      results.length === 0
-        ? "No expenses found"
-        : "Expenses retrieved successfully",
+      results.length === 0 ? "No expenses found" : "Expenses retrieved successfully",
       200,
       pagination
     );
@@ -1220,3 +1235,4 @@ exports.getExpenseReport = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
