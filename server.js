@@ -152,10 +152,12 @@ io.on('connection', (socket) => {
         
         console.log('Received data:', data);
 
-      if (!ticket_id || !sender_id || !receiver_id || !comments) {
-            socket.emit('errors', 'Missing required fields.');
-            throw new Error('Missing required fields.');
-        }
+        if (!ticket_id || !sender_id || !receiver_id || !comments || ticket_id.trim() === '' || sender_id.trim() === '' || receiver_id.trim() === '' || comments.trim() === '') {
+          socket.emit('errors', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
+          throw new Error('Missing required fields.');
+      }
+      
+          socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
 
         const [result] = await db.execute(
             `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
