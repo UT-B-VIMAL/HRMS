@@ -475,13 +475,16 @@ exports.fetchRatings = async (req, res) => {
       let empRating;
 
       if (ratingRecord) {
-          const ratingPercentage = (ratingRecord.rating / 10) * 100; 
-          const averagePercentage = (ratingRecord.average / 10) * 100; 
+          const ratingValue = ratingRecord.rating == null ? 0 : ratingRecord.rating;
+          const averageValue = ratingRecord.average == null ? 0 : ratingRecord.average;
+
+          const ratingPercentage = (ratingValue / 10) * 100; 
+          const averagePercentage = (averageValue / 10) * 100; 
 
           empRating = {
               month: monthName,
-              rating_value: ratingRecord.rating, 
-              average_value: ratingRecord.average, 
+              rating_value: ratingValue, 
+              average_value: averageValue, 
               rating_percentage: parseFloat(ratingPercentage.toFixed(2)), // Rounded to 2 decimal places
               average_percentage: parseFloat(averagePercentage.toFixed(2)),
           };
@@ -506,6 +509,7 @@ exports.fetchRatings = async (req, res) => {
       return errorResponse(res, error.message, "Error fetching ratings", 500);
   }
 };
+
 
 
   

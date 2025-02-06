@@ -17,6 +17,7 @@
     </div>
     <div>
         <input id="toID" placeholder="Recipient userid" />
+        <input id="ticketID" placeholder="ticketID" />
         <input id="comment" placeholder="Type your comment" />
         <button id="send">Send</button>
     </div>
@@ -24,11 +25,11 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const ticketId = '27';
+        const ticketId = '28';
         document.getElementById('register').addEventListener('click', () => {
             const username = document.getElementById('fromID').value;
-            if (username) {
-                socket.emit('register', username);
+            if (username && ticketId) {
+                socket.emit('register', { ticket_id: ticketId, id: username});
             }
         });
 
@@ -37,11 +38,22 @@
             const comment = document.getElementById('comment').value;
             const toID = document.getElementById('toID').value;
 
-            if (fromID && comment && toID && ticketId) {
-                socket.emit('chat message', { ticket_id: ticketId, receiver_id: toID, sender_id: fromID, comments:comment });
-                // document.getElementById('message').value = '';
-            }
+            socket.emit('chat message', { ticket_id: ticketId, receiver_id: toID, sender_id: fromID, comments:comment });
+            // if (fromID && comment && toID && ticketId) {
+            //     // document.getElementById('message').value = '';
+            // }
         });
+        socket.on('errors', (error) => {
+            console.log(error);
+            
+
+        });
+        socket.on('values', (error) => {
+            console.log(error);
+            
+
+        });
+        
 
         socket.emit('load messages', ticketId);
 
@@ -65,6 +77,12 @@
             item.textContent = `${from}: ${message}`;
             document.getElementById('messages').appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        socket.on('user_disconnected', (disconnect) => {
+            console.log('disconnect',disconnect);
+            
+
         });
     </script>
 </body>

@@ -74,27 +74,43 @@ io.on('connection', (socket) => {
   console.log('Connected User:', socket.id);
 
 
-  socket.on('register', async (id) => {
-    // let ids = (id == 0)? 'a' : id;
-    if(id != 0){
-      try {
+  socket.on('register', async (data) => {
+    const { ticket_id, id } = data;
+    // Create a composite key from ticket_id and id. You can adjust the format as needed.
+    const key = `${ticket_id}_${id}`;
+  
+    // Check if the composite key already exists in connectedUsers
+    if (connectedUsers[key]) {
+      console.log(`User ${key} is already connected with socket ID ${connectedUsers[key]}. Rejecting new connection.`);
+      socket.emit('error', 'User is already connected on another socket.');
+      socket.disconnect();
+      return;
+    }
+  
+    try {
+      // When id is not 0, verify the user exists in your database
+      if (id != 0) {
         const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [id]);
         if (results.length > 0) {
-          connectedUsers[id] = socket.id;
-          console.log(`User ${id} registered with socket ID ${socket.id}`);
+          connectedUsers[key] = socket.id;
+          console.log(`User ${key} registered with socket ID ${socket.id}`);
+          socket.emit('register', `User ${key} registered with socket ID ${socket.id}`);
         } else {
           console.log(`User ID ${id} not found.`);
+          socket.emit('error', `User ID ${id} not found.`);
         }
-      } catch (err) {
-        console.error('Error fetching user:', err);
+      } else {
+        // Handle the special case for id == 0
+        connectedUsers[key] = socket.id;
+        console.log(`User ${key} registered with socket ID ${socket.id}`);
+        socket.emit('register', `User ${key} registered with socket ID ${socket.id}`);
       }
-    }else{
-      connectedUsers[id] = socket.id;
-      console.log(`User ${id} registered with socket ID ${socket.id}`);
-
+    } catch (err) {
+      console.error('Error fetching user:', err);
+      socket.emit('error', 'Error during registration.');
     }
-    
   });
+  
 
   // Load messages from ticket_comments table
   socket.on('load messages', async (ticket_id) => {
@@ -136,9 +152,9 @@ io.on('connection', (socket) => {
         
         console.log('Received data:', data);
 
-      if (!ticket_id || !sender_id || !receiver_id || !comments) {
-            throw new Error('Missing required fields.');
-        }
+        
+      
+          socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
 
         const [result] = await db.execute(
             `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
@@ -147,6 +163,7 @@ io.on('connection', (socket) => {
         );
 
         console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
+        socket.emit('datas', result.insertId);
 
         const [resultData] = await db.execute(
           `SELECT 
@@ -170,11 +187,12 @@ io.on('connection', (socket) => {
           WHERE tc.id = ? AND tc.deleted_at IS NULL`, 
           [result.insertId]
       );
-      
+      const key = `${ticket_id}_${receiver_id}`;
 
-        const recipientSocketId = connectedUsers[receiver_id];
+        const recipientSocketId = connectedUsers[key];
         if (recipientSocketId) {
           io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
+          socket.emit('msg', 'Msg sended.');
         }
     } catch (error) {
         console.error('Error saving message:', error);
@@ -184,14 +202,23 @@ io.on('connection', (socket) => {
 
   // Handle user disconnect
   socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
-      // Remove user from connected users
-      Object.keys(connectedUsers).forEach((key) => {
-          if (connectedUsers[key] === socket.id) {
-              delete connectedUsers[key];
-          }
-      });
-  });
+    console.log('User disconnected:', socket.id);
+
+    // Find the user ID associated with this socket ID
+    let disconnectedUser = null;
+    Object.keys(connectedUsers).forEach((key) => {
+        if (connectedUsers[key] === socket.id) {
+            disconnectedUser = key; // Store the disconnected user ID
+            delete connectedUsers[key]; // Remove the user from the connected list
+        }
+    });
+
+    if (disconnectedUser) {
+        // Broadcast the disconnected user ID to all other connected clients
+        socket.broadcast.emit('user_disconnected', { user_id: disconnectedUser, socket_id: socket.id, message:'disconnected' });
+    }
+});
+
 });
 
 // Socket-----------------------------------------------------------------------------

@@ -452,7 +452,7 @@ async function getUserByEmployeeId(employeeId) {
     users.employee_id, 
     users.first_name, 
     users.last_name, 
-    designations.name AS designation_name
+    users.designation_id AS designation_name
   FROM users
   LEFT JOIN designations ON users.designation_id = designations.id
   WHERE users.employee_id = ? AND users.deleted_at IS NULL`;
