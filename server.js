@@ -152,7 +152,7 @@ io.on('connection', (socket) => {
         
         console.log('Received data:', data);
 
-        if (!ticket_id || !sender_id || !receiver_id || !comments || ticket_id.trim() === '' || sender_id.trim() === '' || receiver_id.trim() === '' || comments.trim() === '') {
+        if (!ticket_id || !sender_id || !receiver_id || !comments) {
           socket.emit('errors', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
           throw new Error('Missing required fields.');
       }
