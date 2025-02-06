@@ -25,6 +25,7 @@ exports.getAttendance = async (req, res) => {
       }, {});
       return errorResponse(res, errorMessages, "Validation Error", 400);
     }
+    const user = await getAuthUserDetails(user_id, res);
     if (status === 'Present') {
       // Use today's date as default if `date` is not provided
       const today = new Date().toISOString().slice(0, 10);
@@ -56,7 +57,7 @@ exports.getAttendance = async (req, res) => {
             teams t 
             ON u.team_id = t.id  
         WHERE 
-            t.reporting_user_id = ?  
+            t.reporting_user_id = ?  OR u.team_id =? 
             AND u.id != ? 
             AND u.role_id != 2
             AND u.deleted_at IS NULL
@@ -69,7 +70,7 @@ exports.getAttendance = async (req, res) => {
         LIMIT ?, ?
       `;
     
-      queryParams.push(user_id, user_id); 
+      queryParams.push(user_id, user.team_id,user_id); 
       queryParams.push(dynamicDate); 
     
       if (search) {
