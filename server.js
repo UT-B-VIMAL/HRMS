@@ -153,7 +153,7 @@ io.on('connection', (socket) => {
         console.log('Received data:', data);
 
       if (!ticket_id || !sender_id || !receiver_id || !comments) {
-            socket.emit('error', 'Missing required fields.');
+            socket.emit('errors', 'Missing required fields.');
             throw new Error('Missing required fields.');
         }
 
