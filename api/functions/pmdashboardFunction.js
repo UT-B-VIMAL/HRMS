@@ -300,7 +300,10 @@ exports.fetchAttendance = async (payload, res) => {
         el.half_type 
       FROM teams t
       LEFT JOIN users u ON t.id = u.team_id
-      LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE() AND t.deleted_at IS NULL AND u.deleted_at IS NULL AND el.deleted_at IS NULL
+      LEFT JOIN employee_leave el ON u.id = el.user_id AND DATE(el.date) = CURDATE()  WHERE 
+    t.deleted_at IS NULL 
+    AND (u.deleted_at IS NULL OR u.deleted_at IS NULL) 
+    AND (el.deleted_at IS NULL OR el.deleted_at IS NULL)
     `;
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
     console.log(teamWiseAttendanceData);
