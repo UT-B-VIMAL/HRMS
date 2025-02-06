@@ -1154,7 +1154,7 @@ exports.getExpenseReport = async (queryParams, res) => {
           expenses.deleted_at IS NULL AND
           users.deleted_at IS NULL
           AND (expenses.date BETWEEN ? AND ?)
-          ${search ? "AND (users.first_name LIKE ?)" : ""}
+          ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expense_date LIKE ?)" : ""}
           ${category ? "AND expenses.category IN (?)" : ""}
       ORDER BY 
           expenses.date DESC
@@ -1165,7 +1165,7 @@ exports.getExpenseReport = async (queryParams, res) => {
 
     // Prepare query params
     let params = [from_date, to_date];
-    if (search) params.push(`%${search}%`);
+    if (search) params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     if (category) {
       const categoryArray = Array.isArray(category)
         ? category
