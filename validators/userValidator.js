@@ -10,9 +10,10 @@ const UserSchema = (isUpdate = false) => Joi.object({
   }),
 
   // Make employee_id optional for update
-  employee_id: isUpdate ? Joi.number().integer().optional() : Joi.number().integer().required().messages({
+  employee_id: isUpdate ? Joi.number().integer().min(1).optional() : Joi.number().integer().min(1).required().messages({
     'number.base': 'Employee ID must be a number',
     'number.integer': 'Employee ID must be an integer',
+    'number.min': 'Employee ID must be greater than 0',
     'any.required': 'Employee ID is required',
   }),
 
