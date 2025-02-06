@@ -191,6 +191,7 @@ io.on('connection', (socket) => {
         const recipientSocketId = connectedUsers[key];
         if (recipientSocketId) {
           io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
+          socket.emit('msg', 'Msg sended.');
         }
     } catch (error) {
         console.error('Error saving message:', error);
