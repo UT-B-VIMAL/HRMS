@@ -100,7 +100,7 @@ exports.createexpense = async (req, res) => {
     }
 
     const userQuery = `
-        SELECT id,team_id 
+        SELECT id,team_id,role_id 
         FROM users 
         WHERE deleted_at IS NULL AND id = ?
       `;
@@ -115,7 +115,13 @@ exports.createexpense = async (req, res) => {
       );
     }
     const { team_id,role_id } = userResult[0];
-    let tl_status = (role_id == 2) ? 2 : 0;
+    let tl_status; 
+
+if (role_id == 2 || role_id == 3) {
+  tl_status = 2; 
+} else {
+  tl_status = 0;
+}
 
     const insertQuery = `
         INSERT INTO expense_details (
