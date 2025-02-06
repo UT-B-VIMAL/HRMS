@@ -38,16 +38,22 @@
             const comment = document.getElementById('comment').value;
             const toID = document.getElementById('toID').value;
 
-            if (fromID && comment && toID && ticketId) {
-                socket.emit('chat message', { ticket_id: ticketId, receiver_id: toID, sender_id: fromID, comments:comment });
-                // document.getElementById('message').value = '';
-            }
+            socket.emit('chat message', { ticket_id: ticketId, receiver_id: toID, sender_id: fromID, comments:comment });
+            // if (fromID && comment && toID && ticketId) {
+            //     // document.getElementById('message').value = '';
+            // }
         });
-        socket.on('error', (error) => {
+        socket.on('errors', (error) => {
             console.log(error);
             
 
         });
+        socket.on('values', (error) => {
+            console.log(error);
+            
+
+        });
+        
 
         socket.emit('load messages', ticketId);
 
@@ -71,6 +77,12 @@
             item.textContent = `${from}: ${message}`;
             document.getElementById('messages').appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        socket.on('user_disconnected', (disconnect) => {
+            console.log('disconnect',disconnect);
+            
+
         });
     </script>
 </body>
