@@ -55,6 +55,16 @@ exports.getTimeListReport = async (req, res) => {
             query += ` AND u.team_id = '${team_id}'`;
         }
 
+        // Add search filters
+        if (search) {
+            query += ` AND (
+        CONCAT(u.first_name, ' ', u.last_name) LIKE '%${search}%'
+        OR u.employee_id LIKE '%${search}%'
+        OR t.name LIKE '%${search}%'
+    )`;
+        }
+
+
         query += `
             GROUP BY u.id, dr.date, el.day_type, el.id, t.name
             ORDER BY dr.date, u.id

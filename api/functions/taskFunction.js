@@ -2248,8 +2248,8 @@ if (from_date && to_date) {
 
 // Add search condition if provided
 if (search) {
-  baseQuery += ` AND (t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ?)`;
-  params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  baseQuery += ` AND (t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ? OR u.employee_id LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? )`;
+  params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
 }
 
 // Add GROUP BY clause
