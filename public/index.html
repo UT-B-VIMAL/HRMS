@@ -53,6 +53,7 @@
             
 
         });
+        
 
         socket.emit('load messages', ticketId);
 
@@ -76,6 +77,12 @@
             item.textContent = `${from}: ${message}`;
             document.getElementById('messages').appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        socket.on('user_disconnected', (disconnect) => {
+            console.log('disconnect',disconnect);
+            
+
         });
     </script>
 </body>

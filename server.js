@@ -202,14 +202,23 @@ io.on('connection', (socket) => {
 
   // Handle user disconnect
   socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
-      // Remove user from connected users
-      Object.keys(connectedUsers).forEach((key) => {
-          if (connectedUsers[key] === socket.id) {
-              delete connectedUsers[key];
-          }
-      });
-  });
+    console.log('User disconnected:', socket.id);
+
+    // Find the user ID associated with this socket ID
+    let disconnectedUser = null;
+    Object.keys(connectedUsers).forEach((key) => {
+        if (connectedUsers[key] === socket.id) {
+            disconnectedUser = key; // Store the disconnected user ID
+            delete connectedUsers[key]; // Remove the user from the connected list
+        }
+    });
+
+    if (disconnectedUser) {
+        // Broadcast the disconnected user ID to all other connected clients
+        socket.broadcast.emit('user_disconnected', { user_id: disconnectedUser, socket_id: socket.id, message:'disconnected' });
+    }
+});
+
 });
 
 // Socket-----------------------------------------------------------------------------
