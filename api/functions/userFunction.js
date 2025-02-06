@@ -209,7 +209,6 @@ exports.updateUser = async (id, payload, res) => {
     email,
     phone,
     employee_id,
-    password,
     team_id,
     role_id,
     designation_id,
@@ -218,9 +217,7 @@ exports.updateUser = async (id, payload, res) => {
   } = payload;
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-console.log(hashedPassword);
+    
     const [user] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
   if (user.length === 0) {
     console.log('User not found for ID:', id);
