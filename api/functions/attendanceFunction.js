@@ -301,8 +301,8 @@ exports.updateAttendanceData = async (req, res) => {
   
       // Search filter
       if (search) {
-        searchFilter = `AND u.first_name LIKE ?`;
-        queryParams.push(`%${search}%`);
+        searchFilter = `AND (u.first_name LIKE ? OR u.employee_id LIKE ? OR t.name LIKE ?)`; 
+        queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
       }
   
       // Main query
