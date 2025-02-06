@@ -150,7 +150,7 @@ exports.createTask = async (payload, res) => {
           active_status, status, total_hours_worked, rating, command,
           assigned_user_id, remark, reopen_status, description,
           team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, now(),now())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(),NOW())
       `;
 
     const values = [
