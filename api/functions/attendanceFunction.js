@@ -57,7 +57,7 @@ exports.getAttendance = async (req, res) => {
             teams t 
             ON u.team_id = t.id  
         WHERE 
-            t.reporting_user_id = ?  OR u.team_id =? 
+            (t.reporting_user_id = ?  OR u.team_id =? )
             AND u.id != ? 
             AND u.role_id != 2
             AND u.deleted_at IS NULL
