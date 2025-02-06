@@ -17,6 +17,7 @@
     </div>
     <div>
         <input id="toID" placeholder="Recipient userid" />
+        <input id="ticketID" placeholder="ticketID" />
         <input id="comment" placeholder="Type your comment" />
         <button id="send">Send</button>
     </div>
@@ -24,11 +25,11 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const ticketId = '27';
+        const ticketId = '28';
         document.getElementById('register').addEventListener('click', () => {
             const username = document.getElementById('fromID').value;
-            if (username) {
-                socket.emit('register', username);
+            if (username && ticketId) {
+                socket.emit('register', { ticket_id: ticketId, id: username});
             }
         });
 
@@ -41,6 +42,11 @@
                 socket.emit('chat message', { ticket_id: ticketId, receiver_id: toID, sender_id: fromID, comments:comment });
                 // document.getElementById('message').value = '';
             }
+        });
+        socket.on('error', (error) => {
+            console.log(error);
+            
+
         });
 
         socket.emit('load messages', ticketId);
