@@ -97,7 +97,7 @@ exports.getAttendance = async (req, res) => {
           END AS half_type
       FROM employee_leave el
       INNER JOIN users u ON el.user_id = u.id  -- Join with users table to get user details
-      INNER JOIN teams t ON t.reporting_user_id = ?  
+      INNER JOIN teams t ON (t.reporting_user_id = ? OR u.team_id = ?)  
       WHERE el.user_id IN (SELECT id FROM users WHERE team_id = t.id AND id != ? AND role_id != 2)
        AND u.deleted_at IS NULL
       ${dynamicDate ? 'AND el.date = ?' : ''}  -- Optional date filter
@@ -105,7 +105,7 @@ exports.getAttendance = async (req, res) => {
       LIMIT ?, ?
       `;
           
-      queryParams.push(user_id,user_id); // reporting_user_id condition
+      queryParams.push(user_id,user.team_id,user_id); // reporting_user_id condition
       queryParams.push(dynamicDate); // Optional date filter
       if (search) {
           queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or email)
