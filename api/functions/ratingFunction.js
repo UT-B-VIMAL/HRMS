@@ -245,7 +245,10 @@ exports.ratingUpdation = async (payload, res) => {
   const checkQuery =
     "SELECT COUNT(*) as count FROM ratings WHERE user_id = ? AND month = ? AND rater = ?";
   const [checkResult] = await db.query(checkQuery, [user_id, month,rater]);
-const average = (quality + timelines + agility + attitude + responsibility)/5;
+  const ratings = [quality, timelines, agility, attitude, responsibility].map(Number);
+  const validRatings = ratings.filter(r => !isNaN(r));
+  const average = validRatings.length > 0 ? validRatings.reduce((a, b) => a + b, 0) / validRatings.length : 0;
+  
   if (checkResult[0].count > 0) {
     const updateQuery = `
         UPDATE ratings

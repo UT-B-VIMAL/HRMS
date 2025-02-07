@@ -70,7 +70,14 @@ exports.getTickets = async (id, res) => {
                     WHEN t.status = 3 THEN 'Rejected'
                     ELSE 'Unknown'
                 END AS status_type,
-                t.file_name
+                t.file_name,
+                COALESCE((
+        SELECT COUNT(*) 
+        FROM ticket_comments tc
+        WHERE tc.ticket_id = t.id
+        AND tc.receiver_id = ?
+        AND tc.type = 0
+    ), 0) AS unread_counts
             FROM tickets t
             LEFT JOIN users u ON t.user_id = u.id 
             LEFT JOIN issue_types i ON t.issue_type = i.id 
@@ -84,7 +91,7 @@ exports.getTickets = async (id, res) => {
             LEFT JOIN issue_types i ON t.issue_type = i.id
             WHERE t.deleted_at IS NULL`;
 
-        let values = [];
+        let values = [users?.id];
         let countValues = [];
 
         // Check role and filter tickets accordingly
