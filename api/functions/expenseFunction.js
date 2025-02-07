@@ -1191,12 +1191,17 @@ exports.getExpenseReport = async (queryParams, res) => {
 
     // Execute main query
     const [results] = await db.query(baseQuery, params);
-
+    const rowsWithSerialNo = results.map((row, index) => ({
+      s_no: export_status == 1
+        ? index + 1
+        : (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1,
+      ...row,
+    }));
     // Handle export case
     if (export_status === "1") {
       const { Parser } = require("json2csv");
       const json2csvParser = new Parser();
-      const csv = json2csvParser.parse(results);
+      const csv = json2csvParser.parse(rowsWithSerialNo);
 
       res.header("Content-Type", "text/csv");
       res.attachment("expense_report.csv");
@@ -1223,10 +1228,10 @@ exports.getExpenseReport = async (queryParams, res) => {
     const totalRecords = totalRecordsResult[0].total || 0;
 
     const pagination = getPagination(page, perPage, totalRecords);
-    successResponse(
+    successResponse(  
       res,
-      results,
-      results.length === 0 ? "No expenses found" : "Expenses retrieved successfully",
+      rowsWithSerialNo,
+      rowsWithSerialNo.length === 0 ? "No expenses found" : "Expenses retrieved successfully",
       200,
       pagination
     );
