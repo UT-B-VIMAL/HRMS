@@ -62,8 +62,11 @@ exports.get_idleEmployee = async (req, res) => {
       query += ` AND users.team_id = ?`;
       queryParams.push(team_id);
     } else if (user.role_id === 3) {
-      query += ` AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
+      query += ` AND users.id != ${user_id} AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
       queryParams.push(...teamIds);
+    }else if(user.role_id == 2) 
+    {
+      query += ` AND users.role_id != ${user.role_id} AND users.role_id != 1`;
     }
 
     // Add pagination
@@ -96,8 +99,11 @@ exports.get_idleEmployee = async (req, res) => {
       countQuery += ` AND users.team_id = ?`;
       countQueryParams.push(team_id);
     } else if (user.role_id === 3) {
-      countQuery += ` AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
+      countQuery += ` AND users.id != ${user_id} AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
       countQueryParams.push(...teamIds);
+    } else if(user.role_id == 2) 
+    {
+      countQuery += ` AND users.role_id != ${user.role_id} AND users.role_id !=1`;
     }
 
     // Execute queries

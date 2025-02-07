@@ -25,6 +25,7 @@ exports.getAttendance = async (req, res) => {
       }, {});
       return errorResponse(res, errorMessages, "Validation Error", 400);
     }
+    const user = await getAuthUserDetails(user_id, res);
     if (status === 'Present') {
       // Use today's date as default if `date` is not provided
       const today = new Date().toISOString().slice(0, 10);
@@ -56,7 +57,7 @@ exports.getAttendance = async (req, res) => {
             teams t 
             ON u.team_id = t.id  
         WHERE 
-            t.reporting_user_id = ?  
+            (t.reporting_user_id = ?  OR u.team_id =? )
             AND u.id != ? 
             AND u.role_id != 2
             AND u.deleted_at IS NULL
@@ -69,7 +70,7 @@ exports.getAttendance = async (req, res) => {
         LIMIT ?, ?
       `;
     
-      queryParams.push(user_id, user_id); 
+      queryParams.push(user_id, user.team_id,user_id); 
       queryParams.push(dynamicDate); 
     
       if (search) {
@@ -96,7 +97,7 @@ exports.getAttendance = async (req, res) => {
           END AS half_type
       FROM employee_leave el
       INNER JOIN users u ON el.user_id = u.id  -- Join with users table to get user details
-      INNER JOIN teams t ON t.reporting_user_id = ?  
+      INNER JOIN teams t ON (t.reporting_user_id = ? OR u.team_id = ?)  
       WHERE el.user_id IN (SELECT id FROM users WHERE team_id = t.id AND id != ? AND role_id != 2)
        AND u.deleted_at IS NULL
       ${dynamicDate ? 'AND el.date = ?' : ''}  -- Optional date filter
@@ -104,7 +105,7 @@ exports.getAttendance = async (req, res) => {
       LIMIT ?, ?
       `;
           
-      queryParams.push(user_id,user_id); // reporting_user_id condition
+      queryParams.push(user_id,user.team_id,user_id); // reporting_user_id condition
       queryParams.push(dynamicDate); // Optional date filter
       if (search) {
           queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or email)
