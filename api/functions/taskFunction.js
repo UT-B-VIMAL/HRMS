@@ -2135,14 +2135,14 @@ try{
   
   const { product_id, project_id } = checkResult[0];
   
-  const productCheckQuery = `SELECT COUNT(*) as count FROM products WHERE id = ?`;
+  const productCheckQuery = `SELECT COUNT(*) as count FROM products WHERE id = ? AND deleted_at IS NULL`;
   const [productCheckResult] = await db.query(productCheckQuery, [product_id]);
   
   if (productCheckResult[0].count === 0) {
       return errorResponse(res, "Oops! It appears that the project / product has been deleted for this task. You will be unable to restore this task.", "Product Not Found", 404);
   }
   
-  const projectCheckQuery = `SELECT COUNT(*) as count FROM projects WHERE id = ?`;
+  const projectCheckQuery = `SELECT COUNT(*) as count FROM projects WHERE id = ? AND deleted_at IS NULL`;
   const [projectCheckResult] = await db.query(projectCheckQuery, [project_id]);
   
   if (projectCheckResult[0].count === 0) {
