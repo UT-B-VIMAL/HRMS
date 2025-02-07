@@ -2126,11 +2126,27 @@ try{
   const id = isSubtask ? subtask_id : task_id;
 
   // Check if the record exists and is soft-deleted
-  const checkQuery = `SELECT COUNT(*) as count FROM ${table} WHERE id = ?`;
+  const checkQuery = `SELECT COUNT(*) as count, product_id, project_id FROM ${table} WHERE id = ?`;
   const [checkResult] = await db.query(checkQuery, [id]);
-
-  if (checkResult[0].count === 0) {
-    return errorResponse(res, "Record not found or deleted", "Not Found", 404);
+  
+  if (checkResult.length === 0 || checkResult[0].count === 0) {
+      return errorResponse(res, "Record not found or deleted", "Not Found", 404);
+  }
+  
+  const { product_id, project_id } = checkResult[0];
+  
+  const productCheckQuery = `SELECT COUNT(*) as count FROM products WHERE id = ?`;
+  const [productCheckResult] = await db.query(productCheckQuery, [product_id]);
+  
+  if (productCheckResult[0].count === 0) {
+      return errorResponse(res, "Oops! It appears that the project / product has been deleted for this task. You will be unable to restore this task.", "Product Not Found", 404);
+  }
+  
+  const projectCheckQuery = `SELECT COUNT(*) as count FROM projects WHERE id = ?`;
+  const [projectCheckResult] = await db.query(projectCheckQuery, [project_id]);
+  
+  if (projectCheckResult[0].count === 0) {
+      return errorResponse(res, "Oops! It appears that the project / product has been deleted for this task. You will be unable to restore this task.", "Project Not Found", 404);
   }
 
   // Restore the record
