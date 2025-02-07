@@ -454,61 +454,78 @@ exports.fetchStatisticschart = async (req, res) => {
 
 exports.fetchRatings = async (req, res) => {
   try {
-      const userId = req.query.user_id; 
+      const userId = req.query.user_id;
       if (!userId) {
           return errorResponse(res, null, 'User ID is required', 400);
       }
 
       const now = new Date();
-      const currentMonth = now.toISOString().slice(0, 7); // Get YYYY-MM format
-      const monthName = now.toLocaleString('en-US', { month: 'short' }).toUpperCase(); // Get abbreviated month name in uppercase
+      const currentMonth = now.toISOString().slice(0, 7); // Format: YYYY-MM
+      const currentYear = now.getFullYear(); // Get current year
+      const monthName = now.toLocaleString('en-US', { month: 'short' }).toUpperCase(); // Get abbreviated month name
 
+      // Query for current month's rating
       const ratingQuery = `
-          SELECT rating, average 
-          FROM ratings 
-          WHERE user_id = ? AND month = ?
-      `;
+    SELECT SUM(average) AS total_average
+    FROM ratings 
+    WHERE user_id = ? AND month = ?
+`;
 
-      const [ratingRecords] = await db.query(ratingQuery, [userId, currentMonth]);
-      const ratingRecord = ratingRecords[0];
+const [ratingRecords] = await db.query(ratingQuery, [userId, currentMonth]);
+
+const totalAverage = ratingRecords[0]?.total_average || 0;
+
+      // Query for yearly average calculation (excluding month filter)
+      const yearAvgQuery = `
+    SELECT SUM(average) AS total_average, COUNT(*) AS record_count
+    FROM ratings 
+    WHERE user_id = ? AND month LIKE ?
+`;
+
+const [yearlyAvgRecord] = await db.query(yearAvgQuery, [userId, `${currentYear}-%`]);
+
+const totalAverages = yearlyAvgRecord[0]?.total_average || 0; // Sum of all averages
+const recordCount = yearlyAvgRecord[0]?.record_count || 1; // Avoid division by zero
+
+// Step 1: Divide total average by 2 first
+const adjustedTotal = recordCount / 2;
+
+// Step 2: Use adjustedTotal to calculate yearly average dynamically
+const yearlyAverage = totalAverages / adjustedTotal;
 
       let empRating;
 
-      if (ratingRecord) {
-          const ratingValue = ratingRecord.rating == null ? 0 : ratingRecord.rating;
-          const averageValue = ratingRecord.average == null ? 0 : ratingRecord.average;
+      if (totalAverage) {
+          const ratingValue = (totalAverage || 0); // Sum of rating and average for current month
+          const averageValue = yearlyAverage; // Yearly average
 
-          const ratingPercentage = (ratingValue / 10) * 100; 
-          const averagePercentage = (averageValue / 10) * 100; 
+          const ratingPercentage = (ratingValue / 10) * 100;
+          const averagePercentage = (averageValue / 10) * 100;
 
           empRating = {
               month: monthName,
-              rating_value: ratingValue, 
-              average_value: averageValue, 
-              rating_percentage: parseFloat(ratingPercentage.toFixed(2)), // Rounded to 2 decimal places
+              rating_value: ratingValue,
+              average_value: parseFloat(averageValue.toFixed(2)), // Yearly average rounded to 2 decimal places
+              rating_percentage: parseFloat(ratingPercentage.toFixed(2)), 
               average_percentage: parseFloat(averagePercentage.toFixed(2)),
           };
       } else {
           empRating = {
               month: monthName,
               rating_value: 0,
-              average_value: 0,
+              average_value: parseFloat(yearlyAverage.toFixed(2)),
               rating_percentage: 0,
-              average_percentage: 0,
+              average_percentage: parseFloat(((yearlyAverage / 10) * 100).toFixed(2)),
           };
       }
 
-      return successResponse(
-          res,
-          empRating,
-          "Ratings retrieved successfully",
-          200
-      );
+      return successResponse(res, empRating, "Ratings retrieved successfully", 200);
   } catch (error) {
       console.error("Error fetching ratings:", error);
       return errorResponse(res, error.message, "Error fetching ratings", 500);
   }
 };
+
 
 
 
