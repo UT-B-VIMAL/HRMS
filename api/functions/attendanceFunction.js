@@ -97,7 +97,7 @@ exports.getAttendance = async (req, res) => {
           END AS half_type
       FROM employee_leave el
       INNER JOIN users u ON el.user_id = u.id  -- Join with users table to get user details
-      INNER JOIN teams t ON t.reporting_user_id = ?  
+      INNER JOIN teams t ON (t.reporting_user_id = ? OR u.team_id = ?)  
       WHERE el.user_id IN (SELECT id FROM users WHERE team_id = t.id AND id != ? AND role_id != 2)
        AND u.deleted_at IS NULL
       ${dynamicDate ? 'AND el.date = ?' : ''}  -- Optional date filter
@@ -105,7 +105,7 @@ exports.getAttendance = async (req, res) => {
       LIMIT ?, ?
       `;
           
-      queryParams.push(user_id,user_id); // reporting_user_id condition
+      queryParams.push(user_id,user.team_id,user_id); // reporting_user_id condition
       queryParams.push(dynamicDate); // Optional date filter
       if (search) {
           queryParams.push(`%${search}%`, `%${search}%`); // Search filter (first_name or email)
@@ -313,6 +313,7 @@ exports.updateAttendanceData = async (req, res) => {
           u.first_name AS employee_name,
           u.employee_id,
           dr.date AS date,
+          u.created_at AS joining_date,
           t.name AS team_name,
           CASE 
             WHEN el.user_id IS NOT NULL THEN 'Absent'
@@ -335,7 +336,8 @@ exports.updateAttendanceData = async (req, res) => {
         LEFT JOIN teams t ON t.id = u.team_id AND t.deleted_at IS NULL
         LEFT JOIN employee_leave el
           ON el.user_id = u.id AND el.date = dr.date
-        WHERE u.deleted_at IS NULL AND u.role_id != 1 
+        WHERE u.deleted_at IS NULL AND u.role_id != 1
+        AND DATE(u.created_at) <= dr.date 
         ${teamFilter}
         ${searchFilter}
         ORDER BY u.first_name, dr.date
@@ -353,7 +355,7 @@ exports.updateAttendanceData = async (req, res) => {
   
       // Add serial number (s_no) to the rows
       const rowsWithSerialNo = result.map((row, index) => ({
-        s_no: export_status
+        s_no: export_status == 1
           ? index + 1
           : (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1,
         ...row,
@@ -381,6 +383,7 @@ exports.updateAttendanceData = async (req, res) => {
         LEFT JOIN employee_leave el
           ON el.user_id = u.id AND el.date = dr.date
         WHERE u.deleted_at IS NULL AND u.role_id != 1 
+        AND DATE(u.created_at) <= dr.date
         ${teamFilter}
         ${searchFilter};
       `;
