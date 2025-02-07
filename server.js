@@ -112,6 +112,29 @@ io.on('connection', (socket) => {
   });
   
 
+  socket.on('read type', async (data) => {
+    try {
+        const { ticket_id, user_id } = data;
+
+        const [result] = await db.execute(
+            `UPDATE ticket_comments SET type = 1 WHERE receiver_id = ? AND ticket_id = ?`,
+            [user_id, ticket_id]
+        );
+
+        if (result.affectedRows > 0) {
+            console.log(`Updated ${result.affectedRows} record(s) in ticket_comments.`);
+            socket.emit('msg', 'Message marked as read.');
+        } else {
+            console.log('No records updated.');
+            socket.emit('msg', 'No matching records found.');
+        }
+
+    } catch (error) {
+        console.error('Error updating message type:', error);
+    }
+});
+
+
   // Load messages from ticket_comments table
   socket.on('load messages', async (ticket_id) => {
       try {
