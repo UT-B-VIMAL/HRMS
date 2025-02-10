@@ -1097,6 +1097,7 @@ exports.updateTaskData = async (id, payload, res) => {
     payload.updated_by = updated_by;
     payload.reopen_status = reopen_status;
     payload.active_status = active_status;
+
     const updateFields = [];
     const updateValues = [];
     
@@ -1107,22 +1108,21 @@ exports.updateTaskData = async (id, payload, res) => {
         updateValues.push(payload[key]);
       }
     }
-
+    
     if (updateFields.length === 0) {
       return errorResponse(res, null, "No fields to update", 400);
     }
+    
+    updateFields.push(`updated_at = NOW()`);
+    
+    const updateQuery = `UPDATE tasks SET ${updateFields.join(", ")} WHERE id = ?`;
     updateValues.push(id);
-
-    const updateQuery = `UPDATE tasks SET ${updateFields.join(
-      ", "
-    )} WHERE id = ?`;
+    
     const [updateResult] = await db.query(updateQuery, updateValues);
-
+    
     if (updateResult.affectedRows === 0) {
       return errorResponse(res, null, "Task not updated", 400);
-    }
-
-    
+    }  
 
     // Insert task history entries into the task_histories table
     if (taskHistoryEntries.length > 0) {
