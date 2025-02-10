@@ -170,11 +170,12 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ? 
     WHERE 
-      users.role_id != 2 
+      users.role_id NOT IN (1,2)
       AND users.deleted_at IS NULL
+      AND YEAR(users.created_at) <= ?
   `;
 
-  const queryParams = [year];
+  const queryParams = [year,year];
 
   if (search && search.trim() !== "") {
     const searchWildcard = `%${search.trim()}%`;
