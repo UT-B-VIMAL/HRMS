@@ -10,14 +10,13 @@ exports.get_idleEmployee = async (req, res) => {
   try {
     const { user_id, team_id, page = 1, perPage = 10 } = req.query;
 
-    // Ensure page and perPage are integers
     const pageNumber = parseInt(page, 10);
     const perPageNumber = parseInt(perPage, 10);
     const offset = (pageNumber - 1) * perPageNumber;
 
     // Fetch user details
     const [[user]] = await db.query(
-      "SELECT id, role_id, team_id FROM users WHERE id = ?",
+      "SELECT id, role_id, team_id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
     if (!user) {
@@ -43,7 +42,8 @@ exports.get_idleEmployee = async (req, res) => {
             teams.name AS team_name
         FROM users
         LEFT JOIN teams ON users.team_id = teams.id
-        WHERE NOT EXISTS (
+        WHERE users.deleted_at IS NULL
+        AND NOT EXISTS (
             SELECT 1
             FROM sub_tasks_user_timeline
             WHERE sub_tasks_user_timeline.user_id = users.id
@@ -61,12 +61,12 @@ exports.get_idleEmployee = async (req, res) => {
     if (team_id) {
       query += ` AND users.team_id = ?`;
       queryParams.push(team_id);
-    } else if (user.role_id === 3) {
-      query += ` AND users.id != ${user_id} AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
-      queryParams.push(...teamIds);
-    }else if(user.role_id == 2) 
-    {
-      query += ` AND users.role_id != ${user.role_id} AND users.role_id != 1`;
+    } else if (user.role_id == 3) {
+      query += ` AND users.id != ? AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
+      queryParams.push(user_id, ...teamIds);
+    } else if (user.role_id == 2) {
+      query += ` AND users.role_id != ? AND users.role_id != 1`;
+      queryParams.push(user.role_id);
     }
 
     // Add pagination
@@ -78,7 +78,8 @@ exports.get_idleEmployee = async (req, res) => {
         SELECT COUNT(*) AS total_records
         FROM users
         LEFT JOIN teams ON users.team_id = teams.id
-        WHERE NOT EXISTS (
+        WHERE users.deleted_at IS NULL
+        AND NOT EXISTS (
             SELECT 1
             FROM sub_tasks_user_timeline
             WHERE sub_tasks_user_timeline.user_id = users.id
@@ -99,11 +100,11 @@ exports.get_idleEmployee = async (req, res) => {
       countQuery += ` AND users.team_id = ?`;
       countQueryParams.push(team_id);
     } else if (user.role_id === 3) {
-      countQuery += ` AND users.id != ${user_id} AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
-      countQueryParams.push(...teamIds);
-    } else if(user.role_id == 2) 
-    {
-      countQuery += ` AND users.role_id != ${user.role_id} AND users.role_id !=1`;
+      countQuery += ` AND users.id != ? AND users.team_id IN (${teamIds.map(() => "?").join(",")})`;
+      countQueryParams.push(user_id, ...teamIds);
+    } else if (user.role_id == 2) {
+      countQuery += ` AND users.role_id != ? AND users.role_id != 1`;
+      countQueryParams.push(user.role_id);
     }
 
     // Execute queries
@@ -140,4 +141,5 @@ exports.get_idleEmployee = async (req, res) => {
     );
   }
 };
+
 
