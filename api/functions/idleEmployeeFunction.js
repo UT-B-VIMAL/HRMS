@@ -94,7 +94,7 @@ exports.get_idleEmployee = async (req, res) => {
         )
     `;
 
-    let countQueryParams = [];
+   let countQueryParams = [];
 
     if (team_id) {
       countQuery += ` AND users.team_id = ?`;
