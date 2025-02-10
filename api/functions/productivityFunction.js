@@ -182,7 +182,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
 
 exports.get_individualStatus = async (req, res) => {
     try {
-        const { team_id, month, search, page = 1 , perPage = 10} = req.query;
+        const { team_id, month, search, page = 1, perPage = 10 } = req.query;
         const offset = (page - 1) * perPage;
 
         let baseQuery = `
@@ -194,19 +194,18 @@ exports.get_individualStatus = async (req, res) => {
                 SUM(CASE WHEN tasks.status = 1 THEN 1 ELSE 0 END) AS ongoing_tasks,
                 SUM(CASE WHEN tasks.status = 3 THEN 1 ELSE 0 END) AS completed_tasks
             FROM users
-            LEFT JOIN tasks ON tasks.user_id = users.id
+            LEFT JOIN tasks ON tasks.user_id = users.id AND tasks.deleted_at IS NULL
+            WHERE users.deleted_at IS NULL
         `;
 
-        // Count Query to get the total number of records
         let countQuery = `
             SELECT COUNT(DISTINCT users.id) AS total
             FROM users
-            LEFT JOIN tasks ON tasks.user_id = users.id
+            LEFT JOIN tasks ON tasks.user_id = users.id AND tasks.deleted_at IS NULL
+            WHERE users.deleted_at IS NULL
         `;
 
         let whereConditions = [];
-        whereConditions.push(`users.deleted_at IS NULL`);
-        whereConditions.push(`(tasks.deleted_at IS NULL)`);
 
         if (team_id) whereConditions.push(`users.team_id = ?`);
         if (month) whereConditions.push(`MONTH(tasks.created_at) = ?`);
@@ -222,7 +221,7 @@ exports.get_individualStatus = async (req, res) => {
         }
 
         if (whereConditions.length > 0) {
-            const whereClause = ` WHERE ${whereConditions.join(' AND ')}`;
+            const whereClause = ` AND ${whereConditions.join(' AND ')}`;
             baseQuery += whereClause;
             countQuery += whereClause;
         }
@@ -250,6 +249,7 @@ exports.get_individualStatus = async (req, res) => {
         return errorResponse(res, error.message, 'Server error', 500);
     }
 };
+
 
 
 
