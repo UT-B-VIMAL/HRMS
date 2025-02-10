@@ -170,11 +170,12 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ? 
     WHERE 
-      users.role_id != 2 
+      users.role_id NOT IN (1,2)
       AND users.deleted_at IS NULL
+      AND YEAR(users.created_at) <= ?
   `;
 
-  const queryParams = [year];
+  const queryParams = [year,year];
 
   if (search && search.trim() !== "") {
     const searchWildcard = `%${search.trim()}%`;
@@ -374,6 +375,11 @@ exports.getRatings = async (req, res) => {
       values.push(searchPattern, searchPattern, searchPattern);
     }
 
+    // Check if the user was created before the selected month
+    const firstDayOfMonth = `${selectedMonth}-01`;
+    whereClause += ' AND (users.created_at <= ? OR users.created_at LIKE ?)';
+    values.push(firstDayOfMonth, `${selectedMonth}%`);
+
     // Get total records count
     const countQuery = `SELECT COUNT(*) as total FROM users LEFT JOIN teams ON users.team_id = teams.id ${whereClause}`;
     const [countResult] = await db.query(countQuery, values);
@@ -381,7 +387,7 @@ exports.getRatings = async (req, res) => {
 
     // Get paginated users
     const userQuery = `
-      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name
+      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name,users.created_at as joining_date
       FROM users
       LEFT JOIN teams ON users.team_id = teams.id
       ${whereClause}
@@ -413,6 +419,7 @@ exports.getRatings = async (req, res) => {
         defaultRatings[index] = {
           rater: rating.rater,
           quality: rating.quality,
+          joining_date: user.joining_date,
           timelines: rating.timelines,
           agility: rating.agility,
           attitude: rating.attitude,
@@ -432,6 +439,7 @@ exports.getRatings = async (req, res) => {
         employee_id: user.employee_id,
         user_id: user.user_id,
         month: selectedMonth,
+        joining_date:user.joining_date,
         employee_name: user.first_name,
         team: user.team_name,
         raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
@@ -445,4 +453,5 @@ exports.getRatings = async (req, res) => {
     return errorResponse(res, 'An error occurred while fetching ratings', 'Internal Server Error', 500);
   }
 };
+
 
