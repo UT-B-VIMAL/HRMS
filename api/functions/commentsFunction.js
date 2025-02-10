@@ -59,7 +59,7 @@ exports.addComments = async (payload, res) => {
         INSERT INTO task_histories (
           old_data, new_data, task_id, subtask_id, text,
           updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       `;
       const historyValues = [
         null,
@@ -68,7 +68,9 @@ exports.addComments = async (payload, res) => {
         validSubtaskId,
         'Comment Added',
         updated_by,
-        7 // Default flag for added comments
+        7,
+        localISTTime,
+        localISTTime // Default flag for added comments
       ];
   
       const [historyResult] = await db.query(historyQuery, historyValues);
