@@ -33,13 +33,21 @@ exports.addComments = async (payload, res) => {
       }
   
       const validSubtaskId = subtask_id || null;
-  
+      const getISTTime = () => {
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+        const istTime = new Date(now.getTime() + istOffset);
+        return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
+    };
+    
+    const localISTTime = getISTTime();
+      
       // Insert the new comment
       const insertCommentQuery = `
         INSERT INTO task_comments (task_id, subtask_id, user_id, comments, updated_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
-      const commentValues = [task_id, validSubtaskId, user_id, comments, updated_by];
+      const commentValues = [task_id, validSubtaskId, user_id, comments, updated_by,localISTTime,localISTTime];
   
       const [commentResult] = await db.query(insertCommentQuery, commentValues);
   
@@ -90,13 +98,21 @@ exports.addComments = async (payload, res) => {
         return errorResponse(res, null, 'Comment not found or has been deleted', 404);
       }
       const { old_comments, task_id, subtask_id } = existingComment[0];
+      const getISTTime = () => {
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+        const istTime = new Date(now.getTime() + istOffset);
+        return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
+    };
+    
+    const localISTTime = getISTTime();
         
        const query = `
         UPDATE task_comments
-        SET  comments = ?, updated_by = ?, updated_at = NOW()
+        SET  comments = ?, updated_by = ?, updated_at = ?
         WHERE id = ? AND deleted_at IS NULL
       `;
-      const values = [comments, updated_by, id];
+      const values = [comments, updated_by, localISTTime, id];
   
       const [result] = await db.query(query, values);
   
@@ -108,7 +124,7 @@ exports.addComments = async (payload, res) => {
         INSERT INTO task_histories (
           old_data, new_data, task_id, subtask_id, text,
           updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       `;
       const historyValues = [
         old_comments,
@@ -117,7 +133,9 @@ exports.addComments = async (payload, res) => {
         subtask_id,
         'Comment Updated',
         updated_by,
-        12 // Default flag for updated comments
+        12,
+        localISTTime,
+        localISTTime // Default flag for updated comments
       ];
   
       const [historyResult] = await db.query(historyQuery, historyValues);
@@ -179,11 +197,19 @@ exports.addComments = async (payload, res) => {
         return errorResponse(res, null, "Comment deletion failed", 400);
       }
 
+      const getISTTime = () => {
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+        const istTime = new Date(now.getTime() + istOffset);
+        return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
+    };
+    
+    const localISTTime = getISTTime();
       const historyQuery = `
         INSERT INTO task_histories (
           old_data, new_data, task_id, subtask_id, text,
           updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       `;
       const historyValues = [
         null,
@@ -192,7 +218,9 @@ exports.addComments = async (payload, res) => {
         subtask_id,
         'Comment Deleted',
         updated_by,
-        13 // Default flag for deleted comments
+        13,
+        localISTTime,
+        localISTTime // Default flag for deleted comments
       ];
   
       const [historyResult] = await db.query(historyQuery, historyValues);
