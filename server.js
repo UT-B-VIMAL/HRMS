@@ -430,6 +430,10 @@ apiRouter.get('/getDropDownList',RoleController.checkRole(),commonController.get
 //reports
 apiRouter.get('/getTimeReport', RoleController.checkRole(), reportController.getTimeListReport);
 
+// Ticket count
+apiRouter.get('/ticketcount/:id',RoleController.checkRole(), commonController.getTicketCount);
+
+
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
