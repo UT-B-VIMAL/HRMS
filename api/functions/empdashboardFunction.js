@@ -272,11 +272,11 @@ exports.fetchStatistics = async (req, res) => {
               
                 // If there are no subtasks, apply the current month condition to the task
                 if (isTaskInCurrentMonth) {
-                  if((task.status === 1 && task.active_status === 1) || task.status === 3 || (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)){
+                  if((task.status === 1 || task.active_status === 1) || task.status === 3 || (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)){
                     totalTaskCount++;
                 }
 
-                    if (task.status === 1 && task.active_status === 1) {
+                    if (task.status === 1 || task.active_status === 1) {
                         inProgressTaskCount++;
                     } else if (task.status === 3) {
                         completedTaskCount++;
@@ -287,14 +287,14 @@ exports.fetchStatistics = async (req, res) => {
             } else {
                 // Apply the current month condition only to subtasks
                 if (subtasksInCurrentMonth.length > 0) {
-                  if((task.status === 1 && task.active_status === 1) || task.status === 3 || (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)){
+                  if((task.status === 1 || task.active_status === 1) || task.status === 3 || (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)){
 
                     totalTaskCount++;
                 }
 
                     const allCompleted = subtasksInCurrentMonth.every(subtask => subtask.status === 3);
                     const allTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 0 && subtask.reopen_status === 0 && subtask.active_status === 0);
-                    const inprogressTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 1 && subtask.active_status === 1);
+                    const inprogressTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 1 || subtask.active_status === 1);
 
                     if (allCompleted) {
                         completedTaskCount++;
