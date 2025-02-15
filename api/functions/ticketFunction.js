@@ -44,12 +44,13 @@ exports.getTickets = async (id, res) => {
     const { user_id, search, status, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
-    let users;
-    if (user_id) {
-        users = await getAuthUserDetails(user_id, res);  
-        if (!users) {
-            return errorResponse(res, 'User not found', 'Auth User not found', 404);
-        }
+    if (!user_id) {
+        return errorResponse(res, 'User ID is required', 'Missing user_id in request', 400);
+    }
+
+    const users = await getAuthUserDetails(user_id, res);
+    if (!users) {
+        return errorResponse(res, 'User not found', 'Auth User not found', 404);
     }
 
     try {
@@ -71,16 +72,16 @@ exports.getTickets = async (id, res) => {
                     ELSE 'Unknown'
                 END AS status_type,
                 t.file_name,
-                COALESCE((
+                COALESCE(( 
                     SELECT COUNT(*) 
                     FROM ticket_comments tc
                     WHERE tc.ticket_id = t.id
-                    AND tc.receiver_id = ${users ? '?' : '1'}
+                    AND tc.receiver_id = ?
                     AND tc.type = 0
                 ), 0) AS unread_counts
             FROM tickets t
             LEFT JOIN users u ON t.user_id = u.id 
-            LEFT JOIN issue_types i ON t.issue_type = i.id 
+            LEFT JOIN issue_types i ON t.issue_type = i.id
             , (SELECT @rownum := 0) AS r
             WHERE t.deleted_at IS NULL`;
 
@@ -91,18 +92,17 @@ exports.getTickets = async (id, res) => {
             LEFT JOIN issue_types i ON t.issue_type = i.id
             WHERE t.deleted_at IS NULL`;
 
-        let values = [];
+        let values = [users.id]; 
         let countValues = [];
 
-        // Check role and filter tickets accordingly
-        if (users) {
-            query += ` AND t.created_by = ?`;  
+        if (users.role_id === 1) {
+        } else {
+            query += ` AND t.created_by = ?`;
             countQuery += ` AND t.created_by = ?`;
-            values.push(users.id); 
+            values.push(users.id);
             countValues.push(users.id);
         }
 
-        // Apply status filter if provided
         if (status) {
             query += ` AND t.status = ?`;
             countQuery += ` AND t.status = ?`;
@@ -110,7 +110,6 @@ exports.getTickets = async (id, res) => {
             countValues.push(parseInt(status));
         }
 
-        // Apply search filter if provided
         if (search) {
             query += ` AND (
                 t.user_id LIKE ? 
@@ -145,7 +144,6 @@ exports.getTickets = async (id, res) => {
 
         const pagination = getPagination(page, perPage, totalRecords);
 
-        // Sending the response with pagination data
         return successResponse(
             res,
             result,
@@ -158,6 +156,7 @@ exports.getTickets = async (id, res) => {
         return errorResponse(res, error.message, 'Error retrieving tickets', 500);
     }
 };
+
 
 
 
