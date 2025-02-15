@@ -72,12 +72,12 @@ exports.getTickets = async (id, res) => {
                 END AS status_type,
                 t.file_name,
                 COALESCE((
-        SELECT COUNT(*) 
-        FROM ticket_comments tc
-        WHERE tc.ticket_id = t.id
-        AND tc.receiver_id = ?
-        AND tc.type = 0
-    ), 0) AS unread_counts
+                    SELECT COUNT(*) 
+                    FROM ticket_comments tc
+                    WHERE tc.ticket_id = t.id
+                    AND tc.receiver_id = ${users ? '?' : '1'}
+                    AND tc.type = 0
+                ), 0) AS unread_counts
             FROM tickets t
             LEFT JOIN users u ON t.user_id = u.id 
             LEFT JOIN issue_types i ON t.issue_type = i.id 
@@ -91,17 +91,16 @@ exports.getTickets = async (id, res) => {
             LEFT JOIN issue_types i ON t.issue_type = i.id
             WHERE t.deleted_at IS NULL`;
 
-        let values = [users?.id];
+        let values = [];
         let countValues = [];
 
         // Check role and filter tickets accordingly
         if (users) {
-        // if (users && users.role_id !== 1 && users.role_id !== 2) {
-          query += ` AND t.created_by = ?`;  
-          countQuery += ` AND t.created_by = ?`;
-          values.push(users.id); 
-          countValues.push(users.id);
-      }
+            query += ` AND t.created_by = ?`;  
+            countQuery += ` AND t.created_by = ?`;
+            values.push(users.id); 
+            countValues.push(users.id);
+        }
 
         // Apply status filter if provided
         if (status) {
@@ -159,6 +158,7 @@ exports.getTickets = async (id, res) => {
         return errorResponse(res, error.message, 'Error retrieving tickets', 500);
     }
 };
+
 
 
 
