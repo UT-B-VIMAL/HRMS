@@ -241,4 +241,45 @@ exports.getISTTime = () => {
     const istTime = new Date(now.getTime() + istOffset);
     return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
 };
+
+
+exports.getticketCount = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = id;
+        
+        if (!userId) {
+          return errorResponse(res, null, 'User ID is required', 400);
+        }
+
+        const [rows] = await db.query(
+            "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+            [userId]
+          );
+      
+          // Check if no rows are returned
+          if (rows.length === 0) {
+            return errorResponse(res, null, "User Not Found", 400);
+          }
+          const [rowss] = await db.query(
+            "SELECT COUNT(id) AS count FROM ticket_comments WHERE receiver_id = ? AND type = 0 AND deleted_at IS NULL",
+            [userId]
+          );
+          
+          const ticketCount = rowss[0]?.count || 0;
+
+        return successResponse(
+          res,
+          ticketCount,
+          "Ticket Count retrieved successfully",
+          200
+        );
+    } catch (error) {
+        console.error("Error fetching Ticket Count:", error);
+        return errorResponse(res, error.message, "Error fetching Ticket Count", 500);
+    }
+};
+
+
+
   
