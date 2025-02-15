@@ -164,12 +164,12 @@ exports.fetchTlrating = async (req, res) => {
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
+
     const [rows] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
 
-    // Check if no rows are returned
     if (rows.length === 0) {
       return errorResponse(res, null, "User Not Found", 400);
     }
@@ -195,55 +195,49 @@ exports.fetchTlrating = async (req, res) => {
       [teamIds]
     );
 
-    // Fetch ratings for the current month
+    // Fetch summed ratings for the current month
     const currentMonth = new Date().toISOString().slice(0, 7); // Format YYYY-MM
     const [ratingsResult] = await db.query(
-      "SELECT user_id, rating, average FROM ratings WHERE user_id IN (?) AND month = ?",
+      `SELECT user_id, SUM(average) AS total_average 
+       FROM ratings 
+       WHERE user_id IN (?) AND month = ?
+       GROUP BY user_id`,
       [teamMembers.map((member) => member.id), currentMonth]
     );
 
-    // Create a map for easy access to ratings
+    // Create a map for easy access to summed ratings
     const ratingsMap = new Map();
     ratingsResult.forEach((rating) => {
-      ratingsMap.set(rating.user_id, rating);
+      ratingsMap.set(rating.user_id, rating.total_average);
     });
 
     // Process team members
     const finalRatingResult = teamMembers.map((member) => {
       const nameParts = member.full_name
-        ? member.full_name.split(" ").filter((part) => part.trim() !== "") // Filter out empty parts
-        : []; // Safely handle missing or invalid full_name
+        ? member.full_name.split(" ").filter((part) => part.trim() !== "")
+        : [];
 
       let initials = "";
 
       if (nameParts.length > 1) {
-        // Use first letters of the two name parts
         initials =
           (nameParts[0][0]?.toUpperCase() || "") +
           (nameParts[1][0]?.toUpperCase() || "");
       } else if (nameParts.length === 1) {
-        // Use the first two letters of the single part
         initials = nameParts[0].slice(0, 2).toUpperCase();
       } else {
-        // Fallback for empty or missing names
         initials = "NA";
       }
-
-      const ratingRecord = ratingsMap.get(member.id) || {
-        rating: 0,
-        average: 0,
-      };
 
       return {
         employee_name: member.full_name || "N/A",
         employee_id: member.id || "N/A",
         initials,
-        rating_value: ratingRecord.rating,
-        average_value: ratingRecord.average,
+        rating_value: ratingsMap.get(member.id) || 0, // Use summed average
+        average_value: ratingsMap.get(member.id) || 0, // Keep the same for now
       };
     });
 
-    // If no team members are found, add a placeholder entry
     if (finalRatingResult.length === 0) {
       finalRatingResult.push({
         employee_name: "N/A",
