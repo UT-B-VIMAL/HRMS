@@ -489,10 +489,13 @@ const totalAverages = yearlyAvgRecord[0]?.total_average || 0; // Sum of all aver
 const recordCount = yearlyAvgRecord[0]?.record_count || 1; // Avoid division by zero
 
 // Step 1: Divide total average by 2 first
-const adjustedTotal = recordCount / 2;
+const adjustedTotal = Math.round(recordCount / 2);
+
+
 
 // Step 2: Use adjustedTotal to calculate yearly average dynamically
 const yearlyAverage = totalAverages / adjustedTotal;
+
 
       let empRating;
 
