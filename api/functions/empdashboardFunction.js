@@ -541,7 +541,9 @@ exports.logincheck = async (req, res) => {
 const [ratingRecords] = await db.query(ratingQuery, [email]);
 if(ratingRecords.length != 0){
 
-  return successResponse(res, ratingRecords[0], "Data fetched", 200);
+  return res.status(200).json({
+    data: ratingRecords[0] // Returning a single object instead of an array
+  });
 }else{
 
   return errorResponse(res, 'failed', "Failed to fetch", 500);
