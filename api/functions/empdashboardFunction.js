@@ -529,6 +529,32 @@ const yearlyAverage = totalAverages / adjustedTotal;
       return errorResponse(res, error.message, "Error fetching ratings", 500);
   }
 };
+exports.logincheck = async (req, res) => {
+  try {
+      const {email} = req.body;
+      if (!email) {
+        return errorResponse(res, null, 'Email is required', 400);
+    }
+
+      const ratingQuery = `
+    SELECT *
+    FROM users 
+    WHERE email = ?
+`;
+
+const [ratingRecords] = await db.query(ratingQuery, [email]);
+if(ratingRecords.length != 0){
+
+  return successResponse(res, 'success', "Login successfully", 200);
+}else{
+
+  return errorResponse(res, 'failed', "Login Failed", 500);
+}
+
+  } catch (error) {
+      console.error("Error fetching ratings:", error);
+  }
+};
 
 
 
