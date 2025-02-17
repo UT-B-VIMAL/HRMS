@@ -542,8 +542,12 @@ const [ratingRecords] = await db.query(ratingQuery, [email]);
 if(ratingRecords.length != 0){
 
   return res.status(200).json({
-    data: ratingRecords[0] // Returning a single object instead of an array
+    status: 200,
+    success: true,
+    message: "Content fetched",
+    data: ratingRecords[0]
   });
+
 }else{
 
   return errorResponse(res, 'failed', "Failed to fetch", 500);
