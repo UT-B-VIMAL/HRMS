@@ -41,7 +41,7 @@ exports.getTickets = async (id, res) => {
   
 
   exports.getAlltickets = async (req, res) => {
-    const { user_id, search, status, page = 1, perPage = 10 } = req.query;
+    const { user_id, search, status,flag = 0, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
     if (!user_id) {
@@ -96,6 +96,13 @@ exports.getTickets = async (id, res) => {
         let countValues = [];
 
         if (users.role_id === 1) {
+              if(flag == 1){
+                query += ` AND t.created_by = ?`;
+            countQuery += ` AND t.created_by = ?`;
+            values.push(users.id);
+            countValues.push(users.id);
+
+              }
         } else {
             query += ` AND t.created_by = ?`;
             countQuery += ` AND t.created_by = ?`;
