@@ -1,4 +1,4 @@
-const { fetchPendingTask, fetchDailybreakdown, fetchStatistics, fetchStatisticschart, fetchRatings } = require('../api/functions/empdashboardFunction');
+const { fetchPendingTask, fetchDailybreakdown, fetchStatistics, fetchStatisticschart, fetchRatings, logincheck } = require('../api/functions/empdashboardFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 exports.emppendingtasksection = async (req, res) => {
@@ -36,6 +36,14 @@ exports.empstatisticschartsection = async (req, res) => {
 exports.empratingsection = async (req, res) => {
   try {
     return await fetchRatings(req, res);
+  } catch (error) {
+    console.error("Error during empratingsection processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.loginapis = async (req, res) => {
+  try {
+    return await logincheck(req, res);
   } catch (error) {
     console.error("Error during empratingsection processing:", error.message);
     return errorResponse(res, null, 'Internal Server Error', 500);
