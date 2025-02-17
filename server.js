@@ -422,7 +422,8 @@ apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(), expensedeta
 apiRouter.get('/tlemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAlltlemployeexpensedetails);
 apiRouter.get('/getExpenseReport',RoleController.checkRole(), expensedetailController.getExpenseReports);
 apiRouter.post('/approve_reject_expense', RoleController.checkRole(),expensedetailController.approve_reject_expensedetail);
-
+// Testing login api
+apiRouter.post('/loginapi',empdashboardController.loginapis);
 
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(),commonController.getDropDownList);
