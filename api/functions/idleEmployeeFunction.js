@@ -94,7 +94,7 @@ exports.get_idleEmployee = async (req, res) => {
         )
     `;
 
-   let countQueryParams = [];
+    let countQueryParams = [];
 
     if (team_id) {
       countQuery += ` AND users.team_id = ?`;
@@ -117,10 +117,11 @@ exports.get_idleEmployee = async (req, res) => {
     const pagination = getPagination(pageNumber, perPageNumber, totalRecords);
 
     // **Add serial numbers to results**
-    const data = result.map((row, index) => ({
+    const data = await Promise.all(result.map(async (row, index) => ({
       s_no: offset + index + 1,
       ...row,
-    }));
+      pending_tasks: await getPendingTasksCount(row.id), // Fetch pending task count
+    })));
 
     successResponse(
       res,
@@ -141,5 +142,43 @@ exports.get_idleEmployee = async (req, res) => {
     );
   }
 };
+
+const getPendingTasksCount = async (userId) => {
+  try {
+    // First, check if the user has sub_tasks
+    const [subTasksCount] = await db.query(
+      `SELECT COUNT(*) AS pending_count 
+       FROM sub_tasks 
+       WHERE user_id = ? 
+       AND (status = 0 OR status = 1) 
+       AND active_status = 0`, 
+      [userId]
+    );
+
+    // If sub_tasks are found, return the count from sub_tasks
+    if (subTasksCount && subTasksCount[0].pending_count > 0) {
+      return subTasksCount[0].pending_count;
+    }
+
+    // If no sub_tasks, check the tasks table for pending tasks
+    const [tasksCount] = await db.query(
+      `SELECT COUNT(*) AS pending_count 
+       FROM tasks 
+       WHERE user_id = ? 
+       AND (status = 0 OR status = 1) 
+       AND active_status = 0`, 
+      [userId]
+    );
+
+    return tasksCount[0].pending_count;
+
+  } catch (error) {
+    console.error("Error in getPendingTasksCount:", error);
+    throw new Error("Error retrieving pending tasks count");
+  }
+};
+
+
+
 
 
