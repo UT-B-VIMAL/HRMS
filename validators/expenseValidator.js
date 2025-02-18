@@ -2,11 +2,6 @@ const Joi = require('joi');
 
 const validationschema = {
   createExpenseSchema: Joi.object({
-    project_id: Joi.number().integer().required().messages({
-      "number.base": "Project ID must be a number",
-      "number.integer": "Project ID must be an integer",
-      "any.required": "Project ID is required",
-    }),
     amount: Joi.number().integer().required().messages({
       "number.base": "amount must be a number",
       "number.integer": "amount must be an integer",
@@ -37,11 +32,6 @@ const validationschema = {
 
   // Schema for updating a ticket
   updateExpenseSchema: Joi.object({
-    project_id: Joi.number().integer().required().messages({
-      "number.base": "Project ID must be a number",
-      "number.integer": "Project ID must be an integer",
-      "any.required": "Project ID is required",
-    }),
     amount: Joi.number().integer().required().messages({
       "number.base": "amount must be a number",
       "number.integer": "amount must be an integer",

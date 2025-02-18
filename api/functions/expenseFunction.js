@@ -12,7 +12,6 @@ exports.createexpense = async (req, res) => {
     date,
     category,
     amount,
-    project_id,
     user_id,
     description,
     created_by,
@@ -22,7 +21,6 @@ exports.createexpense = async (req, res) => {
   if (!category) missingFields.push("category");
   if (!date) missingFields.push("date");
   if (!amount) missingFields.push("amount");
-  if (!project_id) missingFields.push("project_id");
   if (!user_id) missingFields.push("user_id");
   if (!description) missingFields.push("description");
   if (!req.files?.file) missingFields.push("file");
@@ -66,38 +64,6 @@ exports.createexpense = async (req, res) => {
   }
 
   try {
-    const projectQuery = `
-        SELECT product_id 
-        FROM projects 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
-    const [projectResult] = await db.query(projectQuery, [project_id]);
-
-    if (projectResult.length === 0) {
-      return errorResponse(
-        res,
-        "Project not found or deleted",
-        "Error creating OT",
-        404
-      );
-    }
-    const { product_id } = projectResult[0];
-
-    const productQuery = `
-        SELECT id 
-        FROM products 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
-    const [productResult] = await db.query(productQuery, [product_id]);
-
-    if (productResult.length === 0) {
-      return errorResponse(
-        res,
-        "Product not found or deleted",
-        "Error creating OT",
-        404
-      );
-    }
 
     const userQuery = `
         SELECT id,team_id,role_id 
@@ -125,14 +91,12 @@ if (role_id == 2 || role_id == 3) {
 
     const insertQuery = `
         INSERT INTO expense_details (
-          user_id, category, product_id, project_id, team_id, description, expense_amount, date, file, tl_status, created_by, updated_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+          user_id, category, team_id, description, expense_amount, date, file, tl_status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
     const values = [
       user_id,
       category,
-      product_id,
-      project_id,
       team_id,
       description,
       amount,
@@ -158,8 +122,6 @@ if (role_id == 2 || role_id == 3) {
       res,
       {
         id: result.insertId,
-        project_id,
-        product_id,
         status,
         user_id,
         created_by,
@@ -185,8 +147,6 @@ exports.getexpense = async (id, res) => {
     ed.id, 
     DATE_FORMAT(ed.date, '%Y-%m-%d') AS date,
     ed.description, 
-    ed.product_id, 
-    ed.project_id,
     ed.user_id,
     ed.status,
     ed.tl_status,
@@ -199,15 +159,9 @@ exports.getexpense = async (id, res) => {
         WHEN ed.category = 3 THEN 'others'
         ELSE 'unknown' 
     END AS category,
-    ed.file,
-    p.name AS product_name,
-    pr.name AS project_name
+    ed.file
 FROM 
     expense_details ed
-JOIN 
-    products p ON ed.product_id = p.id
-JOIN 
-    projects pr ON ed.project_id = pr.id
 WHERE 
     ed.id = ? 
     AND ed.deleted_at IS NULL;
@@ -249,7 +203,6 @@ exports.getAllexpense = async (req, res) => {
       search,
       page = 1,
       perPage = 10,
-      project_id,
       category_id,
     } = req.query;
 
@@ -289,12 +242,6 @@ exports.getAllexpense = async (req, res) => {
     // Query filters
     const expenseConditions = [];
     const expenseValues = [];
-
-    if (project_id) {
-      const projectIds = project_id.split(",");
-      expenseConditions.push(`et.project_id IN (?)`);
-      expenseValues.push(projectIds);
-    }
     if (category_id) {
       const categoryIds = category_id.split(",");
       expenseConditions.push(`et.category IN (?)`);
@@ -325,7 +272,6 @@ exports.getAllexpense = async (req, res) => {
     // Main query
     const expenseQuery = `
       SELECT 
-        pr.name AS project_name,
         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
         et.expense_amount,
         et.description,
@@ -340,8 +286,6 @@ exports.getAllexpense = async (req, res) => {
         u.last_name AS user_last_name
       FROM 
         expense_details et
-      LEFT JOIN 
-        projects pr ON pr.id = et.project_id
       LEFT JOIN 
         users u ON u.id = et.user_id
       ${expenseWhereClause}
@@ -359,7 +303,6 @@ exports.getAllexpense = async (req, res) => {
     const countQuery = `
       SELECT COUNT(*) AS total 
       FROM expense_details et
-      LEFT JOIN projects pr ON pr.id = et.project_id
       LEFT JOIN users u ON u.id = et.user_id
       ${expenseWhereClause}
       AND et.deleted_at IS NULL
@@ -379,7 +322,6 @@ exports.getAllexpense = async (req, res) => {
       user_id: row.user_id,
       date: row.date,
       expense_amount: row.expense_amount,
-      project_name: row.project_name,
       description: row.description,
       category: row.category,
       file: row.file,
@@ -410,7 +352,6 @@ exports.updateexpenses = async (id, req, res) => {
     date,
     category,
     amount,
-    project_id,
     user_id,
     description,
     updated_by,
@@ -434,39 +375,7 @@ exports.updateexpenses = async (id, req, res) => {
     }
 
     // Fetch project details
-    const projectQuery = `
-      SELECT product_id 
-      FROM projects 
-      WHERE deleted_at IS NULL AND id = ?
-    `;
-    const [projectResult] = await db.query(projectQuery, [project_id]);
-
-    if (projectResult.length === 0) {
-      return errorResponse(
-        res,
-        "Project not found or deleted",
-        "Error updating expense details",
-        404
-      );
-    }
-    const { product_id } = projectResult[0];
-
-    // Fetch product details
-    const productQuery = `
-      SELECT id 
-      FROM products 
-      WHERE deleted_at IS NULL AND id = ?
-    `;
-    const [productResult] = await db.query(productQuery, [product_id]);
-
-    if (productResult.length === 0) {
-      return errorResponse(
-        res,
-        "Product not found or deleted",
-        "Error updating expense details",
-        404
-      );
-    }
+    
 
     // Fetch user details
     const userQuery = `
@@ -503,8 +412,6 @@ exports.updateexpenses = async (id, req, res) => {
       SET 
         user_id = ?, 
         category = ?, 
-        product_id = ?, 
-        project_id = ?, 
         team_id = ?, 
         description = ?, 
         expense_amount = ?, 
@@ -518,8 +425,6 @@ exports.updateexpenses = async (id, req, res) => {
     const values = [
       user_id,
       category,
-      product_id,
-      project_id,
       team_id,
       description,
       amount,
@@ -547,8 +452,6 @@ exports.updateexpenses = async (id, req, res) => {
       res,
       {
         id,
-        project_id,
-        product_id,
         user_id,
         updated_by,
       },
@@ -725,7 +628,6 @@ exports.getAllpmemployeexpense = async (req, res) => {
     // Prepare the query to fetch expense details
     const otQuery = `
       SELECT 
-        pr.name AS project_name,
         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
         et.description,
         et.expense_amount AS amount,
@@ -743,8 +645,6 @@ exports.getAllpmemployeexpense = async (req, res) => {
         d.name AS designation
       FROM 
         expense_details et
-      LEFT JOIN 
-        projects pr ON pr.id = et.project_id
       LEFT JOIN 
         users u ON u.id = et.user_id
       LEFT JOIN 
@@ -775,7 +675,6 @@ exports.getAllpmemployeexpense = async (req, res) => {
       designation: row.designation,
       date: row.date,
       category: row.category,
-      project_name: row.project_name,
       team_name: row.team_name,
       task_name: row.task_name,
       description: row.description,
@@ -1053,7 +952,6 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     // Query to fetch expenses
     const otQuery = `
       SELECT 
-        pr.name AS project_name,
         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
         et.status,
         et.tl_status,
@@ -1070,8 +968,6 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         et.file
       FROM 
         expense_details et
-      LEFT JOIN 
-        projects pr ON pr.id = et.project_id
       LEFT JOIN 
         users u ON u.id = et.user_id
       LEFT JOIN 
@@ -1099,7 +995,6 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       designation: row.designation,
       date: row.date,
       category: row.category,
-      project_name: row.project_name,
       description: row.description,
       amount: row.amount,
       file: row.file,
