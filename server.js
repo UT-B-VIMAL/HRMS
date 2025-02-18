@@ -245,7 +245,7 @@ io.on('connection', (socket) => {
 });
 
 // Socket-----------------------------------------------------------------------------
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['*'];
 
 const corsOptions = {
   origin: (origin, callback) => {
