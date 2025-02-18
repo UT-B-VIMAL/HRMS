@@ -11,7 +11,7 @@ exports.getTickets = async (id, res) => {
             t.created_at,
             t.description,
             i.issue_name AS issue_type,
-            t.issue_date AS issue_date,
+            CONVERT_TZ(t.issue_date, '+00:00', '+05:30') AS issue_date,
             t.status,
             CASE 
                 WHEN t.status = 0 THEN 'Pending'
@@ -65,7 +65,7 @@ exports.getTickets = async (id, res) => {
                 t.created_at,
                 t.description,
                 i.issue_name AS issue_type,
-                t.issue_date AS issue_date,
+                CONVERT_TZ(t.issue_date, '+00:00', '+05:30') AS issue_date,
                 t.status,
                 CASE 
                     WHEN t.status = 0 THEN 'Pending'
@@ -159,6 +159,8 @@ exports.getTickets = async (id, res) => {
 
         // Execute the queries
         const [result] = await db.query(query, values);
+        console.log(result);
+
         const [countResult] = await db.query(countQuery, countValues);
         const totalRecords = countResult[0]?.total_records || 0;
 
