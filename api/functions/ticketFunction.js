@@ -11,6 +11,7 @@ exports.getTickets = async (id, res) => {
             t.created_at,
             t.description,
             i.issue_name AS issue_type,
+            i.issue_date AS issue_date,
             t.status,
             CASE 
                 WHEN t.status = 0 THEN 'Pending'
@@ -64,6 +65,7 @@ exports.getTickets = async (id, res) => {
                 t.created_at,
                 t.description,
                 i.issue_name AS issue_type,
+                i.issue_date AS issue_date,
                 t.status,
                 CASE 
                     WHEN t.status = 0 THEN 'Pending'
@@ -128,6 +130,7 @@ exports.getTickets = async (id, res) => {
                 OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
+                OR i.issue_date LIKE ?
                 OR t.status LIKE ? 
                 OR t.file_name LIKE ?
             )`;
@@ -137,6 +140,7 @@ exports.getTickets = async (id, res) => {
                 OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
+                OR i.issue_date LIKE ?
                 OR t.status LIKE ? 
                 OR t.file_name LIKE ?
             )`;
