@@ -639,37 +639,35 @@ exports.projectStatus = async (req, res) => {
 
 exports.projectRequest = async (req, res) => {
   try {
-    const { project_id, user_id, date, search, page = 1, perPage = 10 } = req.query;
+    const { project_id, user_id, employee_id, date, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
     let effectiveUserIds = []; // Store IDs of users whose tasks should be fetched
 
     if (user_id) {
       // Step 1: Get the role_id of the provided user_id
-      const roleQuery = `SELECT role_id FROM users WHERE id = ?`;
+      const roleQuery = `SELECT role_id, team_id FROM users WHERE id = ?`;
       const [roleResult] = await db.query(roleQuery, [user_id]);
 
       if (!roleResult.length) {
         return errorResponse(res, "User not found", "Invalid user_id", 404);
       }
 
-      const role_id = roleResult[0].role_id;
+      const { role_id, team_id } = roleResult[0];
 
-      // Step 2: If role_id is 3, find team members
       if (role_id === 3) {
-        const reportingQuery = `
-          SELECT u.id 
-          FROM users u
-          JOIN teams t ON t.id = u.team_id
-          WHERE t.reporting_user_id = ?`;
-        
-        const [teamUsers] = await db.query(reportingQuery, [user_id]);
+        const teamQuery = `SELECT id FROM users WHERE team_id = ?`;
+        const [teamUsers] = await db.query(teamQuery, [team_id]);
 
         if (teamUsers.length > 0) {
           effectiveUserIds = teamUsers.map((user) => user.id);
         }
-      } else {
-        effectiveUserIds.push(user_id);
+      }
+    }
+
+    if (!user_id || effectiveUserIds.length === 0) {
+      if (employee_id) {
+        effectiveUserIds.push(employee_id);
       }
     }
 
@@ -678,8 +676,8 @@ exports.projectRequest = async (req, res) => {
     const taskValues = [];
     const subtaskValues = [];
 
-    // Apply user_id filter only if it's present
-    if (user_id) {
+    // Apply user filter only if necessary
+    if (effectiveUserIds.length > 0) {
       taskConditions.push(`t.user_id IN (${effectiveUserIds.map(() => '?').join(',')})`);
       subtaskConditions.push(`st.user_id IN (${effectiveUserIds.map(() => '?').join(',')})`);
       taskValues.push(...effectiveUserIds);
@@ -796,6 +794,8 @@ exports.projectRequest = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
 
 
 
