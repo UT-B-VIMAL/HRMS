@@ -245,7 +245,7 @@ exports.fetchStatistics = async (req, res) => {
 
         // Fetch all tasks for the user regardless of creation date
         const tasksQuery = `
-            SELECT id, name, status, created_at 
+            SELECT id, name, status, active_status, reopen_status, created_at 
             FROM tasks 
             WHERE user_id = ? AND deleted_at IS NULL
         `;
@@ -259,7 +259,7 @@ exports.fetchStatistics = async (req, res) => {
         for (const task of tasks) {
             // Fetch subtasks for each task created in the current month and not deleted
             const subtasksQuery = `
-                SELECT id, status, created_at 
+                SELECT id, status, active_status, reopen_status, created_at 
                 FROM sub_tasks 
                 WHERE task_id = ? AND user_id = ? AND deleted_at IS NULL
             `;
@@ -269,31 +269,32 @@ exports.fetchStatistics = async (req, res) => {
             const subtasksInCurrentMonth = subtasks.filter(subtask => new Date(subtask.created_at).getMonth() + 1 === currentMonth);
 
             if (subtasks.length === 0) {
+              
                 // If there are no subtasks, apply the current month condition to the task
                 if (isTaskInCurrentMonth) {
-                  if((task.status === 1 && task.activeStatus === 1) || task.status === 3 || (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0)){
+                  if((task.status === 1 || task.active_status === 1) || task.status === 3 || (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)){
                     totalTaskCount++;
                 }
 
-                    if (task.status === 1 && task.activeStatus === 1) {
+                    if (task.status === 1 || task.active_status === 1) {
                         inProgressTaskCount++;
                     } else if (task.status === 3) {
                         completedTaskCount++;
-                    } else if (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0) {
+                    } else if (task.status === 0 && task.reopen_status === 0 && task.active_status === 0) {
                         todoTaskCount++;
                     }
                 }
             } else {
                 // Apply the current month condition only to subtasks
                 if (subtasksInCurrentMonth.length > 0) {
-                  if((task.status === 1 && task.activeStatus === 1) || task.status === 3 || (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0)){
+                  if((task.status === 1 || task.active_status === 1) || task.status === 3 || (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)){
 
                     totalTaskCount++;
                 }
 
                     const allCompleted = subtasksInCurrentMonth.every(subtask => subtask.status === 3);
-                    const allTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 0 && subtask.reopenStatus === 0 && subtask.activeStatus === 0);
-                    const inprogressTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 1 && subtask.activeStatus === 1);
+                    const allTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 0 && subtask.reopen_status === 0 && subtask.active_status === 0);
+                    const inprogressTodo = subtasksInCurrentMonth.every(subtask => subtask.status === 1 || subtask.active_status === 1);
 
                     if (allCompleted) {
                         completedTaskCount++;
@@ -357,7 +358,7 @@ exports.fetchStatisticschart = async (req, res) => {
 
     // Fetch all tasks for the user
     const tasksQuery = `
-      SELECT id, name, status, created_at 
+      SELECT id, name, status, active_status, reopen_status, created_at 
       FROM tasks 
       WHERE user_id = ? AND deleted_at IS NULL
     `;
@@ -366,7 +367,7 @@ exports.fetchStatisticschart = async (req, res) => {
     for (const task of tasks) {
       // Fetch subtasks for the task
       const subtasksQuery = `
-        SELECT id, status, created_at 
+        SELECT id, status, active_status, reopen_status, created_at 
         FROM sub_tasks 
         WHERE task_id = ? AND user_id = ? AND deleted_at IS NULL
       `;
@@ -387,16 +388,16 @@ exports.fetchStatisticschart = async (req, res) => {
         const isTaskInCurrentMonth = new Date(task.created_at).getMonth() + 1 === currentMonth;
 
         if (isTaskInCurrentMonth) {
-          if((task.status === 1 && task.activeStatus === 1) || task.status === 3 || (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0)){
+          if((task.status === 1 || task.active_status === 1) || task.status === 3 || (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)){
             weekData.total_task_count++;
         }
           
 
-          if (task.status === 1 && task.activeStatus === 1) {
+          if (task.status === 1 || task.active_status === 1) {
             weekData.in_progress_task_count++;
           } else if (task.status === 3) {
             weekData.completed_task_count++;
-          } else if (task.status === 0 && task.reopenStatus === 0 && task.activeStatus === 0) {
+          } else if (task.status === 0 && task.reopen_status === 0 && task.active_status === 0) {
             weekData.todo_task_count++;
           }
         }
@@ -415,16 +416,16 @@ exports.fetchStatisticschart = async (req, res) => {
           }
 
           const subtaskWeekData = weekTaskCounts[subtaskWeek - 1];
-          if((subtask.status === 1 && subtask.activeStatus === 1) || subtask.status === 3 || (subtask.status === 0 && subtask.reopenStatus === 0 && subtask.activeStatus === 0)){
+          if((subtask.status === 1 || subtask.active_status === 1) || subtask.status === 3 || (subtask.status === 0 && subtask.reopen_status === 0 && subtask.active_status === 0)){
             subtaskWeekData.total_task_count++;
         }
           
 
-          if (subtask.status === 1 && subtask.activeStatus === 1) {
+          if (subtask.status === 1 || subtask.active_status === 1) {
             subtaskWeekData.in_progress_task_count++;
           } else if (subtask.status === 3) {
             subtaskWeekData.completed_task_count++;
-          } else if (subtask.status === 0 && subtask.reopenStatus === 0 && subtask.activeStatus === 0) {
+          } else if (subtask.status === 0 && subtask.reopen_status === 0 && subtask.active_status === 0) {
             subtaskWeekData.todo_task_count++;
           }
         });
@@ -488,10 +489,13 @@ const totalAverages = yearlyAvgRecord[0]?.total_average || 0; // Sum of all aver
 const recordCount = yearlyAvgRecord[0]?.record_count || 1; // Avoid division by zero
 
 // Step 1: Divide total average by 2 first
-const adjustedTotal = recordCount / 2;
+const adjustedTotal = Math.round(recordCount / 2);
+
+
 
 // Step 2: Use adjustedTotal to calculate yearly average dynamically
 const yearlyAverage = totalAverages / adjustedTotal;
+
 
       let empRating;
 
@@ -523,6 +527,34 @@ const yearlyAverage = totalAverages / adjustedTotal;
   } catch (error) {
       console.error("Error fetching ratings:", error);
       return errorResponse(res, error.message, "Error fetching ratings", 500);
+  }
+};
+exports.logincheck = async (req, res) => {
+  try {
+       const email = "pm@gmail.com";
+      const ratingQuery = `
+    SELECT *
+    FROM users 
+    WHERE email = ?
+`;
+
+const [ratingRecords] = await db.query(ratingQuery, [email]);
+if(ratingRecords.length != 0){
+
+  return res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Content fetched",
+    data: ratingRecords[0]
+  });
+
+}else{
+
+  return errorResponse(res, 'failed', "Failed to fetch", 500);
+}
+
+  } catch (error) {
+      console.error("Error fetching ratings:", error);
   }
 };
 

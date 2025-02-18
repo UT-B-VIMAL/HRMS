@@ -352,8 +352,10 @@ exports.getRatings = async (req, res) => {
     if (!users) return;
 
     const values = [];
-    let whereClause = " WHERE users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
-
+    let whereClause = " WHERE users.role_id != 1 AND users.deleted_at IS NULL";
+    if (users.role_id === 2) {
+      whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
+    }
     if (team_id) {
       whereClause += ' AND users.team_id = ?';
       values.push(team_id);
@@ -387,7 +389,7 @@ exports.getRatings = async (req, res) => {
 
     // Get paginated users
     const userQuery = `
-      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name,users.created_at as joining_date
+      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name,users.created_at as joining_date,role_id
       FROM users
       LEFT JOIN teams ON users.team_id = teams.id
       ${whereClause}
@@ -419,6 +421,7 @@ exports.getRatings = async (req, res) => {
         defaultRatings[index] = {
           rater: rating.rater,
           quality: rating.quality,
+          role_id: user.role_id,
           joining_date: user.joining_date,
           timelines: rating.timelines,
           agility: rating.agility,
@@ -438,6 +441,7 @@ exports.getRatings = async (req, res) => {
         s_no: offset + index + 1,
         employee_id: user.employee_id,
         user_id: user.user_id,
+        role_id:user.role_id,
         month: selectedMonth,
         joining_date:user.joining_date,
         employee_name: user.first_name,

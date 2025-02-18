@@ -250,6 +250,7 @@ exports.getAllexpense = async (req, res) => {
       page = 1,
       perPage = 10,
       project_id,
+      category_id,
     } = req.query;
 
     if (!user_id) {
@@ -293,6 +294,11 @@ exports.getAllexpense = async (req, res) => {
       const projectIds = project_id.split(",");
       expenseConditions.push(`et.project_id IN (?)`);
       expenseValues.push(projectIds);
+    }
+    if (category_id) {
+      const categoryIds = category_id.split(",");
+      expenseConditions.push(`et.category IN (?)`);
+      expenseValues.push(categoryIds);
     }
     if (user_id) {
       expenseConditions.push("et.user_id = ?");

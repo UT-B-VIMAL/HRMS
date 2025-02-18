@@ -3,7 +3,7 @@ const mysql = require("mysql2");
 const {
   successResponse, errorResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage
 } = require("../../helpers/responseHelper");
-const { getAuthUserDetails,processStatusData,formatTimeDHMS} = require("../../api/functions/commonFunction");
+const { getAuthUserDetails,processStatusData,formatTimeDHMS,getISTTime} = require("../../api/functions/commonFunction");
 const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
 const { Parser } = require('json2csv');
@@ -1112,8 +1112,9 @@ exports.updateTaskData = async (id, payload, res) => {
     if (updateFields.length === 0) {
       return errorResponse(res, null, "No fields to update", 400);
     }
-    
-    updateFields.push(`updated_at = NOW()`);
+    const localISTTime = getISTTime(); // Assuming this function returns the IST time
+    updateFields.push(`updated_at = ?`);
+    updateValues.push(localISTTime);
     
     const updateQuery = `UPDATE tasks SET ${updateFields.join(", ")} WHERE id = ?`;
     updateValues.push(id);
@@ -1901,14 +1902,46 @@ exports.updateTaskTimeLine = async (req, res) => {
       taskId = taskOrSubtask.id;
       subtaskId = null;
     }
+    
+    const getStatusGroups = (t_status, reopenStatus, activeStatus) => {
+      t_status = Number(t_status);
+      reopenStatus = Number(reopenStatus);
+      activeStatus = Number(activeStatus);
+      if (t_status === 0 && reopenStatus === 0 && activeStatus === 0) {
+        return "To Do";
+      } else if (t_status === 1 && reopenStatus === 0 && activeStatus === 0) {
+        return "On Hold";
+      } else if (t_status === 2 && reopenStatus === 0) {
+        return "Pending Approval";
+      } else if (reopenStatus === 1 && activeStatus === 0) {
+        return "Reopen";
+      } else if (t_status === 1 && activeStatus === 1) {
+        return "InProgress";
+      } else if (t_status === 3) {
+        return "Done";
+      }
+      return ""; 
+    };
 
-    // Action-based logic (start, pause, end)
+    const localISTTime = getISTTime();
+    const old_data=getStatusGroups(taskOrSubtask.status,taskOrSubtask.reopen_status,taskOrSubtask.active_status)
+    console.log("old_data",taskId,subtaskId,taskOrSubtask.user_id);
     if (action === "start") {
+
       await this.startTask(taskOrSubtask, type, id,res);
+      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      const values = [old_data,"InProgress", taskId,subtaskId,"Changed Status",taskOrSubtask.user_id,1, localISTTime,localISTTime];
+      await db.query(query, values);
     } else if (action === "pause") {
       await this.pauseTask(taskOrSubtask, type, id, lastStartTime, timeline_id,res);
+      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      const values = [old_data,"On Hold", taskId,subtaskId,"Changed Status",taskOrSubtask.user_id,1, localISTTime,localISTTime];
+      await db.query(query, values);
     } else if (action === "end") {
       await this.endTask(taskOrSubtask, type, id, lastStartTime, timeline_id, comment,res);
+      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      const values = [old_data,"Pending Approval", taskId,subtaskId,"Changed Status",taskOrSubtask.user_id,1, localISTTime,localISTTime];
+      await db.query(query, values);
     } else {
       return errorResponse(res, "Invalid Type", 400);
     }

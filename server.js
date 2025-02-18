@@ -245,20 +245,11 @@ io.on('connection', (socket) => {
 });
 
 // Socket-----------------------------------------------------------------------------
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
-
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Origin ${origin} is not allowed by CORS`));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], 
-  allowedHeaders: ['Content-Type', 'Authorization'], 
+  origin: "*", // Allow all origins
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 };
-
 
 
 app.use(cors(corsOptions));
@@ -422,13 +413,18 @@ apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(), expensedeta
 apiRouter.get('/tlemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAlltlemployeexpensedetails);
 apiRouter.get('/getExpenseReport',RoleController.checkRole(), expensedetailController.getExpenseReports);
 apiRouter.post('/approve_reject_expense', RoleController.checkRole(),expensedetailController.approve_reject_expensedetail);
-
+// Testing login api
+apiRouter.get('/loginapi',empdashboardController.loginapis);
 
 //common
 apiRouter.get('/getDropDownList',RoleController.checkRole(),commonController.getDropDownList);
 
 //reports
 apiRouter.get('/getTimeReport', RoleController.checkRole(), reportController.getTimeListReport);
+
+// Ticket count
+apiRouter.get('/ticketcount/:id',RoleController.checkRole(), commonController.getTicketCount);
+
 
 
 // Use `/api` as a common prefix
