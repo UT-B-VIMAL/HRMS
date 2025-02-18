@@ -21,7 +21,7 @@ const convertSecondsToReadableTime = (seconds) => {
 
 exports.getTeamwiseProductivity = async (req, res) => {
     try {
-        const { team_id, month, user_id, employee_id, search, page = 1, perPage = 10 } = req.query;
+        const { team_id, from_date,to_date, user_id, employee_id, search, page = 1, perPage = 10 } = req.query;
 
         const offset = (page - 1) * perPage;
 
@@ -75,7 +75,8 @@ exports.getTeamwiseProductivity = async (req, res) => {
             ON u.id = combined.user_id
             WHERE u.deleted_at IS NULL
             ${team_id ? `AND combined.team_id = ?` : ''}
-            ${month ? `AND MONTH(combined.created_at) = ?` : ''}
+            ${from_date ? `AND combined.created_at >= ?` : ''}
+            ${to_date ? `AND combined.created_at <= ?` : ''}
             ${user_id ? `AND u.id = ?` : ''}
             ${employee_id ? `AND u.employee_id = ?` : ''}
             ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
@@ -88,8 +89,11 @@ exports.getTeamwiseProductivity = async (req, res) => {
         if (team_id) {
             queryParams.push(team_id);
         }
-        if (month) {
-            queryParams.push(month);
+        if (from_date){
+             queryParams.push(from_date);
+        }
+        if (to_date) {
+            queryParams.push(to_date);
         }
         if (user_id) {
             queryParams.push(user_id);
@@ -118,7 +122,8 @@ exports.getTeamwiseProductivity = async (req, res) => {
             ON u.id = combined.user_id
             WHERE u.deleted_at IS NULL
             ${team_id ? `AND combined.team_id = ?` : ''}
-            ${month ? `AND MONTH(combined.created_at) = ?` : ''}
+            ${from_date ? `AND combined.created_at >= ?` : ''}
+            ${to_date ? `AND combined.created_at <= ?` : ''}
             ${user_id ? `AND u.id = ?` : ''}
             ${employee_id ? `AND u.employee_id = ?` : ''}
             ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
@@ -127,9 +132,12 @@ exports.getTeamwiseProductivity = async (req, res) => {
         if (team_id) {
             countValues.push(team_id);
         }
-        if (month) {
-            countValues.push(month);
-        }
+        if (from_date){
+            countValues.push(from_date);
+       }
+       if (to_date) {
+            countValues.push(to_date);
+       }
         if (user_id) {
             countValues.push(user_id);
         }
@@ -155,7 +163,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
             employee_id: item.employee_id,
             team_id: item.team_id || null,
             total_estimated_hours: convertSecondsToReadableTime(item.total_estimated_seconds),
-            total_worked_hours: convertSecondsToReadableTime(item.total_worked_seconds),
+            total_worked_hours:   convertSecondsToReadableTime(item.total_worked_seconds),
             total_extended_hours: convertSecondsToReadableTime(item.total_extended_seconds),
         }));
 
@@ -182,7 +190,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
 
 exports.get_individualStatus = async (req, res) => {
     try {
-        const { team_id, month, search, page = 1, perPage = 10 } = req.query;
+        const { team_id, from_date, to_date, search, page = 1, perPage = 10 } = req.query;
         const offset = (page - 1) * perPage;
 
         let baseQuery = `
@@ -208,14 +216,20 @@ exports.get_individualStatus = async (req, res) => {
         let whereConditions = [];
 
         if (team_id) whereConditions.push(`users.team_id = ?`);
-        if (month) whereConditions.push(`MONTH(tasks.created_at) = ?`);
+        if (from_date && to_date) {
+            whereConditions.push(`tasks.created_at BETWEEN ? AND ?`);
+        }
+
         if (search) {
             whereConditions.push(`(users.first_name LIKE ? OR users.employee_id LIKE ?)`); 
         }
 
         const queryParams = [];
         if (team_id) queryParams.push(team_id);
-        if (month) queryParams.push(month);
+        if (from_date && to_date) {
+            queryParams.push(from_date, to_date);
+        }
+
         if (search) {
             queryParams.push(`%${search}%`, `%${search}%`);
         }
