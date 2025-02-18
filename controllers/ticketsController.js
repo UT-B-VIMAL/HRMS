@@ -8,7 +8,7 @@ const {getAlltickets,getTickets,updateTickets}= require("../api/functions/ticket
 
 exports.createTicket = async (req, res) => {
     try {
-      const { user_id, issue_type,issue_date, description, created_by } = req.body;
+      const { user_id, issue_type,issue_date=null, description, created_by } = req.body;
 
 
       const missingFields = [];
