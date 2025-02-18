@@ -642,139 +642,129 @@ exports.projectRequest = async (req, res) => {
     const { project_id, user_id, date, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
-    const taskConditions = [];
-    const taskValues = [];
+    let effectiveUserIds = []; // Store IDs of users whose tasks should be fetched
 
+    if (user_id) {
+      // Step 1: Get the role_id of the provided user_id
+      const roleQuery = `SELECT role_id FROM users WHERE id = ?`;
+      const [roleResult] = await db.query(roleQuery, [user_id]);
+
+      if (!roleResult.length) {
+        return errorResponse(res, "User not found", "Invalid user_id", 404);
+      }
+
+      const role_id = roleResult[0].role_id;
+
+      // Step 2: If role_id is 3, find team members
+      if (role_id === 3) {
+        const reportingQuery = `
+          SELECT u.id 
+          FROM users u
+          JOIN teams t ON t.id = u.team_id
+          WHERE t.reporting_user_id = ?`;
+        
+        const [teamUsers] = await db.query(reportingQuery, [user_id]);
+
+        if (teamUsers.length > 0) {
+          effectiveUserIds = teamUsers.map((user) => user.id);
+        }
+      } else {
+        effectiveUserIds.push(user_id);
+      }
+    }
+
+    const taskConditions = [];
     const subtaskConditions = [];
+    const taskValues = [];
     const subtaskValues = [];
 
-    // Task-specific filters
+    // Apply user_id filter only if it's present
+    if (user_id) {
+      taskConditions.push(`t.user_id IN (${effectiveUserIds.map(() => '?').join(',')})`);
+      subtaskConditions.push(`st.user_id IN (${effectiveUserIds.map(() => '?').join(',')})`);
+      taskValues.push(...effectiveUserIds);
+      subtaskValues.push(...effectiveUserIds);
+    }
+
     if (project_id) {
       taskConditions.push("t.project_id = ?");
+      subtaskConditions.push("st.project_id = ?");
       taskValues.push(project_id);
-    }
-    if (user_id) {
-      taskConditions.push("t.user_id = ?");
-      taskValues.push(user_id);
+      subtaskValues.push(project_id);
     }
     if (date) {
       taskConditions.push("DATE(t.created_at) = ?");
-      taskValues.push(date);
-    }
-    if (search) {
-      const searchTerm = `%${search}%`;
-      taskConditions.push(
-        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
-      );
-      taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
-    }
-
-    // Subtask-specific filters
-    if (project_id) {
-      subtaskConditions.push("st.project_id = ?");
-      subtaskValues.push(project_id);
-    }
-    if (user_id) {
-      subtaskConditions.push("st.user_id = ?");
-      subtaskValues.push(user_id);
-    }
-    if (date) {
       subtaskConditions.push("DATE(st.created_at) = ?");
+      taskValues.push(date);
       subtaskValues.push(date);
     }
     if (search) {
       const searchTerm = `%${search}%`;
-      subtaskConditions.push(
-        `(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ?)`
-      );
-      subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      taskConditions.push("(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)");
+      subtaskConditions.push("(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)");
+      taskValues.push(searchTerm, searchTerm, searchTerm);
+      subtaskValues.push(searchTerm, searchTerm, searchTerm);
     }
 
-    const taskWhereClause =
-      taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
-    const subtaskWhereClause =
-      subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
+    const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
+    const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
 
-    // Query to fetch subtasks with status = 2
+    // Fetch Subtasks
     const subtasksQuery = `
       SELECT 
         pr.name AS project_name,
         st.name AS name,
         tm.name AS team_name,
         DATE_FORMAT(st.created_at, '%Y-%m-%d') AS date,
-        r_assigned.name AS assigned_by_designation,
+        u.designation_id AS assigned_by_designation,
         'Subtask' AS type,
         t.id AS task_id,
         st.id AS subtask_id,
         st.user_id AS subtask_user_id
-      FROM 
-        sub_tasks st
-      LEFT JOIN 
-        tasks t ON t.id = st.task_id
-      LEFT JOIN 
-        users u ON u.id = st.user_id
-      LEFT JOIN 
-        projects pr ON pr.id = t.project_id
-      LEFT JOIN 
-        teams tm ON tm.id = u.team_id
-      LEFT JOIN 
-        users u_assigned ON u_assigned.id = t.assigned_user_id
-      LEFT JOIN 
-        roles r_assigned ON r_assigned.id = u_assigned.role_id
-      WHERE 
-        st.status = 2
-        AND st.deleted_at IS NULL
-        ${subtaskWhereClause}
-        ORDER BY 
-        st.id
+      FROM sub_tasks st
+      LEFT JOIN tasks t ON t.id = st.task_id
+      LEFT JOIN users u ON u.id = st.user_id
+      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN teams tm ON tm.id = u.team_id
+      LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
+      WHERE st.status = 2 AND st.deleted_at IS NULL ${subtaskWhereClause}
+      ORDER BY st.id
     `;
 
-    // Query to fetch tasks without subtasks
+    // Fetch Tasks
     const tasksQuery = `
       SELECT 
         pr.name AS project_name,
         t.name AS name,
         tm.name AS team_name,
         DATE_FORMAT(t.created_at, '%Y-%m-%d') AS date,
-        r_assigned.name AS assigned_by_designation,
+        u.designation_id AS assigned_by_designation,
         'Task' AS type,
         t.id AS task_id,
         NULL AS subtask_id,
         t.user_id AS task_user_id
-      FROM 
-        tasks t
-      LEFT JOIN 
-        users u ON u.id = t.user_id
-      LEFT JOIN 
-        projects pr ON pr.id = t.project_id
-      LEFT JOIN 
-        teams tm ON tm.id = u.team_id
-      LEFT JOIN 
-        users u_assigned ON u_assigned.id = t.assigned_user_id
-      LEFT JOIN 
-        roles r_assigned ON r_assigned.id = u_assigned.role_id
-      WHERE 
-        t.deleted_at IS NULL
-        AND t.status = 2
+      FROM tasks t
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN teams tm ON tm.id = u.team_id
+      LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
+      WHERE t.deleted_at IS NULL AND t.status = 2 
         AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
         ${taskWhereClause}
-        ORDER BY 
-        t.id
+      ORDER BY t.id
     `;
 
-    // Execute both queries
+    // Execute queries
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
     const [tasks] = await db.query(tasksQuery, taskValues);
 
-    // Combine the results
+    // Merge and process results
     const mergedResults = [...subtasks, ...tasks];
 
-    // Fetch assignee names and remove user_id
+    // Fetch assignee names
     const processedData = await Promise.all(
       mergedResults.map(async (item) => {
-        const assigneeUserId = item.subtask_id
-          ? item.subtask_user_id
-          : item.task_user_id;
+        const assigneeUserId = item.subtask_id ? item.subtask_user_id : item.task_user_id;
         const assigneeNameQuery = `SELECT COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS assignee_name FROM users WHERE id = ?`;
         const [results] = await db.query(assigneeNameQuery, [assigneeUserId]);
         item.assignee_name = results[0] ? results[0].assignee_name : "Unknown";
@@ -783,12 +773,12 @@ exports.projectRequest = async (req, res) => {
       })
     );
 
-    // Pagination logic
+    // Pagination
     const totalRecords = processedData.length;
     const paginatedData = processedData.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
-    // Add serial numbers to the paginated data
+    // Add serial numbers
     const data = paginatedData.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
@@ -806,6 +796,7 @@ exports.projectRequest = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
 
 
 exports.getRequestupdate = async (req, res) => {
