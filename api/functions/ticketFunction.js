@@ -146,8 +146,8 @@ exports.getTickets = async (id, res) => {
             )`;
 
             const searchPattern = `%${search}%`;
-            values.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-            countValues.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+            values.push(searchPattern, searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
+            countValues.push(searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
         // Pagination
