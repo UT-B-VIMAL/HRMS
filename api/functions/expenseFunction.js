@@ -1222,6 +1222,7 @@ exports.getExpenseReport = async (queryParams, res) => {
       WHERE 
          expenses.deleted_at IS NULL AND
          users.deleted_at IS NULL
+         AND expenses.pm_status = 2
          AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
          ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)" : ""}
          ${category ? "AND expenses.category IN (?)" : ""}
