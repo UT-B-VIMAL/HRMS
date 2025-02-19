@@ -1403,6 +1403,7 @@ exports.fetchTlviewproductdata = async (req, res) => {
       ReOpenCount: groupedTasks["Re Open"].length,
       TaskCount: taskCount,
       OverallCompletionPercentage: overallCompletionPercentage,
+      completedItems: completedItems,
       productname: product.name,
       productid: product.id,
     };
