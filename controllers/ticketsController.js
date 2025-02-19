@@ -8,7 +8,7 @@ const {getAlltickets,getTickets,updateTickets}= require("../api/functions/ticket
 
 exports.createTicket = async (req, res) => {
     try {
-      const { user_id, issue_type, description, created_by } = req.body;
+      const { user_id, issue_type,issue_date=null, description, created_by } = req.body;
 
 
       const missingFields = [];
@@ -37,14 +37,14 @@ exports.createTicket = async (req, res) => {
       }
   
       const [result] = await db.execute(
-        'INSERT INTO tickets (user_id, issue_type, description, file_name, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
-        [user_id, issue_type, description, fileUrl, created_by]
+        'INSERT INTO tickets (user_id, issue_type, issue_date,description, file_name, created_by, created_at, updated_at) VALUES (?, ?,?, ?, ?, ?, NOW(), NOW())',
+        [user_id, issue_type,issue_date, description, fileUrl, created_by]
       );
   
       // Return success response
       return successResponse(
         res,
-        { id: result.insertId, user_id, issue_type, description, file_url: fileUrl, created_by },
+        { id: result.insertId, user_id, issue_type,issue_date, description, file_url: fileUrl, created_by },
         "Ticket created successfully",
         201
       );
