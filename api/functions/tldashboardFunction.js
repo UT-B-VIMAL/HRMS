@@ -404,6 +404,7 @@ exports.fetchTLproducts = async (req, res) => {
           product_name: product.name,
           task_count: tasks.length,
           completed_percentage: completionPercentage,
+          completed_items: completedItems,
           employee_count: workingEmployees.size,
           employees: employeeList,
         };
@@ -1403,7 +1404,6 @@ exports.fetchTlviewproductdata = async (req, res) => {
       ReOpenCount: groupedTasks["Re Open"].length,
       TaskCount: taskCount,
       OverallCompletionPercentage: overallCompletionPercentage,
-      completedItems: completedItems,
       productname: product.name,
       productid: product.id,
     };
