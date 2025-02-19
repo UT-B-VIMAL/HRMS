@@ -11,6 +11,7 @@ exports.getTickets = async (id, res) => {
             t.created_at,
             t.description,
             i.issue_name AS issue_type,
+            CONVERT_TZ(t.issue_date, '+00:00', '+05:30') AS issue_date,
             t.status,
             CASE 
                 WHEN t.status = 0 THEN 'Pending'
@@ -64,6 +65,7 @@ exports.getTickets = async (id, res) => {
                 t.created_at,
                 t.description,
                 i.issue_name AS issue_type,
+                CONVERT_TZ(t.issue_date, '+00:00', '+05:30') AS issue_date,
                 t.status,
                 CASE 
                     WHEN t.status = 0 THEN 'Pending'
@@ -128,6 +130,7 @@ exports.getTickets = async (id, res) => {
                 OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
+                OR t.issue_date LIKE ?
                 OR t.status LIKE ? 
                 OR t.file_name LIKE ?
             )`;
@@ -137,13 +140,14 @@ exports.getTickets = async (id, res) => {
                 OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
+                OR t.issue_date LIKE ?
                 OR t.status LIKE ? 
                 OR t.file_name LIKE ?
             )`;
 
             const searchPattern = `%${search}%`;
-            values.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-            countValues.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+            values.push(searchPattern, searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
+            countValues.push(searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
         // Pagination
@@ -155,6 +159,8 @@ exports.getTickets = async (id, res) => {
 
         // Execute the queries
         const [result] = await db.query(query, values);
+        console.log(result);
+
         const [countResult] = await db.query(countQuery, countValues);
         const totalRecords = countResult[0]?.total_records || 0;
 
