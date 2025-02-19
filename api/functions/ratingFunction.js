@@ -446,6 +446,7 @@ exports.getRatings = async (req, res) => {
         joining_date:user.joining_date,
         employee_name: user.first_name,
         team: user.team_name,
+        user_type:  user.role_id === 4?  "Employee" :user.role_id === 3?  "TL": "PM",
         raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
         overall_score: user.role_id === 3? overallScore * 2 : overallScore
       };
