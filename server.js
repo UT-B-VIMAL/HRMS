@@ -10,6 +10,7 @@ const bodyParser = require("./middleware/bodyParser");
 const globalErrorHandler = require("./middleware/errorHandler");
 const loginController = require('./controllers/loginController');
 const userController = require('./controllers/userController');
+const profileController = require('./controllers/profileController'); 
 const productController = require('./controllers/productController');
 const taskController = require('./controllers/taskController');
 const subtaskController = require('./controllers/subtaskcontroller');
@@ -265,6 +266,7 @@ apiRouter.post('/logout', loginController.logout);
 apiRouter.put('/change_password/:id',RoleController.checkRole(),loginController.changePassword);
 apiRouter.post('/forgot_password',loginController.forgotPassword);
 apiRouter.post('/reset_password',loginController.reset_password);
+apiRouter.post('/profile', profileController.createOrUpdateProfile);
 
 // User Routes
 apiRouter.post('/user',RoleController.checkRole(), userController.createUser);

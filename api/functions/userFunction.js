@@ -7,7 +7,7 @@ const { createUserInKeycloak, deleteUserInKeycloak, editUserInKeycloak } = requi
 // Create User
 exports.createUser = async (payload, res) => {
   const {
-    first_name, last_name, employee_id, email, phone,
+    first_name, last_name, employee_id, email,
     password, team_id, role_id, designation_id,
     created_by, created_at = new Date(), updated_at = new Date(), deleted_at = null
   } = payload;
@@ -33,14 +33,14 @@ exports.createUser = async (payload, res) => {
     // Insert the user into the database
     const query = `  
       INSERT INTO users (
-        first_name, last_name, employee_id, email, phone,
+        first_name, last_name, employee_id, email,
         password, team_id, role_id, designation_id,
         created_by, deleted_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
 
     const values = [
-      first_name, last_name, employee_id, email, phone,
+      first_name, last_name, employee_id, email,
       hashedPassword, team_id, role_id, designation_id,
       created_by, deleted_at
     ];
@@ -207,7 +207,6 @@ exports.updateUser = async (id, payload, res) => {
     last_name,
     keycloak_id,
     email,
-    phone,
     employee_id,
     team_id,
     role_id,
@@ -250,7 +249,7 @@ if (existingemail.length > 0) {
 
   let query = `
     UPDATE users SET
-      first_name = ?, last_name = ?, email = ?, phone = ?,employee_id = ?,
+      first_name = ?, last_name = ?, email = ?,employee_id = ?,
       team_id = ?, role_id = ?, designation_id = ?, updated_by = ?, updated_at = NOW() 
     WHERE id = ?
   `;
@@ -260,7 +259,6 @@ if (existingemail.length > 0) {
     first_name,
     last_name,
     email,
-    phone,
     employee_id,
     team_id,
     role_id,

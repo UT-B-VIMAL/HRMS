@@ -41,7 +41,7 @@ exports.getTickets = async (id, res) => {
   };
   
 
-  exports.getAlltickets = async (req, res) => {
+exports.getAlltickets = async (req, res) => {
     const { user_id, search, status, flag = 0, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
@@ -55,7 +55,6 @@ exports.getTickets = async (id, res) => {
     }
 
     try {
-        // Base queries
         let query = `
             SELECT 
                 (@rownum := @rownum + 1) AS s_no,
@@ -75,17 +74,15 @@ exports.getTickets = async (id, res) => {
                     ELSE 'Unknown'
                 END AS status_type,
                 t.file_name,
-                COALESCE((
-                    SELECT COUNT(*) 
-                    FROM ticket_comments tc
-                    WHERE tc.ticket_id = t.id
-                    AND tc.receiver_id = ? 
-                    AND tc.type = 0
-                ), 0) AS unread_counts
+                COALESCE((SELECT COUNT(*) 
+                          FROM ticket_comments tc
+                          WHERE tc.ticket_id = t.id
+                          AND tc.receiver_id = ? 
+                          AND tc.type = 0), 0) AS unread_counts
             FROM tickets t
             LEFT JOIN users u ON t.user_id = u.id 
             LEFT JOIN issue_types i ON t.issue_type = i.id,
-            (SELECT @rownum := ?) AS r  -- Initialize @rownum variable
+            (SELECT @rownum := ${offset || 0}) AS r
             WHERE t.deleted_at IS NULL
         `;
 
@@ -100,22 +97,18 @@ exports.getTickets = async (id, res) => {
         let values = [users.id];
         let countValues = [];
 
-        // Role-based filtering
-        if (users.role_id === 1) {
-            if (flag == 1) {
-                query += ` AND t.created_by = ?`;
-                countQuery += ` AND t.created_by = ?`;
-                values.push(users.id);
-                countValues.push(users.id);
-            }
-        } else {
+        if (users.role_id === 1 && flag == 1) {
+            query += ` AND t.created_by = ?`;
+            countQuery += ` AND t.created_by = ?`;
+            values.push(users.id);
+            countValues.push(users.id);
+        } else if (users.role_id !== 1) {
             query += ` AND t.created_by = ?`;
             countQuery += ` AND t.created_by = ?`;
             values.push(users.id);
             countValues.push(users.id);
         }
 
-        // Status filtering
         if (status) {
             query += ` AND t.status = ?`;
             countQuery += ` AND t.status = ?`;
@@ -123,7 +116,6 @@ exports.getTickets = async (id, res) => {
             countValues.push(parseInt(status));
         }
 
-        // Search filtering
         if (search) {
             query += ` AND (
                 t.user_id LIKE ? 
@@ -150,21 +142,13 @@ exports.getTickets = async (id, res) => {
             countValues.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
-        // Pagination
         query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
         values.push(parseInt(perPage), parseInt(offset));
 
-        // Set the starting value of @rownum based on the previous page's rows
-        query = query.replace('@rownum := ?', `@rownum := ${offset}`);
-
-        // Execute the queries
         const [result] = await db.query(query, values);
-        console.log(result);
-
         const [countResult] = await db.query(countQuery, countValues);
-        const totalRecords = countResult[0]?.total_records || 0;
 
-        // Pagination metadata
+        const totalRecords = countResult[0]?.total_records || 0;
         const pagination = getPagination(page, perPage, totalRecords);
 
         return successResponse(
@@ -179,6 +163,7 @@ exports.getTickets = async (id, res) => {
         return errorResponse(res, error.message, 'Error retrieving tickets', 500);
     }
 };
+
 
 
 
