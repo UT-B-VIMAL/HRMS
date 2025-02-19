@@ -447,7 +447,7 @@ exports.getRatings = async (req, res) => {
         employee_name: user.first_name,
         team: user.team_name,
         raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
-        overall_score: overallScore
+        overall_score: user.role_id === 3? overallScore * 2 : overallScore
       };
     });
 
