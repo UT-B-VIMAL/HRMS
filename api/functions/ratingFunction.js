@@ -32,6 +32,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
     return `COALESCE(ROUND(SUM(CASE WHEN SUBSTRING(ratings.month, 6, 2) = '${monthNum}' THEN ratings.average END), 1), '-') AS ${month}`;
   }).join(', ');
 
+  // Main query for the paginated data
   let query = `
     SELECT 
       users.id AS user_id,
@@ -61,7 +62,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       AND YEAR(users.created_at) <= ?
   `;
 
-  const queryParams = [year,year];
+  const queryParams = [year, year];
 
   if (search && search.trim() !== "") {
     const searchWildcard = `%${search.trim()}%`;
@@ -75,6 +76,38 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
     queryParams.push(searchWildcard, searchWildcard, searchWildcard);
   }
 
+  // Query for counting total records (without pagination)
+  let countQuery = `
+    SELECT 
+      COUNT(DISTINCT users.id) AS totalRecords
+    FROM 
+      users
+    LEFT JOIN 
+      teams ON users.team_id = teams.id
+    LEFT JOIN 
+      ratings ON users.id = ratings.user_id
+      AND SUBSTRING(ratings.month, 1, 4) = ? 
+    WHERE 
+      users.role_id NOT IN (1,2)
+      AND users.deleted_at IS NULL
+      AND YEAR(users.created_at) <= ?
+  `;
+
+  // Apply the same conditions for the count query
+  const countQueryParams = [...queryParams];
+  if (search && search.trim() !== "") {
+    const searchWildcard = `%${search.trim()}%`;
+    countQuery += `
+      AND (
+        users.first_name LIKE ? 
+        OR users.employee_id LIKE ? 
+        OR teams.name LIKE ?
+      )
+    `;
+    countQueryParams.push(searchWildcard, searchWildcard, searchWildcard);
+  }
+
+  // Add pagination to the main query
   query += ` 
     GROUP BY users.id, users.first_name, users.employee_id, teams.name
     LIMIT ? OFFSET ?
@@ -82,13 +115,20 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
   queryParams.push(parseInt(perPage, 10), offset);
 
   try {
+    // Execute the count query for total records
+    const [countResult] = await db.query(countQuery, countQueryParams);
+    const totalRecords = countResult[0]?.totalRecords || 0;
+
+    // Execute the main query for paginated data
     const [result] = await db.query(query, queryParams);
 
-    const totalRecords = result.length > 0 ? result.length : 0;
+    // Add serial numbers to rows
     const rowsWithSerialNo = result.map((row, index) => ({
       s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
       ...row,
     }));
+
+    // Calculate pagination
     const pagination = getPagination(page, perPage, totalRecords);
 
     return successResponse(
@@ -102,6 +142,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
     return errorResponse(res, error.message, "Error fetching ratings", 500);
   }
 };
+
 
 
 
