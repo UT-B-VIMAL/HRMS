@@ -39,6 +39,8 @@ exports.getAttendance = async (req, res) => {
           u.created_at AS joining_date,
           el.day_type, 
           el.date AS leave_date, 
+          el.half_type as half_type_val,
+          el.day_type as day_type_val,
           CASE 
             WHEN el.day_type = 1 THEN 'Absent'
             WHEN el.day_type = 2 THEN 'Half Day'
