@@ -27,7 +27,7 @@ exports.fetchPendingTask = async (req, res) => {
           p.name AS project_name
         FROM tasks t
         LEFT JOIN projects p ON t.project_id = p.id
-        WHERE t.status != 3 AND t.deleted_at IS NULL
+        WHERE t.status != 3 AND NOT (t.status = 2 AND t.reopen_status = 0) AND t.deleted_at IS NULL
       `;
       const [tasks] = await db.query(tasksQuery);
   
@@ -43,7 +43,7 @@ exports.fetchPendingTask = async (req, res) => {
               st.status AS subtask_status,
               st.user_id AS subtask_user_id
             FROM sub_tasks st
-            WHERE st.task_id = ? AND st.deleted_at IS NULL
+            WHERE st.task_id = ? AND NOT (st.status = 2 AND st.reopen_status = 0) AND st.deleted_at IS NULL
           `;
           const [subtasks] = await db.query(subtasksQuery, [task.task_id]);
   

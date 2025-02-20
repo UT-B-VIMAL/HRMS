@@ -108,6 +108,7 @@ exports.fetchProducts = async (payload, res) => {
           product_name: product.name,
           total_tasks: tasks.length,
           completed_percentage: completionPercentage,
+          completed_items: completedItems,
           employee_count: workingEmployees.size,
           employees: employeeList,
         };

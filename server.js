@@ -362,12 +362,9 @@ apiRouter.get('/empratings',RoleController.checkRole(), empdashboardController.e
 apiRouter.get('/teamwise_productivity', RoleController.checkRole(),productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', RoleController.checkRole(),productivityController.get_individualProductivity);
 
-//Rating
-apiRouter.get('/getAnnualRatings', RoleController.checkRole(),ratingController.getAnnualRatings);
-apiRouter.get('/getAllRatings', RoleController.checkRole(),ratingController.getAllRatings);
-apiRouter.post('/ratingUpdation', RoleController.checkRole(), ratingController.ratingUpdation);
 
-//phase -2
+
+//rating
 apiRouter.post('/updateRating', RoleController.checkRole(), ratingController.ratingUpdations);
 apiRouter.get('/getRating', RoleController.checkRole(), ratingController.getRating);
 apiRouter.get('/getAllUserRating', RoleController.checkRole(), ratingController.getAllUserRating);

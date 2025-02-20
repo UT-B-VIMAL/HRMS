@@ -48,15 +48,15 @@ const {
     try {
       const { id } = req.params;
       const payload = req.body;
-      const { error } = updateExpenseSchema.validate(payload, { abortEarly: false });
-      if (error) {
-        const errorMessages = error.details.reduce((acc, err) => {
-          acc[err.path[0]] = err.message;
-          return acc;
-        }, {});
+      // const { error } = updateExpenseSchema.validate(payload, { abortEarly: false });
+      // if (error) {
+      //   const errorMessages = error.details.reduce((acc, err) => {
+      //     acc[err.path[0]] = err.message;
+      //     return acc;
+      //   }, {});
   
-        return errorResponse(res, errorMessages, "Validation Error", 403);
-      }
+      //   return errorResponse(res, errorMessages, "Validation Error", 403);
+      // }
   
       await updateexpenses(id, req, res);
     } catch (error) {

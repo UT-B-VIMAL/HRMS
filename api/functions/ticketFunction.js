@@ -138,8 +138,8 @@ exports.getAlltickets = async (req, res) => {
             )`;
 
             const searchPattern = `%${search}%`;
-            values.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-            countValues.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+            values.push(searchPattern, searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
+            countValues.push(searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
         query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
