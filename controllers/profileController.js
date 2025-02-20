@@ -23,12 +23,21 @@ exports.createOrUpdateProfile = async (req, res) => {
     }
 };
 
+
+const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+};
+
 exports.getProfile = async (req, res) => {
     try {
         const { id } = req.params;
 
         if (!id) {
-            return res.status(400).json(errorResponse('User ID is required'));
+            return errorResponse(res, null, 'User ID is required', 400);
         }
 
         const query = `
@@ -39,15 +48,20 @@ exports.getProfile = async (req, res) => {
         const [profile] = await db.query(query, [id]);
 
         if (!profile || profile.length === 0) {
-            return res.status(404).json(errorResponse('Profile not found'));
+            return errorResponse(res, null, 'Profile not found', 404);
         }
 
-        return res.status(200).json(successResponse('Profile retrieved successfully', profile[0]));
+        // Format the DOB in DD-MM-YYYY format
+        profile[0].dob = formatDate(profile[0].dob);
+
+        // Return the formatted response
+        return successResponse(res, profile[0], 'Profile retrieved successfully');
     } catch (error) {
         console.error('Error retrieving profile:', error.message);
-        return res.status(500).json(errorResponse('Error retrieving profile', error.message));
+        return errorResponse(res, error.message, 'Error retrieving profile', 500);
     }
 };
+
 
 
 
