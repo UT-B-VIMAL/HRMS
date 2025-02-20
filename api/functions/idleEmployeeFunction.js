@@ -121,6 +121,7 @@ exports.get_idleEmployee = async (req, res) => {
       s_no: offset + index + 1,
       ...row,
       pending_tasks: await getPendingTasksCount(row.id), // Fetch pending task count
+      idle_reason: await getIdleReason(row.id),
     })));
 
     successResponse(
@@ -177,6 +178,44 @@ const getPendingTasksCount = async (userId) => {
     throw new Error("Error retrieving pending tasks count");
   }
 };
+
+const getIdleReason = async (userId) => {
+  try {
+    const [subTasks] = await db.query(
+      `SELECT status, active_status 
+       FROM sub_tasks 
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    const [tasks] = await db.query(
+      `SELECT status, active_status 
+       FROM tasks 
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    const allTasks = [...subTasks, ...tasks];
+
+    if (allTasks.length === 0 || allTasks.every(task => task.status === 3)) {
+      return "Task Unassigned";
+    }
+
+    if (allTasks.some(task => task.status === 1 && task.active_status === 0)) {
+      return "On Hold";
+    }
+
+    if (allTasks.some(task => task.status === 0 && task.active_status === 0)) {
+      return "Task Not Yet Started";
+    }
+
+    return "Task Unassigned"; 
+  } catch (error) {
+    console.error("Error in getIdleReason:", error);
+    return "Error retrieving idle reason";
+  }
+};
+
 
 
 
