@@ -209,17 +209,18 @@ exports.getAuthUserDetails = async (authUserId, res) => {
 
   exports.formatTimeDHMS = (time) => {
     if (time === "00:00:00") {
-        return "0m";
+        return "0m 0s";
     }
 
-    const [hours, minutes] = time.split(":").map(Number);
-    const totalMinutes = hours * 60 + minutes;
+    const [hours, minutes, seconds] = time.split(":").map(Number);
+    const totalSeconds = hours * 3600 + minutes * 60 + seconds;
 
-    const days = Math.floor(totalMinutes / (8 * 60)); // 8 hours per day
-    const remainingMinutes = totalMinutes % (8 * 60);
+    const days = Math.floor(totalSeconds / (8 * 3600)); // 8 hours per day
+    const remainingSeconds = totalSeconds % (8 * 3600);
 
-    const remainingHours = Math.floor(remainingMinutes / 60);
-    const finalMinutes = remainingMinutes % 60;
+    const remainingHours = Math.floor(remainingSeconds / 3600);
+    const remainingMinutes = Math.floor((remainingSeconds % 3600) / 60);
+    const finalSeconds = remainingSeconds % 60;
 
     let result = '';
     if (days > 0) {
@@ -228,12 +229,16 @@ exports.getAuthUserDetails = async (authUserId, res) => {
     if (remainingHours > 0) {
         result += `${remainingHours}h `;
     }
-    if (finalMinutes > 0 || result === '') {
-        result += `${finalMinutes}m`;
+    if (remainingMinutes > 0) {
+        result += `${remainingMinutes}m `;
+    }
+    if (finalSeconds > 0 || result === '') {
+        result += `${finalSeconds}s`;
     }
 
     return result.trim();
 };
+
   
 exports.getISTTime = () => {
     const now = new Date();
