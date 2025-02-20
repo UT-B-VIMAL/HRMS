@@ -97,3 +97,24 @@ exports.deleteFileFromS3 = async (fileUrl) => {
     throw new Error("Error deleting file from S3");
   }
 };
+
+exports.uploadProfileFileToS3 = async (fileContent, fileName) => {
+  const params = {
+    Bucket: "unity-hrms", // Add bucket name as a string
+    Key: `profile/${fileName}`, 
+    Body: fileContent, 
+    ContentType: 'image/jpeg', // Assuming all profile files are JPEG
+    ACL: 'public-read',
+  };
+
+  try {
+    const command = new PutObjectCommand(params);
+    const response = await s3Client.send(command);
+    console.log('Profile upload success:', response);
+
+    return `unity-hrms.s3.ap-south-1.amazonaws.com/profile/${fileName}`;
+  } catch (error) {
+    console.error('Error uploading profile file to S3:', error.message);
+    throw new Error("Error uploading profile file to S3");
+  }
+};

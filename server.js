@@ -267,6 +267,7 @@ apiRouter.put('/change_password/:id',RoleController.checkRole(),loginController.
 apiRouter.post('/forgot_password',loginController.forgotPassword);
 apiRouter.post('/reset_password',loginController.reset_password);
 apiRouter.post('/profile', profileController.createOrUpdateProfile);
+apiRouter.get('/profile/:id', profileController.getProfile);
 
 // User Routes
 apiRouter.post('/user',RoleController.checkRole(), userController.createUser);
