@@ -73,7 +73,7 @@ exports.getAlltickets = async (req, res) => {
                     WHEN t.status = 3 THEN 'Rejected'
                     ELSE 'Unknown'
                 END AS status_type,
-                t.file_name,
+               CONCAT('https://', t.file_name) AS file_name,
                 COALESCE((SELECT COUNT(*) 
                           FROM ticket_comments tc
                           WHERE tc.ticket_id = t.id
