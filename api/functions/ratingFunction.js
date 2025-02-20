@@ -281,9 +281,11 @@ exports.getRatings = async (req, res) => {
 
     const values = [];
     let whereClause = " WHERE users.role_id != 1 AND users.deleted_at IS NULL";
+    
     if (users.role_id === 2) {
       whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
     }
+    
     if (team_id) {
       whereClause += ' AND users.team_id = ?';
       values.push(team_id);
@@ -317,76 +319,96 @@ exports.getRatings = async (req, res) => {
 
     // Get paginated users
     const userQuery = `
-      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name,users.created_at as joining_date,role_id
+      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name, users.created_at as joining_date, role_id
       FROM users
       LEFT JOIN teams ON users.team_id = teams.id
       ${whereClause}
       ORDER BY users.id
       LIMIT ? OFFSET ?`;
+      
     values.push(parseInt(perPage, 10), parseInt(offset, 10));
 
     const [userResults] = await db.query(userQuery, values);
+    
     if (userResults.length === 0) {
       return successResponse(res, [], 'No ratings found', 200, getPagination(page, perPage, totalRecords));
     }
 
     const userIds = userResults.map(user => user.user_id);
     const ratingQuery = `
-      SELECT r.*, ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average ,status
+      SELECT r.*, ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average, status
       FROM ratings r 
       WHERE r.user_id IN (?) AND r.month = ?`;
       
-
-
     const [ratingResults] = await db.query(ratingQuery, [userIds, selectedMonth]);
-    
+
     const groupedResults = userResults.map((user, index) => {
       const employeeRatings = ratingResults.filter(rating => rating.user_id === user.user_id);
-      const defaultRatings = [
-        { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-" },
-        { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-" }
-      ];
-      employeeRatings.forEach(rating => {
-
-        const index = rating.rater === "TL" ? 0 : 1;
-       if(rating.updated_by == user_id || rating.status == 1) {
-        defaultRatings[index] = {
-          rater: rating.rater,
-          quality: rating.quality,
-          role_id: user.role_id,
-          joining_date: user.joining_date,
-          timelines: rating.timelines,
-          agility: rating.agility,
-          attitude: rating.attitude,
-          responsibility: rating.responsibility,
-          average: rating.average !== null ? parseFloat(rating.average).toFixed(1) : "-",
-          rating_id: rating.id,
-          status: rating.status,
-          remarks: rating.remarks && rating.remarks.trim() ? rating.remarks : "-"
-        };
-       }else{
-        defaultRatings[index].status = rating.status;
-        defaultRatings[index].rating_id= rating.id;
-       }
       
+      const defaultRatings = [
+        { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-", status: 0 },
+        { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-", status: 0 }
+      ];
+
+      employeeRatings.forEach(rating => {
+        const index = rating.rater === "TL" ? 0 : 1;
+        
+        if (rating.updated_by == user_id || rating.status == 1) {
+          defaultRatings[index] = {
+            rater: rating.rater,
+            quality: rating.quality,
+            role_id: user.role_id,
+            joining_date: user.joining_date,
+            timelines: rating.timelines,
+            agility: rating.agility,
+            attitude: rating.attitude,
+            responsibility: rating.responsibility,
+            average: rating.average !== null ? parseFloat(rating.average).toFixed(1) : "-",
+            rating_id: rating.id,
+            status: rating.status,
+            remarks: rating.remarks && rating.remarks.trim() ? rating.remarks : "-"
+          };
+        } else {
+          defaultRatings[index].status = rating.status;
+          defaultRatings[index].rating_id = rating.id;
+        }
       });
 
-      const overallScore = employeeRatings.length
-        ? (employeeRatings.reduce((acc, curr) => acc + (curr.average || 0), 0) / employeeRatings.length).toFixed(1)
-        : "-";
+      // Fixing overall score calculation
+      const tlRating = defaultRatings.find(r => r.rater === "TL") || {};
+      const pmRating = defaultRatings.find(r => r.rater === "PM") || {};
+
+      const tlScore = tlRating.average !== "-" ? parseFloat(tlRating.average) : null;
+      const pmScore = pmRating.average !== "-" ? parseFloat(pmRating.average) : null;
+
+      let overallScore;
+      if (tlScore !== null && pmScore !== null) {
+        overallScore = (tlScore + pmScore).toFixed(1);
+      } else if (tlScore !== null) {
+        overallScore = tlScore.toFixed(1);
+      } else if (pmScore !== null) {
+        overallScore = pmScore.toFixed(1);
+      } else {
+        overallScore = "-";
+      }
+
+      // Adjust for TLs
+      if (user.role_id === 3 && overallScore !== "-") {
+        overallScore = (parseFloat(overallScore) * 2).toFixed(1);
+      }
 
       return {
         s_no: offset + index + 1,
         employee_id: user.employee_id,
         user_id: user.user_id,
-        role_id:user.role_id,
+        role_id: user.role_id,
         month: selectedMonth,
-        joining_date:user.joining_date,
+        joining_date: user.joining_date,
         employee_name: user.first_name,
         team: user.team_name,
-        user_type:  user.role_id === 4?  "Employee" :user.role_id === 3?  "TL": "PM",
+        user_type: user.role_id === 4 ? "Employee" : user.role_id === 3 ? "TL" : "PM",
         raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
-        overall_score: user.role_id === 3? overallScore * 2 : overallScore
+        overall_score: overallScore
       };
     });
 
