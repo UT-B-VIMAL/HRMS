@@ -348,18 +348,12 @@ exports.getAllexpense = async (req, res) => {
 
 // Update Expense
 exports.updateexpenses = async (id, req, res) => {
-  const {
-    date,
-    category,
-    amount,
-    user_id,
-    description,
-    updated_by,
-  } = req.body;
+  const { date, category, amount, user_id, description, updated_by } = req.body;
 
   try {
+    // Fetch the existing expense details
     const expenseQuery = `
-      SELECT id 
+      SELECT * 
       FROM expense_details 
       WHERE deleted_at IS NULL AND id = ?
     `;
@@ -374,30 +368,31 @@ exports.updateexpenses = async (id, req, res) => {
       );
     }
 
-    // Fetch project details
-    
+    const oldExpense = expenseResult[0];
 
-    // Fetch user details
-    const userQuery = `
-      SELECT id, team_id 
-      FROM users 
-      WHERE deleted_at IS NULL AND id = ?
-    `;
-    const [userResult] = await db.query(userQuery, [user_id]);
+    // Fetch user details if user_id is provided
+    let team_id = oldExpense.team_id; // Default to old value
+    if (user_id) {
+      const userQuery = `
+        SELECT id, team_id 
+        FROM users 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+      const [userResult] = await db.query(userQuery, [user_id]);
 
-    if (userResult.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error updating expense details",
-        404
-      );
+      if (userResult.length === 0) {
+        return errorResponse(
+          res,
+          "User not found or deleted",
+          "Error updating expense details",
+          404
+        );
+      }
+      team_id = userResult[0].team_id;
     }
 
-    const { team_id } = userResult[0];
-
     // Handle file upload if present
-    let fileUrl = null;
+    let fileUrl = oldExpense.file; // Default to old file
     if (req.files && req.files.file) {
       const file = req.files.file;
       const fileBuffer = file.data;
@@ -406,38 +401,58 @@ exports.updateexpenses = async (id, req, res) => {
       fileUrl = await uploadexpenseFileToS3(fileBuffer, uniqueFileName);
     }
 
-    // Construct the update query
+    // Construct the update query dynamically
+    const updateFields = [];
+    const values = [];
+
+    if (user_id) {
+      updateFields.push("user_id = ?");
+      values.push(user_id);
+    }
+    if (category) {
+      updateFields.push("category = ?");
+      values.push(category);
+    }
+    if (team_id) {
+      updateFields.push("team_id = ?");
+      values.push(team_id);
+    }
+    if (description) {
+      updateFields.push("description = ?");
+      values.push(description);
+    }
+    if (amount) {
+      updateFields.push("expense_amount = ?");
+      values.push(amount);
+    }
+    if (date) {
+      updateFields.push("date = ?");
+      values.push(date);
+    }
+    if (fileUrl) {
+      updateFields.push("file = ?");
+      values.push(fileUrl);
+    }
+    if (updated_by) {
+      updateFields.push("updated_by = ?");
+      values.push(updated_by);
+    }
+
+    values.push(id); // Last value is the WHERE condition
+
+    if (updateFields.length === 0) {
+      return errorResponse(res, "No fields to update", "Nothing to update", 400);
+    }
+
     const updateQuery = `
       UPDATE expense_details 
-      SET 
-        user_id = ?, 
-        category = ?, 
-        team_id = ?, 
-        description = ?, 
-        expense_amount = ?, 
-        date = ?, 
-        file = ?, 
-        updated_by = ?, 
-        updated_at = NOW() 
+      SET ${updateFields.join(", ")}, updated_at = NOW()
       WHERE id = ? AND deleted_at IS NULL
     `;
-
-    const values = [
-      user_id,
-      category,
-      team_id,
-      description,
-      amount,
-      date,
-      fileUrl,
-      updated_by,
-      id,
-    ];
 
     // Execute the update query
     const [result] = await db.query(updateQuery, values);
 
-    // Check if any rows were updated
     if (result.affectedRows === 0) {
       return errorResponse(
         res,
@@ -452,7 +467,7 @@ exports.updateexpenses = async (id, req, res) => {
       res,
       {
         id,
-        user_id,
+        user_id: user_id || oldExpense.user_id, // Keep old value if not updated
         updated_by,
       },
       "Expense detail updated successfully",
@@ -468,6 +483,7 @@ exports.updateexpenses = async (id, req, res) => {
     );
   }
 };
+
 
 // Delete Expense
 exports.deleteExpense = async (id, res) => {
