@@ -1,7 +1,6 @@
 const db = require("../../config/db");
 const { uploadexpenseFileToS3 } = require("../../config/s3");
 
-// Core reusable function
 exports.createOrUpdateProfile = async (user_id, profileData, file = null) => {
   const {
     dob,
@@ -11,18 +10,11 @@ exports.createOrUpdateProfile = async (user_id, profileData, file = null) => {
     emergency_contact_no,
     blood_group,
     address,
-    permanent_address
+    permanent_address,
   } = profileData;
 
-  // Validate required fields
-  const missingFields = [];
-  if (!user_id) missingFields.push("user_id");
-  if (!dob) missingFields.push("dob");
-  if (!gender) missingFields.push("gender");
-  if (!mobile_no) missingFields.push("mobile_no");
-
-  if (missingFields.length > 0) {
-    throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+  if (!user_id) {
+    throw new Error("Missing required field: user_id");
   }
 
   let profileImageUrl = null;
@@ -44,34 +36,63 @@ exports.createOrUpdateProfile = async (user_id, profileData, file = null) => {
     profileImageUrl = await uploadexpenseFileToS3(fileBuffer, uniqueFileName);
   }
 
-  console.log("profileImageUrl", profileImageUrl);
-
   // Check if profile exists
   const profileCheckQuery = `SELECT id FROM user_profiles WHERE user_id = ?`;
   const [existingProfile] = await db.query(profileCheckQuery, [user_id]);
 
   if (existingProfile.length > 0) {
     // Update existing profile
-    const updateQuery = `
-      UPDATE user_profiles
-      SET dob = ?, gender = ?, mobile_no = ?, emergency_contact_name = ?, 
-          emergency_contact_no = ?, blood_group = ?, address = ?, 
-          permanent_address = ?, profile_img = ?, updated_at = NOW()
-      WHERE user_id = ?
-    `;
-    const updateValues = [
-      dob,
-      gender,
-      mobile_no,
-      emergency_contact_name,
-      emergency_contact_no,
-      blood_group,
-      address,
-      permanent_address,
-      profileImageUrl,
-      user_id,
-    ];
-    await db.query(updateQuery, updateValues);
+    const updateFields = [];
+    const updateValues = [];
+
+    // Dynamically build the update query based on provided data
+    if (dob) {
+      updateFields.push("dob = ?");
+      updateValues.push(dob);
+    }
+    if (gender) {
+      updateFields.push("gender = ?");
+      updateValues.push(gender);
+    }
+    if (mobile_no) {
+      updateFields.push("mobile_no = ?");
+      updateValues.push(mobile_no);
+    }
+    if (emergency_contact_name) {
+      updateFields.push("emergency_contact_name = ?");
+      updateValues.push(emergency_contact_name);
+    }
+    if (emergency_contact_no) {
+      updateFields.push("emergency_contact_no = ?");
+      updateValues.push(emergency_contact_no);
+    }
+    if (blood_group) {
+      updateFields.push("blood_group = ?");
+      updateValues.push(blood_group);
+    }
+    if (address) {
+      updateFields.push("address = ?");
+      updateValues.push(address);
+    }
+    if (permanent_address) {
+      updateFields.push("permanent_address = ?");
+      updateValues.push(permanent_address);
+    }
+    if (profileImageUrl) {
+      updateFields.push("profile_img = ?");
+      updateValues.push(profileImageUrl);
+    }
+
+    if (updateFields.length > 0) {
+      const updateQuery = `
+        UPDATE user_profiles
+        SET ${updateFields.join(", ")}, updated_at = NOW()
+        WHERE user_id = ?
+      `;
+      updateValues.push(user_id);
+      await db.query(updateQuery, updateValues);
+    }
+
     return { user_id, message: "Profile updated successfully" };
   } else {
     // Insert new profile
@@ -84,17 +105,19 @@ exports.createOrUpdateProfile = async (user_id, profileData, file = null) => {
     `;
     const insertValues = [
       user_id,
-      dob,
-      gender,
-      mobile_no,
-      emergency_contact_name,
-      emergency_contact_no,
-      blood_group,
-      address,
-      permanent_address,
-      profileImageUrl
+      dob || null,
+      gender || null,
+      mobile_no || null,
+      emergency_contact_name || null,
+      emergency_contact_no || null,
+      blood_group || null,
+      address || null,
+      permanent_address || null,
+      profileImageUrl || null,
     ];
     await db.query(insertQuery, insertValues);
     return { user_id, message: "Profile created successfully" };
   }
 };
+
+
