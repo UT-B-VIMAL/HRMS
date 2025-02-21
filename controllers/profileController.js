@@ -45,6 +45,7 @@ exports.getProfile = async (req, res) => {
                 p.user_id,
                 CONCAT(u.first_name, ' ', u.last_name) AS name,
                 u.designation_id AS designation,
+                u.email,
                 t.name as team_name,
                 p.dob,
                 p.gender,
