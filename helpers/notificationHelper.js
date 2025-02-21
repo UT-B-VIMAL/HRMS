@@ -1,4 +1,4 @@
-const userSockets = {}; // Store user socket connections
+const userSockets = {};
 
 const sendNotificationToAdmins = (io, message) => {
   io.emit('admin_notification', { message });

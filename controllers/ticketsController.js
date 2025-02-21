@@ -41,14 +41,11 @@ exports.createTicket = async (req, res) => { // Remove io parameter
       [user_id, issue_type, issue_date, description, fileUrl, created_by]
     );
 
-    // Emit notification to all admins
     sendNotificationToAdmins(io, `A new ticket has been created by user ${user_id}.`);
 
-    // Fetch all users with role_id 1 (admins)
     const [admins] = await db.execute('SELECT id FROM users WHERE role_id = 1');
     const adminIds = admins.map(admin => admin.id);
 
-    // Send push notifications to all admins via socket.io
     if (adminIds.length > 0) {
       const notificationPayload = {
         title: 'New Ticket Created',

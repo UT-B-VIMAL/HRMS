@@ -79,7 +79,7 @@ io.on('connection', (socket) => {
   console.log('Connected User:', socket.id);
 
   socket.on('register', async (data) => {
-    const { userId } = data; // Use userId instead of ticket_id and id
+    const { userId } = data;
     if (connectedUsers[userId]) {
       console.log(`User ${userId} is already connected with socket ID ${connectedUsers[userId]}. Rejecting new connection.`);
       socket.emit('error', 'User is already connected on another socket.');
