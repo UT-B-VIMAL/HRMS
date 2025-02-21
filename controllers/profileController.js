@@ -41,26 +41,40 @@ exports.getProfile = async (req, res) => {
         }
 
         const query = `
-            SELECT user_id, dob, gender, mobile_no, emergency_contact_name, 
-                   emergency_contact_no, blood_group, address, permanent_address, profile_img
-            FROM user_profiles 
-            WHERE user_id = ?`;
+            SELECT 
+                p.user_id,
+                CONCAT(u.first_name, ' ', u.last_name) AS name,
+                u.designation_id AS designation,
+                t.name as team_name,
+                p.dob,
+                p.gender,
+                p.mobile_no,
+                p.emergency_contact_name,
+                p.emergency_contact_no,
+                p.blood_group,
+                p.address,
+                p.permanent_address,
+                p.profile_img
+            FROM user_profiles p
+            LEFT JOIN users u ON p.user_id = u.id
+            LEFT JOIN teams t ON u.team_id = t.id
+            WHERE p.user_id = ?`;
+
         const [profile] = await db.query(query, [id]);
 
         if (!profile || profile.length === 0) {
             return errorResponse(res, null, 'Profile not found', 404);
         }
 
-        // Format the DOB in DD-MM-YYYY format
         profile[0].dob = formatDate(profile[0].dob);
 
-        // Return the formatted response
         return successResponse(res, profile[0], 'Profile retrieved successfully');
     } catch (error) {
         console.error('Error retrieving profile:', error.message);
         return errorResponse(res, error.message, 'Error retrieving profile', 500);
     }
 };
+
 
 
 
