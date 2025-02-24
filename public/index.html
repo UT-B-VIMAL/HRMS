@@ -29,7 +29,7 @@
         document.getElementById('register').addEventListener('click', () => {
             const username = document.getElementById('fromID').value;
             if (username && ticketId) {
-                socket.emit('register', { ticket_id: ticketId, userId: username});
+                socket.emit('register', { ticket_id: ticketId, id: username});
                 socket.emit('read type', { ticket_id: ticketId, user_id: username});
             }
         });
@@ -50,7 +50,13 @@
 
         });
         socket.on('values', (error) => {
-            console.log(error);
+            console.log('values',error);
+            
+
+        });
+        
+        socket.on('msg', (error) => {
+            console.log('msg',error);
             
 
         });
@@ -71,7 +77,7 @@
         });
 
         socket.on('chat message', (data) => {
-            console.log(data);
+            console.log('coming',data);
             
             const { from, message } = data;
             const item = document.createElement('li');
