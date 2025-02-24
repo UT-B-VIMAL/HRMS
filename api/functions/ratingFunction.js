@@ -10,121 +10,7 @@ const { getAuthUserDetails } = require("./commonFunction");
 
 
 
-exports.getAllRatings = async (queryParamsval, res) => {
-  const { search, team_id, page = 1, perPage = 10 } = queryParamsval;
 
-  const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
-
-  const currentMonth = new Date().toISOString().slice(0, 7);
-
-  let query = `
-      SELECT 
-        users.id,
-        users.first_name,
-        users.employee_id,
-        teams.name AS team_name,
-        COALESCE(ratings.rating, 0) AS rating,
-        COALESCE(ratings.average, 0) AS average
-      FROM 
-        users
-      LEFT JOIN 
-        teams ON users.team_id = teams.id
-      LEFT JOIN 
-        ratings ON users.id = ratings.user_id AND ratings.month = ?
-      WHERE 
-        users.role_id != 2 AND users.deleted_at IS NULL
-    `;
-
-  const queryParams = [currentMonth];
-
-  // Add filters for `teamId` and `search`
-  if (team_id) {
-    query += ` AND users.team_id = ?`;
-    queryParams.push(team_id);
-  }
-
-  if (search && search.trim() !== "") {
-    const searchWildcard = `%${search.trim()}%`;
-    query += `
-        AND (
-          users.first_name LIKE ? 
-          OR users.employee_id LIKE ? 
-          OR teams.name LIKE ?
-        )
-      `;
-    queryParams.push(searchWildcard, searchWildcard, searchWildcard);
-  }
-
-  query += " LIMIT ? OFFSET ?";
-  queryParams.push(parseInt(perPage, 10), offset);
-
-  try {
-    const [result] = await db.query(query, queryParams);
-
-    const totalRecords = result.length > 0 ? result.length : 0;
-    const rowsWithSerialNo = result.map((row, index) => ({
-        s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
-        ...row,
-    }));
-   const pagination =getPagination(page, perPage, totalRecords);
-  
-    // Return paginated data with results
-    return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No Ratings found' : 'Ratings fetched successfully', 200, pagination);
-
-  } catch (error) {
-    return errorResponse(res, error.message, "Error fetching ratings", 500);
-  }
-};
-
-
-
-
-
-exports.updateRating = async (payload, res) => {
-  const { average, rating, user_id,updated_by } = payload;
-
-  const { error } = ratingSchema.validate(
-    { average, rating, user_id,updated_by },
-    { abortEarly: false }
-  );
-  if (error) {
-    const errorMessages = error.details.reduce((acc, err) => {
-      acc[err.path[0]] = err.message;
-      return acc;
-    }, {});
-    return errorResponse(res, errorMessages, "Validation Error", 400);
-  }
-  const user = await getAuthUserDetails(updated_by, res);
-  if (!user) return;
-  const currentMonth = new Date().toISOString().slice(0, 7);
-
-  const checkUserQuery = "SELECT COUNT(*) as count FROM users WHERE id = ? AND deleted_at IS NULL";
-  const [checkUserResult] = await db.query(checkUserQuery, [user_id]);
-  if (checkUserResult[0].count == 0) {
-    return errorResponse(res, "User not found or already deleted", "Not Found", 404);
-  }
-  // Check if a rating exists for the user and month
-  const checkQuery =
-    "SELECT COUNT(*) as count FROM ratings WHERE user_id = ? AND month = ?";
-  const [checkResult] = await db.query(checkQuery, [user_id, currentMonth]);
-
-  if (checkResult[0].count > 0) {
-    const updateQuery = `
-        UPDATE ratings
-        SET rating = ?, average = ?, updated_by = ?
-        WHERE user_id = ? AND month = ?`;
-    const values = [rating, average, updated_by, user_id, currentMonth];
-    await db.query(updateQuery, values);
-  } else {
-    const insertQuery = `
-        INSERT INTO ratings 
-        (user_id, rating, average, month, updated_by) 
-        VALUES (?, ?, ?, ?, ?)`;
-    const values = [user_id, rating, average, currentMonth, updated_by];
-    await db.query(insertQuery, values);
-  }
-  return successResponse(res, null, "Rating Updated successfully", 200);
-};
 
 
 
@@ -261,10 +147,10 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
 
 
 exports.ratingUpdation = async (payload, res) => {
-  const { month,rater, quality, timelines,agility,attitude,responsibility,remarks,user_id,updated_by } = payload;
+  const { status,month,rater, quality, timelines,agility,attitude,responsibility,remarks,user_id,updated_by } = payload;
 
   const { error } = UpdateRatingSchema.validate(
-    { month,rater, quality, timelines,agility,attitude,responsibility,user_id,updated_by,remarks },
+    { status,month,rater, quality, timelines,agility,attitude,responsibility,user_id,updated_by,remarks },
     { abortEarly: false }
   );
   if (error) {
@@ -295,15 +181,15 @@ exports.ratingUpdation = async (payload, res) => {
     const updateQuery = `
         UPDATE ratings
         SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?,remarks = ?
-        WHERE user_id = ? AND month = ? AND rater = ?`;
-    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, user_id, month, rater];
+        WHERE user_id = ? AND month = ? AND rater = ? AND status = ?`;
+    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, user_id, month, rater ,status];
     await db.query(updateQuery, values);
   } else {
     const insertQuery = `
         INSERT INTO ratings 
-        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks];
+        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks,status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks,status];
     await db.query(insertQuery, values);
   }
   const responsePayload = {
@@ -319,6 +205,7 @@ exports.ratingUpdation = async (payload, res) => {
     },
     remarks,
     average,
+    status,
     updated_by,
   };
   return successResponse(res, responsePayload, "Rating Updated successfully", 200);
@@ -394,9 +281,11 @@ exports.getRatings = async (req, res) => {
 
     const values = [];
     let whereClause = " WHERE users.role_id != 1 AND users.deleted_at IS NULL";
+    
     if (users.role_id === 2) {
       whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
     }
+    
     if (team_id) {
       whereClause += ' AND users.team_id = ?';
       values.push(team_id);
@@ -430,66 +319,96 @@ exports.getRatings = async (req, res) => {
 
     // Get paginated users
     const userQuery = `
-      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name,users.created_at as joining_date,role_id
+      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name, users.created_at as joining_date, role_id
       FROM users
       LEFT JOIN teams ON users.team_id = teams.id
       ${whereClause}
       ORDER BY users.id
       LIMIT ? OFFSET ?`;
+      
     values.push(parseInt(perPage, 10), parseInt(offset, 10));
 
     const [userResults] = await db.query(userQuery, values);
+    
     if (userResults.length === 0) {
       return successResponse(res, [], 'No ratings found', 200, getPagination(page, perPage, totalRecords));
     }
 
     const userIds = userResults.map(user => user.user_id);
     const ratingQuery = `
-      SELECT r.*, ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average
+      SELECT r.*, ((r.quality + r.timelines + r.agility + r.attitude + r.responsibility) / 5) AS average, status
       FROM ratings r 
       WHERE r.user_id IN (?) AND r.month = ?`;
+      
     const [ratingResults] = await db.query(ratingQuery, [userIds, selectedMonth]);
 
     const groupedResults = userResults.map((user, index) => {
       const employeeRatings = ratingResults.filter(rating => rating.user_id === user.user_id);
+      
       const defaultRatings = [
-        { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-" },
-        { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-" }
+        { rater: "TL", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-", status: 0 },
+        { rater: "PM", quality: 0, timelines: 0, agility: 0, attitude: 0, responsibility: 0, average: 0, rating_id: null, remarks: "-", status: 0 }
       ];
 
       employeeRatings.forEach(rating => {
         const index = rating.rater === "TL" ? 0 : 1;
-        defaultRatings[index] = {
-          rater: rating.rater,
-          quality: rating.quality,
-          role_id: user.role_id,
-          joining_date: user.joining_date,
-          timelines: rating.timelines,
-          agility: rating.agility,
-          attitude: rating.attitude,
-          responsibility: rating.responsibility,
-          average: rating.average !== null ? parseFloat(rating.average).toFixed(1) : "-",
-          rating_id: rating.id,
-          remarks: rating.remarks && rating.remarks.trim() ? rating.remarks : "-"
-        };
+        
+        if (rating.updated_by == user_id || rating.status == 1) {
+          defaultRatings[index] = {
+            rater: rating.rater,
+            quality: rating.quality,
+            role_id: user.role_id,
+            joining_date: user.joining_date,
+            timelines: rating.timelines,
+            agility: rating.agility,
+            attitude: rating.attitude,
+            responsibility: rating.responsibility,
+            average: rating.average !== null ? parseFloat(rating.average).toFixed(1) : "-",
+            rating_id: rating.id,
+            status: rating.status,
+            remarks: rating.remarks && rating.remarks.trim() ? rating.remarks : "-"
+          };
+        } else {
+          defaultRatings[index].status = rating.status;
+          defaultRatings[index].rating_id = rating.id;
+        }
       });
 
-      const overallScore = employeeRatings.length
-        ? (employeeRatings.reduce((acc, curr) => acc + (curr.average || 0), 0) / employeeRatings.length).toFixed(1)
-        : "-";
+      // Fixing overall score calculation
+      const tlRating = defaultRatings.find(r => r.rater === "TL") || {};
+      const pmRating = defaultRatings.find(r => r.rater === "PM") || {};
+
+      const tlScore = tlRating.average !== "-" ? parseFloat(tlRating.average) : null;
+      const pmScore = pmRating.average !== "-" ? parseFloat(pmRating.average) : null;
+
+      let overallScore;
+      if (tlScore !== null && pmScore !== null) {
+        overallScore = (tlScore + pmScore).toFixed(1);
+      } else if (tlScore !== null) {
+        overallScore = tlScore.toFixed(1);
+      } else if (pmScore !== null) {
+        overallScore = pmScore.toFixed(1);
+      } else {
+        overallScore = "-";
+      }
+
+      // Adjust for TLs
+      if (user.role_id === 3 && overallScore !== "-") {
+        overallScore = (parseFloat(overallScore) * 2).toFixed(1);
+      }
 
       return {
         s_no: offset + index + 1,
         employee_id: user.employee_id,
         user_id: user.user_id,
-        role_id:user.role_id,
+        role_id: user.role_id,
         month: selectedMonth,
-        joining_date:user.joining_date,
+        joining_date: user.joining_date,
         employee_name: user.first_name,
         team: user.team_name,
-        user_type:  user.role_id === 4?  "Employee" :user.role_id === 3?  "TL": "PM",
+        user_type: user.role_id === 4 ? "Employee" : user.role_id === 3 ? "TL" : "PM",
         raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
-        overall_score: user.role_id === 3? overallScore * 2 : overallScore
+        overall_score: overallScore
       };
     });
 

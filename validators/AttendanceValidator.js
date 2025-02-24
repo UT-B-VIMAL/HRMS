@@ -1,13 +1,17 @@
 const Joi = require("joi");
 
 const attendanceValidator = Joi.object({
-  ids: Joi.array()
-    .items(Joi.number().integer().positive().required())
-    .required()
-    .messages({
-      "array.base": "IDs must be an array",
-      "array.includes": "Each ID must be a valid integer",
-    }),
+  id: Joi.number()
+  .integer()
+  .positive()
+  .required()
+  .messages({
+    "number.base": "ID must be a number",
+    "number.integer": "ID must be an integer",
+    "number.positive": "ID must be a positive number",
+    "any.required": "The ID field is required",
+  }),
+
   date: Joi.date().required().messages({
     "date.base": "Invalid date format",
     "any.required": "The date field is required",
@@ -27,14 +31,14 @@ const attendanceValidator = Joi.object({
       }),
       otherwise: Joi.optional(),
     }),
-  statusFilter: Joi.string()
+  status: Joi.string()
     .valid("Present", "Absent")
     .required().empty('')
     .messages({
-    'string.base': 'The Status Filter must be a string',
-      "any.required": "The Status Filter field is required",
-      "any.only": "The Status Filter must be 'Present' or 'Absent'",
-      'string.empty': 'The Status Filter cannot be empty',
+    'string.base': 'The Status  must be a string',
+      "any.required": "The Status  field is required",
+      "any.only": "The Status  must be 'Present' or 'Absent'",
+      'string.empty': 'The Status  cannot be empty',
     }), 
     updated_by: Joi.number().integer().required().messages({
         'number.base': 'updated_by must be a valid user ID',
@@ -44,15 +48,7 @@ const attendanceValidator = Joi.object({
 }).with("halfDay", "attendanceType");
 
 const attendanceFetch = Joi.object({
-    status: Joi.string()
-    .valid("Present", "Absent")
-    .required().empty('')
-    .messages({
-    'string.base': 'The Status Filter must be a string',
-      "any.required": "The Status Filter field is required",
-      "any.only": "The Status Filter must be 'Present' or 'Absent'",
-      'string.empty': 'The Status Filter cannot be empty',
-    }),
+   
     user_id: Joi.number().integer().required().messages({
         'number.base': 'User Id must be a valid user ID',
         'any.required': 'User Id field is required'

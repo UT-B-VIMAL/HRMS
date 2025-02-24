@@ -36,7 +36,7 @@ const RoleController = {
                 }
 
                 const userId = decodedToken.sub; // Usually, the user ID is in the 'sub' field
-                console.log(`${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`);
+                // console.log(`${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`);
 
 
                 const groupsResponse = await axios.get(
@@ -48,7 +48,7 @@ const RoleController = {
                     }
                 );
 
-                console.log("Groups Response:", groupsResponse.data);
+                // console.log("Groups Response:", groupsResponse.data);
 
                 if (!groupsResponse.data || groupsResponse.data.length === 0) {
                     return res.status(404).send({ message: "No groups found for this user" });
@@ -65,7 +65,7 @@ const RoleController = {
                     }
                 );
 
-                console.log("Group Roles Response:", groupsRolesResponse.data);
+                // console.log("Group Roles Response:", groupsRolesResponse.data);
 
                 const clientMappings = groupsRolesResponse.data.clientMappings || {};
                 const realmManagementMapping = clientMappings["hrmsClient"];
