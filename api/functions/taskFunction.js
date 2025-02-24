@@ -1959,7 +1959,7 @@ exports.deleteTaskList = async (req, res) => {
       LEFT JOIN products p ON p.id = t.product_id
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
-      WHERE st.deleted_at IS NOT NULL ${subtaskWhereClause}
+      WHERE st.deleted_at IS NOT NULL AND pr.deleted_at IS NOT NULL AND p.deleted_at IS NOT NULL ${subtaskWhereClause}
     `;
 
     // Query to fetch deleted tasks (not linked to subtasks)
@@ -1983,7 +1983,7 @@ exports.deleteTaskList = async (req, res) => {
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
       WHERE t.deleted_at IS NOT NULL 
-        AND t.id NOT IN (SELECT task_id FROM sub_tasks) 
+        AND t.id NOT IN (SELECT task_id FROM sub_tasks) AND pr.deleted_at IS NOT NULL AND p.deleted_at IS NOT NULL
         ${taskWhereClause}
     `;
 

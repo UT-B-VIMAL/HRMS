@@ -25,11 +25,11 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const ticketId = '17';
+        const ticketId = '25';
         document.getElementById('register').addEventListener('click', () => {
             const username = document.getElementById('fromID').value;
             if (username && ticketId) {
-                socket.emit('register', { ticket_id: ticketId, id: username});
+                socket.emit('register', { ticket_id: ticketId, userId: username});
                 socket.emit('read type', { ticket_id: ticketId, user_id: username});
             }
         });
