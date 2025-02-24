@@ -79,50 +79,175 @@ const connectedUsers = {}; // Change to store arrays of socket IDs
 io.on('connection', (socket) => {
   console.log('Connected User:', socket.id);
 
-  socket.on('register', async (data) => {
-    const { userId } = data;
-    if (!connectedUsers[userId]) {
-      connectedUsers[userId] = [];
-    }
-    connectedUsers[userId].push(socket.id); // Add the socket ID to the array
 
+  socket.on('register', async (data) => {
+    const { ticket_id, id } = data;
+    // Create a composite key from ticket_id and id. You can adjust the format as needed.
+    const key = `${ticket_id}_${id}`;
+  
+    // Check if the composite key already exists in connectedUsers
+    if (connectedUsers[key]) {
+      console.log(`User ${key} is already connected with socket ID ${connectedUsers[key]}. Rejecting new connection.`);
+      socket.emit('error', 'User is already connected on another socket.');
+      socket.disconnect();
+      return;
+    }
+  
     try {
-      const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [userId]);
-      if (results.length > 0) {
-        registerUserSocket(userId, socket.id); // Register the user socket
-        console.log(`User ${userId} registered with socket ID ${socket.id}`);
-        socket.emit('register', `User ${userId} registered with socket ID ${socket.id}`);
+      // When id is not 0, verify the user exists in your database
+      if (id != 0) {
+        const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [id]);
+        if (results.length > 0) {
+          connectedUsers[key] = socket.id;
+          console.log(`User ${key} registered with socket ID ${socket.id}`);
+          socket.emit('register', `User ${key} registered with socket ID ${socket.id}`);
+        } else {
+          console.log(`User ID ${id} not found.`);
+          socket.emit('error', `User ID ${id} not found.`);
+        }
       } else {
-        console.log(`User ID ${userId} not found.`);
-        socket.emit('error', `User ID ${userId} not found.`);
+        // Handle the special case for id == 0
+        connectedUsers[key] = socket.id;
+        console.log(`User ${key} registered with socket ID ${socket.id}`);
+        socket.emit('register', `User ${key} registered with socket ID ${socket.id}`);
       }
     } catch (err) {
       console.error('Error fetching user:', err);
       socket.emit('error', 'Error during registration.');
     }
   });
+  
 
+  socket.on('read type', async (data) => {
+    try {
+        const { ticket_id, user_id } = data;
+
+        const [result] = await db.execute(
+            `UPDATE ticket_comments SET type = 1 WHERE receiver_id = ? AND ticket_id = ?`,
+            [user_id, ticket_id]
+        );
+
+        if (result.affectedRows > 0) {
+            console.log(`Updated ${result.affectedRows} record(s) in ticket_comments.`);
+            socket.emit('msg', 'Message marked as read.');
+        } else {
+            console.log('No records updated.');
+            socket.emit('msg', 'No matching records found.');
+        }
+
+    } catch (error) {
+        console.error('Error updating message type:', error);
+    }
+});
+
+
+  // Load messages from ticket_comments table
+  socket.on('load messages', async (ticket_id) => {
+      try {
+          const [comments] = await db.execute(
+              `SELECT 
+                  tc.id,
+                  tc.ticket_id,
+                  tc.sender_id,
+                  tc.receiver_id,
+                  tc.comments,
+                  CASE 
+                  WHEN tc.sender_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) 
+              END AS sender_name,
+              CASE 
+                  WHEN tc.receiver_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
+              END AS receiver_name,
+                  tc.created_at
+              FROM ticket_comments tc
+              LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
+          LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
+              WHERE tc.ticket_id = ? AND tc.deleted_at IS NULL
+              ORDER BY tc.created_at ASC`,
+              [ticket_id]
+          );
+
+          socket.emit('load messages', comments);
+      } catch (error) {
+          console.error('Error fetching ticket history:', error.message);
+      }
+  });
+
+  socket.on('chat message', async (data) => {
+    try {
+        const { ticket_id, sender_id, receiver_id, comments } = data;
+
+        
+        console.log('Received data:', data);
+
+        
+      
+          socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
+
+        const [result] = await db.execute(
+            `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
+            VALUES (?, ?, ?, ?, NOW(), NOW(), NULL)`,
+            [ticket_id, sender_id, receiver_id, comments]
+        );
+
+        console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
+        socket.emit('datas', result.insertId);
+
+        const [resultData] = await db.execute(
+          `SELECT 
+              tc.id,
+              tc.ticket_id,
+              tc.sender_id,
+              tc.receiver_id,
+              tc.comments,
+              CASE 
+                  WHEN tc.sender_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(sender.first_name, ''), ' ', COALESCE(NULLIF(sender.last_name, ''), '')) 
+              END AS sender_name,
+              CASE 
+                  WHEN tc.receiver_id = 0 THEN 'Anonymous'
+                  ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
+              END AS receiver_name,
+              tc.created_at
+          FROM ticket_comments tc
+          LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
+          LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
+          WHERE tc.id = ? AND tc.deleted_at IS NULL`, 
+          [result.insertId]
+      );
+      const key = `${ticket_id}_${receiver_id}`;
+
+        const recipientSocketId = connectedUsers[key];
+        if (recipientSocketId) {
+          io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
+          socket.emit('msg', 'Msg sended.');
+        }
+    } catch (error) {
+        console.error('Error saving message:', error);
+    }
+});
+
+
+  // Handle user disconnect
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
 
     // Find the user ID associated with this socket ID
     let disconnectedUser = null;
-    Object.keys(connectedUsers).forEach((userId) => {
-      const index = connectedUsers[userId].indexOf(socket.id);
-      if (index !== -1) {
-        connectedUsers[userId].splice(index, 1); // Remove the socket ID from the array
-        if (connectedUsers[userId].length === 0) {
-          delete connectedUsers[userId]; // Remove the user if no sockets are left
+    Object.keys(connectedUsers).forEach((key) => {
+        if (connectedUsers[key] === socket.id) {
+            disconnectedUser = key; // Store the disconnected user ID
+            delete connectedUsers[key]; // Remove the user from the connected list
         }
-        disconnectedUser = userId;
-      }
     });
 
     if (disconnectedUser) {
-      console.log(`User ${disconnectedUser} disconnected.`);
-      unregisterUserSocket(socket.id);
+        // Broadcast the disconnected user ID to all other connected clients
+        socket.broadcast.emit('user_disconnected', { user_id: disconnectedUser, socket_id: socket.id, message:'disconnected' });
     }
-  });
+});
+
 });
 
 // Socket-----------------------------------------------------------------------------
