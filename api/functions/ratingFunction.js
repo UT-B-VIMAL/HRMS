@@ -55,7 +55,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       teams ON users.team_id = teams.id
     LEFT JOIN 
       ratings ON users.id = ratings.user_id
-      AND SUBSTRING(ratings.month, 1, 4) = ? 
+      AND SUBSTRING(ratings.month, 1, 4) = ?  AND ratings.status = 1
     WHERE 
       users.role_id NOT IN (1,2)
       AND users.deleted_at IS NULL
