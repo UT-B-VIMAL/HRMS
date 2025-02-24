@@ -11,7 +11,15 @@ exports.getNotifications = async (user_id, res) => {
     `;
     const [notifications] = await db.query(query, [user_id]);
 
-    return successResponse(res, notifications, 'Notifications retrieved successfully');
+    const unreadCountQuery = `
+      SELECT COUNT(*) AS unread_count
+      FROM notifications
+      WHERE user_id = ? AND read_status = 0
+    `;
+    const [unreadCountResult] = await db.query(unreadCountQuery, [user_id]);
+    const unreadCount = unreadCountResult[0].unread_count;
+
+    return successResponse(res, { notifications, unread_count: unreadCount }, 'Notifications retrieved successfully');
   } catch (error) {
     console.error('Error retrieving notifications:', error.message);
     return errorResponse(res, error.message, 'Error retrieving notifications', 500);
