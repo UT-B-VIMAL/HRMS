@@ -318,7 +318,7 @@ apiRouter.get('/projects',RoleController.checkRole(), projectController.getAllPr
 apiRouter.get('/project_status', projectController.project_status);
 apiRouter.get('/project_request',RoleController.checkRole(), projectController.project_request);
 apiRouter.get('/project_requestupdate',RoleController.checkRole(), projectController.project_requestupdate);
-apiRouter.put('/project_requestchange/:id',RoleController.checkRole(), projectController.project_requestchange);
+apiRouter.put('/project_requestchange/:id',RoleController.checkRole(),(req,res) => projectController.project_requestchange(req, res, req.io));
 
 // Team Routes
 apiRouter.post('/team',RoleController.checkRole(), teamController.createTeam);
