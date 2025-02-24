@@ -646,21 +646,28 @@ exports.projectRequest = async (req, res) => {
 
     if (user_id) {
       // Step 1: Get the role_id of the provided user_id
-      const roleQuery = `SELECT role_id, team_id FROM users WHERE id = ?`;
+      const roleQuery = `SELECT role_id FROM users WHERE id = ?`;
       const [roleResult] = await db.query(roleQuery, [user_id]);
 
       if (!roleResult.length) {
         return errorResponse(res, "User not found", "Invalid user_id", 404);
       }
 
-      const { role_id, team_id } = roleResult[0];
+      const { role_id } = roleResult[0];
 
       if (role_id === 3) {
-        const teamQuery = `SELECT id FROM users WHERE team_id = ?`;
-        const [teamUsers] = await db.query(teamQuery, [team_id]);
+        // Get the team ID where reporting_user_id = user_id
+        const teamQuery = `SELECT id FROM teams WHERE reporting_user_id = ?`;
+        const [teamResult] = await db.query(teamQuery, [user_id]);
 
-        if (teamUsers.length > 0) {
-          effectiveUserIds = teamUsers.map((user) => user.id);
+        if (teamResult.length > 0) {
+          const teamId = teamResult[0].id;
+          const teamUsersQuery = `SELECT id FROM users WHERE team_id = ?`;
+          const [teamUsers] = await db.query(teamUsersQuery, [teamId]);
+
+          if (teamUsers.length > 0) {
+            effectiveUserIds = teamUsers.map((user) => user.id);
+          }
         }
       }
     }
@@ -714,7 +721,7 @@ exports.projectRequest = async (req, res) => {
         st.name AS name,
         tm.name AS team_name,
         DATE_FORMAT(st.created_at, '%Y-%m-%d') AS date,
-        u.designation_id AS assigned_by_designation,
+        ua.designation_id AS assigned_by_designation,
         'Subtask' AS type,
         t.id AS task_id,
         st.id AS subtask_id,
@@ -722,6 +729,7 @@ exports.projectRequest = async (req, res) => {
       FROM sub_tasks st
       LEFT JOIN tasks t ON t.id = st.task_id
       LEFT JOIN users u ON u.id = st.user_id
+      LEFT JOIN users ua ON ua.id = st.assigned_user_id
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
       LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
@@ -736,13 +744,14 @@ exports.projectRequest = async (req, res) => {
         t.name AS name,
         tm.name AS team_name,
         DATE_FORMAT(t.created_at, '%Y-%m-%d') AS date,
-        u.designation_id AS assigned_by_designation,
+        ua.designation_id AS assigned_by_designation,
         'Task' AS type,
         t.id AS task_id,
         NULL AS subtask_id,
         t.user_id AS task_user_id
       FROM tasks t
       LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN users ua ON ua.id = t.assigned_user_id
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
       LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
