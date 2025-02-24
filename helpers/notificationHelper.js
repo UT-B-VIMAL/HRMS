@@ -1,24 +1,25 @@
 const userSockets = {};
 
-const sendNotificationToAdmins = (io, message) => {
-  io.emit('admin_notification', { message });
-};
-
 const registerUserSocket = (userId, socketId) => {
-  userSockets[userId] = socketId;
+  if (!userSockets[userId]) {
+    userSockets[userId] = [];
+  }
+  userSockets[userId].push(socketId);
 };
 
 const unregisterUserSocket = (socketId) => {
-  for (const userId in userSockets) {
-    if (userSockets[userId] === socketId) {
-      delete userSockets[userId];
-      break;
+  Object.keys(userSockets).forEach((userId) => {
+    const index = userSockets[userId].indexOf(socketId);
+    if (index !== -1) {
+      userSockets[userId].splice(index, 1);
+      if (userSockets[userId].length === 0) {
+        delete userSockets[userId];
+      }
     }
-  }
+  });
 };
 
 module.exports = {
-  sendNotificationToAdmins,
   registerUserSocket,
   unregisterUserSocket,
   userSockets,

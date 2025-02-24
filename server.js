@@ -32,6 +32,7 @@ const ticketsController =require('./controllers/ticketsController');
 const otdetailController =require('./controllers/otdetailController');
 const expensedetailController =require('./controllers/expensedetailController');
 const reportController = require('./controllers/reportController')
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
@@ -73,24 +74,21 @@ app.use((req, res, next) => {
 const db = require('./config/db');
 const path = require('path');
 app.use(express.static(path.join(__dirname, 'public')));
-const connectedUsers = {}; 
+const connectedUsers = {}; // Change to store arrays of socket IDs
 
 io.on('connection', (socket) => {
   console.log('Connected User:', socket.id);
 
   socket.on('register', async (data) => {
     const { userId } = data;
-    if (connectedUsers[userId]) {
-      console.log(`User ${userId} is already connected with socket ID ${connectedUsers[userId]}. Rejecting new connection.`);
-      socket.emit('error', 'User is already connected on another socket.');
-      socket.disconnect();
-      return;
+    if (!connectedUsers[userId]) {
+      connectedUsers[userId] = [];
     }
+    connectedUsers[userId].push(socket.id); // Add the socket ID to the array
 
     try {
       const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [userId]);
       if (results.length > 0) {
-        connectedUsers[userId] = socket.id;
         registerUserSocket(userId, socket.id); // Register the user socket
         console.log(`User ${userId} registered with socket ID ${socket.id}`);
         socket.emit('register', `User ${userId} registered with socket ID ${socket.id}`);
@@ -110,9 +108,13 @@ io.on('connection', (socket) => {
     // Find the user ID associated with this socket ID
     let disconnectedUser = null;
     Object.keys(connectedUsers).forEach((userId) => {
-      if (connectedUsers[userId] === socket.id) {
-        disconnectedUser = userId; // Store the disconnected user ID
-        delete connectedUsers[userId]; // Remove the user from the connected list
+      const index = connectedUsers[userId].indexOf(socket.id);
+      if (index !== -1) {
+        connectedUsers[userId].splice(index, 1); // Remove the socket ID from the array
+        if (connectedUsers[userId].length === 0) {
+          delete connectedUsers[userId]; // Remove the user if no sockets are left
+        }
+        disconnectedUser = userId;
       }
     });
 
@@ -250,15 +252,15 @@ apiRouter.post('/updateAttendance', RoleController.checkRole(), attendanceContro
 apiRouter.get('/getAttendanceReport', RoleController.checkRole(), attendanceController.getAttendanceListReport);
 
 // Comments
-apiRouter.post('/comments',RoleController.checkRole(),commentsController. addComments);
-apiRouter.put('/comments/:id',RoleController.checkRole(),commentsController. updateComments);
-apiRouter.delete('/comments',RoleController.checkRole(),commentsController. deleteComments);
+apiRouter.post('/comments',RoleController.checkRole(),commentsController.addComments);
+apiRouter.put('/comments/:id',RoleController.checkRole(),commentsController.updateComments);
+apiRouter.delete('/comments',RoleController.checkRole(),commentsController.deleteComments);
 
 //tickets
-apiRouter.get('/tickets',RoleController.checkRole(),ticketsController. getAlltickets);
-apiRouter.get('/tickets/:id',RoleController.checkRole(),ticketsController. getTickets);
+apiRouter.get('/tickets',RoleController.checkRole(),ticketsController.getAlltickets);
+apiRouter.get('/tickets/:id',RoleController.checkRole(),ticketsController.getTickets);
 apiRouter.post('/tickets',RoleController.checkRole(),(req, res) => ticketsController.createTicket(req, res, req.io));
-apiRouter.put('/tickets/:id',RoleController.checkRole(),ticketsController. updateTickets);
+apiRouter.put('/tickets/:id',RoleController.checkRole(), (req, res) => ticketsController.updateTickets(req, res, req.io));
 apiRouter.post('/ticket-comments',RoleController.checkRole(),(req, res) => ticketsController.ticketComments(req, res, req.io));
 
 // OT Details
@@ -297,6 +299,7 @@ apiRouter.get('/ticketcount/:id',RoleController.checkRole(), commonController.ge
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
+app.use('/api', notificationRoutes);
 
 app.use(globalErrorHandler);
 
@@ -312,3 +315,5 @@ if (isProduction) {
     console.log(`Development server is running on http://${DOMAIN}:${PORT}`);
   });
 }
+
+module.exports = app;
