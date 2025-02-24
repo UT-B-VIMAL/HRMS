@@ -31,8 +31,9 @@ const commentsController = require('./controllers/commentsController');
 const ticketsController =require('./controllers/ticketsController');
 const otdetailController =require('./controllers/otdetailController');
 const expensedetailController =require('./controllers/expensedetailController');
-const reportController = require('./controllers/reportController')
+const reportController = require('./controllers/reportController');
 const notificationRoutes = require('./routes/notificationRoutes');
+
 
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
@@ -64,8 +65,6 @@ const io = socketIo(server, {
     methods: ["GET", "POST"]
   }
 });
-
-// Middleware to attach io to req object
 app.use((req, res, next) => {
   req.io = io;
   next();
@@ -74,13 +73,35 @@ app.use((req, res, next) => {
 const db = require('./config/db');
 const path = require('path');
 app.use(express.static(path.join(__dirname, 'public')));
-const connectedUsers = {}; // Change to store arrays of socket IDs
+const connectedUsers = {}; 
 
 io.on('connection', (socket) => {
   console.log('Connected User:', socket.id);
+  socket.on('register_notification', async (data) => {
+    const { userId } = data;
+    if (!connectedUsers[userId]) {
+      connectedUsers[userId] = [];
+    }
+    connectedUsers[userId].push(socket.id); // Add the socket ID to the array
 
+    try {
+      const [results] = await db.execute('SELECT id FROM users WHERE id = ?', [userId]);
+      if (results.length > 0) {
+        registerUserSocket(userId, socket.id); // Register the user socket
+        console.log(`User ${userId} registered with socket ID ${socket.id}`);
+        socket.emit('register', `User ${userId} registered with socket ID ${socket.id}`);
+      } else {
+        console.log(`User ID ${userId} not found.`);
+        socket.emit('error', `User ID ${userId} not found.`);
+      }
+    } catch (err) {
+      console.error('Error fetching user:', err);
+      socket.emit('error', 'Error during registration.');
+    }
+  });
 
-  socket.on('register', async (data) => {
+  socket.on('register', async (data) => 
+  {
     const { ticket_id, id } = data;
     // Create a composite key from ticket_id and id. You can adjust the format as needed.
     const key = `${ticket_id}_${id}`;
@@ -336,6 +357,8 @@ apiRouter.get('/subtask/:id', RoleController.checkRole(),subtaskController.getSu
 apiRouter.get('/subtask',RoleController.checkRole(), subtaskController.getAllSubTasks);
 apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(), subtaskController.updateDatas);
 
+
+
 // Idle Employee Route
 apiRouter.get('/idleEmployee', RoleController.checkRole(),idleEmployeeController.get_idleEmployee);
 
@@ -365,6 +388,8 @@ apiRouter.get('/empratings',RoleController.checkRole(), empdashboardController.e
 apiRouter.get('/teamwise_productivity', RoleController.checkRole(),productivityController.get_teamwiseProductivity);
 apiRouter.get('/individual_status', RoleController.checkRole(),productivityController.get_individualProductivity);
 
+
+
 //rating
 apiRouter.post('/updateRating', RoleController.checkRole(), ratingController.ratingUpdations);
 apiRouter.get('/getRating', RoleController.checkRole(), ratingController.getRating);
@@ -376,10 +401,11 @@ apiRouter.get('/getAttendanceList', RoleController.checkRole(), attendanceContro
 apiRouter.post('/updateAttendance', RoleController.checkRole(), attendanceController.updateAttendance);
 apiRouter.get('/getAttendanceReport', RoleController.checkRole(), attendanceController.getAttendanceListReport);
 
+
 // Comments
-apiRouter.post('/comments',RoleController.checkRole(),commentsController.addComments);
-apiRouter.put('/comments/:id',RoleController.checkRole(),commentsController.updateComments);
-apiRouter.delete('/comments',RoleController.checkRole(),commentsController.deleteComments);
+apiRouter.post('/comments',RoleController.checkRole(),commentsController. addComments);
+apiRouter.put('/comments/:id',RoleController.checkRole(),commentsController. updateComments);
+apiRouter.delete('/comments',RoleController.checkRole(),commentsController. deleteComments);
 
 //tickets
 apiRouter.get('/tickets',RoleController.checkRole(),ticketsController.getAlltickets);
@@ -387,6 +413,9 @@ apiRouter.get('/tickets/:id',RoleController.checkRole(),ticketsController.getTic
 apiRouter.post('/tickets',RoleController.checkRole(),(req, res) => ticketsController.createTicket(req, res, req.io));
 apiRouter.put('/tickets/:id',RoleController.checkRole(), (req, res) => ticketsController.updateTickets(req, res, req.io));
 apiRouter.post('/ticket-comments',RoleController.checkRole(),(req, res) => ticketsController.ticketComments(req, res, req.io));
+
+
+ //apiRouter.delete('/tickets/:id',RoleController.checkRole(),ticketsController. deleteTickets);
 
 // OT Details
 apiRouter.post('/otdetail', RoleController.checkRole(),otdetailController.createOtdetail);
@@ -399,6 +428,7 @@ apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(), otdetailControll
 apiRouter.put('/tlotdetail/:id',RoleController.checkRole(), otdetailController.updatetlOtdetail);
 apiRouter.post('/approve_reject_ot', RoleController.checkRole(),otdetailController.approve_reject_otdetail);
 apiRouter.get('/getOtReport', RoleController.checkRole(),otdetailController.getOtReport);
+
 
 // Expense
 apiRouter.post('/expensedetail', RoleController.checkRole(),expensedetailController.createexpensedetail);
@@ -421,6 +451,8 @@ apiRouter.get('/getTimeReport', RoleController.checkRole(), reportController.get
 
 // Ticket count
 apiRouter.get('/ticketcount/:id',RoleController.checkRole(), commonController.getTicketCount);
+
+
 
 // Use `/api` as a common prefix
 app.use('/api', apiRouter);
