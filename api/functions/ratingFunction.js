@@ -180,9 +180,9 @@ exports.ratingUpdation = async (payload, res) => {
   if (checkResult[0].count > 0) {
     const updateQuery = `
         UPDATE ratings
-        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?,remarks = ?
-        WHERE user_id = ? AND month = ? AND rater = ? AND status = ?`;
-    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, user_id, month, rater ,status];
+        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?,remarks = ?,status = ?
+        WHERE user_id = ? AND month = ? AND rater = ?`;
+    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, status,user_id, month, rater];
     await db.query(updateQuery, values);
   } else {
     const insertQuery = `
