@@ -118,7 +118,7 @@ responsibility: Joi.number()
     "any.required": "The user_id field is required.",
   }),
 
-  status: Joi.number().valid(0, 1).required().messages({
+  status: Joi.valid(0, 1).required().messages({
     "any.only": "The status must be either 0 or 1.",
     "any.required": "The status field is required.",
   }),

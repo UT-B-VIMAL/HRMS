@@ -187,7 +187,7 @@ exports.ratingUpdation = async (payload, res) => {
   } else {
     const insertQuery = `
         INSERT INTO ratings 
-        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks)
+        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks,status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks,status];
     await db.query(insertQuery, values);
