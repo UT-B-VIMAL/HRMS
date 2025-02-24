@@ -7,6 +7,7 @@ const {
 } = require("../../helpers/responseHelper");
 const { projectSchema } = require("../../validators/projectValidator");
 const { getAuthUserDetails } = require("./commonFunction");
+const { userSockets } = require('../../helpers/notificationHelper');
 
 
 // Create Project
@@ -885,7 +886,7 @@ exports.getRequestupdate = async (req, res) => {
 
 
 
-exports.getRequestchange = async (id, payload, res) => {
+exports.getRequestchange = async (id, payload, res, req) => {
   const { user_id, type, remark, rating, action } = payload;
 
   const requiredFields = [
@@ -923,7 +924,7 @@ exports.getRequestchange = async (id, payload, res) => {
     // Validate if the task or subtask exists
     const table = type === 'task' ? 'tasks' : 'sub_tasks';
     const [idRows] = await db.query(
-      `SELECT id FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
+      `SELECT id, user_id FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
       [id]
     );
 
@@ -936,15 +937,21 @@ exports.getRequestchange = async (id, payload, res) => {
       );
     }
 
+    const userId = idRows[0].user_id;
+
     // Determine status values based on action
-    let statusToSet, reopenstatusToSet;
+    let statusToSet, reopenstatusToSet, notificationTitle, notificationBody;
 
     if (action === 'reopen') {
       statusToSet = 0;
       reopenstatusToSet = 1;
+      notificationTitle = 'Task Reopened';
+      notificationBody = 'Your task has been reopened for further review. Please check the updates.';
     } else if (action === 'close') {
       statusToSet = 3;
       reopenstatusToSet = 0;
+      notificationTitle = 'Task Approved';
+      notificationBody = 'Your submitted task has been successfully approved.';
     }
 
     // Prepare fields and values for update
@@ -980,6 +987,22 @@ exports.getRequestchange = async (id, payload, res) => {
         404
       );
     }
+
+    // Send notification to the user
+    const notificationPayload = {
+      title: notificationTitle,
+      body: notificationBody,
+    };
+    const socketIds = userSockets[userId];
+    if (Array.isArray(socketIds)) {
+      socketIds.forEach(socketId => {
+        req.io.to(socketId).emit('push_notification', notificationPayload);
+      });
+    }
+    await db.execute(
+      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      [userId, notificationPayload.title, notificationPayload.body, 0]
+    );
 
     // Return success response
     return successResponse(
