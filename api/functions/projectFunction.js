@@ -656,20 +656,23 @@ exports.projectRequest = async (req, res) => {
       const { role_id } = roleResult[0];
 
       if (role_id === 3) {
-        // Get the team ID where reporting_user_id = user_id
+        // Get all team IDs where the user is the reporting user
         const teamQuery = `SELECT id FROM teams WHERE reporting_user_id = ?`;
-        const [teamResult] = await db.query(teamQuery, [user_id]);
-
-        if (teamResult.length > 0) {
-          const teamId = teamResult[0].id;
-          const teamUsersQuery = `SELECT id FROM users WHERE team_id = ?`;
-          const [teamUsers] = await db.query(teamUsersQuery, [teamId]);
-
-          if (teamUsers.length > 0) {
-            effectiveUserIds = teamUsers.map((user) => user.id);
-          }
+        const [teamResults] = await db.query(teamQuery, [user_id]);
+    
+        if (teamResults.length > 0) {
+            const teamIds = teamResults.map(team => team.id); // Extract all team IDs
+    
+            // Get all users belonging to these teams
+            const teamUsersQuery = `SELECT id FROM users WHERE team_id IN (${teamIds.map(() => '?').join(',')})`;
+            const [teamUsers] = await db.query(teamUsersQuery, teamIds);
+    
+            if (teamUsers.length > 0) {
+                effectiveUserIds = teamUsers.map(user => user.id); // Extract all user IDs
+            }
         }
-      }
+    }
+    
     }
 
     if (!user_id || effectiveUserIds.length === 0) {
