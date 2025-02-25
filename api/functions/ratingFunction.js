@@ -57,7 +57,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ?  AND ratings.status = 1
     WHERE 
-      users.role_id NOT IN (1,2)
+      users.role_id NOT IN (1)
       AND users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
@@ -88,7 +88,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ? 
     WHERE 
-      users.role_id NOT IN (1,2)
+      users.role_id NOT IN (1)
       AND users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
@@ -282,9 +282,9 @@ exports.getRatings = async (req, res) => {
     const values = [];
     let whereClause = " WHERE users.role_id != 1 AND users.deleted_at IS NULL";
     
-    if (users.role_id === 2) {
-      whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
-    }
+    // if (users.role_id === 2) {
+    //   whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
+    // }
     
     if (team_id) {
       whereClause += ' AND users.team_id = ?';
@@ -393,7 +393,7 @@ exports.getRatings = async (req, res) => {
       }
 
       // Adjust for TLs
-      if (user.role_id === 3 && overallScore !== "-") {
+      if (user.role_id === 3 && overallScore !== "-" || user.role_id === 2 && overallScore !== "-") {
         overallScore = (parseFloat(overallScore) * 2).toFixed(1);
       }
 
