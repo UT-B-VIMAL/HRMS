@@ -11,7 +11,6 @@ exports.createTicket = async (req, res) => {
   const io = req.io; 
   try {
     const { user_id, issue_type, issue_date = null, description, created_by } = req.body;
-
     const missingFields = [];
     if (!issue_type) missingFields.push("issue_type");
     if (!description) missingFields.push("description");
@@ -50,9 +49,14 @@ exports.createTicket = async (req, res) => {
         body: `A new support ticket has been submitted. Please review.`,
       };
       adminIds.forEach(async (adminId) => {
-        const socketId = userSockets[adminId]; // Get the socket ID for the admin
-        if (socketId) {
-          io.to(socketId).emit('push_notification', notificationPayload);
+        const socketIds = userSockets[adminId]; // Get the array of socket IDs for the admin
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach(socketId => {
+            console.log(`Sending notification to admin ${adminId} with socket ID ${socketId}`);
+            io.of('/notifications').emit('push_notification', notificationPayload);
+          });
+        } else {
+          console.log(`No socket IDs found for admin ${adminId}`);
         }
         // Insert notification into the database
         await db.execute(
@@ -141,8 +145,11 @@ exports.updateTickets = async (req, res) => {
       const socketIds = userSockets[createdBy]; // Get the array of socket IDs for the created_by user
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
-          io.to(socketId).emit('push_notification', notificationPayload);
+          console.log(`Sending notification to user ${createdBy} with socket ID ${socketId}`);
+          io.of('/notifications').emit('push_notification', notificationPayload);
         });
+      } else {
+        console.log(`No socket IDs found for user ${createdBy}`);
       }
       // Insert notification into the database
       await db.execute(
@@ -156,7 +163,8 @@ exports.updateTickets = async (req, res) => {
   }
 };
 
-exports.ticketComments = async (req, res, io) => {
+exports.ticketComments = async (req, res) => {
+  const io = req.io;
   const { ticket_id, sender_id, receiver_id, comments } = req.body;
 
   // Perform validation or other necessary operations
@@ -224,8 +232,11 @@ exports.ticketComments = async (req, res, io) => {
       const socketIds = userSockets[receiver_id]; // Get the array of socket IDs for the receiver
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
-          io.to(socketId).emit('push_notification', notificationPayload);
+          console.log(`Sending notification to user ${receiver_id} with socket ID ${socketId}`);
+          io.of('/notifications').emit('push_notification', notificationPayload);
         });
+      } else {
+        console.log(`No socket IDs found for user ${receiver_id}`);
       }
       // Insert notification into the database
       await db.execute(

@@ -1008,7 +1008,7 @@ exports.getRequestchange = async (id, payload, res, req) => {
     const socketIds = userSockets[userId];
     if (Array.isArray(socketIds)) {
       socketIds.forEach(socketId => {
-        req.io.to(socketId).emit('push_notification', notificationPayload);
+        req.io.of('/notifications').emit('push_notification', notificationPayload);
       });
     }
     await db.execute(

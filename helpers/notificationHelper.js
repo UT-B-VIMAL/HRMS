@@ -4,7 +4,9 @@ const registerUserSocket = (userId, socketId) => {
   if (!userSockets[userId]) {
     userSockets[userId] = [];
   }
-  userSockets[userId].push(socketId);
+  if (!userSockets[userId].includes(socketId)) {
+    userSockets[userId].push(socketId);
+  }
 };
 
 const unregisterUserSocket = (socketId) => {
