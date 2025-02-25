@@ -67,7 +67,7 @@ exports.getProfile = async (req, res) => {
             return errorResponse(res, null, 'Profile not found', 404);
         }
 
-        profile[0].dob = formatDate(profile[0].dob);
+        profile[0].dob = profile[0].dob ? formatDate(profile[0].dob) : null;
 
         return successResponse(res, profile[0], 'Profile retrieved successfully');
     } catch (error) {
