@@ -195,22 +195,6 @@ exports.createTask = async (payload, res) => {
   }
 };
 
-// Show Task
-// exports.getTask = async (id, res) => {
-//     try {
-//       const query = 'SELECT * FROM tasks WHERE id = ?';
-//       const [rows] = await db.query(query, [id]);
-
-//       if (rows.length === 0) {
-//         return errorResponse(res, null, 'Task not found', 204);
-//       }
-
-//       return successResponse(res, rows[0], 'Task retrieved successfully');
-//     } catch (error) {
-//       return errorResponse(res, error.message, 'Error retrieving task', 500);
-//     }
-//   };
-
 exports.getTask = async (id, res) => {
   try {
     // Task query
@@ -680,114 +664,7 @@ exports.updateTask = async (id, payload, res) => {
   }
 };
 
-// exports.updateTaskData = async (id, payload, res) => {
-//   const {
-//     status,
-//     assigned_user_id,
-//     team_id,
-//     owner_id,
-//     estimated_hours,
-//     start_date,
-//     due_date,
-//     priority,
-//     updated_by,
-//     updated_at,
-//   } = payload;
-
-//   // Define the mapping of fields to status_flag values
-//   const statusFlagMapping = {
-//     status: 1,
-//     owner_id: 2,
-//     estimated_hours: 3,
-//     due_date: 4,
-//     start_date: 5,
-//     description: 6,
-//     assigned_user_id: 9,
-//     team_id: 10,
-//     priority: 11,
-//     updated_by:12,
-//   };
-
-//   console.log([id]);
-
-//   try {
-//     // Fetch the current task details with a soft delete check
-//     const [tasks] = await db.query(
-//       'SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL',
-//       [id]
-//     );
-//     const currentTask = tasks[0]; // Get the first result
-
-//     if (!currentTask) {
-//       return errorResponse(res, null, 'Task not found or has been deleted', 404);
-//     }
-
-//     // Prepare dynamic update query for the specified fields
-//     const updateFields = [];
-//     const updateValues = [];
-
-//     for (const key in payload) {
-//       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
-//         updateFields.push(`${key} = ?`);
-//         updateValues.push(payload[key]);
-//       }
-//     }
-
-//     if (updateFields.length === 0) {
-//       return errorResponse(res, null, 'No fields to update', 400);
-//     }
-
-//     // Add task ID for the WHERE clause
-//     updateValues.push(id);
-
-//     // Execute the update query
-//     const updateQuery = `UPDATE tasks SET ${updateFields.join(', ')} WHERE id = ?`;
-//     const [updateResult] = await db.query(updateQuery, updateValues);
-
-//     if (updateResult.affectedRows === 0) {
-//       return errorResponse(res, null, 'Task not updated', 400);
-//     }
-
-//     // Prepare task history entries for changes
-//     const taskHistoryEntries = [];
-//     for (const key in payload) {
-//       if (payload[key] !== undefined && payload[key] !== currentTask[key]) {
-//         const flag = statusFlagMapping[key] || null; // Get the flag ID, default to null if not defined
-//         taskHistoryEntries.push([
-//           currentTask[key], // old_data
-//           payload[key], // new_data
-//           id, // task_id
-//           null, // subtask_id (optional)
-//           `Changed ${key}`, // description
-//           updated_by, // updated_by
-//           flag, // status_flag
-//           new Date(), // created_at
-//           new Date(), // updated_at
-//           null, // deleted_at
-//         ]);
-//       }
-//     }
-
-//     // Insert task history entries into the task_histories table
-//     if (taskHistoryEntries.length > 0) {
-//       const historyQuery = `
-//         INSERT INTO task_histories (
-//           old_data, new_data, task_id, subtask_id, text,
-//           updated_by, status_flag, created_at, updated_at, deleted_at
-//         ) VALUES ?
-//       `;
-//       await db.query(historyQuery, [taskHistoryEntries]);
-//     }
-
-//     return successResponse(res, { id, ...payload }, 'Task updated successfully');
-//   } catch (error) {
-//     return errorResponse(res, error.message, 'Error updating task', 500);
-//   }
-// };
-
-// Delete Task
-
-exports.updateTaskData = async (id, payload, res) => {
+exports.updateTaskData = async (id, payload, res,req) => {
   const {
     status,
     active_status,
@@ -835,6 +712,21 @@ exports.updateTaskData = async (id, payload, res) => {
         );
       }
       payload.team_id = assigned_user[0].team_id;
+
+      const notificationPayload = {
+        title: 'New Task Assigned',
+        body: 'A new task has been assigned to you. Check your dashboard for details.',
+      };
+      const socketIds = userSockets[user_id];
+      if (Array.isArray(socketIds)) {
+        socketIds.forEach(socketId => {
+          req.io.to(socketId).emit('push_notification', notificationPayload);
+        });
+      }
+      await db.execute(
+        'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+        [user_id, notificationPayload.title, notificationPayload.body, 0]
+      );
     }
 
     if (assigned_user_id) {
