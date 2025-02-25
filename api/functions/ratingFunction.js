@@ -17,7 +17,7 @@ const { getAuthUserDetails } = require("./commonFunction");
 // phase 2
 
 exports.getAnnualRatings = async (queryParamsval, res) => {
-  const { search, year, page = 1, perPage = 10 } = queryParamsval;
+  const { search, year, page = 1, perPage = 10 ,user_id} = queryParamsval;
   const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
 
   // Define all 12 months
@@ -57,12 +57,23 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ?  AND ratings.status = 1
     WHERE 
-      users.role_id NOT IN (1,2)
+      users.role_id NOT IN (1)
       AND users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
-
   const queryParams = [year, year];
+  const users = await getAuthUserDetails(user_id, res);
+  if (!users) return;
+  if(users.role_id===3){
+  const [teamRows] = await db.query(
+      `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
+      [user_id]
+    );
+    const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
+    query += ' AND users.team_id IN (?) AND users.role_id != 3';
+    queryParams.push(teamIds);
+  }
+ 
 
   if (search && search.trim() !== "") {
     const searchWildcard = `%${search.trim()}%`;
@@ -88,13 +99,22 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ? 
     WHERE 
-      users.role_id NOT IN (1,2)
+      users.role_id NOT IN (1)
       AND users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
 
   // Apply the same conditions for the count query
   const countQueryParams = [...queryParams];
+  if (users.role_id === 3) {
+    const [teamRows] = await db.query(
+      `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
+      [user_id]
+    );
+    const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
+    countQuery += ' AND users.team_id IN (?) AND users.role_id != 3';
+    countQueryParams.push(teamIds);
+  }
   if (search && search.trim() !== "") {
     const searchWildcard = `%${search.trim()}%`;
     countQuery += `
@@ -180,9 +200,9 @@ exports.ratingUpdation = async (payload, res) => {
   if (checkResult[0].count > 0) {
     const updateQuery = `
         UPDATE ratings
-        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?,remarks = ?
-        WHERE user_id = ? AND month = ? AND rater = ? AND status = ?`;
-    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, user_id, month, rater ,status];
+        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?,remarks = ?,status = ?
+        WHERE user_id = ? AND month = ? AND rater = ?`;
+    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, status,user_id, month, rater];
     await db.query(updateQuery, values);
   } else {
     const insertQuery = `
@@ -282,9 +302,9 @@ exports.getRatings = async (req, res) => {
     const values = [];
     let whereClause = " WHERE users.role_id != 1 AND users.deleted_at IS NULL";
     
-    if (users.role_id === 2) {
-      whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
-    }
+    // if (users.role_id === 2) {
+    //   whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
+    // }
     
     if (team_id) {
       whereClause += ' AND users.team_id = ?';
@@ -393,7 +413,7 @@ exports.getRatings = async (req, res) => {
       }
 
       // Adjust for TLs
-      if (user.role_id === 3 && overallScore !== "-") {
+      if (user.role_id === 3 && overallScore !== "-" || user.role_id === 2 && overallScore !== "-") {
         overallScore = (parseFloat(overallScore) * 2).toFixed(1);
       }
 
