@@ -33,7 +33,6 @@ exports.uploadFileToS3 = async (fileContent, fileName) => {
   try {
     const command = new PutObjectCommand(params);
     const response = await s3Client.send(command);  
-    console.log('Upload Success', response);
 
     return `unity-hrms.s3.ap-south-1.amazonaws.com/tickets/${fileName}`;
   } catch (err) {

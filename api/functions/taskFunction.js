@@ -720,7 +720,7 @@ exports.updateTaskData = async (id, payload, res,req) => {
       const socketIds = userSockets[user_id];
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
-          req.io.to(socketId).emit('push_notification', notificationPayload);
+          req.io.of('/notifications').emit('push_notification', notificationPayload);
         });
       }
       await db.execute(
