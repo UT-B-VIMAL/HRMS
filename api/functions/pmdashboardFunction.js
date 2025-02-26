@@ -29,6 +29,7 @@ exports.fetchProducts = async (payload, res) => {
           const [subtasks] = await db.query(subtasksQuery, [task.id]);
 
           if (subtasks.length > 0) {
+            // If task has subtasks, count only the subtasks
             totalItems += subtasks.length;
             completedItems += subtasks.filter(
               (subtask) => subtask.status === 3
@@ -36,28 +37,25 @@ exports.fetchProducts = async (payload, res) => {
 
             for (const subtask of subtasks) {
               if (subtask.user_id) {
-                // Check if the user_id exists in the users table and is not deleted
                 const [userCheck] = await db.query(
                   "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
                   [subtask.user_id]
                 );
-
                 if (userCheck.length > 0) {
                   workingEmployees.add(subtask.user_id);
                 }
               }
             }
           } else {
+            // If task has no subtasks, count the task itself
             totalItems += 1;
             if (task.status === 3) completedItems += 1;
 
             if (task.user_id) {
-              // Check if the user_id exists in the users table and is not deleted
               const [userCheck] = await db.query(
                 "SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL",
                 [task.user_id]
               );
-
               if (userCheck.length > 0) {
                 workingEmployees.add(task.user_id);
               }
@@ -106,7 +104,7 @@ exports.fetchProducts = async (payload, res) => {
         return {
           product_id: product.id,
           product_name: product.name,
-          total_tasks: tasks.length,
+          total_tasks: totalItems, // Corrected total task count logic
           completed_percentage: completionPercentage,
           completed_items: completedItems,
           employee_count: workingEmployees.size,
@@ -129,6 +127,7 @@ exports.fetchProducts = async (payload, res) => {
     return errorResponse(res, error.message, "Error fetching products", 500);
   }
 };
+
 
 exports.fetchUtilization = async (req, res) => {
   try {
