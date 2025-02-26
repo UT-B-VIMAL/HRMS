@@ -495,7 +495,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
       `
       SELECT id, user_id
       FROM tasks
-      WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeCondition} AND status != 3
+      WHERE deleted_at IS NULL AND team_id IN (?) ${absentEmployeeCondition} AND status NOT IN (2, 3)
     `,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
@@ -507,7 +507,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
       `
       SELECT task_id, user_id
       FROM sub_tasks
-      WHERE task_id IN (?) AND status != 3 AND deleted_at IS NULL
+      WHERE task_id IN (?) AND status NOT IN (2, 3) AND deleted_at IS NULL
     `,
       [taskIds]
     );
