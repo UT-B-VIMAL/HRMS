@@ -124,7 +124,6 @@ exports.getAlltickets = async (req, res) => {
                 OR i.issue_name LIKE ? 
                 OR t.issue_date LIKE ?
                 OR t.status LIKE ? 
-                OR t.file_name LIKE ?
             )`;
 
             countQuery += ` AND (
@@ -134,12 +133,11 @@ exports.getAlltickets = async (req, res) => {
                 OR i.issue_name LIKE ? 
                 OR t.issue_date LIKE ?
                 OR t.status LIKE ? 
-                OR t.file_name LIKE ?
             )`;
 
             const searchPattern = `%${search}%`;
-            values.push(searchPattern, searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
-            countValues.push(searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern, searchPattern);
+            values.push(searchPattern, searchPattern, searchPattern, searchPattern,searchPattern, searchPattern);
+            countValues.push(searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
         }
 
         query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;

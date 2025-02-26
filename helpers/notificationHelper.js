@@ -1,4 +1,5 @@
 const userSockets = {};
+
 const registerSocket = (userId, socketId) => {
   if (!userSockets[userId]) {
     userSockets[userId] = [];
@@ -11,6 +12,7 @@ const registerSocket = (userId, socketId) => {
     console.log(`Socket ID ${socketId} is already registered for user ${userId}`);
   }
 };
+
 const unregisterSocket = (userId, socketId) => {
   if (userSockets[userId]) {
     userSockets[userId] = userSockets[userId].filter(id => id !== socketId);

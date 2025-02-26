@@ -3,6 +3,7 @@ const db = require('../config/db');
 module.exports = (io) => {
   io.on('connection', (socket) => {
     console.log(`Connected User for Notifications: ${socket.id}`);
+
     socket.on('register_notification', ({ userId }) => {
       registerSocket(userId, socket.id);
     });
