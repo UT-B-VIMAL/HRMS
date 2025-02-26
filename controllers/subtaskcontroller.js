@@ -91,7 +91,7 @@ exports.updateDatas=async(req,res)=>{
         return errorResponse(res, errorMessages, "Validation Error", 403);
       }
 
-      await updatesubTaskData(id, payload, res);
+      await updatesubTaskData(id, payload, res,req);
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error updating task', 500);

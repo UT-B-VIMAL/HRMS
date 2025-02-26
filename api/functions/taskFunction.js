@@ -1028,7 +1028,29 @@ exports.updateTaskData = async (id, payload, res,req) => {
       await db.query(historyQuery, [taskHistoryEntries]);
     }
 
-   
+    let notificationTitle, notificationBody;
+
+    if (reopen_status == 1) {
+      notificationTitle = 'Task Reopened';
+      notificationBody = 'Your task has been reopened for further review. Please check the updates.';
+    } else if (status == 3) {
+      notificationTitle = 'Task Approved';
+      notificationBody = 'Your submitted task has been successfully approved.';
+    }
+    const notificationPayload = {
+      title: notificationTitle,
+      body: notificationBody,
+    };
+    const socketIds = userSockets[currentTask.user_id];
+    if (Array.isArray(socketIds)) {
+      socketIds.forEach(socketId => {
+        req.io.of('/notifications').emit('push_notification', notificationPayload);
+      });
+    }
+    await db.execute(
+      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      [currentTask.user_id, notificationPayload.title, notificationPayload.body, 0]
+    );
     return successResponse(
       res,
       { id, ...payload },

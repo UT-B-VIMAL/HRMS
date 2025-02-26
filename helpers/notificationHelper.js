@@ -23,7 +23,6 @@ const unregisterSocket = (userId, socketId) => {
     console.log(`Remaining socket IDs for user ${userId}:`, userSockets[userId] || []);
   }
 };
-
 module.exports = {
   userSockets,
   registerSocket,
