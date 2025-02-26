@@ -3,6 +3,7 @@ const { successResponse, errorResponse,calculateNewWorkedTime,convertSecondsToHH
 const moment = require("moment");
 const {startTask ,pauseTask,endTask}=require('../functions/taskFunction')
 const { getAuthUserDetails,formatTimeDHMS } = require('./commonFunction');
+const { userSockets } = require('../../helpers/notificationHelper');
 
 // Insert Task
 exports.createSubTask = async (payload, res) => {
@@ -325,7 +326,7 @@ exports.deleteSubTask = async (id, res) => {
   }
 };
 
-exports.updatesubTaskData = async (id, payload, res) => {
+exports.updatesubTaskData = async (id, payload, res,req) => {
   const {
     status,
     name,
@@ -363,12 +364,28 @@ exports.updatesubTaskData = async (id, payload, res) => {
   };
 
   try {
+  
     if (user_id) {
       const [assignee] = await db.query('SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL', [user_id]);
       if (assignee.length === 0) {
         return errorResponse(res, null, 'Assigned User not found or has been deleted', 404);
       }
       payload.team_id = assignee[0].team_id;
+
+      const notificationPayload = {
+        title: 'New Task Assigned',
+        body: 'A new task has been assigned to you. Check your dashboard for details.',
+      };
+      const socketIds = userSockets[user_id];
+      if (Array.isArray(socketIds)) {
+        socketIds.forEach(socketId => {
+          req.io.of('/notifications').emit('push_notification', notificationPayload);
+        });
+      }
+      await db.execute(
+        'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+        [user_id, notificationPayload.title, notificationPayload.body, 0]
+      );
     }
 
     if (assigned_user_id) {
@@ -635,6 +652,29 @@ exports.updatesubTaskData = async (id, payload, res) => {
     }
 
 
+    let notificationTitle, notificationBody;
+
+    if (reopen_status == 1) {
+      notificationTitle = 'Task Reopened';
+      notificationBody = 'Your task has been reopened for further review. Please check the updates.';
+    } else if (status == 3) {
+      notificationTitle = 'Task Approved';
+      notificationBody = 'Your submitted task has been successfully approved.';
+    }
+    const notificationPayload = {
+      title: notificationTitle,
+      body: notificationBody,
+    };
+    const socketIds = userSockets[currentTask.user_id];
+    if (Array.isArray(socketIds)) {
+      socketIds.forEach(socketId => {
+        req.io.of('/notifications').emit('push_notification', notificationPayload);
+      });
+    }
+    await db.execute(
+      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      [currentTask.user_id, notificationPayload.title, notificationPayload.body, 0]
+    );
 
     return successResponse(res, { id, ...payload }, 'Task updated successfully');
   } catch (error) {
