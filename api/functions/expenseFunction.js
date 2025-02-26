@@ -5,18 +5,11 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const { uploadexpenseFileToS3, deleteFileFromS3 } = require("../../config/s3");
-const { userSockets } = require('../../helpers/notificationHelper');
+const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Expense
 exports.createexpense = async (req, res) => {
-  const {
-    date,
-    category,
-    amount,
-    user_id,
-    description,
-    created_by,
-  } = req.body;
+  const { date, category, amount, user_id, description, created_by } = req.body;
   const allowedExtensions = ["jpg", "jpeg", "png", "pdf", "doc", "docx"];
   const missingFields = [];
   if (!category) missingFields.push("category");
@@ -65,14 +58,13 @@ exports.createexpense = async (req, res) => {
   }
 
   try {
-
     const userQuery = `
         SELECT id,team_id,role_id 
         FROM users 
         WHERE deleted_at IS NULL AND id = ?
       `;
     const [userResult] = await db.query(userQuery, [user_id]);
-    
+
     if (userResult.length === 0) {
       return errorResponse(
         res,
@@ -81,14 +73,14 @@ exports.createexpense = async (req, res) => {
         404
       );
     }
-    const { team_id,role_id } = userResult[0];
-    let tl_status; 
+    const { team_id, role_id } = userResult[0];
+    let tl_status;
 
-if (role_id == 2 || role_id == 3) {
-  tl_status = 2; 
-} else {
-  tl_status = 0;
-}
+    if (role_id == 2 || role_id == 3) {
+      tl_status = 2;
+    } else {
+      tl_status = 0;
+    }
 
     const insertQuery = `
         INSERT INTO expense_details (
@@ -442,7 +434,12 @@ exports.updateexpenses = async (id, req, res) => {
     values.push(id); // Last value is the WHERE condition
 
     if (updateFields.length === 0) {
-      return errorResponse(res, "No fields to update", "Nothing to update", 400);
+      return errorResponse(
+        res,
+        "No fields to update",
+        "Nothing to update",
+        400
+      );
     }
 
     const updateQuery = `
@@ -484,7 +481,6 @@ exports.updateexpenses = async (id, req, res) => {
     );
   }
 };
-
 
 // Delete Expense
 exports.deleteExpense = async (id, res) => {
@@ -598,21 +594,52 @@ exports.getAllpmemployeexpense = async (req, res) => {
     }
 
     // Handle search term
-    if (search) {
-      const searchTerm = `%${search}%`;
-      otConditions.push(
-        "(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
-      );
-      otValues.push(
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm
-      );
+    // Handle search term
+   // Handle search term
+if (search) {
+  const searchTerm = `%${search}%`;
+
+  // Define a mapping for tl_status search values
+  const statusMapping = {
+    pending: "0",
+    rejected: "1",
+    approved: "2",
+  };
+
+  let statusSearchCondition = "";
+
+  // If search term matches one of the mapped statuses, apply the correct filtering
+  if (Object.keys(statusMapping).includes(search.toLowerCase())) {
+    switch (statusMapping[search.toLowerCase()]) {
+      case "0":
+        statusSearchCondition = " OR (et.tl_status != 0 AND et.pm_status = 0) ";
+        break;
+      case "1":
+        statusSearchCondition =
+          " OR ((et.tl_status = 1 OR et.tl_status = 2) AND et.pm_status = 0) ";
+        break;
+      case "2":
+        statusSearchCondition =
+          " OR (et.pm_status = 2 AND et.tl_status = 2 AND et.status = 2) ";
+        break;
     }
+  }
+
+  otConditions.push(
+    `(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ? ${statusSearchCondition})`
+  );
+
+  otValues.push(
+    searchTerm,
+    searchTerm,
+    searchTerm,
+    searchTerm,
+    searchTerm,
+    searchTerm,
+    searchTerm
+  );
+}
+
 
     // Handle status conditions
     switch (status) {
@@ -798,7 +825,7 @@ exports.approve_reject_expense = async (payload, res, req) => {
 
     if (role === "tl") {
       updateQuery += ` tl_status = ? `;
-    } else if (role === "pm") {
+    } else if (role === "pm" || role === "admin") {
       updateQuery += ` pm_status = ? `;
     } else {
       return errorResponse(
@@ -828,26 +855,32 @@ exports.approve_reject_expense = async (payload, res, req) => {
 
     // Send notification to the user
     const categoryMap = {
-      1: 'Food',
-      2: 'Travel',
-      3: 'Others'
+      1: "Food",
+      2: "Travel",
+      3: "Others",
     };
-    const expenseType = categoryMap[category] || 'Unknown';
+    const expenseType = categoryMap[category] || "Unknown";
 
     const notificationPayload = {
-      title: status === 2 ? 'Expense Approved' : 'Expense Rejected',
-      body: `Your expense claim for ${expenseType} has been ${status === 2 ? 'approved' : 'rejected'}.`,
+      title: status === 2 ? "Expense Approved" : "Expense Rejected",
+      body: `Your expense claim for ${expenseType} has been ${
+        status === 2 ? "approved" : "rejected"
+      }.`,
     };
 
     const socketIds = userSockets[user_id];
     if (Array.isArray(socketIds)) {
-      socketIds.forEach(socketId => {
-        console.log(`Sending notification to user ${user_id} with socket ID ${socketId}`);
-        req.io.of('/notifications').emit('push_notification', notificationPayload);
+      socketIds.forEach((socketId) => {
+        console.log(
+          `Sending notification to user ${user_id} with socket ID ${socketId}`
+        );
+        req.io
+          .of("/notifications")
+          .emit("push_notification", notificationPayload);
       });
     }
     await db.execute(
-      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
       [user_id, notificationPayload.title, notificationPayload.body, 0]
     );
 
@@ -1081,8 +1114,12 @@ exports.getExpenseReport = async (queryParams, res) => {
     const today = new Date().toISOString().split("T")[0];
 
     // If dates are not provided, use the current date
-    const fromDate = from_date ? new Date(from_date).toISOString().split("T")[0] : today;
-    const toDate = to_date ? new Date(to_date).toISOString().split("T")[0] : today;
+    const fromDate = from_date
+      ? new Date(from_date).toISOString().split("T")[0]
+      : today;
+    const toDate = to_date
+      ? new Date(to_date).toISOString().split("T")[0]
+      : today;
 
     // Base query with filters
     const baseQuery = `
@@ -1107,20 +1144,24 @@ exports.getExpenseReport = async (queryParams, res) => {
          users.deleted_at IS NULL
          AND expenses.pm_status = 2
          AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
-         ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)" : ""}
+         ${
+           search
+             ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
+             : ""
+         }
          ${category ? "AND expenses.category IN (?)" : ""}
       ORDER BY 
          expenses.date DESC
-      ${
-        export_status === "1" ? "" : "LIMIT ? OFFSET ?"
-      };
+      ${export_status === "1" ? "" : "LIMIT ? OFFSET ?"};
     `;
 
     // Prepare query params
     let params = [fromDate, toDate];
     if (search) params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     if (category) {
-      const categoryArray = Array.isArray(category) ? category : category.split(",");
+      const categoryArray = Array.isArray(category)
+        ? category
+        : category.split(",");
       params.push(categoryArray);
     }
 
@@ -1137,9 +1178,10 @@ exports.getExpenseReport = async (queryParams, res) => {
     // Execute main query
     const [results] = await db.query(baseQuery, params);
     const rowsWithSerialNo = results.map((row, index) => ({
-      s_no: export_status == 1
-        ? index + 1
-        : (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1,
+      s_no:
+        export_status == 1
+          ? index + 1
+          : (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1,
       ...row,
     }));
     // Handle export case
@@ -1163,7 +1205,11 @@ exports.getExpenseReport = async (queryParams, res) => {
          users.deleted_at IS NULL
          AND expenses.pm_status = 2
          AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
-         ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)" : ""}
+         ${
+           search
+             ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
+             : ""
+         }
          ${category ? "AND expenses.category IN (?)" : ""}
     `;
 
@@ -1174,10 +1220,12 @@ exports.getExpenseReport = async (queryParams, res) => {
     const totalRecords = totalRecordsResult[0].total || 0;
 
     const pagination = getPagination(page, perPage, totalRecords);
-    successResponse(  
+    successResponse(
       res,
       rowsWithSerialNo,
-      rowsWithSerialNo.length === 0 ? "No expenses found" : "Expenses retrieved successfully",
+      rowsWithSerialNo.length === 0
+        ? "No expenses found"
+        : "Expenses retrieved successfully",
       200,
       pagination
     );
@@ -1186,4 +1234,3 @@ exports.getExpenseReport = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
