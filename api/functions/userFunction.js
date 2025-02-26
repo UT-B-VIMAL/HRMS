@@ -36,7 +36,7 @@ exports.createUser = async (payload, res) => {
         first_name, last_name, employee_id, email,
         password, team_id, role_id, designation_id,
         created_by, deleted_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
 
     const values = [
