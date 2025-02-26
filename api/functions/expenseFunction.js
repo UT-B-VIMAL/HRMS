@@ -5,6 +5,7 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const { uploadexpenseFileToS3, deleteFileFromS3 } = require("../../config/s3");
+const { userSockets } = require('../../helpers/notificationHelper');
 
 // Insert Expense
 exports.createexpense = async (req, res) => {
@@ -718,8 +719,8 @@ exports.getAllpmemployeexpense = async (req, res) => {
 };
 
 // Approve or reject
-exports.approve_reject_expense = async (payload, res) => {
-  const { id, user_id, status, updated_by, role } = payload;
+exports.approve_reject_expense = async (payload, res, req) => {
+  const { id, status, updated_by, role } = payload;
 
   try {
     // Validate required fields
@@ -756,9 +757,9 @@ exports.approve_reject_expense = async (payload, res) => {
       );
     }
 
-    // Verify the expense exists
+    // Verify the expense exists and fetch user_id and category
     const expenseQuery = `
-      SELECT id FROM expense_details 
+      SELECT id, user_id, category FROM expense_details 
       WHERE deleted_at IS NULL AND id = ?
     `;
     const [expenseResult] = await db.query(expenseQuery, [id]);
@@ -771,6 +772,8 @@ exports.approve_reject_expense = async (payload, res) => {
         404
       );
     }
+
+    const { user_id, category } = expenseResult[0];
 
     // Verify the updating user exists
     const updatedByQuery = `
@@ -822,6 +825,31 @@ exports.approve_reject_expense = async (payload, res) => {
         400
       );
     }
+
+    // Send notification to the user
+    const categoryMap = {
+      1: 'Food',
+      2: 'Travel',
+      3: 'Others'
+    };
+    const expenseType = categoryMap[category] || 'Unknown';
+
+    const notificationPayload = {
+      title: status === 2 ? 'Expense Approved' : 'Expense Rejected',
+      body: `Your expense claim for ${expenseType} has been ${status === 2 ? 'approved' : 'rejected'}.`,
+    };
+
+    const socketIds = userSockets[user_id];
+    if (Array.isArray(socketIds)) {
+      socketIds.forEach(socketId => {
+        console.log(`Sending notification to user ${user_id} with socket ID ${socketId}`);
+        req.io.of('/notifications').emit('push_notification', notificationPayload);
+      });
+    }
+    await db.execute(
+      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      [user_id, notificationPayload.title, notificationPayload.body, 0]
+    );
 
     // Return success response
     return successResponse(

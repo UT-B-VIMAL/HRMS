@@ -9,7 +9,7 @@ const { successResponse, errorResponse } = require("../helpers/responseHelper");
 exports.ratingUpdations = async (req, res) => {
   try {
     const payload = req.body;
-    await ratingUpdation(payload,res);
+    await ratingUpdation(payload,res,req);
   } catch (error) {
     const statusCode = error.status || 500;
     return errorResponse(res, error.message, "Error updating rating", statusCode);

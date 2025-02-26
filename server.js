@@ -193,7 +193,7 @@ apiRouter.get('/teamwise_productivity', RoleController.checkRole(),productivityC
 apiRouter.get('/individual_status', RoleController.checkRole(),productivityController.get_individualProductivity);
 
 //rating
-apiRouter.post('/updateRating', RoleController.checkRole(), ratingController.ratingUpdations);
+apiRouter.post('/updateRating', RoleController.checkRole(),(req, res) => ratingController.ratingUpdations(req, res, req.io));
 apiRouter.get('/getRating', RoleController.checkRole(), ratingController.getRating);
 apiRouter.get('/getAllUserRating', RoleController.checkRole(), ratingController.getAllUserRating);
 apiRouter.get('/getAnnualRatings', RoleController.checkRole(),ratingController.getAnnualRatings);
@@ -224,11 +224,11 @@ apiRouter.get('/otdetail',RoleController.checkRole(), otdetailController.getAllO
 apiRouter.get('/pmemployeeotdetail',RoleController.checkRole(), otdetailController.getAllpmemployeeOtdetails);
 apiRouter.get('/tlemployeeotdetail',RoleController.checkRole(), otdetailController.getAlltlemployeeOtdetails);
 apiRouter.put('/tlotdetail/:id',RoleController.checkRole(), otdetailController.updatetlOtdetail);
-apiRouter.post('/approve_reject_ot', RoleController.checkRole(),otdetailController.approve_reject_otdetail);
+apiRouter.post('/approve_reject_ot', RoleController.checkRole(),(req, res) => otdetailController.approve_reject_otdetail(req, res, req.io));
 apiRouter.get('/getOtReport', RoleController.checkRole(),otdetailController.getOtReport);
 
 // Expense
-apiRouter.post('/expensedetail', RoleController.checkRole(),expensedetailController.createexpensedetail);
+apiRouter.post('/expensedetail', RoleController.checkRole(),(req, res) => expensedetailController.createexpensedetail(req, res, req.io));
 apiRouter.get('/expensedetail/:id', RoleController.checkRole(),expensedetailController.getexpensedetail);
 apiRouter.put('/expensedetail/:id',RoleController.checkRole(), expensedetailController.updateexpensedetail);
 apiRouter.delete('/expensedetail/:id',RoleController.checkRole(),expensedetailController.deleteexpensedetail);
