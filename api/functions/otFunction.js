@@ -973,7 +973,7 @@ exports.approve_reject_OT = async (payload, res, req) => {
     // Apply status = 0 condition only when role is "tl"
     if (role === "tl") {
       otQuery += ` AND status = 0 `;
-    } else if (role === "pm") {
+    } else if (role === "pm" || role === "admin") {
       otQuery += ` AND tl_status != 0 `; // PM should only act if TL has updated it
     }
 
