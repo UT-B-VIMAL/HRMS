@@ -594,52 +594,22 @@ exports.getAllpmemployeexpense = async (req, res) => {
     }
 
     // Handle search term
-    // Handle search term
-   // Handle search term
-if (search) {
-  const searchTerm = `%${search}%`;
-
-  // Define a mapping for tl_status search values
-  const statusMapping = {
-    pending: "0",
-    rejected: "1",
-    approved: "2",
-  };
-
-  let statusSearchCondition = "";
-
-  // If search term matches one of the mapped statuses, apply the correct filtering
-  if (Object.keys(statusMapping).includes(search.toLowerCase())) {
-    switch (statusMapping[search.toLowerCase()]) {
-      case "0":
-        statusSearchCondition = " OR (et.tl_status != 0 AND et.pm_status = 0) ";
-        break;
-      case "1":
-        statusSearchCondition =
-          " OR ((et.tl_status = 1 OR et.tl_status = 2) AND et.pm_status = 0) ";
-        break;
-      case "2":
-        statusSearchCondition =
-          " OR (et.pm_status = 2 AND et.tl_status = 2 AND et.status = 2) ";
-        break;
+    if (search) {
+      const searchTerm = `%${search}%`;
+      otConditions.push(
+        "(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.employee_id LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
+      );
+      otValues.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
     }
-  }
-
-  otConditions.push(
-    `(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ? ${statusSearchCondition})`
-  );
-
-  otValues.push(
-    searchTerm,
-    searchTerm,
-    searchTerm,
-    searchTerm,
-    searchTerm,
-    searchTerm,
-    searchTerm
-  );
-}
-
 
     // Handle status conditions
     switch (status) {
@@ -672,6 +642,7 @@ if (search) {
     // Prepare the query to fetch expense details
     const otQuery = `
       SELECT 
+        pr.name AS project_name,
         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
         et.description,
         et.expense_amount AS amount,
@@ -689,6 +660,8 @@ if (search) {
         d.name AS designation
       FROM 
         expense_details et
+      LEFT JOIN 
+        projects pr ON pr.id = et.project_id
       LEFT JOIN 
         users u ON u.id = et.user_id
       LEFT JOIN 
@@ -719,6 +692,7 @@ if (search) {
       designation: row.designation,
       date: row.date,
       category: row.category,
+      project_name: row.project_name,
       team_name: row.team_name,
       task_name: row.task_name,
       description: row.description,
@@ -990,9 +964,10 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       otConditions.push(
-        "(u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
+        "(u.first_name LIKE ? OR u.last_name LIKE ? OR u.employee_id LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
       );
       otValues.push(
+        searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
