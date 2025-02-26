@@ -161,7 +161,7 @@ apiRouter.put('/subtask/:id',RoleController.checkRole(), subtaskController.updat
 apiRouter.delete('/subtask/:id', RoleController.checkRole(),subtaskController.deleteSubTask);
 apiRouter.get('/subtask/:id', RoleController.checkRole(),subtaskController.getSubTask);
 apiRouter.get('/subtask',RoleController.checkRole(), subtaskController.getAllSubTasks);
-apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(), subtaskController.updateDatas);
+apiRouter.put('/subtaskupdate/:id',RoleController.checkRole(),(req,res) => subtaskController.updateDatas(req, res, req.io));
 
 // Idle Employee Route
 apiRouter.get('/idleEmployee', RoleController.checkRole(),idleEmployeeController.get_idleEmployee);
