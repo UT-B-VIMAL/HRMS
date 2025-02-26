@@ -37,7 +37,7 @@ exports.approve_reject_otdetail = async (req, res) => {
   try {
     const payload = req.body;
 
-    await approve_reject_OT(payload, res);
+    await approve_reject_OT(payload, res, req);
   } catch (error) {
     console.error("Error upadating status:", error.message);
     return errorResponse(res, error.message, "Error upadating status", 500);

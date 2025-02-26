@@ -4,8 +4,7 @@ const {
   errorResponse,
   successResponse,
 } = require("../../helpers/responseHelper");
-
-const getPagination  = require("../../helpers/pagination");
+const { userSockets } = require('../../helpers/notificationHelper');
 const { getAuthUserDetails } = require("./commonFunction");
 
 
@@ -166,7 +165,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
 
 
 
-exports.ratingUpdation = async (payload, res) => {
+exports.ratingUpdation = async (payload, res, req) => {
   const { status,month,rater, quality, timelines,agility,attitude,responsibility,remarks,user_id,updated_by } = payload;
 
   const { error } = UpdateRatingSchema.validate(
@@ -228,6 +227,25 @@ exports.ratingUpdation = async (payload, res) => {
     status,
     updated_by,
   };
+
+  if (status == "1") {
+    const notificationPayload = {
+      title: 'Rating Updated',
+      body: 'Your performance rating has been updated. Check dashboard for details.',
+    };
+    const socketIds = userSockets[user_id];
+    if (Array.isArray(socketIds)) {
+      socketIds.forEach(socketId => {
+        console.log(`Sending notification to user ${user_id} with socket ID ${socketId}`);
+        req.io.of('/notifications').emit('push_notification', notificationPayload);
+      });
+    }
+    await db.execute(
+      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      [user_id, notificationPayload.title, notificationPayload.body, 0]
+    );
+  }
+
   return successResponse(res, responsePayload, "Rating Updated successfully", 200);
 };
 

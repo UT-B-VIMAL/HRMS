@@ -1788,11 +1788,13 @@ exports.updateTaskTimeLine = async (req, res) => {
       taskOrSubtask = subtask[0];
       taskId = taskOrSubtask.task_id;
       subtaskId = taskOrSubtask.id;
+      userTeamId = taskOrSubtask.team_id;
     } else {
       const [task] = await db.query("SELECT * FROM tasks WHERE id = ?", [id]);
       taskOrSubtask = task[0];
       taskId = taskOrSubtask.id;
       subtaskId = null;
+      userTeamId = taskOrSubtask.team_id;
     }
     
     const getStatusGroups = (t_status, reopenStatus, activeStatus) => {
@@ -1834,6 +1836,47 @@ exports.updateTaskTimeLine = async (req, res) => {
       const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
       const values = [old_data,"Pending Approval", taskId,subtaskId,"Changed Status",taskOrSubtask.user_id,1, localISTTime,localISTTime];
       await db.query(query, values);
+
+      // Send notifications to users with role_id 1 and 2
+      const [adminsAndManagers] = await db.query('SELECT id FROM users WHERE role_id IN (1, 2)');
+      const adminAndManagerIds = adminsAndManagers.map(user => user.id);
+
+      const notificationPayload = {
+        title: 'Review Employee Tasks',
+        body: 'Please review employee pending tasks.',
+      };
+
+      adminAndManagerIds.forEach(async (userId) => {
+        const socketIds = userSockets[userId];
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach(socketId => {
+            console.log(`Sending notification to user ${userId} with socket ID ${socketId}`);
+            req.io.of('/notifications').emit('push_notification', notificationPayload);
+          });
+        }
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [userId, notificationPayload.title, notificationPayload.body, 0]
+        );
+      });
+
+      // Send notification to the reporting user of the team
+      const userTeamId = taskOrSubtask.team_id;
+      const [team] = await db.query('SELECT reporting_user_id FROM teams WHERE id = ?', [userTeamId]);
+      if (team.length > 0) {
+        const reportingUserId = team[0].reporting_user_id;
+        const reportingUserSocketIds = userSockets[reportingUserId];
+        if (Array.isArray(reportingUserSocketIds)) {
+          reportingUserSocketIds.forEach(socketId => {
+            console.log(`Sending notification to reporting user ${reportingUserId} with socket ID ${socketId}`);
+            req.io.of('/notifications').emit('push_notification', notificationPayload);
+          });
+        }
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [reportingUserId, notificationPayload.title, notificationPayload.body, 0]
+        );
+      }
     } else {
       return errorResponse(res, "Invalid Type", 400);
     }

@@ -6,6 +6,7 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { Parser } = require("json2csv");
+const { userSockets } = require('../../helpers/notificationHelper');
 
 // Insert OT
 exports.createOt = async (payload, res) => {
@@ -895,7 +896,7 @@ const addTimes = (time1, time2) => {
 };
 
 // Approve or reject
-exports.approve_reject_OT = async (payload, res) => {
+exports.approve_reject_OT = async (payload, res, req) => {
   const { user_id, status, updated_by, role } = payload;
 
   try {
@@ -957,6 +958,24 @@ exports.approve_reject_OT = async (payload, res) => {
       );
     }
 
+    // Fetch the date for the notification
+    const otQuery = `
+      SELECT date FROM ot_details 
+      WHERE user_id = ? AND status = 0 AND deleted_at IS NULL
+    `;
+    const [otResult] = await db.query(otQuery, [user_id]);
+
+    if (otResult.length === 0) {
+      return errorResponse(
+        res,
+        "No OT records found with status 0 for this user",
+        "Error updating OT status",
+        400
+      );
+    }
+
+    const otDate = otResult[0].date;
+
     // Build the update query based on role
     let updateQuery = `
       UPDATE ot_details
@@ -991,6 +1010,24 @@ exports.approve_reject_OT = async (payload, res) => {
         400
       );
     }
+
+    // Send notification to the user
+    const notificationPayload = {
+      title: status === 2 ? 'Overtime Approved' : 'Overtime Rejected',
+      body: `Your overtime request for ${otDate} has been ${status === 2 ? 'approved' : 'rejected'}. Check comments for details.`,
+    };
+
+    const socketIds = userSockets[user_id];
+    if (Array.isArray(socketIds)) {
+      socketIds.forEach(socketId => {
+        console.log(`Sending notification to user ${user_id} with socket ID ${socketId}`);
+        req.io.of('/notifications').emit('push_notification', notificationPayload);
+      });
+    }
+    await db.execute(
+      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      [user_id, notificationPayload.title, notificationPayload.body, 0]
+    );
 
     // Return success response
     return successResponse(

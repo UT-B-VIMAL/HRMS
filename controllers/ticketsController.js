@@ -213,7 +213,6 @@ exports.ticketComments = async (req, res) => {
         created_at: new Date(),
       };
 
-      // Emit WebSocket event to all connected users who should receive this comment
       io.sockets.emit('new_ticket_comment', newComment);  // Send the new comment to all connected users
 
       // Send notification to the receiver
@@ -229,7 +228,7 @@ exports.ticketComments = async (req, res) => {
           body: 'You have a new message in your support ticket.',
         };
       }
-      const socketIds = userSockets[receiver_id]; // Get the array of socket IDs for the receiver
+      const socketIds = userSockets[receiver_id]; 
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
           console.log(`Sending notification to user ${receiver_id} with socket ID ${socketId}`);
