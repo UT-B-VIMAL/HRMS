@@ -6,11 +6,7 @@ const {
 } = require("../../helpers/responseHelper");
 const { userSockets } = require('../../helpers/notificationHelper');
 const { getAuthUserDetails } = require("./commonFunction");
-
-
-
-
-
+const getPagination  = require("../../helpers/pagination");
 
 
 // phase 2
@@ -302,7 +298,7 @@ exports.getRatingById = async (req, res) => {
 };
 
 exports.getRatings = async (req, res) => {
-  try {
+  // try {
     const { team_id, month, user_id, search, page = 1, perPage = 10 } = req;
     const offset = (page - 1) * perPage;
 
@@ -451,10 +447,10 @@ exports.getRatings = async (req, res) => {
     });
 
     return successResponse(res, groupedResults, 'Ratings fetched successfully', 200, getPagination(page, perPage, totalRecords));
-  } catch (error) {
-    console.error('Error fetching ratings:', error);
-    return errorResponse(res, 'An error occurred while fetching ratings', 'Internal Server Error', 500);
-  }
+  // } catch (error) {
+  //   console.error('Error fetching ratings:', error);
+  //   return errorResponse(res, 'An error occurred while fetching ratings', 'Internal Server Error', 500);
+  // }
 };
 
 
