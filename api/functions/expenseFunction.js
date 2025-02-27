@@ -110,6 +110,50 @@ exports.createexpense = async (req, res) => {
 
     const status = statusResult.length > 0 ? statusResult[0].status : 0;
 
+    // Check if created_by user has role_id == 4
+    const createdByQuery = `
+      SELECT role_id, team_id 
+      FROM users 
+      WHERE id = ?
+    `;
+    const [createdByResult] = await db.query(createdByQuery, [created_by]);
+
+    if (createdByResult.length > 0 && createdByResult[0].role_id == 4) {
+      const teamId = createdByResult[0].team_id;
+
+      // Fetch reporting_user_id from teams table
+      const teamQuery = `
+        SELECT reporting_user_id 
+        FROM teams 
+        WHERE id = ?
+      `;
+      const [teamResult] = await db.query(teamQuery, [teamId]);
+
+      if (teamResult.length > 0) {
+        const reportingUserId = teamResult[0].reporting_user_id;
+
+        // Notification payload
+        const notificationPayload = {
+          title: 'Review Employee Expenses',
+          body: 'New expense requests need your approval.',
+        };
+
+        const socketIds = userSockets[reportingUserId];
+
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach((socketId) => {
+            console.log(`Sending notification to user ${reportingUserId} with socket ID ${socketId}`);
+            req.io.of('/notifications').emit('push_notification', notificationPayload);
+          });
+        }
+
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [reportingUserId, notificationPayload.title, notificationPayload.body, 0]
+        );
+      }
+    }
+
     // Return success response
     return successResponse(
       res,
@@ -827,45 +871,81 @@ exports.approve_reject_expense = async (payload, res, req) => {
       );
     }
 
-    // Send notification to the user
-    const categoryMap = {
-      1: "Food",
-      2: "Travel",
-      3: "Others",
-    };
-    const expenseType = categoryMap[category] || "Unknown";
+    if (role === "pm" && status === 2) {
+      // Send notification to the user
+      const categoryMap = {
+        1: "Food",
+        2: "Travel",
+        3: "Others",
+      };
+      const expenseType = categoryMap[category] || "Unknown";
 
-    const notificationPayload = {
-      title: status === 2 ? "Expense Approved" : "Expense Rejected",
-      body: `Your expense claim for ${expenseType} has been ${
-        status === 2 ? "approved" : "rejected"
-      }.`,
-    };
+      const notificationPayload = {
+        title: status === 2 ? "Expense Approved" : "Expense Rejected",
+        body: `Your expense claim for ${expenseType} has been ${status === 2 ? "approved" : "rejected"
+          }.`,
+      };
 
-    const socketIds = userSockets[user_id];
-    if (Array.isArray(socketIds)) {
-      socketIds.forEach((socketId) => {
-        console.log(
-          `Sending notification to user ${user_id} with socket ID ${socketId}`
-        );
-        req.io
-          .of("/notifications")
-          .emit("push_notification", notificationPayload);
-      });
+      const socketIds = userSockets[user_id];
+      if (Array.isArray(socketIds)) {
+        socketIds.forEach((socketId) => {
+          console.log(
+            `Sending notification to user ${user_id} with socket ID ${socketId}`
+          );
+          req.io
+            .of("/notifications")
+            .emit("push_notification", notificationPayload);
+        });
+      }
+      await db.execute(
+        "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+        [user_id, notificationPayload.title, notificationPayload.body, 0]
+      );
     }
-    await db.execute(
-      "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-      [user_id, notificationPayload.title, notificationPayload.body, 0]
-    );
 
-    // Return success response
-    return successResponse(
+    // Return success response immediately
+    successResponse(
       res,
       status === 2
         ? "Expense Approved successfully"
         : "Expense Rejected successfully",
       200
     );
+
+    // Handle notification sending asynchronously
+    if (role === "tl" && status === 2) {
+      (async () => {
+        const pmUsersQuery = `
+          SELECT id FROM users 
+          WHERE role_id IN (1, 2) AND deleted_at IS NULL
+        `;
+        const [pmUsers] = await db.query(pmUsersQuery);
+
+        const pmNotificationPayload = {
+          title: "Review Employee Expenses",
+          body: "New employee expense requests need your approval.",
+        };
+
+        for (const pmUser of pmUsers) {
+          const pmSocketIds = userSockets[pmUser.id];
+          if (Array.isArray(pmSocketIds)) {
+            pmSocketIds.forEach((socketId) => {
+              console.log(
+                `Sending notification to PM/Admin user ${pmUser.id} with socket ID ${socketId}`
+              );
+              req.io
+                .of("/notifications")
+                .emit("push_notification", pmNotificationPayload);
+            });
+          }
+
+          await db.execute(
+            "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+            [pmUser.id, pmNotificationPayload.title, pmNotificationPayload.body, 0]
+          );
+        }
+      })();
+    }
   } catch (error) {
     console.error(
       "Error approving or rejecting expense details:",
@@ -1119,11 +1199,10 @@ exports.getExpenseReport = async (queryParams, res) => {
          users.deleted_at IS NULL
          AND expenses.pm_status = 2
          AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
-         ${
-           search
-             ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
-             : ""
-         }
+         ${search
+        ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
+        : ""
+      }
          ${category ? "AND expenses.category IN (?)" : ""}
       ORDER BY 
          expenses.date DESC
@@ -1180,11 +1259,10 @@ exports.getExpenseReport = async (queryParams, res) => {
          users.deleted_at IS NULL
          AND expenses.pm_status = 2
          AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
-         ${
-           search
-             ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
-             : ""
-         }
+         ${search
+        ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
+        : ""
+      }
          ${category ? "AND expenses.category IN (?)" : ""}
     `;
 
