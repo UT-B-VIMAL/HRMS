@@ -37,7 +37,7 @@ const {
     try {
       const payload = req.body;
   
-      await approve_reject_expense(payload, res);
+      await approve_reject_expense(payload, res, req); // Corrected function name
     } catch (error) {
       console.error("Error upadating status:", error.message);
       return errorResponse(res, error.message, "Error upadating status", 500);
