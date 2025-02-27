@@ -27,7 +27,7 @@ exports.createOtdetail = async (req, res) => {
       return errorResponse(res, errorMessages, "Validation Error", 403);
     }
 
-    await createOt(payload, res);
+    await createOt(payload, res, req);
   } catch (error) {
     console.error("Error creating OT:", error.message);
     return errorResponse(res, error.message, "Error creating OT detail", 500);
