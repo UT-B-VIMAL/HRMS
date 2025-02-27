@@ -1037,7 +1037,9 @@ exports.approve_reject_ot = async (payload, res, req) => {
 
     updateQuery += ` WHERE user_id = ? AND deleted_at IS NULL`;
 
-    const values = [status, updated_by, status, user_id];
+    updateQuery += ` WHERE id = ? AND deleted_at IS NULL`;
+
+    const values = [status, updated_by, status, id];
 
     // Execute the query
     const [result] = await db.query(updateQuery, values);
