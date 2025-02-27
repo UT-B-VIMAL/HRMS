@@ -41,7 +41,7 @@ const dailyAttendanceNotificationCron = require('./cron/dailyAttendanceNotificat
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
 const DOMAIN = isProduction ? process.env.LIVE_URL : process.env.LIVE_URL;
-const PORT = isProduction ? 8085 : 3000;
+const PORT = isProduction ? 8095 : 3000;
 
 // Socket-----------------------------------------------------------------------------
 const socketIo = require('socket.io');
