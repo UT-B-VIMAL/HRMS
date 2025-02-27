@@ -9,7 +9,7 @@ const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert OT
-exports.createOt = async (payload, res) => {
+exports.createOt = async (payload, res, req) => {
   const { date, time, project_id, task_id, user_id, comments, created_by } =
     payload;
 
@@ -174,6 +174,50 @@ exports.createOt = async (payload, res) => {
     const [statusResult] = await db.query(selectQuery, [result.insertId]);
 
     const status = statusResult.length > 0 ? statusResult[0].status : 0;
+
+    // Check if created_by user has role_id == 4
+    const createdByQuery = `
+      SELECT role_id, team_id 
+      FROM users 
+      WHERE id = ?
+    `;
+    const [createdByResult] = await db.query(createdByQuery, [created_by]);
+
+    if (createdByResult.length > 0 && createdByResult[0].role_id == 4) {
+      const teamId = createdByResult[0].team_id;
+
+      // Fetch reporting_user_id from teams table
+      const teamQuery = `
+        SELECT reporting_user_id 
+        FROM teams 
+        WHERE id = ?
+      `;
+      const [teamResult] = await db.query(teamQuery, [teamId]);
+
+      if (teamResult.length > 0) {
+        const reportingUserId = teamResult[0].reporting_user_id;
+
+        // Notification payload
+        const notificationPayload = {
+          title: 'Review Employee OT Requests',
+          body: 'Pending overtime requests for your team. Review and approve/reject as necessary.',
+        };
+
+        const socketIds = userSockets[reportingUserId];
+
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach((socketId) => {
+            console.log(`Sending notification to user ${reportingUserId} with socket ID ${socketId}`);
+            req.io.of('/notifications').emit('push_notification', notificationPayload);
+          });
+        }
+
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [reportingUserId, notificationPayload.title, notificationPayload.body, 0]
+        );
+      }
+    }
 
     // Return success response
     return successResponse(
@@ -900,12 +944,20 @@ const addTimes = (time1, time2) => {
   )}:${String(seconds).padStart(2, "0")}`;
 };
 
-// Approve or reject
-exports.approve_reject_OT = async (payload, res, req) => {
+// Approve or reject OT
+exports.approve_reject_ot = async (payload, res, req) => {
   const { user_id, status, updated_by, role } = payload;
 
   try {
     // Validate required fields
+    if (!user_id) {
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Error updating OT details",
+        400
+      );
+    }
     if (!status) {
       return errorResponse(
         res,
@@ -931,21 +983,23 @@ exports.approve_reject_OT = async (payload, res, req) => {
       );
     }
 
-    // Verify the user exists
-    const userQuery = `
-      SELECT id FROM users 
-      WHERE deleted_at IS NULL AND id = ?
+    // Verify the OT exists and fetch user_id and date
+    const otQuery = `
+      SELECT id, user_id, date FROM ot_details 
+      WHERE deleted_at IS NULL AND user_id = ?
     `;
-    const [userResult] = await db.query(userQuery, [user_id]);
+    const [otResult] = await db.query(otQuery, [user_id]);
 
-    if (userResult.length === 0) {
+    if (otResult.length === 0) {
       return errorResponse(
         res,
-        "User not found or deleted",
+        "OT not found or deleted",
         "Error fetching OT details",
         404
       );
     }
+
+    const { id, date } = otResult[0];
 
     // Verify the updating user exists
     const updatedByQuery = `
@@ -963,33 +1017,6 @@ exports.approve_reject_OT = async (payload, res, req) => {
       );
     }
 
-    // Fetch the date for the notification
-
-    let otQuery = `
-  SELECT date FROM ot_details 
-  WHERE user_id = ? AND deleted_at IS NULL
-`;
-
-    // Apply status = 0 condition only when role is "tl"
-    if (role === "tl") {
-      otQuery += ` AND status = 0 `;
-    } else if (role === "pm") {
-      otQuery += ` AND tl_status != 0 `; // PM should only act if TL has updated it
-    }
-
-    const [otResult] = await db.query(otQuery, [user_id]);
-
-    if (otResult.length === 0) {
-      return errorResponse(
-        res,
-        "No OT records found with status 0 for this user",
-        "Error updating OT status",
-        400
-      );
-    }
-
-    const otDate = otResult[0].date;
-
     // Build the update query based on role
     let updateQuery = `
       UPDATE ot_details
@@ -997,10 +1024,8 @@ exports.approve_reject_OT = async (payload, res, req) => {
 
     if (role === "tl") {
       updateQuery += ` tl_status = ? `;
-      updateQuery += ` WHERE user_id = ? AND status = 0 AND deleted_at IS NULL`;
-    } else if (role === "pm") {
+    } else if (role === "pm" || role === "admin") {
       updateQuery += ` pm_status = ? `;
-      updateQuery += ` WHERE user_id = ? AND tl_status != 0 AND deleted_at IS NULL`;
     } else {
       return errorResponse(
         res,
@@ -1009,6 +1034,8 @@ exports.approve_reject_OT = async (payload, res, req) => {
         400
       );
     }
+
+    updateQuery += ` WHERE user_id = ? AND deleted_at IS NULL`;
 
     const values = [status, updated_by, status, user_id];
 
@@ -1019,8 +1046,8 @@ exports.approve_reject_OT = async (payload, res, req) => {
     if (result.affectedRows === 0) {
       return errorResponse(
         res,
-        "No OT records found with status 0 for this user",
-        "Error updating OT status",
+        "No records updated, ensure the OT record exists and matches the criteria",
+        "Error updating OT details",
         400
       );
     }
@@ -1028,9 +1055,9 @@ exports.approve_reject_OT = async (payload, res, req) => {
     // Send notification to the user
     const notificationPayload = {
       title: status === 2 ? "Overtime Approved" : "Overtime Rejected",
-      body: `Your overtime request for ${otDate} has been ${
+      body: `Your overtime request for ${date} has been ${
         status === 2 ? "approved" : "rejected"
-      }. Check comments for details.`,
+      }.`,
     };
 
     const socketIds = userSockets[user_id];
@@ -1049,15 +1076,55 @@ exports.approve_reject_OT = async (payload, res, req) => {
       [user_id, notificationPayload.title, notificationPayload.body, 0]
     );
 
-    // Return success response
-    return successResponse(
+    // Return success response immediately
+    successResponse(
       res,
       status === 2 ? "OT Approved successfully" : "OT Rejected successfully",
       200
     );
+
+    // Handle notification sending asynchronously
+    if (role === "tl" && status === 2) {
+      (async () => {
+        const pmUsersQuery = `
+          SELECT id FROM users 
+          WHERE role_id = 2 AND deleted_at IS NULL
+        `;
+        const [pmUsers] = await db.query(pmUsersQuery);
+
+        const pmNotificationPayload = {
+          title: "Review Employee OT Requests",
+          body: "Pending overtime requests from employees require your review.",
+        };
+
+        for (const pmUser of pmUsers) {
+          const pmSocketIds = userSockets[pmUser.id];
+          if (Array.isArray(pmSocketIds)) {
+            pmSocketIds.forEach((socketId) => {
+              console.log(
+                `Sending notification to PM user ${pmUser.id} with socket ID ${socketId}`
+              );
+              req.io
+                .of("/notifications")
+                .emit("push_notification", pmNotificationPayload);
+            });
+          }
+
+          await db.execute(
+            "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+            [pmUser.id, pmNotificationPayload.title, pmNotificationPayload.body, 0]
+          );
+        }
+      })();
+    }
   } catch (error) {
     console.error("Error approving or rejecting OT details:", error.message);
-    return errorResponse(res, error.message, "Error updating OT details", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error updating OT details",
+      500
+    );
   }
 };
 
