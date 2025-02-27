@@ -10,6 +10,8 @@ const s3Client = new S3Client({
   },
 });
 
+const S3_BUCKET_URL = process.env.S3_BUCKET_URL;
+
 exports.uploadFileToS3 = async (fileContent, fileName) => {
   const fileExtension = path.extname(fileName).toLowerCase();
 
@@ -34,12 +36,13 @@ exports.uploadFileToS3 = async (fileContent, fileName) => {
     const command = new PutObjectCommand(params);
     const response = await s3Client.send(command);  
 
-    return `unity-hrms.s3.ap-south-1.amazonaws.com/tickets/${fileName}`;
+    return `${S3_BUCKET_URL}/tickets/${fileName}`;
   } catch (err) {
     console.error('Error uploading file:', err);
     throw new Error("Error uploading file to S3");
   }
 };
+
 exports.uploadexpenseFileToS3 = async (fileContent, fileName) => {
   const fileExtension = path.extname(fileName).toLowerCase();
 
@@ -65,16 +68,17 @@ exports.uploadexpenseFileToS3 = async (fileContent, fileName) => {
     const response = await s3Client.send(command);  
     console.log('Upload Success', response);
 
-    return `unity-hrms.s3.ap-south-1.amazonaws.com/expense/${fileName}`;
+    return `${S3_BUCKET_URL}/expense/${fileName}`;
   } catch (err) {
     console.error('Error uploading file:', err);
     throw new Error("Error uploading file to S3");
   }
 };
+
 exports.deleteFileFromS3 = async (fileUrl) => {
   try {
     // Extract the S3 key from the file URL
-    const fileKey = fileUrl.split('unity-hrms.s3.ap-south-1.amazonaws.com/')[1];
+    const fileKey = fileUrl.split(`${S3_BUCKET_URL}/`)[1];
 
     if (!fileKey) {
       throw new Error("Invalid file URL format");
@@ -111,7 +115,7 @@ exports.uploadProfileFileToS3 = async (fileContent, fileName) => {
     const response = await s3Client.send(command);
     console.log('Profile upload success:', response);
 
-    return `unity-hrms.s3.ap-south-1.amazonaws.com/profile/${fileName}`;
+    return `${S3_BUCKET_URL}/profile/${fileName}`;
   } catch (error) {
     console.error('Error uploading profile file to S3:', error.message);
     throw new Error("Error uploading profile file to S3");

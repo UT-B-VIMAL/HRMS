@@ -1051,7 +1051,7 @@ exports.approve_reject_ot = async (payload, res, req) => {
         400
       );
     }
-
+    if(role === "pm" && status === 2) {
     // Send notification to the user
     const notificationPayload = {
       title: status === 2 ? "Overtime Approved" : "Overtime Rejected",
@@ -1075,6 +1075,7 @@ exports.approve_reject_ot = async (payload, res, req) => {
       "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
       [user_id, notificationPayload.title, notificationPayload.body, 0]
     );
+  }
 
     // Return success response immediately
     successResponse(
