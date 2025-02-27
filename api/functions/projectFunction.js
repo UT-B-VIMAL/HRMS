@@ -563,60 +563,64 @@ exports.projectStatus = async (req, res) => {
     };
 
     
-    const Subtasks = subtasks.map((subtask) => {
-      const startTime = moment(subtask.start_time, "HH:mm:ss");
-      const endTime = moment(subtask.end_time, "HH:mm:ss");
+    const formatDuration = (start, end) => {
+      if (!start || !end) return "-"; 
+    
+      const startTime = moment(start, "HH:mm:ss");
+      const endTime = moment(end, "HH:mm:ss");
+    
+      if (!startTime.isValid() || !endTime.isValid()) return "-"; 
+    
       const duration = moment.duration(endTime.diff(startTime));
     
-      return {
-        type: "SubTask",
-        status: mapStatus(subtask.subtask_status),
-        date: subtask.date,
-        product_name: subtask.product_name,
-        project_name: subtask.project_name,
-        task_id: subtask.task_id,
-        task_name: subtask.task_name,
-        subtask_id: subtask.subtask_id,
-        subtask_name: subtask.subtask_name,
-        user_id: subtask.user_id,
-        assignee: subtask.assignee,
-        estimated_time: subtask.estimated_time,
-        time_taken: subtask.time_taken,
-        rating: subtask.subtask_rating,
-        team_id: subtask.team_id,
-        team_name: subtask.team_name,
-        start_time: startTime.format("hh:mm:ss A"), // Convert to 12-hour format
-        end_time: endTime.format("hh:mm:ss A"), // Convert to 12-hour format
-        time_difference: `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
-      };
-    });
+      return duration.asMilliseconds() > 0
+        ? `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
+        : "-"; // If negative or zero duration, return "-"
+    };
     
-    const Tasks = tasks.map((task) => {
-      const startTime = moment(task.start_time, "HH:mm:ss");
-      const endTime = moment(task.end_time, "HH:mm:ss");
-      const duration = moment.duration(endTime.diff(startTime));
+    const Subtasks = subtasks.map((subtask) => ({
+      type: "SubTask",
+      status: mapStatus(subtask.subtask_status),
+      date: subtask.date,
+      product_name: subtask.product_name,
+      project_name: subtask.project_name,
+      task_id: subtask.task_id,
+      task_name: subtask.task_name,
+      subtask_id: subtask.subtask_id,
+      subtask_name: subtask.subtask_name,
+      user_id: subtask.user_id,
+      assignee: subtask.assignee,
+      estimated_time: subtask.estimated_time,
+      time_taken: subtask.time_taken,
+      rating: subtask.subtask_rating,
+      team_id: subtask.team_id,
+      team_name: subtask.team_name,
+      start_time: subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      end_time: subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      subtask_duration: formatDuration(subtask.start_time, subtask.end_time),
+    }));
     
-      return {
-        type: "Task",
-        status: mapStatus(task.task_status),
-        date: task.date,
-        product_name: task.product_name,
-        project_name: task.project_name,
-        task_id: task.task_id,
-        task_name: task.task_name,
-        subtask_name: null,
-        user_id: task.user_id,
-        assignee: task.assignee,
-        estimated_time: task.estimated_time,
-        task_duration: task.task_duration,
-        rating: task.rating,
-        team_id: task.team_id,
-        team_name: task.team_name,
-        start_time: startTime.format("hh:mm:ss A"), // Convert to 12-hour format
-        end_time: endTime.format("hh:mm:ss A"), // Convert to 12-hour format
-        time_difference: `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
-      };
-    });
+    const Tasks = tasks.map((task) => ({
+      type: "Task",
+      status: mapStatus(task.task_status),
+      date: task.date,
+      product_name: task.product_name,
+      project_name: task.project_name,
+      task_id: task.task_id,
+      task_name: task.task_name,
+      subtask_name: null,
+      user_id: task.user_id,
+      assignee: task.assignee,
+      estimated_time: task.estimated_time,
+      rating: task.rating,
+      team_id: task.team_id,
+      team_name: task.team_name,
+      start_time: task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      end_time: task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      
+      task_duration: formatDuration(task.start_time, task.end_time),
+    }));
+    
 
     const groupedTasks = [...Subtasks, ...Tasks];
 
