@@ -97,7 +97,6 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const apiRouter = express.Router();
 app.use(fileUpload());
  
-//authentication
 apiRouter.post('/login', loginController.login);
 apiRouter.post('/logout', loginController.logout);
 apiRouter.put('/change_password/:id',RoleController.checkRole(),loginController.changePassword);
