@@ -562,6 +562,7 @@ exports.projectStatus = async (req, res) => {
       }
     };
 
+    
     const Subtasks = subtasks.map((subtask) => {
       const startTime = moment(subtask.start_time, "HH:mm:ss");
       const endTime = moment(subtask.end_time, "HH:mm:ss");
@@ -584,8 +585,8 @@ exports.projectStatus = async (req, res) => {
         rating: subtask.subtask_rating,
         team_id: subtask.team_id,
         team_name: subtask.team_name,
-        start_time: startTime.format("HH:mm:ss"),
-        end_time: endTime.format("HH:mm:ss"),
+        start_time: startTime.format("hh:mm:ss A"), // Convert to 12-hour format
+        end_time: endTime.format("hh:mm:ss A"), // Convert to 12-hour format
         time_difference: `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
       };
     });
@@ -611,12 +612,12 @@ exports.projectStatus = async (req, res) => {
         rating: task.rating,
         team_id: task.team_id,
         team_name: task.team_name,
-        start_time: startTime.format("HH:mm:ss"),
-        end_time: endTime.format("HH:mm:ss"),
+        start_time: startTime.format("hh:mm:ss A"), // Convert to 12-hour format
+        end_time: endTime.format("hh:mm:ss A"), // Convert to 12-hour format
         time_difference: `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
       };
     });
-    
+
     const groupedTasks = [...Subtasks, ...Tasks];
 
     const totalRecords = groupedTasks.length;
