@@ -35,6 +35,8 @@ const reportController = require('./controllers/reportController');
 const notificationRoutes = require('./routes/notificationRoutes');
 
 const { registerSocket, unregisterSocket, userSockets } = require('./helpers/notificationHelper');
+const monthlyNotificationCron = require('./cron/monthlyNotification'); // Import the monthly notification cron job
+const dailyAttendanceNotificationCron = require('./cron/dailyAttendanceNotification'); // Import the daily attendance notification cron job
 
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);

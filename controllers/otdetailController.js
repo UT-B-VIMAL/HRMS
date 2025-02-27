@@ -6,7 +6,7 @@ const {
   getAllOts,
   getAllpmemployeeOts,
   getAlltlemployeeOts,
-  approve_reject_OT,
+  approve_reject_ot, // Corrected function name
   getOtReportData
 } = require("../api/functions/otFunction");
 const { successResponse, errorResponse } = require("../helpers/responseHelper");
@@ -33,14 +33,15 @@ exports.createOtdetail = async (req, res) => {
     return errorResponse(res, error.message, "Error creating OT detail", 500);
   }
 };
+
 exports.approve_reject_otdetail = async (req, res) => {
   try {
     const payload = req.body;
 
-    await approve_reject_OT(payload, res, req);
+    await approve_reject_ot(payload, res, req); // Corrected function name
   } catch (error) {
-    console.error("Error upadating status:", error.message);
-    return errorResponse(res, error.message, "Error upadating status", 500);
+    console.error("Error updating status:", error.message);
+    return errorResponse(res, error.message, "Error updating status", 500);
   }
 };
 
@@ -63,6 +64,7 @@ exports.updateOtdetail = async (req, res) => {
     return errorResponse(res, error.message, "Error updating OT detail", 500);
   }
 };
+
 exports.updatetlOtdetail = async (req, res) => {
   try {
     const { id } = req.params;
@@ -108,6 +110,7 @@ exports.getAllOtdetails = async (req, res) => {
     return errorResponse(res, error.message, "Error retrieving OT detail", 500);
   }
 };
+
 exports.getAllpmemployeeOtdetails = async (req, res) => {
   try {
     await getAllpmemployeeOts(req, res);
@@ -115,6 +118,7 @@ exports.getAllpmemployeeOtdetails = async (req, res) => {
     return errorResponse(res, error.message, "Error retrieving OT detail", 500);
   }
 };
+
 exports.getAlltlemployeeOtdetails = async (req, res) => {
   try {
     await getAlltlemployeeOts(req, res);
