@@ -25,7 +25,7 @@ exports.uploadFileToS3 = async (fileContent, fileName) => {
   }
 
   const params = {
-    Bucket: "unity-hrms", 
+    Bucket: process.env.S3_BUCKET_NAME, 
     Key: `tickets/${fileName}`, 
     Body: fileContent,   
     ContentType: contentType, 
@@ -56,7 +56,7 @@ exports.uploadexpenseFileToS3 = async (fileContent, fileName) => {
   }
 
   const params = {
-    Bucket: "unity-hrms", 
+    Bucket: process.env.S3_BUCKET_NAME, 
     Key: `expense/${fileName}`, 
     Body: fileContent,   
     ContentType: contentType, 
@@ -85,7 +85,7 @@ exports.deleteFileFromS3 = async (fileUrl) => {
     }
 
     const params = {
-      Bucket: "unity-hrms", // Your S3 bucket name
+      Bucket: process.env.S3_BUCKET_NAME, // Your S3 bucket name
       Key: fileKey, // Extracted file key
     };
 
@@ -103,7 +103,7 @@ exports.deleteFileFromS3 = async (fileUrl) => {
 
 exports.uploadProfileFileToS3 = async (fileContent, fileName) => {
   const params = {
-    Bucket: "unity-hrms", // Add bucket name as a string
+    Bucket: process.env.S3_BUCKET_NAME, // Add bucket name as a string
     Key: `profile/${fileName}`, 
     Body: fileContent, 
     ContentType: 'image/jpeg', // Assuming all profile files are JPEG
