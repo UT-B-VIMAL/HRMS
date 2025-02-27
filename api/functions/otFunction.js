@@ -6,14 +6,14 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { Parser } = require("json2csv");
-const { userSockets } = require('../../helpers/notificationHelper');
+const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert OT
 exports.createOt = async (payload, res) => {
   const { date, time, project_id, task_id, user_id, comments, created_by } =
     payload;
 
-    const missingFields = [];
+  const missingFields = [];
   if (!date) missingFields.push("date");
   if (!project_id) missingFields.push("project_id");
   if (!task_id) missingFields.push("task_id");
@@ -42,7 +42,7 @@ exports.createOt = async (payload, res) => {
     const timeMatch = time.match(
       /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
     );
-  
+
     if (!timeMatch) {
       return errorResponse(
         res,
@@ -51,12 +51,12 @@ exports.createOt = async (payload, res) => {
         400
       );
     }
-  
-    const days = parseInt(timeMatch[2] || '0', 10);
-    const hours = parseInt(timeMatch[4] || '0', 10);
-    const minutes = parseInt(timeMatch[6] || '0', 10);
-    const seconds = parseInt(timeMatch[8] || '0', 10);
-  
+
+    const days = parseInt(timeMatch[2] || "0", 10);
+    const hours = parseInt(timeMatch[4] || "0", 10);
+    const minutes = parseInt(timeMatch[6] || "0", 10);
+    const seconds = parseInt(timeMatch[8] || "0", 10);
+
     if (
       days < 0 ||
       hours < 0 ||
@@ -65,15 +65,16 @@ exports.createOt = async (payload, res) => {
       minutes >= 60 ||
       seconds >= 60
     ) {
-      return errorResponse(res, null, 'Invalid time values in time', 400);
+      return errorResponse(res, null, "Invalid time values in time", 400);
     }
-  
+
     // Convert days to hours and calculate total hours
     const totalHours = days * 8 + hours;
-  
+
     // Format as "HH:MM:SS"
-    payload.time = `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    
+    payload.time = `${String(totalHours).padStart(2, "0")}:${String(
+      minutes
+    ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 
   try {
@@ -132,8 +133,7 @@ exports.createOt = async (payload, res) => {
         WHERE deleted_at IS NULL AND id = ?
       `;
     const [userResult] = await db.query(userQuery, [user_id]);
-    
-    
+
     if (userResult.length === 0) {
       return errorResponse(
         res,
@@ -144,15 +144,14 @@ exports.createOt = async (payload, res) => {
     }
     const { team_id, role_id } = userResult[0];
 
-let tl_status = (role_id == 2) ? 2 : 0;
-  
-  
-  const insertQuery = `
+    let tl_status = role_id == 2 ? 2 : 0;
+
+    const insertQuery = `
       INSERT INTO ot_details (
         user_id, product_id, project_id, task_id, team_id, comments, tl_status, date, time, created_by, updated_by, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
-  const values = [
+    const values = [
       user_id,
       product_id,
       project_id,
@@ -164,8 +163,7 @@ let tl_status = (role_id == 2) ? 2 : 0;
       payload.time,
       created_by,
       created_by,
-  ];
-  
+    ];
 
     const [result] = await db.query(insertQuery, values);
     const selectQuery = `
@@ -420,48 +418,56 @@ exports.updateOt = async (id, payload, res) => {
 
   const formatTime = (timeValue, fieldName) => {
     if (timeValue) {
-        const timeMatch = timeValue.match(
-            /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      const timeMatch = timeValue.match(
+        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      );
+
+      if (!timeMatch) {
+        return errorResponse(
+          res,
+          null,
+          `Invalid format for ${fieldName}. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".`,
+          400
         );
+      }
 
-        if (!timeMatch) {
-            return errorResponse(
-                res,
-                null,
-                `Invalid format for ${fieldName}. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".`,
-                400
-            );
-        }
+      const days = parseInt(timeMatch[2] || "0", 10);
+      const hours = parseInt(timeMatch[4] || "0", 10);
+      const minutes = parseInt(timeMatch[6] || "0", 10);
+      const seconds = parseInt(timeMatch[8] || "0", 10);
 
-        const days = parseInt(timeMatch[2] || '0', 10);
-        const hours = parseInt(timeMatch[4] || '0', 10);
-        const minutes = parseInt(timeMatch[6] || '0', 10);
-        const seconds = parseInt(timeMatch[8] || '0', 10);
+      if (
+        days < 0 ||
+        hours < 0 ||
+        minutes < 0 ||
+        seconds < 0 ||
+        minutes >= 60 ||
+        seconds >= 60
+      ) {
+        return errorResponse(
+          res,
+          null,
+          `Invalid time values in ${fieldName}`,
+          400
+        );
+      }
 
-        if (
-            days < 0 ||
-            hours < 0 ||
-            minutes < 0 ||
-            seconds < 0 ||
-            minutes >= 60 ||
-            seconds >= 60
-        ) {
-            return errorResponse(res, null, `Invalid time values in ${fieldName}`, 400);
-        }
+      // Convert days to hours and calculate total hours
+      const totalHours = days * 8 + hours;
 
-        // Convert days to hours and calculate total hours
-        const totalHours = days * 8 + hours;
-
-        // Format as "HH:MM:SS"
-        return `${String(totalHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      // Format as "HH:MM:SS"
+      return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(
+        2,
+        "0"
+      )}:${String(seconds).padStart(2, "0")}`;
     }
     return null; // If timeValue is null/undefined, return null
-};
+  };
 
-// Apply the function to time, pmtime, and tltime
-payload.time = formatTime(time, "time");
-payload.pmtime = formatTime(pmtime, "pmtime");
-payload.tltime = formatTime(tltime, "tltime");
+  // Apply the function to time, pmtime, and tltime
+  payload.time = formatTime(time, "time");
+  payload.pmtime = formatTime(pmtime, "pmtime");
+  payload.tltime = formatTime(tltime, "tltime");
 
   try {
     const checkQuery = `
@@ -756,7 +762,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
     const otWhereClause =
       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
 
-      const otQuery = `
+    const otQuery = `
       SELECT 
         pr.name AS project_name,
         t.name AS task_name,
@@ -792,7 +798,6 @@ exports.getAllpmemployeeOts = async (req, res) => {
       ORDER BY 
         ot.id DESC
     `;
-
 
     const [ots] = await db.query(otQuery, otValues);
 
@@ -959,10 +964,19 @@ exports.approve_reject_OT = async (payload, res, req) => {
     }
 
     // Fetch the date for the notification
-    const otQuery = `
-      SELECT date FROM ot_details 
-      WHERE user_id = ? AND status = 0 AND deleted_at IS NULL
-    `;
+
+    let otQuery = `
+  SELECT date FROM ot_details 
+  WHERE user_id = ? AND deleted_at IS NULL
+`;
+
+    // Apply status = 0 condition only when role is "tl"
+    if (role === "tl") {
+      otQuery += ` AND status = 0 `;
+    } else if (role === "pm" || role === "admin") {
+      otQuery += ` AND tl_status != 0 `; // PM should only act if TL has updated it
+    }
+
     const [otResult] = await db.query(otQuery, [user_id]);
 
     if (otResult.length === 0) {
@@ -1013,19 +1027,25 @@ exports.approve_reject_OT = async (payload, res, req) => {
 
     // Send notification to the user
     const notificationPayload = {
-      title: status === 2 ? 'Overtime Approved' : 'Overtime Rejected',
-      body: `Your overtime request for ${otDate} has been ${status === 2 ? 'approved' : 'rejected'}. Check comments for details.`,
+      title: status === 2 ? "Overtime Approved" : "Overtime Rejected",
+      body: `Your overtime request for ${otDate} has been ${
+        status === 2 ? "approved" : "rejected"
+      }. Check comments for details.`,
     };
 
     const socketIds = userSockets[user_id];
     if (Array.isArray(socketIds)) {
-      socketIds.forEach(socketId => {
-        console.log(`Sending notification to user ${user_id} with socket ID ${socketId}`);
-        req.io.of('/notifications').emit('push_notification', notificationPayload);
+      socketIds.forEach((socketId) => {
+        console.log(
+          `Sending notification to user ${user_id} with socket ID ${socketId}`
+        );
+        req.io
+          .of("/notifications")
+          .emit("push_notification", notificationPayload);
       });
     }
     await db.execute(
-      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
       [user_id, notificationPayload.title, notificationPayload.body, 0]
     );
 
