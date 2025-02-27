@@ -652,30 +652,35 @@ exports.updatesubTaskData = async (id, payload, res,req) => {
     }
 
 
-    let notificationTitle, notificationBody;
-
-    if (reopen_status == 1) {
-      notificationTitle = 'Task Reopened';
-      notificationBody = 'Your task has been reopened for further review. Please check the updates.';
-    } else if (status == 3) {
-      notificationTitle = 'Task Approved';
-      notificationBody = 'Your submitted task has been successfully approved.';
+    if (currentTask.user_id) {
+      let notificationTitle = '';
+      let notificationBody = '';
+    
+      if (reopen_status == 1) {
+        notificationTitle = 'Task Reopened';
+        notificationBody = 'Your task has been reopened for further review. Please check the updates.';
+      } else if (status == 3) {
+        notificationTitle = 'Task Approved';
+        notificationBody = 'Your submitted task has been successfully approved.';
+      }
+    
+      if (notificationTitle && notificationBody) {
+        const notificationPayload = { title: notificationTitle, body: notificationBody };
+        const socketIds = userSockets[currentTask.user_id];
+    
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach(socketId => {
+            req.io.of('/notifications').emit('push_notification', notificationPayload);
+          });
+        }
+    
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [currentTask.user_id, notificationPayload.title, notificationPayload.body, 0]
+        );
+      }
     }
-    const notificationPayload = {
-      title: notificationTitle,
-      body: notificationBody,
-    };
-    const socketIds = userSockets[currentTask.user_id];
-    if (Array.isArray(socketIds)) {
-      socketIds.forEach(socketId => {
-        req.io.of('/notifications').emit('push_notification', notificationPayload);
-      });
-    }
-    await db.execute(
-      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
-      [currentTask.user_id, notificationPayload.title, notificationPayload.body, 0]
-    );
-
+    
     return successResponse(res, { id, ...payload }, 'Task updated successfully');
   } catch (error) {
     return errorResponse(res, error.message, 'Error updating task', 500);
