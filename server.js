@@ -239,7 +239,7 @@ apiRouter.get('/expensedetail',RoleController.checkRole(), expensedetailControll
 apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAllpmemployeeexpensedetails);
 apiRouter.get('/tlemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAlltlemployeexpensedetails);
 apiRouter.get('/getExpenseReport',RoleController.checkRole(), expensedetailController.getExpenseReports);
-apiRouter.post('/approve_reject_expense', RoleController.checkRole(),expensedetailController.approve_reject_expensedetail);
+apiRouter.post('/approve_reject_expense', RoleController.checkRole(),(req, res) => expensedetailController.approve_reject_expensedetail(req, res, req.io));
 // Testing login api
 apiRouter.get('/loginapi',empdashboardController.loginapis);
 
