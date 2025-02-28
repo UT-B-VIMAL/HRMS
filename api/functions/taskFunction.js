@@ -1688,7 +1688,7 @@ exports.startTask = async (taskOrSubtask, type, id,res) => {
     throw {
       status: 500,
       success: false,
-      message: 400,
+      message: "You Already have Active Task",
       error: "You Already have Active Task"
   };
   }
@@ -1904,7 +1904,7 @@ exports.updateTaskTimeLine = async (req, res) => {
 
     return successResponse(res, "Time updated successfully", 201);
   } catch (error) {
-    return errorResponse(res, "Error Updating Time", 400);
+    return errorResponse(res, error.message, 400);
   }
 };
 
