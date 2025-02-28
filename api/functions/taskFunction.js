@@ -1267,18 +1267,52 @@ exports.getTaskList = async (queryParams, res) => {
 
     if (role_id === 4) {
       baseQuery += ` AND (
-  (NOT EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL) 
-   AND tasks.user_id = ?)
-  OR
-  EXISTS (
-    SELECT 1 FROM sub_tasks 
-    WHERE sub_tasks.task_id = tasks.id 
-    AND sub_tasks.user_id = ? 
-    AND sub_tasks.deleted_at IS NULL
-  )
-)`;
-      params.push(user_id, user_id);
-    }
+          -- 1. If the task is assigned to the user but has no subtasks, return it
+          (NOT EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND sub_tasks.deleted_at IS NULL
+          ) 
+          AND tasks.user_id = ?)
+  
+          OR
+  
+          -- 2. If at least one subtask is assigned to the user OR 
+          --    all subtasks are unassigned and the main task is assigned to the user, return it
+          EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND (
+                  sub_tasks.user_id = ? 
+                  OR (tasks.user_id = ? AND NOT EXISTS (
+                      SELECT 1 FROM sub_tasks 
+                      WHERE sub_tasks.task_id = tasks.id 
+                      AND sub_tasks.user_id IS NOT NULL
+                  ))
+              )
+              AND sub_tasks.deleted_at IS NULL
+          )
+  
+          OR
+  
+          -- 3. If all subtasks have NULL user_id but the main task is assigned to the user, return them
+          (
+              tasks.user_id = ?
+              AND EXISTS (
+                  SELECT 1 FROM sub_tasks 
+                  WHERE sub_tasks.task_id = tasks.id 
+                  AND sub_tasks.user_id IS NULL
+                  AND sub_tasks.deleted_at IS NULL
+              )
+          )
+      )`;
+  
+      params.push(user_id, user_id, user_id, user_id);
+  }
+  
+  
+  
+  
     
     
 
@@ -1336,10 +1370,11 @@ exports.getTaskList = async (queryParams, res) => {
     // Fetch subtasks only if tasks exist
     const taskIds = tasks.map((task) => task.task_id);
     let allSubtasks = [];
-    if (taskIds.length > 0) {
+
+    if (tasks.length > 0) {
+      const taskIds = tasks.map((task) => task.task_id);
       [allSubtasks] = await db.query(
-        `
-        SELECT 
+        `SELECT 
           id AS subtask_id, 
           name AS subtask_name, 
           task_id,
@@ -1350,10 +1385,19 @@ exports.getTaskList = async (queryParams, res) => {
           reopen_status, 
           active_status 
         FROM sub_tasks
-        WHERE task_id IN (?) AND user_id = ? AND sub_tasks.deleted_at IS NULL`,
-        [taskIds, user_id]
+        WHERE task_id IN (?) 
+          AND (
+            (sub_tasks.user_id IS NULL AND EXISTS (
+              SELECT 1 FROM tasks WHERE tasks.id = sub_tasks.task_id AND tasks.user_id = ?
+            )) 
+            OR 
+            (sub_tasks.user_id = ?)
+          )
+          AND sub_tasks.deleted_at IS NULL`,
+        [taskIds, user_id, user_id]
       );
     }
+    
 
     // Group subtasks by task_id
     const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
