@@ -1223,6 +1223,7 @@ exports.getTaskList = async (queryParams, res) => {
       SELECT 
         tasks.id AS task_id, 
         tasks.name AS task_name,
+        user_id,
         tasks.priority,
         tasks.estimated_hours,
         tasks.total_hours_worked,
@@ -1265,25 +1266,20 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     if (role_id === 4) {
-      // Check if subtasks exist
       baseQuery += ` AND (
-        (
-          EXISTS (
-            SELECT 1 FROM sub_tasks 
-            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL
-          ) AND EXISTS (
-            SELECT 1 FROM sub_tasks 
-            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.user_id = ? AND sub_tasks.deleted_at IS NULL
-          )
-        ) OR (
-          NOT EXISTS (
-            SELECT 1 FROM sub_tasks 
-            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL
-          ) AND tasks.user_id = ?
-        )
-      )`;
+  (NOT EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL) 
+   AND tasks.user_id = ?)
+  OR
+  EXISTS (
+    SELECT 1 FROM sub_tasks 
+    WHERE sub_tasks.task_id = tasks.id 
+    AND sub_tasks.user_id = ? 
+    AND sub_tasks.deleted_at IS NULL
+  )
+)`;
       params.push(user_id, user_id);
     }
+    
     
 
     // Additional filters
@@ -1347,14 +1343,15 @@ exports.getTaskList = async (queryParams, res) => {
           id AS subtask_id, 
           name AS subtask_name, 
           task_id,
+          user_id,
           estimated_hours, 
           total_hours_worked, 
           status, 
           reopen_status, 
           active_status 
         FROM sub_tasks
-        WHERE task_id IN (?) AND sub_tasks.deleted_at IS NULL`,
-        [taskIds]
+        WHERE task_id IN (?) AND user_id = ? AND sub_tasks.deleted_at IS NULL`,
+        [taskIds, user_id]
       );
     }
 
@@ -1397,6 +1394,7 @@ exports.getTaskList = async (queryParams, res) => {
     tasks.forEach((task) => {
       const taskDetails = {
         task_id: task.task_id,
+        user_id: task.user_id,
         task_name: task.task_name,
         project_name: task.project_name,
         product_name: task.product_name,
@@ -1424,6 +1422,7 @@ exports.getTaskList = async (queryParams, res) => {
             }
             groupedSubtasks[group].push({
               subtask_id: subtask.subtask_id,
+              user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
             });
