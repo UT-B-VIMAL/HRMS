@@ -35,11 +35,13 @@ const reportController = require('./controllers/reportController');
 const notificationRoutes = require('./routes/notificationRoutes');
 
 const { registerSocket, unregisterSocket, userSockets } = require('./helpers/notificationHelper');
+const monthlyNotificationCron = require('./cron/monthlyNotification'); // Import the monthly notification cron job
+const dailyAttendanceNotificationCron = require('./cron/dailyAttendanceNotification'); // Import the daily attendance notification cron job
 
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
-const DOMAIN = isProduction ? "frontendnode.hrms.utwebapps.com" : "localhost";
-const PORT = isProduction ? 8085 : 3000;
+const DOMAIN = isProduction ? process.env.LIVE_URL : process.env.LOCAL_URL;
+const PORT = isProduction ? 8095 : 3000;
 
 // Socket-----------------------------------------------------------------------------
 const socketIo = require('socket.io');
@@ -95,7 +97,6 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const apiRouter = express.Router();
 app.use(fileUpload());
  
-//authentication
 apiRouter.post('/login', loginController.login);
 apiRouter.post('/logout', loginController.logout);
 apiRouter.put('/change_password/:id',RoleController.checkRole(),loginController.changePassword);
@@ -238,7 +239,7 @@ apiRouter.get('/expensedetail',RoleController.checkRole(), expensedetailControll
 apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAllpmemployeeexpensedetails);
 apiRouter.get('/tlemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAlltlemployeexpensedetails);
 apiRouter.get('/getExpenseReport',RoleController.checkRole(), expensedetailController.getExpenseReports);
-apiRouter.post('/approve_reject_expense', RoleController.checkRole(),expensedetailController.approve_reject_expensedetail);
+apiRouter.post('/approve_reject_expense', RoleController.checkRole(),(req, res) => expensedetailController.approve_reject_expensedetail(req, res, req.io));
 // Testing login api
 apiRouter.get('/loginapi',empdashboardController.loginapis);
 

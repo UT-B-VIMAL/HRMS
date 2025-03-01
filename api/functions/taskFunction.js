@@ -577,8 +577,6 @@ exports.updateTask = async (id, payload, res) => {
         end_date = IF(? = end_date, end_date, ?),
         extended_status = IF(? = extended_status, extended_status, ?),
         extended_hours = IF(? = extended_hours, extended_hours, ?),
-        active_status = IF(? = active_status, active_status, ?),
-        status = IF(? = status, status, ?),
         total_hours_worked = IF(? = total_hours_worked, total_hours_worked, ?),
         rating = IF(? = rating, rating, ?),
         command = IF(? = command, command, ?),
@@ -615,10 +613,6 @@ exports.updateTask = async (id, payload, res) => {
       extended_status,
       extended_hours,
       extended_hours,
-      active_status,
-      active_status,
-      status,
-      status,
       total_hours_worked,
       total_hours_worked,
       rating,
@@ -1028,29 +1022,34 @@ exports.updateTaskData = async (id, payload, res,req) => {
       await db.query(historyQuery, [taskHistoryEntries]);
     }
 
-    let notificationTitle, notificationBody;
-
-    if (reopen_status == 1) {
-      notificationTitle = 'Task Reopened';
-      notificationBody = 'Your task has been reopened for further review. Please check the updates.';
-    } else if (status == 3) {
-      notificationTitle = 'Task Approved';
-      notificationBody = 'Your submitted task has been successfully approved.';
+    if (currentTask.user_id) {
+      let notificationTitle = '';
+      let notificationBody = '';
+    
+      if (reopen_status == 1) {
+        notificationTitle = 'Task Reopened';
+        notificationBody = 'Your task has been reopened for further review. Please check the updates.';
+      } else if (status == 3) {
+        notificationTitle = 'Task Approved';
+        notificationBody = 'Your submitted task has been successfully approved.';
+      }
+    
+      if (notificationTitle && notificationBody) {
+        const notificationPayload = { title: notificationTitle, body: notificationBody };
+        const socketIds = userSockets[currentTask.user_id];
+    
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach(socketId => {
+            req.io.of('/notifications').emit('push_notification', notificationPayload);
+          });
+        }
+    
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [currentTask.user_id, notificationPayload.title, notificationPayload.body, 0]
+        );
+      }
     }
-    const notificationPayload = {
-      title: notificationTitle,
-      body: notificationBody,
-    };
-    const socketIds = userSockets[currentTask.user_id];
-    if (Array.isArray(socketIds)) {
-      socketIds.forEach(socketId => {
-        req.io.of('/notifications').emit('push_notification', notificationPayload);
-      });
-    }
-    await db.execute(
-      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
-      [currentTask.user_id, notificationPayload.title, notificationPayload.body, 0]
-    );
     return successResponse(
       res,
       { id, ...payload },
@@ -1224,6 +1223,7 @@ exports.getTaskList = async (queryParams, res) => {
       SELECT 
         tasks.id AS task_id, 
         tasks.name AS task_name,
+        user_id,
         tasks.priority,
         tasks.estimated_hours,
         tasks.total_hours_worked,
@@ -1266,25 +1266,54 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     if (role_id === 4) {
-      // Check if subtasks exist
       baseQuery += ` AND (
-        (
+          -- 1. If the task is assigned to the user but has no subtasks, return it
+          (NOT EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND sub_tasks.deleted_at IS NULL
+          ) 
+          AND tasks.user_id = ?)
+  
+          OR
+  
+          -- 2. If at least one subtask is assigned to the user OR 
+          --    all subtasks are unassigned and the main task is assigned to the user, return it
           EXISTS (
-            SELECT 1 FROM sub_tasks 
-            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL
-          ) AND EXISTS (
-            SELECT 1 FROM sub_tasks 
-            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.user_id = ? AND sub_tasks.deleted_at IS NULL
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND (
+                  sub_tasks.user_id = ? 
+                  OR (tasks.user_id = ? AND NOT EXISTS (
+                      SELECT 1 FROM sub_tasks 
+                      WHERE sub_tasks.task_id = tasks.id 
+                      AND sub_tasks.user_id IS NOT NULL
+                  ))
+              )
+              AND sub_tasks.deleted_at IS NULL
           )
-        ) OR (
-          NOT EXISTS (
-            SELECT 1 FROM sub_tasks 
-            WHERE sub_tasks.task_id = tasks.id AND sub_tasks.deleted_at IS NULL
-          ) AND tasks.user_id = ?
-        )
+  
+          OR
+  
+          -- 3. If all subtasks have NULL user_id but the main task is assigned to the user, return them
+          (
+              tasks.user_id = ?
+              AND EXISTS (
+                  SELECT 1 FROM sub_tasks 
+                  WHERE sub_tasks.task_id = tasks.id 
+                  AND sub_tasks.user_id IS NULL
+                  AND sub_tasks.deleted_at IS NULL
+              )
+          )
       )`;
-      params.push(user_id, user_id);
-    }
+  
+      params.push(user_id, user_id, user_id, user_id);
+  }
+  
+  
+  
+  
+    
     
 
     // Additional filters
@@ -1341,23 +1370,34 @@ exports.getTaskList = async (queryParams, res) => {
     // Fetch subtasks only if tasks exist
     const taskIds = tasks.map((task) => task.task_id);
     let allSubtasks = [];
-    if (taskIds.length > 0) {
+
+    if (tasks.length > 0) {
+      const taskIds = tasks.map((task) => task.task_id);
       [allSubtasks] = await db.query(
-        `
-        SELECT 
+        `SELECT 
           id AS subtask_id, 
           name AS subtask_name, 
           task_id,
+          user_id,
           estimated_hours, 
           total_hours_worked, 
           status, 
           reopen_status, 
           active_status 
         FROM sub_tasks
-        WHERE task_id IN (?) AND sub_tasks.deleted_at IS NULL`,
-        [taskIds]
+        WHERE task_id IN (?) 
+          AND (
+            (sub_tasks.user_id IS NULL AND EXISTS (
+              SELECT 1 FROM tasks WHERE tasks.id = sub_tasks.task_id AND tasks.user_id = ?
+            )) 
+            OR 
+            (sub_tasks.user_id = ?)
+          )
+          AND sub_tasks.deleted_at IS NULL`,
+        [taskIds, user_id, user_id]
       );
     }
+    
 
     // Group subtasks by task_id
     const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
@@ -1398,6 +1438,7 @@ exports.getTaskList = async (queryParams, res) => {
     tasks.forEach((task) => {
       const taskDetails = {
         task_id: task.task_id,
+        user_id: task.user_id,
         task_name: task.task_name,
         project_name: task.project_name,
         product_name: task.product_name,
@@ -1425,6 +1466,7 @@ exports.getTaskList = async (queryParams, res) => {
             }
             groupedSubtasks[group].push({
               subtask_id: subtask.subtask_id,
+              user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
             });
@@ -1689,7 +1731,7 @@ exports.startTask = async (taskOrSubtask, type, id,res) => {
     throw {
       status: 500,
       success: false,
-      message: 400,
+      message: "You Already have Active Task",
       error: "You Already have Active Task"
   };
   }
@@ -1905,7 +1947,7 @@ exports.updateTaskTimeLine = async (req, res) => {
 
     return successResponse(res, "Time updated successfully", 201);
   } catch (error) {
-    return errorResponse(res, "Error Updating Time", 400);
+    return errorResponse(res, error.message, 400);
   }
 };
 

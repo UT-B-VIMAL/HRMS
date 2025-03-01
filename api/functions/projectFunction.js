@@ -562,6 +562,22 @@ exports.projectStatus = async (req, res) => {
       }
     };
 
+    
+    const formatDuration = (start, end) => {
+      if (!start || !end) return "-"; 
+    
+      const startTime = moment(start, "HH:mm:ss");
+      const endTime = moment(end, "HH:mm:ss");
+    
+      if (!startTime.isValid() || !endTime.isValid()) return "-"; 
+    
+      const duration = moment.duration(endTime.diff(startTime));
+    
+      return duration.asMilliseconds() > 0
+        ? `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
+        : "-"; // If negative or zero duration, return "-"
+    };
+    
     const Subtasks = subtasks.map((subtask) => ({
       type: "SubTask",
       status: mapStatus(subtask.subtask_status),
@@ -579,11 +595,11 @@ exports.projectStatus = async (req, res) => {
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time: subtask.start_time,
-      end_time: subtask.end_time,
-      subtask_duration: subtask.subtask_duration,
+      start_time: subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      end_time: subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      subtask_duration: formatDuration(subtask.start_time, subtask.end_time),
     }));
-
+    
     const Tasks = tasks.map((task) => ({
       type: "Task",
       status: mapStatus(task.task_status),
@@ -596,14 +612,15 @@ exports.projectStatus = async (req, res) => {
       user_id: task.user_id,
       assignee: task.assignee,
       estimated_time: task.estimated_time,
-      task_duration: task.task_duration,
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-      start_time: task.start_time,
-      end_time: task.end_time,
-      task_duration: task.task_duration,
+      start_time: task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      end_time: task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      
+      task_duration: formatDuration(task.start_time, task.end_time),
     }));
+    
 
     const groupedTasks = [...Subtasks, ...Tasks];
 
