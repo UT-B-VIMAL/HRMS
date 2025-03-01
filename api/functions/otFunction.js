@@ -1017,6 +1017,8 @@ exports.approve_reject_ot = async (payload, res, req) => {
       );
     }
 
+    console.log(id);
+    
     // Build the update query based on role
     let updateQuery = `
       UPDATE ot_details
@@ -1035,9 +1037,9 @@ exports.approve_reject_ot = async (payload, res, req) => {
       );
     }
 
-    updateQuery += ` WHERE id = ? AND deleted_at IS NULL`;
+    updateQuery += ` WHERE user_id = ? AND deleted_at IS NULL`;
 
-    const values = [status, updated_by, status, id];
+    const values = [status, updated_by, status, user_id];
 
     // Execute the query
     const [result] = await db.query(updateQuery, values);
