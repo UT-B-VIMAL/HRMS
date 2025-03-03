@@ -4,7 +4,8 @@ const { getNotifications, markAsRead, markAllAsRead, getUnreadNotifications } = 
 
 router.get('/notifications/:user_id', async (req, res) => {
   const { user_id } = req.params;
-  await getNotifications(user_id, res);
+  const queryParams = req.query; // Get query parameters from the request
+  await getNotifications(user_id, queryParams, res);
 });
 
 router.get('/notifications/:user_id/unread', async (req, res) => {
