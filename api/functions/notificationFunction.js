@@ -14,7 +14,7 @@ exports.getNotifications = async (user_id, res) => {
     const unreadCountQuery = `
       SELECT COUNT(*) AS unread_count
       FROM notifications
-      WHERE user_id = ? AND read_status = 0
+      WHERE user_id = ?
     `;
     const [unreadCountResult] = await db.query(unreadCountQuery, [user_id]);
     const unreadCount = unreadCountResult[0].unread_count;
@@ -23,6 +23,23 @@ exports.getNotifications = async (user_id, res) => {
   } catch (error) {
     console.error('Error retrieving notifications:', error.message);
     return errorResponse(res, error.message, 'Error retrieving notifications', 500);
+  }
+};
+
+exports.getUnreadNotifications = async (user_id, res) => {
+  try {
+    const query = `
+      SELECT id, title, body, read_status, created_at
+      FROM notifications
+      WHERE user_id = ? AND read_status = 0
+      ORDER BY created_at DESC
+    `;
+    const [notifications] = await db.query(query, [user_id]);
+
+    return successResponse(res, notifications, 'Unread notifications retrieved successfully');
+  } catch (error) {
+    console.error('Error retrieving unread notifications:', error.message);
+    return errorResponse(res, error.message, 'Error retrieving unread notifications', 500);
   }
 };
 
