@@ -1313,6 +1313,7 @@ exports.getTaskList = async (queryParams, res) => {
   
   
   
+  
     
     
 
@@ -1367,10 +1368,7 @@ exports.getTaskList = async (queryParams, res) => {
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
 
-    // Fetch subtasks only if tasks exist
-    const taskIds = tasks.map((task) => task.task_id);
     let allSubtasks = [];
-
     if (tasks.length > 0) {
       const taskIds = tasks.map((task) => task.task_id);
       [allSubtasks] = await db.query(
@@ -1385,16 +1383,9 @@ exports.getTaskList = async (queryParams, res) => {
           reopen_status, 
           active_status 
         FROM sub_tasks
-        WHERE task_id IN (?) 
-          AND (
-            (sub_tasks.user_id IS NULL AND EXISTS (
-              SELECT 1 FROM tasks WHERE tasks.id = sub_tasks.task_id AND tasks.user_id = ?
-            )) 
-            OR 
-            (sub_tasks.user_id = ?)
-          )
+        WHERE task_id IN (?) AND user_id = ?
           AND sub_tasks.deleted_at IS NULL`,
-        [taskIds, user_id, user_id]
+        [taskIds, user_id]
       );
     }
     
