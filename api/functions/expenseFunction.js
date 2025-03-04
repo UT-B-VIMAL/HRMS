@@ -906,7 +906,7 @@ exports.approve_reject_expense = async (payload, res, req) => {
     // Return success response immediately
     successResponse(
       res,
-      status === 2
+      status == 2
         ? "Expense Approved successfully"
         : "Expense Rejected successfully",
       200

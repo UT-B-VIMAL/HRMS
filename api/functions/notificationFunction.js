@@ -1,28 +1,52 @@
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const getPagination = require('../../helpers/pagination');
 
-exports.getNotifications = async (user_id, res) => {
+exports.getNotifications = async (user_id, queryParams, res) => {
   try {
+    const { page = 1, perPage = 10 } = queryParams;
+    const offset = (page - 1) * perPage;
+
     const query = `
       SELECT id, title, body, read_status, created_at
       FROM notifications
       WHERE user_id = ?
       ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
     `;
-    const [notifications] = await db.query(query, [user_id]);
+    const [notifications] = await db.query(query, [user_id, parseInt(perPage), parseInt(offset)]);
 
-    const unreadCountQuery = `
-      SELECT COUNT(*) AS unread_count
+    const countQuery = `
+      SELECT COUNT(*) AS total
       FROM notifications
-      WHERE user_id = ? AND read_status = 0
+      WHERE user_id = ?
     `;
-    const [unreadCountResult] = await db.query(unreadCountQuery, [user_id]);
-    const unreadCount = unreadCountResult[0].unread_count;
+    const [countResult] = await db.query(countQuery, [user_id]);
+    const totalRecords = countResult[0].total;
 
-    return successResponse(res, { notifications, unread_count: unreadCount }, 'Notifications retrieved successfully');
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    return successResponse(res, { notifications, pagination }, 'Notifications retrieved successfully');
   } catch (error) {
     console.error('Error retrieving notifications:', error.message);
     return errorResponse(res, error.message, 'Error retrieving notifications', 500);
+  }
+};
+
+exports.getUnreadNotifications = async (user_id, res) => {
+  try {
+    const query = `
+      SELECT id, title, body, read_status, created_at
+      FROM notifications
+      WHERE user_id = ? AND read_status = 0
+      ORDER BY created_at DESC
+    `;
+    const [notifications] = await db.query(query, [user_id]);
+
+    return successResponse(res, notifications, 'Unread notifications retrieved successfully');
+  } catch (error) {
+    console.error('Error retrieving unread notifications:', error.message);
+    return errorResponse(res, error.message, 'Error retrieving unread notifications', 500);
   }
 };
 
