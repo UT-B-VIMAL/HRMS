@@ -243,11 +243,7 @@ exports.updateAttendanceAndNotify = async (req, res) => {
     `;
     const [teamResult] = await db.query(teamQuery, [team_id]);
 
-    if (teamResult.length === 0) {
-      return errorResponse(res, "Team not found or deleted", "Error updating attendance", 404);
-    }
-
-    const teamName = teamResult[0].name;
+    const teamName = teamResult.length > 0 ? teamResult[0].name : 'Unknown Team';
 
     // Prepare notification payload
     const notificationPayload = {
