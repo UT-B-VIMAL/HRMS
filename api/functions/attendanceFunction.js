@@ -6,6 +6,7 @@ const {attendanceValidator, attendanceFetch}=  require("../../validators/Attenda
 const getPagination = require("../../helpers/pagination");
 const { getAuthUserDetails } = require("./commonFunction");
 const { Parser } = require('json2csv');
+const { userSockets } = require("../../helpers/notificationHelper");
 
 
 exports.getAttendance = async (req, res) => {
@@ -216,7 +217,98 @@ exports.updateAttendanceData = async (req, res) => {
 };
 
 
-  exports.getEmployeeAttendance = async (req, res) => {
+exports.updateAttendanceAndNotify = async (req, res) => {
+  const { user_id } = req.query;
+
+  try {
+    // Fetch user details
+    const userQuery = `
+      SELECT id, role_id, team_id 
+      FROM users 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+    const [userResult] = await db.query(userQuery, [user_id]);
+
+    if (userResult.length === 0) {
+      return errorResponse(res, "User not found or deleted", "Error updating attendance", 404);
+    }
+
+    const { role_id, team_id } = userResult[0];
+
+    // Fetch team name
+    const teamQuery = `
+      SELECT name 
+      FROM teams 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+    const [teamResult] = await db.query(teamQuery, [team_id]);
+
+    if (teamResult.length === 0) {
+      return errorResponse(res, "Team not found or deleted", "Error updating attendance", 404);
+    }
+
+    const teamName = teamResult[0].name;
+
+    // Prepare notification payload
+    const notificationPayload = {
+      title: `${teamName} Updated Attendance`,
+      body: `${teamName} has updated the team's attendance records.`,
+    };
+
+    // Send notifications based on role
+    if (role_id === 3) {
+      // Send notification to all PMs
+      const pmUsersQuery = `
+        SELECT id 
+        FROM users 
+        WHERE role_id = 2 AND deleted_at IS NULL
+      `;
+      const [pmUsers] = await db.query(pmUsersQuery);
+
+      pmUsers.forEach(async (pmUser) => {
+        const socketIds = userSockets[pmUser.id];
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach((socketId) => {
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
+          });
+        }
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [pmUser.id, notificationPayload.title, notificationPayload.body, 0]
+        );
+      });
+    } else if (role_id === 2) {
+      // Send notification to all Admins
+      const adminUsersQuery = `
+        SELECT id 
+        FROM users 
+        WHERE role_id = 1 AND deleted_at IS NULL
+      `;
+      const [adminUsers] = await db.query(adminUsersQuery);
+
+      adminUsers.forEach(async (adminUser) => {
+        const socketIds = userSockets[adminUser.id];
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach((socketId) => {
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
+          });
+        }
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [adminUser.id, notificationPayload.title, notificationPayload.body, 0]
+        );
+      });
+    }
+
+    return successResponse(res, null, "Attendance updated and notifications sent successfully", 200);
+  } catch (error) {
+    console.error("Error updating attendance and sending notifications:", error.message);
+    return errorResponse(res, error.message, "Error updating attendance", 500);
+  }
+};
+
+
+exports.getEmployeeAttendance = async (req, res) => {
     const {
       from_date,
       to_date,
@@ -369,8 +461,8 @@ exports.updateAttendanceData = async (req, res) => {
       return errorResponse(res, error.message, "Error fetching Attendance Report", 500);
     }
   };
-  
-  
 
-  
+
+
+
 

@@ -379,7 +379,7 @@ exports.updatesubTaskData = async (id, payload, res,req) => {
       const socketIds = userSockets[user_id];
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
-          req.io.of('/notifications').emit('push_notification', notificationPayload);
+          req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
         });
       }
       await db.execute(
@@ -670,7 +670,7 @@ exports.updatesubTaskData = async (id, payload, res,req) => {
     
         if (Array.isArray(socketIds)) {
           socketIds.forEach(socketId => {
-            req.io.of('/notifications').emit('push_notification', notificationPayload);
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         }
     

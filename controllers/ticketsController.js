@@ -52,8 +52,7 @@ exports.createTicket = async (req, res) => {
         const socketIds = userSockets[adminId]; // Get the array of socket IDs for the admin
         if (Array.isArray(socketIds)) {
           socketIds.forEach(socketId => {
-            console.log(`Sending notification to admin ${adminId} with socket ID ${socketId}`);
-            io.of('/notifications').emit('push_notification', notificationPayload);
+            io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         } else {
           console.log(`No socket IDs found for admin ${adminId}`);
@@ -145,8 +144,7 @@ exports.updateTickets = async (req, res) => {
       const socketIds = userSockets[createdBy]; // Get the array of socket IDs for the created_by user
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
-          console.log(`Sending notification to user ${createdBy} with socket ID ${socketId}`);
-          io.of('/notifications').emit('push_notification', notificationPayload);
+          io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
         });
       } else {
         console.log(`No socket IDs found for user ${createdBy}`);
@@ -231,8 +229,7 @@ exports.ticketComments = async (req, res) => {
       const socketIds = userSockets[receiver_id]; 
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
-          console.log(`Sending notification to user ${receiver_id} with socket ID ${socketId}`);
-          io.of('/notifications').emit('push_notification', notificationPayload);
+          io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
         });
       } else {
         console.log(`No socket IDs found for user ${receiver_id}`);

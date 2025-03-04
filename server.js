@@ -106,7 +106,7 @@ apiRouter.post('/profile', profileController.createOrUpdateProfile);
 apiRouter.get('/profile/:id', profileController.getProfile);
 
 // User Routes
-apiRouter.post('/user',RoleController.checkRole(), userController.createUser);
+apiRouter.post('/user', userController.createUser);
 apiRouter.put('/user/:id',RoleController.checkRole(), userController.updateUser);
 apiRouter.delete('/user/:id',RoleController.checkRole(), userController.deleteUser);
 apiRouter.get('/user/:id',RoleController.checkRole(), userController.getUser);
@@ -205,6 +205,8 @@ apiRouter.get('/getAnnualRatings', RoleController.checkRole(),ratingController.g
 apiRouter.get('/getAttendanceList', RoleController.checkRole(), attendanceController.getAttendanceList);
 apiRouter.post('/updateAttendance', RoleController.checkRole(), attendanceController.updateAttendance);
 apiRouter.get('/getAttendanceReport', RoleController.checkRole(), attendanceController.getAttendanceListReport);
+apiRouter.post('/all_present', (req, res) => attendanceController.updateAttendanceAndNotify(req, res, req.io));
+
 
 // Comments
 apiRouter.post('/comments',RoleController.checkRole(),commentsController.addComments);

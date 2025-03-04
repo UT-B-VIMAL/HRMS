@@ -1,5 +1,5 @@
-const {  errorResponse } = require("../helpers/responseHelper");
-const { getAttendance, updateAttendanceData, getEmployeeAttendance } = require("../api/functions/attendanceFunction");
+const { errorResponse } = require("../helpers/responseHelper");
+const { getAttendance, updateAttendanceData, getEmployeeAttendance, updateAttendanceAndNotify } = require("../api/functions/attendanceFunction");
 
 exports.getAttendanceList = async (req, res) => {
     try {
@@ -21,7 +21,7 @@ exports.updateAttendance = async (req, res) => {
       }
   };
 
-  exports.getAttendanceListReport = async (req, res) => {
+exports.getAttendanceListReport = async (req, res) => {
     try {
       await getEmployeeAttendance(req,res);
     
@@ -29,11 +29,20 @@ exports.updateAttendance = async (req, res) => {
       const statusCode = error.status || 500;
       return errorResponse(res, error.message, "Error Fetching Attendance", statusCode);
     }
+  };
+
+exports.updateAttendanceAndNotify = async (req, res) => {
+  try {
+    await updateAttendanceAndNotify(req, res); 
+  } catch (error) {
+    const statusCode = error.status || 500;
+    return errorResponse(res, error.message, "Error updating attendance and sending notifications", statusCode);
   }
+};
 
-  
 
 
-  
+
+
 
 
