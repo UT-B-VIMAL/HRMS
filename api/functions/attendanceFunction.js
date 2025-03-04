@@ -250,10 +250,29 @@ exports.updateAttendanceAndNotify = async (req, res) => {
       title: `${teamName} Updated Attendance`,
       body: `${teamName} has updated the team's attendance records.`,
     };
-
+    const today = new Date().toISOString().slice(0, 10);
     // Send notifications based on role
     if (role_id === 3) {
       // Send notification to all PMs
+      const userQuery = `
+          SELECT id 
+          FROM users 
+          WHERE deleted_at IS NULL AND team_id IN (?) AND id != ?
+      `;
+      const teamQuery = `
+          SELECT id 
+          FROM teams 
+          WHERE deleted_at IS NULL AND reporting_user_id = ?
+      `;
+      const [rows] = await db.query(teamQuery, [user_id]);
+      const teamIds = rows.map(row => row.id);
+      const userIds = teamIds.length > 0 
+          ? (await db.query(userQuery, [teamIds, user_id]))[0].map(row => row.id) 
+          : [];
+      console.log(today);
+       
+      await db.query(`DELETE FROM employee_leave WHERE user_id IN (?) AND date = ?`, [userIds, today]);
+
       const pmUsersQuery = `
         SELECT id 
         FROM users 
@@ -275,6 +294,16 @@ exports.updateAttendanceAndNotify = async (req, res) => {
       });
     } else if (role_id === 2) {
       // Send notification to all Admins
+
+      const userQuery = `
+          SELECT id 
+          FROM users 
+          WHERE deleted_at IS NULL  AND role_id IN (2,3);
+      `;
+      const [rows] = await db.query(userQuery, [user_id]);
+      const userIds = rows.map(row => row.id);
+      await db.query(`DELETE FROM employee_leave WHERE user_id IN (?) AND date = ?`, [userIds, today]);
+ 
       const adminUsersQuery = `
         SELECT id 
         FROM users 
