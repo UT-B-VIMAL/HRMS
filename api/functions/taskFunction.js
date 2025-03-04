@@ -1371,8 +1371,8 @@ exports.getTaskList = async (queryParams, res) => {
     let allSubtasks = [];
     if (tasks.length > 0) {
       const taskIds = tasks.map((task) => task.task_id);
-      [allSubtasks] = await db.query(
-        `SELECT 
+      let query = `
+        SELECT 
           id AS subtask_id, 
           name AS subtask_name, 
           task_id,
@@ -1383,11 +1383,20 @@ exports.getTaskList = async (queryParams, res) => {
           reopen_status, 
           active_status 
         FROM sub_tasks
-        WHERE task_id IN (?) AND user_id = ?
-          AND sub_tasks.deleted_at IS NULL`,
-        [taskIds, user_id]
-      );
+        WHERE task_id IN (?) 
+          AND sub_tasks.deleted_at IS NULL
+      `;
+    
+      // Add user_id filter only if role_id is 4
+      const queryParams = [taskIds];
+      if (role_id === 4) {
+        query += " AND user_id = ?";
+        queryParams.push(user_id);
+      }
+    
+      [allSubtasks] = await db.query(query, queryParams);
     }
+    
     
 
     // Group subtasks by task_id
