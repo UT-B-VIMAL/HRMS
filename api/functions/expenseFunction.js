@@ -142,8 +142,7 @@ exports.createexpense = async (req, res) => {
 
         if (Array.isArray(socketIds)) {
           socketIds.forEach((socketId) => {
-            console.log(`Sending notification to user ${reportingUserId} with socket ID ${socketId}`);
-            req.io.of('/notifications').emit('push_notification', notificationPayload);
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         }
 
@@ -889,11 +888,9 @@ exports.approve_reject_expense = async (payload, res, req) => {
       const socketIds = userSockets[user_id];
       if (Array.isArray(socketIds)) {
         socketIds.forEach((socketId) => {
-          console.log(
-            `Sending notification to user ${user_id} with socket ID ${socketId}`
-          );
+        
           req.io
-            .of("/notifications")
+            .of("/notifications").to(socketId)
             .emit("push_notification", notificationPayload);
         });
       }
@@ -930,11 +927,9 @@ exports.approve_reject_expense = async (payload, res, req) => {
           const pmSocketIds = userSockets[pmUser.id];
           if (Array.isArray(pmSocketIds)) {
             pmSocketIds.forEach((socketId) => {
-              console.log(
-                `Sending notification to PM/Admin user ${pmUser.id} with socket ID ${socketId}`
-              );
+              
               req.io
-                .of("/notifications")
+                .of("/notifications").to(socketId)
                 .emit("push_notification", pmNotificationPayload);
             });
           }

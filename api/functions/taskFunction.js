@@ -714,7 +714,7 @@ exports.updateTaskData = async (id, payload, res,req) => {
       const socketIds = userSockets[user_id];
       if (Array.isArray(socketIds)) {
         socketIds.forEach(socketId => {
-          req.io.of('/notifications').emit('push_notification', notificationPayload);
+          req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
         });
       }
       await db.execute(
@@ -1040,7 +1040,7 @@ exports.updateTaskData = async (id, payload, res,req) => {
     
         if (Array.isArray(socketIds)) {
           socketIds.forEach(socketId => {
-            req.io.of('/notifications').emit('push_notification', notificationPayload);
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         }
     
@@ -1914,8 +1914,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         const socketIds = userSockets[userId];
         if (Array.isArray(socketIds)) {
           socketIds.forEach(socketId => {
-            console.log(`Sending notification to user ${userId} with socket ID ${socketId}`);
-            req.io.of('/notifications').emit('push_notification', notificationPayload);
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         }
         await db.execute(
@@ -1932,8 +1931,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         const reportingUserSocketIds = userSockets[reportingUserId];
         if (Array.isArray(reportingUserSocketIds)) {
           reportingUserSocketIds.forEach(socketId => {
-            console.log(`Sending notification to reporting user ${reportingUserId} with socket ID ${socketId}`);
-            req.io.of('/notifications').emit('push_notification', notificationPayload);
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         }
         await db.execute(

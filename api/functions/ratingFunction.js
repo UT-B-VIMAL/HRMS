@@ -162,10 +162,10 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
 
 
 exports.ratingUpdation = async (payload, res, req) => {
-  const { status,month,rater, quality, timelines,agility,attitude,responsibility,remarks,user_id,updated_by } = payload;
+  const { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id, updated_by } = payload;
 
   const { error } = UpdateRatingSchema.validate(
-    { status,month,rater, quality, timelines,agility,attitude,responsibility,user_id,updated_by,remarks },
+    { status, month, rater, quality, timelines, agility, attitude, responsibility, user_id, updated_by, remarks },
     { abortEarly: false }
   );
   if (error) {
@@ -187,24 +187,24 @@ exports.ratingUpdation = async (payload, res, req) => {
   // Check if a rating exists for the user and month
   const checkQuery =
     "SELECT COUNT(*) as count FROM ratings WHERE user_id = ? AND month = ? AND rater = ?";
-  const [checkResult] = await db.query(checkQuery, [user_id, month,rater]);
+  const [checkResult] = await db.query(checkQuery, [user_id, month, rater]);
   const ratings = [quality, timelines, agility, attitude, responsibility].map(Number);
   const validRatings = ratings.filter(r => !isNaN(r));
   const average = validRatings.length > 0 ? validRatings.reduce((a, b) => a + b, 0) / validRatings.length : 0;
-  
+
   if (checkResult[0].count > 0) {
     const updateQuery = `
         UPDATE ratings
-        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?,remarks = ?,status = ?
+        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?, remarks = ?, status = ?
         WHERE user_id = ? AND month = ? AND rater = ?`;
-    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by,remarks, status,user_id, month, rater];
+    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by, remarks, status, user_id, month, rater];
     await db.query(updateQuery, values);
   } else {
     const insertQuery = `
         INSERT INTO ratings 
-        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks,status)
+        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by,remarks,status];
+    const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status];
     await db.query(insertQuery, values);
   }
   const responsePayload = {
@@ -232,8 +232,7 @@ exports.ratingUpdation = async (payload, res, req) => {
     const socketIds = userSockets[user_id];
     if (Array.isArray(socketIds)) {
       socketIds.forEach(socketId => {
-        console.log(`Sending notification to user ${user_id} with socket ID ${socketId}`);
-        req.io.of('/notifications').emit('push_notification', notificationPayload);
+        req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
       });
     }
     await db.execute(
@@ -242,7 +241,107 @@ exports.ratingUpdation = async (payload, res, req) => {
     );
   }
 
-  return successResponse(res, responsePayload, "Rating Updated successfully", 200);
+  successResponse(res, responsePayload, "Rating Updated successfully", 200);
+
+  // Asynchronous notification handling
+  if (user.role_id === "3" && status == "1") {
+    // Check if all ratings for the team are updated
+    const teamQuery = `
+      SELECT id, name FROM teams WHERE id = ? AND deleted_at IS NULL
+    `;
+    const [teamResult] = await db.query(teamQuery, [user.team_id]);
+    const teamName = teamResult.length > 0 ? teamResult[0].name : 'Unknown Team';
+
+    const teamMembersQuery = `
+      SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL
+    `;
+    const [teamMembers] = await db.query(teamMembersQuery, [user.team_id]);
+
+    const allRatingsUpdated = await Promise.all(teamMembers.map(async (member) => {
+      const ratingCheckQuery = `
+        SELECT COUNT(*) as count FROM ratings WHERE user_id = ? AND month = ? AND rater = ? AND status = 1
+      `;
+      const [ratingCheckResult] = await db.query(ratingCheckQuery, [member.id, month, 'TL']);
+      return ratingCheckResult[0].count > 0;
+    }));
+
+    if (allRatingsUpdated.every(Boolean)) {
+      // Send notification to all PMs
+      const pmUsersQuery = `
+        SELECT id FROM users WHERE role_id = 2 AND deleted_at IS NULL
+      `;
+      const [pmUsers] = await db.query(pmUsersQuery);
+
+      const notificationPayload = {
+        title: `${teamName} Updated Attendance`,
+        body: `${teamName} has updated team attendance.`,
+      };
+
+      pmUsers.forEach(async (pmUser) => {
+        const socketIds = userSockets[pmUser.id];
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach((socketId) => {
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
+          });
+        }
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [pmUser.id, notificationPayload.title, notificationPayload.body, 0]
+        );
+      });
+    }
+  }
+
+  if (user.role_id === "2" && status == "1") {
+    // Check if all ratings for all teams are updated
+    const allTeamsQuery = `
+      SELECT id, name FROM teams WHERE deleted_at IS NULL
+    `;
+    const [allTeams] = await db.query(allTeamsQuery);
+
+    const allRatingsUpdated = await Promise.all(allTeams.map(async (team) => {
+      const teamMembersQuery = `
+        SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL
+      `;
+      const [teamMembers] = await db.query(teamMembersQuery, [team.id]);
+
+      const teamRatingsUpdated = await Promise.all(teamMembers.map(async (member) => {
+        const ratingCheckQuery = `
+          SELECT COUNT(*) as count FROM ratings WHERE user_id = ? AND month = ? AND rater = ? AND status = 1
+        `;
+        const [ratingCheckResult] = await db.query(ratingCheckQuery, [member.id, month, 'PM']);
+        return ratingCheckResult[0].count > 0;
+      }));
+
+      return teamRatingsUpdated.every(Boolean);
+    }));
+
+    if (allRatingsUpdated.every(Boolean)) {
+      // Send notification to all Admins
+      const adminUsersQuery = `
+        SELECT id FROM users WHERE role_id = 1 AND deleted_at IS NULL
+      `;
+      const [adminUsers] = await db.query(adminUsersQuery);
+
+      const notificationPayload = {
+        title: 'Employee Rating Updated',
+        body: `Performance rating has been updated successfully.`,
+      };
+
+      adminUsers.forEach(async (adminUser) => {
+        const socketIds = userSockets[adminUser.id];
+        if (Array.isArray(socketIds)) {
+          socketIds.forEach((socketId) => {
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
+          });
+        }
+        await db.execute(
+          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+          [adminUser.id, notificationPayload.title, notificationPayload.body, 0]
+        );
+      });
+    }
+  }
 };
 
 exports.getRatingById = async (req, res) => {

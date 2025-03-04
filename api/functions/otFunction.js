@@ -207,8 +207,7 @@ exports.createOt = async (payload, res, req) => {
 
         if (Array.isArray(socketIds)) {
           socketIds.forEach((socketId) => {
-            console.log(`Sending notification to user ${reportingUserId} with socket ID ${socketId}`);
-            req.io.of('/notifications').emit('push_notification', notificationPayload);
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         }
 
@@ -949,6 +948,7 @@ exports.approve_reject_ot = async (payload, res, req) => {
   const { user_id, status, updated_by, role } = payload;
 
   try {
+
     // Validate required fields
     if (!user_id) {
       return errorResponse(
@@ -1016,8 +1016,6 @@ exports.approve_reject_ot = async (payload, res, req) => {
         404
       );
     }
-
-    console.log(id);
     
     // Build the update query based on role
     let updateQuery = `
@@ -1053,7 +1051,7 @@ exports.approve_reject_ot = async (payload, res, req) => {
         400
       );
     }
-    if(role === "pm" && status === 2) {
+    if(role === "pm" && status === "2") {
     // Send notification to the user
     const notificationPayload = {
       title: status === 2 ? "Overtime Approved" : "Overtime Rejected",
@@ -1065,12 +1063,8 @@ exports.approve_reject_ot = async (payload, res, req) => {
     const socketIds = userSockets[user_id];
     if (Array.isArray(socketIds)) {
       socketIds.forEach((socketId) => {
-        console.log(
-          `Sending notification to user ${user_id} with socket ID ${socketId}`
-        );
-        req.io
-          .of("/notifications")
-          .emit("push_notification", notificationPayload);
+       
+        req.io.of("/notifications").to(socketId).emit("push_notification", notificationPayload);
       });
     }
     await db.execute(
@@ -1087,7 +1081,8 @@ exports.approve_reject_ot = async (payload, res, req) => {
     );
 
     // Handle notification sending asynchronously
-    if (role === "tl" && status === 2) {
+    if (role == "tl" && status == "2") {
+
       (async () => {
         const pmUsersQuery = `
           SELECT id FROM users 
@@ -1099,16 +1094,12 @@ exports.approve_reject_ot = async (payload, res, req) => {
           title: "Review Employee OT Requests",
           body: "Pending overtime requests from employees require your review.",
         };
-
         for (const pmUser of pmUsers) {
           const pmSocketIds = userSockets[pmUser.id];
           if (Array.isArray(pmSocketIds)) {
             pmSocketIds.forEach((socketId) => {
-              console.log(
-                `Sending notification to PM user ${pmUser.id} with socket ID ${socketId}`
-              );
               req.io
-                .of("/notifications")
+                .of("/notifications").to(socketId)
                 .emit("push_notification", pmNotificationPayload);
             });
           }

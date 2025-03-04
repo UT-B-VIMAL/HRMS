@@ -67,8 +67,7 @@ const sendMonthlyNotification = async () => {
 
         if (Array.isArray(socketIds)) {
           socketIds.forEach((socketId) => {
-            console.log(`Sending notification to user ${reportingUserId} with socket ID ${socketId}`);
-            req.io.of('/notifications').emit('push_notification', notificationPayload);
+            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
           });
         }
 
