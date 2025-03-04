@@ -64,7 +64,23 @@ exports.getProfile = async (req, res) => {
         const [profile] = await db.query(query, [id]);
 
         if (!profile || profile.length === 0) {
-            return errorResponse(res, null, 'Profile not found', 404);
+            // Fetch basic user data if profile not found
+            const userQuery = `
+                SELECT 
+                    CONCAT(u.first_name, ' ', u.last_name) AS name,
+                    u.designation_id AS designation,
+                    u.email,
+                    t.name as team_name
+                FROM users u
+                LEFT JOIN teams t ON u.team_id = t.id
+                WHERE u.id = ?`;
+            const [user] = await db.query(userQuery, [id]);
+
+            if (!user || user.length === 0) {
+                return errorResponse(res, null, 'Profile not found', 404);
+            }
+
+            return successResponse(res, user[0], 'Basic user data retrieved successfully');
         }
 
         profile[0].dob = profile[0].dob ? formatDate(profile[0].dob) : null;
