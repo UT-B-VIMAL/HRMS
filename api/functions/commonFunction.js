@@ -17,7 +17,7 @@ exports.getAllData = async (payload, res) => {
         else if (type === "tl") {
             query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
         } else if (type === "products") {
-            // if(user_id){
+            
             const users = await this.getAuthUserDetails(user_id, res);
             if (!users) return;
             if (users.role_id === 3) {
@@ -29,12 +29,14 @@ exports.getAllData = async (payload, res) => {
                 }else{
                    teamIds.push(users.team_id);
                 }
-                
-                const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND team_id IN (?)";
-                const [taskRows] = await db.query(queryTasks, [teamIds]);
+                const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
+                const [userRows] = await db.query(userIdList, [teamIds]);
+                const userIds = userRows.map(row => row.id);
+                const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [taskRows] = await db.query(queryTasks, [userIds]);
 
-                const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND team_id IN (?)";
-                const [subtaskRows] = await db.query(querySubtasks, [teamIds]);
+                const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [subtaskRows] = await db.query(querySubtasks, [userIds]);
 
                 let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
                 if (productIds.length === 0) {
@@ -56,7 +58,6 @@ exports.getAllData = async (payload, res) => {
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
             
             }
-        // }
         } else if (type === "projects") {
             // if(user_id){
             const users = await this.getAuthUserDetails(user_id, res);
@@ -70,11 +71,14 @@ exports.getAllData = async (payload, res) => {
                 }else{
                    teamIds.push(users.team_id);
                 }
-                const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND team_id IN (?)";
-                const [taskRows] = await db.query(queryTasks, [teamIds]);
+                const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
+                const [userRows] = await db.query(userIdList, [teamIds]);
+                const userIds = userRows.map(row => row.id);
+                const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [taskRows] = await db.query(queryTasks, [userIds]);
 
-                const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND team_id IN (?)";
-                const [subtaskRows] = await db.query(querySubtasks, [teamIds]);
+                const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [subtaskRows] = await db.query(querySubtasks, [userIds]);
 
                 let projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
                 if (projectIds.length === 0) {
@@ -107,6 +111,21 @@ exports.getAllData = async (payload, res) => {
         } else if (type === "assignee") {
             query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
         } 
+        else if (type === "ot_projects") {
+            const users = await this.getAuthUserDetails(user_id, res);
+            if (!users) return;
+            const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id = ?";
+            const [taskRows] = await db.query(queryTasks, [user_id]);
+
+            const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id = ?";
+            const [subtaskRows] = await db.query(querySubtasks, [user_id]);
+            let projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
+            if (projectIds.length === 0) {
+                projectIds = [-1]; // Prevent SQL error
+            }
+            query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
+            queryParams.push(projectIds);
+        }
         
         else if (type === "issue") {
             query = "SELECT id, issue_name FROM issue_types WHERE deleted_at IS NULL";
