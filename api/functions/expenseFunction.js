@@ -662,7 +662,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
         break;
       case "1":
         otConditions.push(
-          "(et.tl_status = 1 OR et.tl_status = 2) AND et.pm_status = 0"
+          "et.tl_status = 1 AND et.pm_status = 1"
         );
         break;
       case "2":
