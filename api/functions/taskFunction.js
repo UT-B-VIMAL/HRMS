@@ -240,7 +240,6 @@ exports.getTask = async (queryParams, res) => {
       taskParams.push(user_id, user_id);
     }
 
-    // Execute Task Query
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
       return errorResponse(res, "Task not found", "Error retrieving task", 404);
