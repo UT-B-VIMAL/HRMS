@@ -195,8 +195,31 @@ exports.createTask = async (payload, res) => {
   }
 };
 
-exports.getTask = async (id, res) => {
-  try {
+exports.getTask = async (queryParams, res) => {
+  try {    
+    const {
+      id,
+      user_id,
+    } = queryParams;
+
+
+    // Validate if user_id exists
+    if (!user_id) {
+      console.log("Missing user_id in query parameters");
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Missing user_id in query parameters",
+        400
+      );
+    }
+
+    // Get user details
+    const userDetails = await getAuthUserDetails(user_id, res);
+
+    if (!userDetails || userDetails.id == undefined) {
+      return;
+    }
     // Task query
     const taskQuery = `
     SELECT 
@@ -214,12 +237,15 @@ exports.getTask = async (id, res) => {
     LEFT JOIN users owner ON t.assigned_user_id = owner.id 
     LEFT JOIN products p ON t.product_id = p.id 
     LEFT JOIN projects pj ON t.project_id = pj.id 
-    WHERE t.id = ?
-    AND t.deleted_at IS NULL;
+WHERE t.id = ?
+AND (t.user_id = ? OR t.assigned_user_id = ?)
+AND t.deleted_at IS NULL;
+
 
 
     `;
-    const [task] = await db.query(taskQuery, [id]);
+    const [task] = await db.query(taskQuery, [id, user_id, user_id]);
+
 
     // console.log(task);
 
@@ -238,12 +264,14 @@ exports.getTask = async (id, res) => {
     LEFT JOIN users u ON st.user_id = u.id 
     LEFT JOIN tasks t ON st.task_id = t.id 
     LEFT JOIN projects p ON t.project_id = p.id 
-    WHERE st.task_id = ? 
-    AND st.deleted_at IS NULL
+WHERE st.task_id = ? 
+AND st.user_id = ?
+AND st.deleted_at IS NULL
     ORDER BY st.id DESC;
 
     `;
-    const subtasks = await db.query(subtasksQuery, [id]);
+    const subtasks = await db.query(subtasksQuery, [id, user_id]);
+
 
     // // Histories query
     const historiesQuery = `

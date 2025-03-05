@@ -148,7 +148,7 @@ apiRouter.get('/designations',RoleController.checkRole(), designationController.
 apiRouter.post('/task', RoleController.checkRole(),taskController.createTask);
 apiRouter.put('/task/:id',RoleController.checkRole(), taskController.updateTask);
 apiRouter.delete('/task/:id', RoleController.checkRole(),taskController.deleteTask);
-apiRouter.get('/task/:id',RoleController.checkRole(), taskController.getTask);
+apiRouter.get('/task',RoleController.checkRole(), taskController.getTask);
 apiRouter.get('/task', RoleController.checkRole(),taskController.getAllTasks);
 apiRouter.put('/taskupdate/:id',RoleController.checkRole(),(req,res) => taskController.updateDatas(req, res, req.io));
 apiRouter.get('/getTaskDatas',RoleController.checkRole(), taskController.getTaskDatas);
