@@ -94,7 +94,9 @@ const taskController = {
 
   getTask: async (req, res) => {
     try {
-      const queryParams = req.query;      
+      const { id } = req.params; 
+      const { user_id } = req.query;  
+      const queryParams = { id, user_id };  
       await getTask(queryParams, res);
 
     } catch (error) {
