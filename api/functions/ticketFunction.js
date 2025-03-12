@@ -61,7 +61,7 @@ exports.getAlltickets = async (req, res) => {
                 t.id,
                 t.user_id,
                 COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS name, 
-                t.created_at,
+                CONVERT_TZ(t.created_at, '+00:00', '+05:30') AS created_at,
                 t.description,
                 i.issue_name AS issue_type,
                 CONVERT_TZ(t.issue_date, '+00:00', '+05:30') AS issue_date,
@@ -117,23 +117,24 @@ exports.getAlltickets = async (req, res) => {
         }
 
         if (search) {
-            query += ` AND (
-                CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
-                OR t.id LIKE ? 
-                OR DATE(t.created_at) LIKE ?
-                OR t.description LIKE ? 
-                OR i.issue_name LIKE ? 
-                OR t.issue_date LIKE ?
-            )`;
-
-            countQuery += ` AND (
-                CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
-                OR t.id LIKE ? 
-                OR DATE(t.created_at) LIKE ?
-                OR t.description LIKE ? 
-                OR i.issue_name LIKE ? 
-                OR t.issue_date LIKE ?
-            )`;
+          query += ` AND (
+              CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+              OR t.id LIKE ? 
+              OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+              OR t.description LIKE ? 
+              OR i.issue_name LIKE ? 
+              OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+          )`;
+      
+          countQuery += ` AND (
+              CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+              OR t.id LIKE ? 
+              OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+              OR t.description LIKE ? 
+              OR i.issue_name LIKE ? 
+              OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+          )`;
+      
 
             const searchPattern = `%${search}%`;
             values.push(searchPattern, searchPattern,searchPattern, searchPattern,searchPattern, searchPattern);
