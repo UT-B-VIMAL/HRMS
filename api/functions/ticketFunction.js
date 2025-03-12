@@ -118,28 +118,24 @@ exports.getAlltickets = async (req, res) => {
 
         if (search) {
             query += ` AND (
-                t.user_id LIKE ? 
-                OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+                CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.id LIKE ? 
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
                 OR t.issue_date LIKE ?
-                OR t.status LIKE ? 
             )`;
 
             countQuery += ` AND (
-                t.user_id LIKE ? 
-                OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+                CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.id LIKE ? 
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
                 OR t.issue_date LIKE ?
-                OR t.status LIKE ? 
             )`;
 
             const searchPattern = `%${search}%`;
-            values.push(searchPattern,searchPattern, searchPattern, searchPattern, searchPattern,searchPattern, searchPattern);
-            countValues.push(searchPattern,searchPattern, searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
+            values.push(searchPattern, searchPattern, searchPattern,searchPattern, searchPattern);
+            countValues.push( searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
         }
 
         query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
