@@ -120,6 +120,7 @@ exports.getAlltickets = async (req, res) => {
             query += ` AND (
                 CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.id LIKE ? 
+                OR DATE(t.created_at) LIKE ?
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
                 OR t.issue_date LIKE ?
@@ -128,14 +129,15 @@ exports.getAlltickets = async (req, res) => {
             countQuery += ` AND (
                 CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
                 OR t.id LIKE ? 
+                OR DATE(t.created_at) LIKE ?
                 OR t.description LIKE ? 
                 OR i.issue_name LIKE ? 
                 OR t.issue_date LIKE ?
             )`;
 
             const searchPattern = `%${search}%`;
-            values.push(searchPattern, searchPattern, searchPattern,searchPattern, searchPattern);
-            countValues.push( searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
+            values.push(searchPattern, searchPattern,searchPattern, searchPattern,searchPattern, searchPattern);
+            countValues.push( searchPattern,searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
         }
 
         query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
