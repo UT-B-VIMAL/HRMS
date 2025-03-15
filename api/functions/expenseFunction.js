@@ -290,9 +290,9 @@ exports.getAllexpense = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       expenseConditions.push(
-        `(pr.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR et.description LIKE ?)`
+        `(u.first_name LIKE ? OR u.last_name LIKE ? OR et.description LIKE ?)`
       );
-      expenseValues.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      expenseValues.push(searchTerm, searchTerm, searchTerm);
     }
     if (status) {
       const statusArray = status.split(",");
