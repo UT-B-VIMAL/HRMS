@@ -549,7 +549,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
 
     // Fetch all employees in the team (excluding absentees)
     const [allEmployees] = await db.query(
-      `SELECT id, 
+      `SELECT id, role_id ,designation_id,
               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name 
        FROM users 
        WHERE deleted_at IS NULL 
@@ -562,6 +562,8 @@ exports.fetchTLresourceallotment = async (req, res) => {
       if (!allocatedTaskUsers.has(user.id)) {
         employeeDetails.push({
           employee_name: user.employee_name,
+          employee_role: user.role_id,
+          employee_designation: user.designation_id,
           status: "Not Allocated",
         });
       }
