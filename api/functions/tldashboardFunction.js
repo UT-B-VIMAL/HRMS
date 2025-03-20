@@ -50,7 +50,7 @@ exports.fetchAttendance = async (req, res) => {
     // Fetch absent employees
     const [absentEmployees] = await db.query(
       `
-        SELECT e.user_id AS employee_id, u.employee_id AS employeeId,
+        SELECT e.user_id AS employee_id, u.employee_id AS employeeId,role_id ,designation_id,
                COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name
         FROM employee_leave e
         JOIN users u ON e.user_id = u.id
@@ -76,7 +76,7 @@ exports.fetchAttendance = async (req, res) => {
     // Fetch present employees
     const [presentEmployees] = await db.query(
       `
-        SELECT id AS user_id,employee_id AS employeeId, 
+        SELECT id AS user_id,employee_id AS employeeId, role_id ,designation_id,
                COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
         FROM users
         WHERE team_id IN (?) 
@@ -95,12 +95,16 @@ exports.fetchAttendance = async (req, res) => {
         employee_id: emp.employeeId,
         user_id: emp.employee_id,
         full_name: emp.full_name,
+        role_id: emp.role_id,
+        designation_id: emp.designation_id,
         status: "Absent",
       })),
       ...presentEmployees.map((emp) => ({
         employee_id: emp.employeeId,
         user_id: emp.user_id,
         full_name: emp.full_name,
+        role_id: emp.role_id,
+        designation_id: emp.designation_id,
         status: "Present",
       })),
     ];
@@ -193,7 +197,7 @@ exports.fetchTlrating = async (req, res) => {
 
     // Fetch team members with concatenated full name
     const [teamMembers] = await db.query(
-      `SELECT id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
+      `SELECT id, role_id ,designation_id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
        FROM users WHERE team_id IN (?) AND deleted_at IS NULL`,
       [teamIds]
     );
@@ -234,6 +238,8 @@ exports.fetchTlrating = async (req, res) => {
 
       return {
         employee_name: member.full_name || "N/A",
+        role_id: member.role_id || "N/A",
+        designation_id: member.designation_id || "N/A",
         employee_id: member.id || "N/A",
         initials,
         rating_value: ratingsMap.get(member.id) || 0, // Use summed average
@@ -244,6 +250,8 @@ exports.fetchTlrating = async (req, res) => {
     if (finalRatingResult.length === 0) {
       finalRatingResult.push({
         employee_name: "N/A",
+        role_id: "N/A",
+        designation_id: "N/A",
         employee_id: 0,
         initials: "NA",
         rating_value: 0,
