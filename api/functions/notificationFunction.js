@@ -2,9 +2,10 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const getPagination = require('../../helpers/pagination');
 
-exports.getNotifications = async (user_id, queryParams, res) => {
+exports.getNotifications = async (req, res) => {
   try {
-    const { page = 1, perPage = 10 } = queryParams;
+    const { user_id } = req.params; // Get user_id from req.params
+    const { page = 1, perPage = 10 } = req.query; // Get page and perPage from req.query
     const offset = (page - 1) * perPage;
 
     const query = `
@@ -24,9 +25,17 @@ exports.getNotifications = async (user_id, queryParams, res) => {
     const [countResult] = await db.query(countQuery, [user_id]);
     const totalRecords = countResult[0].total;
 
+    const unreadCountQuery = `
+      SELECT COUNT(*) AS unreadCount
+      FROM notifications
+      WHERE user_id = ? AND read_status = 0
+    `;
+    const [unreadCountResult] = await db.query(unreadCountQuery, [user_id]);
+    const unread_count = unreadCountResult[0].unreadCount;
+
     const pagination = getPagination(page, perPage, totalRecords);
 
-    return successResponse(res, { notifications, pagination }, 'Notifications retrieved successfully');
+    return successResponse(res, { notifications, pagination, unread_count }, 'Notifications retrieved successfully');
   } catch (error) {
     console.error('Error retrieving notifications:', error.message);
     return errorResponse(res, error.message, 'Error retrieving notifications', 500);
