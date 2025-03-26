@@ -446,6 +446,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
+
     const [rows] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
@@ -466,15 +467,13 @@ exports.fetchTLresourceallotment = async (req, res) => {
     }
 
     const teamIds = teamResult.map((team) => team.id);
-
-    // Get today's date
     const today = new Date().toISOString().split("T")[0];
 
     // Fetch absent employees
     const [absentEmployees] = await db.query(
       `SELECT user_id FROM employee_leave 
        WHERE date = ? 
-       AND user_id IN (SELECT id FROM users WHERE team_id IN (?) AND deleted_at IS NULL) 
+       AND user_id IN (SELECT id FROM users WHERE team_id IN (?) AND role_id != 3 AND deleted_at IS NULL) 
        AND deleted_at IS NULL`,
       [today, teamIds]
     );
@@ -482,11 +481,12 @@ exports.fetchTLresourceallotment = async (req, res) => {
     const absentEmployeeIds = absentEmployees.map((emp) => emp.user_id);
     const absentEmployeeCondition = absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
-    // Get total team users excluding absentees
+    // Get total team users excluding absentees and role_id = 3
     const [totalUsers] = await db.query(
       `SELECT COUNT(*) as total_count 
        FROM users 
        WHERE deleted_at IS NULL 
+       AND role_id != 3 
        AND team_id IN (?) ${absentEmployeeCondition}`,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
@@ -496,13 +496,14 @@ exports.fetchTLresourceallotment = async (req, res) => {
     let employeeDetails = [];
     const allocatedTaskUsers = new Set();
 
-    // Fetch tasks only (ignore subtasks if no task exists)
+    // Fetch tasks
     const [tasks] = await db.query(
       `SELECT id, user_id 
        FROM tasks 
        WHERE deleted_at IS NULL 
-       AND team_id IN (?) ${absentEmployeeCondition} 
-       AND status NOT IN (2, 3)`,
+       AND team_id IN (?) 
+       AND status NOT IN (2, 3) 
+       AND user_id IN (SELECT id FROM users WHERE role_id != 3) ${absentEmployeeCondition}`,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
 
@@ -535,10 +536,11 @@ exports.fetchTLresourceallotment = async (req, res) => {
     // Fetch employee details of allocated users
     if (allocatedTaskUsers.size > 0) {
       const [allocatedEmployeeDetails] = await db.query(
-        `SELECT id,role_id ,designation_id, 
+        `SELECT id, role_id, designation_id, 
                 COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name 
          FROM users 
-         WHERE id IN (?) AND team_id IN (?) ${absentEmployeeCondition} 
+         WHERE id IN (?) AND role_id != 3 
+         AND team_id IN (?) ${absentEmployeeCondition} 
          AND deleted_at IS NULL`,
         absentEmployeeIds.length > 0
           ? [Array.from(allocatedTaskUsers), teamIds, absentEmployeeIds]
@@ -555,12 +557,13 @@ exports.fetchTLresourceallotment = async (req, res) => {
       });
     }
 
-    // Fetch all employees in the team (excluding absentees)
+    // Fetch all employees in the team (excluding absentees & role_id = 3)
     const [allEmployees] = await db.query(
-      `SELECT id, role_id ,designation_id,
+      `SELECT id, role_id, designation_id,
               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name 
        FROM users 
        WHERE deleted_at IS NULL 
+       AND role_id != 3 
        AND team_id IN (?) ${absentEmployeeCondition}`,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
@@ -607,6 +610,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
     );
   }
 };
+
 
 exports.fetchTLdatas = async (req, res) => {
   try {
