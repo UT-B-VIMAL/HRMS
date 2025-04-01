@@ -2104,7 +2104,7 @@ exports.deleteTaskList = async (req, res) => {
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
       WHERE t.deleted_at IS NOT NULL 
-        AND t.id NOT IN (SELECT task_id FROM sub_tasks) AND pr.deleted_at IS NOT NULL AND p.deleted_at IS NOT NULL
+        AND t.id NOT IN (SELECT task_id FROM sub_tasks) AND pr.deleted_at IS  NULL AND p.deleted_at IS  NULL
         ${taskWhereClause}
     `;
 
@@ -2114,7 +2114,7 @@ exports.deleteTaskList = async (req, res) => {
 
     // Combine the results
     const mergedResults = [...subtasks, ...tasks];
-
+console.log("mergedResults", mergedResults);
     // Fetch assignee names and remove user_id
     const processedData = await Promise.all(
       mergedResults.map(async (item) => {
