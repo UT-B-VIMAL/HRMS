@@ -27,15 +27,19 @@ exports.fetchPendingTask = async (req, res) => {
           t.extended_hours,
           t.user_id AS task_user_id,
           t.status AS task_status,
+          t.reopen_status AS task_reopen_status,
           p.name AS project_name
         FROM tasks t
         LEFT JOIN projects p ON t.project_id = p.id
-        WHERE t.status != 3 AND NOT (t.status = 2 AND t.reopen_status = 0) AND t.deleted_at IS NULL
+        WHERE t.deleted_at IS NULL
       `;
     const [tasks] = await db.query(tasksQuery);
-
+    
     const result = await Promise.all(
       tasks.map(async (task) => {
+        console.log(task.task_id);
+        
+        // Fetch subtasks for each task
         const subtasksQuery = `
             SELECT 
               st.id AS subtask_id,
@@ -44,19 +48,22 @@ exports.fetchPendingTask = async (req, res) => {
               st.total_hours_worked,
               st.extended_hours,
               st.status AS subtask_status,
+              st.reopen_status AS subtask_reopen_status,
               st.user_id AS subtask_user_id
             FROM sub_tasks st
-            WHERE st.task_id = ? AND NOT (st.status = 2 AND st.reopen_status = 0) AND st.deleted_at IS NULL
+            WHERE st.task_id = ? AND st.deleted_at IS NULL
           `;
         const [subtasks] = await db.query(subtasksQuery, [task.task_id]);
 
         const pendingTaskResult = [];
 
         if (subtasks.length > 0) {
+          // If subtasks exist, apply condition check for subtasks
           subtasks.forEach((subtask) => {
             if (
               subtask.subtask_user_id === parseInt(userId) &&
-              subtask.subtask_status !== 3
+              subtask.subtask_status !== 3 && 
+              !(subtask.subtask_status === 2 && subtask.subtask_reopen_status === 0) // Check the subtask status and reopen_status
             ) {
               const estimatedSeconds = timeToSeconds(subtask.estimated_hours);
               const workedSeconds = timeToSeconds(subtask.total_hours_worked);
@@ -65,15 +72,12 @@ exports.fetchPendingTask = async (req, res) => {
               const remainingSeconds = estimatedSeconds - workedSeconds;
 
               const workedPercentage = estimatedSeconds
-                ? Math.round((workedSeconds / estimatedSeconds) * 100 * 100) /
-                  100
+                ? Math.round((workedSeconds / estimatedSeconds) * 100 * 100) / 100
                 : 0;
 
               const remainingPercentage = estimatedSeconds
                 ? Math.round(
-                    (Math.max(0, remainingSeconds) / estimatedSeconds) *
-                      100 *
-                      100
+                    (Math.max(0, remainingSeconds) / estimatedSeconds) * 100 * 100
                   ) / 100
                 : 0;
 
@@ -96,37 +100,43 @@ exports.fetchPendingTask = async (req, res) => {
             }
           });
         } else if (task.task_user_id === parseInt(userId)) {
-          const estimatedSeconds = timeToSeconds(task.estimated_hours);
-          const workedSeconds = timeToSeconds(task.total_hours_worked);
-          const extendedSeconds = timeToSeconds(task.extended_hours);
+          // If no subtasks, apply the condition check for the task itself
+          if (
+            task.task_status !== 3 &&
+            !(task.task_status === 2 && task.task_reopen_status === 0) // Check the task status and reopen_status
+          ) {
+            const estimatedSeconds = timeToSeconds(task.estimated_hours);
+            const workedSeconds = timeToSeconds(task.total_hours_worked);
+            const extendedSeconds = timeToSeconds(task.extended_hours);
 
-          const remainingSeconds = estimatedSeconds - workedSeconds;
+            const remainingSeconds = estimatedSeconds - workedSeconds;
 
-          const workedPercentage = estimatedSeconds
-            ? Math.round((workedSeconds / estimatedSeconds) * 100 * 100) / 100
-            : 0;
+            const workedPercentage = estimatedSeconds
+              ? Math.round((workedSeconds / estimatedSeconds) * 100 * 100) / 100
+              : 0;
 
-          const remainingPercentage = estimatedSeconds
-            ? Math.round(
-                (Math.max(0, remainingSeconds) / estimatedSeconds) * 100 * 100
-              ) / 100
-            : 0;
+            const remainingPercentage = estimatedSeconds
+              ? Math.round(
+                  (Math.max(0, remainingSeconds) / estimatedSeconds) * 100 * 100
+                ) / 100
+              : 0;
 
-          const remainingHours =
-            extendedSeconds > estimatedSeconds
-              ? "00:00"
-              : new Date(Math.max(0, remainingSeconds) * 1000)
-                  .toISOString()
-                  .slice(11, 16);
+            const remainingHours =
+              extendedSeconds > estimatedSeconds
+                ? "00:00"
+                : new Date(Math.max(0, remainingSeconds) * 1000)
+                    .toISOString()
+                    .slice(11, 16);
 
-          pendingTaskResult.push({
-            project_name: task.project_name || "N/A",
-            task_name: task.task_name,
-            remaining_hours: remainingHours,
-            worked_percentage: workedPercentage,
-            remaining_percentage: remainingPercentage,
-            type: "task",
-          });
+            pendingTaskResult.push({
+              project_name: task.project_name || "N/A",
+              task_name: task.task_name,
+              remaining_hours: remainingHours,
+              worked_percentage: workedPercentage,
+              remaining_percentage: remainingPercentage,
+              type: "task",
+            });
+          }
         }
 
         return pendingTaskResult;
@@ -150,6 +160,8 @@ exports.fetchPendingTask = async (req, res) => {
     );
   }
 };
+
+
 exports.fetchDailybreakdown = async (req, res) => {
   try {
     const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
