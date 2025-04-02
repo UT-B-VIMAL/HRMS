@@ -382,13 +382,14 @@ exports.getTask = async (queryParams, res) => {
           shortName: history.short_name,
           // time: timeago.format(history.updated_at),
           time:  moment(history.updated_at).tz('Asia/Kolkata').fromNow(),
+          time_1:  moment(history.updated_at),
           
         }))
       )
       : [];
 
       historiesData.forEach(history => {
-        console.log("Time:", history.time);
+        console.log("Time:", history.time_1);
       });
 
     const commentsData =
