@@ -12,7 +12,7 @@ const getPagination  = require("../../helpers/pagination");
 // phase 2
 
 exports.getAnnualRatings = async (queryParamsval, res) => {
-  const { search, year, page = 1, perPage = 10 ,user_id} = queryParamsval;
+  const { search, year, page = 1, perPage = 10 ,user_id, team_id} = queryParamsval;
   const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
 
   // Define all 12 months
@@ -33,6 +33,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       users.id AS user_id,
       users.first_name AS employee_name,
       users.employee_id,
+      users.team_id,
       teams.name AS team_name,
       ${monthColumns}, 
       CASE 
@@ -81,6 +82,10 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
     `;
     queryParams.push(searchWildcard, searchWildcard, searchWildcard);
   }
+  if (team_id) {
+    query += ' AND users.team_id = ?';
+    queryParams.push(team_id);
+  }
 
   // Query for counting total records (without pagination)
   let countQuery = `
@@ -121,7 +126,10 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
     `;
     countQueryParams.push(searchWildcard, searchWildcard, searchWildcard);
   }
-
+  if(team_id) {
+    countQuery += ' AND users.team_id = ?';
+    countQueryParams.push(team_id);
+  }
   // Add pagination to the main query
   query += ` 
     GROUP BY users.id, users.first_name, users.employee_id, teams.name
