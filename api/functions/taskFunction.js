@@ -1,4 +1,5 @@
 const db = require("../../config/db");
+const timeago = require("timeago.js");
 const mysql = require("mysql2");
 const {
   successResponse, errorResponse, getPagination, calculateNewWorkedTime, convertSecondsToHHMMSS, convertToSeconds, calculateRemainingHours, calculatePercentage
@@ -378,7 +379,7 @@ exports.getTask = async (queryParams, res) => {
           description: history.status_description || "Changed the status",
           updated_by: history.updated_by,
           shortName: history.short_name,
-          time: moment(history.updated_at).fromNow(),
+          time: timeago.format(history.updated_at),
         }))
       )
       : [];
@@ -391,7 +392,7 @@ exports.getTask = async (queryParams, res) => {
           comments: comment.comments,
           updated_by: comment.updated_by || "",
           shortName: comment.updated_by.substr(0, 2),
-          time: moment(comment.updated_at).fromNow(),
+          time: timeago.format(comment.updated_at),
         }))
         : [];
 
