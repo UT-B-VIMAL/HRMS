@@ -191,26 +191,32 @@ exports.fetchDailybreakdown = async (req, res) => {
 
     // Process the results
     const dailyBreakdown = rows.map((record) => {
-      const startTime = new Date(record.start_time);
-      const endTime = record.end_time ? new Date(record.end_time) : null;
+      const startTimeUTC = new Date(record.start_time);
+      const endTimeUTC = record.end_time ? new Date(record.end_time) : null;
 
-      // Format times as h:i A
-      const formattedStartTime = startTime.toLocaleTimeString("en-US", {
+      // Convert to IST (UTC+5:30)
+      const startTimeIST = new Date(startTimeUTC.getTime() + 5.5 * 60 * 60 * 1000);
+      const endTimeIST = endTimeUTC ? new Date(endTimeUTC.getTime() + 5.5 * 60 * 60 * 1000) : null;
+
+      // Format times as h:i A (12-hour format)
+      const formattedStartTime = startTimeIST.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: true,
+        timeZone: "Asia/Kolkata",
       });
 
-      const formattedEndTime = endTime
-        ? endTime.toLocaleTimeString("en-US", {
+      const formattedEndTime = endTimeIST
+        ? endTimeIST.toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
+            timeZone: "Asia/Kolkata",
           })
         : "-";
 
       // Calculate the duration and format as HH:MM:SS
-      const durationInSeconds = Math.max((endTime - startTime) / 1000, 0);
+      const durationInSeconds = Math.max((endTimeIST - startTimeIST) / 1000, 0);
       totalDurationInSeconds += durationInSeconds;
 
       const hours = Math.floor(durationInSeconds / 3600);
@@ -273,6 +279,7 @@ exports.fetchDailybreakdown = async (req, res) => {
     );
   }
 };
+
 
 exports.fetchStatistics = async (req, res) => {
   try {
