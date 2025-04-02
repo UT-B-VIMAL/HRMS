@@ -1,11 +1,12 @@
 const db = require("../../config/db");
-const timeago = require("timeago.js");
+const moment = require('moment-timezone');
+
 const mysql = require("mysql2");
 const {
   successResponse, errorResponse, getPagination, calculateNewWorkedTime, convertSecondsToHHMMSS, convertToSeconds, calculateRemainingHours, calculatePercentage
 } = require("../../helpers/responseHelper");
 const { getAuthUserDetails, processStatusData, formatTimeDHMS, getISTTime } = require("../../api/functions/commonFunction");
-const moment = require("moment");
+// const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
 const { Parser } = require('json2csv');
 const { userSockets } = require('../../helpers/notificationHelper');
@@ -379,11 +380,16 @@ exports.getTask = async (queryParams, res) => {
           description: history.status_description || "Changed the status",
           updated_by: history.updated_by,
           shortName: history.short_name,
-          time: timeago.format(history.updated_at),
+          // time: timeago.format(history.updated_at),
+          time:  moment(history.updated_at).tz('Asia/Kolkata').fromNow(),
+          
         }))
       )
       : [];
 
+      historiesData.forEach(history => {
+        console.log("Time:", history.time);
+      });
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
@@ -392,7 +398,9 @@ exports.getTask = async (queryParams, res) => {
           comments: comment.comments,
           updated_by: comment.updated_by || "",
           shortName: comment.updated_by.substr(0, 2),
-          time: timeago.format(comment.updated_at),
+          // time: timeago.format(comment.updated_at),
+          time:  moment(comment.updated_at).tz('Asia/Kolkata').fromNow(),
+          
         }))
         : [];
 
