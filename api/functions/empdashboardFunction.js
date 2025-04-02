@@ -203,7 +203,6 @@ exports.fetchDailybreakdown = async (req, res) => {
         hour: "2-digit",
         minute: "2-digit",
         hour12: true,
-        timeZone: "Asia/Kolkata",
       });
 
       const formattedEndTime = endTimeIST
@@ -211,7 +210,6 @@ exports.fetchDailybreakdown = async (req, res) => {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
-            timeZone: "Asia/Kolkata",
           })
         : "-";
 
