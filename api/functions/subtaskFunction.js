@@ -172,8 +172,9 @@ ORDER BY h.id DESC;
             description: history.status_description || "N/A",
             updated_by: history.updated_by || "Unknown User",
             shortName: history.short_name,
-            time:  moment(history.updated_at).tz('Asia/Kolkata').fromNow(),
-            // time: moment(history.updated_at).fromNow(),
+            time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
+            time_utc: history.updated_at, 
+            time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(),
           }))
         )
       : [];
@@ -184,9 +185,9 @@ ORDER BY h.id DESC;
       comments: comment.comments || "No Comment",
       updated_by: comment.updated_by || "Unknown User",
       shortName:comment. updated_by.substr(0, 2),
-      time:  moment(comment.updated_at).tz('Asia/Kolkata').fromNow(),
-
-      // time: moment(comment.updated_at).fromNow(),
+      time_date: moment.utc(comment.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
+      time_utc: comment.updated_at, 
+      time: moment.utc(comment.updated_at).tz('Asia/Kolkata').fromNow(), 
     }));
 
 

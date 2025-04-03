@@ -380,9 +380,9 @@ exports.getTask = async (queryParams, res) => {
               description: history.status_description || "Changed the status",
               updated_by: history.updated_by,
               shortName: history.short_name,
-              time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), // Show IST time
-              time_utc: history.updated_at, // Original UTC timestamp
-              time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(), // Show relative time in IST
+              time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
+              time_utc: history.updated_at, 
+              time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(), 
             }))
           )
         : [];
@@ -395,8 +395,9 @@ exports.getTask = async (queryParams, res) => {
           comments: comment.comments,
           updated_by: comment.updated_by || "",
           shortName: comment.updated_by.substr(0, 2),
-          // time: timeago.format(comment.updated_at),
-          time:  moment(comment.updated_at).tz('Asia/Kolkata').fromNow(),
+          time_date: moment.utc(comment.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
+          time_utc: comment.updated_at, 
+          time: moment.utc(comment.updated_at).tz('Asia/Kolkata').fromNow(), 
           
         }))
         : [];
