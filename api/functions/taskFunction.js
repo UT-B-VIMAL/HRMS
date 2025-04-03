@@ -1919,17 +1919,17 @@ exports.updateTaskTimeLine = async (req, res) => {
     if (action === "start") {
 
       await this.startTask(taskOrSubtask, type, id, res);
-      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
       const values = [old_data, "InProgress", taskId, subtaskId, "Changed Status", taskOrSubtask.user_id, 1, localISTTime, localISTTime];
       await db.query(query, values);
     } else if (action === "pause") {
       await this.pauseTask(taskOrSubtask, type, id, lastStartTime, timeline_id, res);
-      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?,NOW(), NOW())";
       const values = [old_data, "On Hold", taskId, subtaskId, "Changed Status", taskOrSubtask.user_id, 1, localISTTime, localISTTime];
       await db.query(query, values);
     } else if (action === "end") {
       await this.endTask(taskOrSubtask, type, id, lastStartTime, timeline_id, comment, res);
-      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      const query = "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
       const values = [old_data, "Pending Approval", taskId, subtaskId, "Changed Status", taskOrSubtask.user_id, 1, localISTTime, localISTTime];
       await db.query(query, values);
 
