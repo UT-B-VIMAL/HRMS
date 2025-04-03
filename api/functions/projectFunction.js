@@ -579,6 +579,7 @@ exports.projectStatus = async (req, res) => {
     const Subtasks = subtasks.map((subtask) => {
       const statusText = mapStatus(subtask.subtask_status);
       const isDone = statusText === "Done";
+      const isToDo = statusText === "To Do";
     
       return {
         type: "SubTask",
@@ -597,7 +598,7 @@ exports.projectStatus = async (req, res) => {
         rating: subtask.subtask_rating,
         team_id: subtask.team_id,
         team_name: subtask.team_name,
-        start_time: subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        start_time: isToDo ? "-" : subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
         end_time: isDone && subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
         subtask_duration: isDone ? formatDuration(subtask.start_time, subtask.end_time) : "-",
       };
@@ -607,6 +608,7 @@ exports.projectStatus = async (req, res) => {
     const Tasks = tasks.map((task) => {
       const statusText = mapStatus(task.task_status);
       const isDone = statusText === "Done";
+      const isToDo = statusText === "To Do";
     
       return {
         type: "Task",
@@ -623,7 +625,7 @@ exports.projectStatus = async (req, res) => {
         rating: task.rating,
         team_id: task.team_id,
         team_name: task.team_name,
-        start_time: task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        start_time: isToDo ? "-" : task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
         end_time: isDone && task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
         task_duration: isDone ? formatDuration(task.start_time, task.end_time) : "-",
       };
