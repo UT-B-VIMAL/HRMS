@@ -549,19 +549,16 @@ exports.projectStatus = async (req, res) => {
     // Then fetch subtasks
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
 
-    const mapStatus = (statusCode) => {
-      switch (statusCode) {
-        case 0:
-          return "To Do";
-        case 1:
-          return "In Progress";
-        case 3:
-          return "Done";
-        default:
-          return "Unknown";
+    const mapStatus = (status, reopenStatus = 0, activeStatus = 0) => {
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+        return "To Do";
+      } else if (status === 1 && activeStatus === 1) {
+        return "In Progress";
+      } else if (status === 3) {
+        return "Done";
       }
+      return "Unknown";
     };
-
     
     const formatDuration = (start, end) => {
       if (!start || !end) return "-"; 
@@ -575,51 +572,63 @@ exports.projectStatus = async (req, res) => {
     
       return duration.asMilliseconds() > 0
         ? `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
-        : "-"; // If negative or zero duration, return "-"
+        : "-"; 
     };
     
-    const Subtasks = subtasks.map((subtask) => ({
-      type: "SubTask",
-      status: mapStatus(subtask.subtask_status),
-      date: moment(subtask.date).format("YYYY-MM-DD"),
-      product_name: subtask.product_name,
-      project_name: subtask.project_name,
-      task_id: subtask.task_id,
-      task_name: subtask.task_name,
-      subtask_id: subtask.subtask_id,
-      subtask_name: subtask.subtask_name,
-      user_id: subtask.user_id,
-      assignee: subtask.assignee,
-      estimated_time: subtask.estimated_time,
-      time_taken: subtask.time_taken,
-      rating: subtask.subtask_rating,
-      team_id: subtask.team_id,
-      team_name: subtask.team_name,
-      start_time: subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-      end_time: subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-      subtask_duration: formatDuration(subtask.start_time, subtask.end_time),
-    }));
+    // Map Subtasks
+    const Subtasks = subtasks.map((subtask) => {
+      const statusText = mapStatus(subtask.subtask_status);
+      const isDone = statusText === "Done";
     
-    const Tasks = tasks.map((task) => ({
-      type: "Task",
-      status: mapStatus(task.task_status),
-      date: moment(task.date).format("YYYY-MM-DD"),
-      product_name: task.product_name,
-      project_name: task.project_name,
-      task_id: task.task_id,
-      task_name: task.task_name,
-      subtask_name: null,
-      user_id: task.user_id,
-      assignee: task.assignee,
-      estimated_time: task.estimated_time,
-      rating: task.rating,
-      team_id: task.team_id,
-      team_name: task.team_name,
-      start_time: task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-      end_time: task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-      
-      task_duration: formatDuration(task.start_time, task.end_time),
-    }));
+      return {
+        type: "SubTask",
+        status: statusText,
+        date: moment(subtask.date).format("YYYY-MM-DD"),
+        product_name: subtask.product_name,
+        project_name: subtask.project_name,
+        task_id: subtask.task_id,
+        task_name: subtask.task_name,
+        subtask_id: subtask.subtask_id,
+        subtask_name: subtask.subtask_name,
+        user_id: subtask.user_id,
+        assignee: subtask.assignee,
+        estimated_time: subtask.estimated_time,
+        time_taken: subtask.time_taken,
+        rating: subtask.subtask_rating,
+        team_id: subtask.team_id,
+        team_name: subtask.team_name,
+        start_time: subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        end_time: isDone && subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        subtask_duration: isDone ? formatDuration(subtask.start_time, subtask.end_time) : "-",
+      };
+    });
+    
+    // Map Tasks
+    const Tasks = tasks.map((task) => {
+      const statusText = mapStatus(task.task_status);
+      const isDone = statusText === "Done";
+    
+      return {
+        type: "Task",
+        status: statusText,
+        date: moment(task.date).format("YYYY-MM-DD"),
+        product_name: task.product_name,
+        project_name: task.project_name,
+        task_id: task.task_id,
+        task_name: task.task_name,
+        subtask_name: null,
+        user_id: task.user_id,
+        assignee: task.assignee,
+        estimated_time: task.estimated_time,
+        rating: task.rating,
+        team_id: task.team_id,
+        team_name: task.team_name,
+        start_time: task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        end_time: isDone && task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        task_duration: isDone ? formatDuration(task.start_time, task.end_time) : "-",
+      };
+    });
+    
     
 
     const groupedTasks = [...Subtasks, ...Tasks];
