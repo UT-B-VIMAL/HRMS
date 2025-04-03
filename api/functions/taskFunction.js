@@ -210,6 +210,8 @@ exports.getTask = async (queryParams, res) => {
       return errorResponse(res, "User not found", "Invalid user ID", 404);
     }
 
+
+
     // Base Task Query
     let taskQuery = `
       SELECT 
@@ -269,8 +271,11 @@ exports.getTask = async (queryParams, res) => {
 
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
+
+
+
     const historiesQuery = `
-      SELECT h.*,
+      SELECT h.*, 
         COALESCE(
           CASE 
             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
@@ -371,29 +376,34 @@ exports.getTask = async (queryParams, res) => {
           status_text: statusMap[subtask.status] || "Unknown",
         }))
         : [];
-
-        const historiesData = Array.isArray(histories) && histories[0].length > 0
-        ? await Promise.all(
-            histories[0].map(async (history) => {
-              const istTime = moment.utc(history.updated_at).tz('Asia/Kolkata');
-      
-              return {
-                old_data: history.old_data,
-                new_data: history.new_data,
-                description: history.status_description || "Changed the status",
-                updated_by: history.updated_by,
-                shortName: history.short_name,
-                time: istTime.fromNow(),  
-                time_date: istTime.format('YYYY-MM-DD HH:mm:ss'), 
-              };
-            })
-          )
-        : [];
       
 
-      historiesData.forEach(history => {
-        console.log("Time:", history.time);
-      });
+        
+            const query = `SELECT * FROM task_histories WHERE id = 580`;
+            const history = await db.query(query); // Use parameterized query
+        
+            console.log("History Data:", history);
+       
+        
+
+    const historiesData = Array.isArray(histories) && histories[0].length > 0
+      ? await Promise.all(
+        histories[0].map(async (history) => ({
+          old_data: history.old_data,
+          new_data: history.new_data,
+          description: history.status_description || "Changed the status",
+          updated_by: history.updated_by,
+          shortName: history.short_name,
+          time: moment(history.updated_at).tz('Asia/Kolkata').fromNow(),
+          time_1:  history.updated_at,
+          time_2:  moment(history.updated_at).fromNow(),
+        }))
+      )
+      : [];
+
+      // historiesData.forEach(history => {
+      //   console.log("Time:", history.time_1);
+      // });
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
@@ -402,8 +412,8 @@ exports.getTask = async (queryParams, res) => {
           comments: comment.comments,
           updated_by: comment.updated_by || "",
           shortName: comment.updated_by.substr(0, 2),
-          time:  moment(comment.updated_at).fromNow(),
-          time_date:  comment.updated_at,
+          // time: timeago.format(comment.updated_at),
+          time:  moment(comment.updated_at).tz('Asia/Kolkata').fromNow(),
           
         }))
         : [];
@@ -415,6 +425,8 @@ exports.getTask = async (queryParams, res) => {
       histories: historiesData,
       comments: commentsData,
     };
+
+
 
     return successResponse(
       res,

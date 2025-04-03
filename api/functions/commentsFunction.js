@@ -100,14 +100,15 @@ exports.addComments = async (payload, res) => {
         return errorResponse(res, null, 'Comment not found or has been deleted', 404);
       }
       const { old_comments, task_id, subtask_id } = existingComment[0];
-      const getISTTime = () => {
-        const now = new Date();
-        const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-        const istTime = new Date(now.getTime() + istOffset);
-        return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
-    };
+
+    //   const getISTTime = () => {
+    //     const now = new Date();
+    //     const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+    //     const istTime = new Date(now.getTime() + istOffset);
+    //     return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
+    // };
     
-    const localISTTime = getISTTime();
+    // const localISTTime = getISTTime();
         
        const query = `
         UPDATE task_comments
@@ -136,8 +137,8 @@ exports.addComments = async (payload, res) => {
         'Comment Updated',
         updated_by,
         12,
-        localISTTime,
-        localISTTime // Default flag for updated comments
+        now(),
+        now()
       ];
   
       const [historyResult] = await db.query(historyQuery, historyValues);
