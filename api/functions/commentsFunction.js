@@ -45,7 +45,7 @@ exports.addComments = async (payload, res) => {
       // Insert the new comment
       const insertCommentQuery = `
         INSERT INTO task_comments (task_id, subtask_id, user_id, comments, updated_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, NOW(), NOW())
       `;
       const commentValues = [task_id, validSubtaskId, user_id, comments, updated_by,localISTTime,localISTTime];
   
@@ -111,7 +111,7 @@ exports.addComments = async (payload, res) => {
         
        const query = `
         UPDATE task_comments
-        SET  comments = ?, updated_by = ?, updated_at = ?
+        SET  comments = ?, updated_by = ?, updated_at = NOW()
         WHERE id = ? AND deleted_at IS NULL
       `;
       const values = [comments, updated_by, localISTTime, id];
@@ -209,7 +209,7 @@ exports.addComments = async (payload, res) => {
         INSERT INTO task_histories (
           old_data, new_data, task_id, subtask_id, text,
           updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
       `;
       const historyValues = [
         null,
