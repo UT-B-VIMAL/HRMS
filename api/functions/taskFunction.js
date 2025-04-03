@@ -372,23 +372,27 @@ exports.getTask = async (queryParams, res) => {
         }))
         : [];
 
-    const historiesData = Array.isArray(histories) && histories[0].length > 0
-      ? await Promise.all(
-        histories[0].map(async (history) => ({
-          old_data: history.old_data,
-          new_data: history.new_data,
-          description: history.status_description || "Changed the status",
-          updated_by: history.updated_by,
-          shortName: history.short_name,
-          time:  moment(history.updated_at).fromNow(),
-          time_date:  history.updated_at,
-
-        }))
-      )
-      : [];
+        const historiesData = Array.isArray(histories) && histories[0].length > 0
+        ? await Promise.all(
+            histories[0].map(async (history) => {
+              const istTime = moment.utc(history.updated_at).tz('Asia/Kolkata');
+      
+              return {
+                old_data: history.old_data,
+                new_data: history.new_data,
+                description: history.status_description || "Changed the status",
+                updated_by: history.updated_by,
+                shortName: history.short_name,
+                time: istTime.fromNow(),  
+                time_date: istTime.format('YYYY-MM-DD HH:mm:ss'), 
+              };
+            })
+          )
+        : [];
+      
 
       historiesData.forEach(history => {
-        console.log("Time:", history.time_1);
+        console.log("Time:", history.time);
       });
 
     const commentsData =
