@@ -237,10 +237,7 @@ exports.getTask = async (queryParams, res) => {
     if (userDetails.role_id === 3) {
       taskQuery += ` AND t.team_id = ?`;
       taskParams.push(userDetails.team_id);
-    } else if (userDetails.role_id === 4) {
-      taskQuery += ` AND (t.user_id = ? OR t.assigned_user_id = ?)`;
-      taskParams.push(user_id, user_id);
-    }
+    } 
 
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
@@ -263,8 +260,8 @@ exports.getTask = async (queryParams, res) => {
       subtaskQuery += ` AND st.team_id = ?`;
       subtaskParams.push(userDetails.team_id);
     } else if (userDetails.role_id === 4) {
-      subtaskQuery += ` AND (st.user_id = ? OR st.assigned_user_id = ?)`;
-      subtaskParams.push(user_id, user_id);
+      subtaskQuery += ` AND (st.user_id = ?)`;
+      subtaskParams.push(user_id);
     }
 
     const subtasks = await db.query(subtaskQuery, subtaskParams);
