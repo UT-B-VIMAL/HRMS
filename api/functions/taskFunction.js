@@ -1,6 +1,6 @@
 const db = require("../../config/db");
 const moment = require('moment-timezone');
-
+const timeago = require("timeago.js");
 const mysql = require("mysql2");
 const {
   successResponse, errorResponse, getPagination, calculateNewWorkedTime, convertSecondsToHHMMSS, convertToSeconds, calculateRemainingHours, calculatePercentage
@@ -270,7 +270,7 @@ exports.getTask = async (queryParams, res) => {
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
     const historiesQuery = `
-      SELECT h.*, 
+      SELECT h.*,  CONVERT_TZ( h.updated_at, '+00:00', 'Asia/Kolkata') AS updated_at,
         COALESCE(
           CASE 
             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
@@ -380,10 +380,9 @@ exports.getTask = async (queryParams, res) => {
           description: history.status_description || "Changed the status",
           updated_by: history.updated_by,
           shortName: history.short_name,
-          // time: timeago.format(history.updated_at),
-          time:  moment(history.updated_at).tz('Asia/Kolkata').fromNow(),
-          time_1: history.updated_at,
-          
+          time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(),
+          time_1:  history.updated_at,
+          time_2:  moment(history.updated_at).fromNow(),
         }))
       )
       : [];
@@ -1025,9 +1024,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    if (updateFields.length === 0) {
-      return errorResponse(res, null, "No fields to update", 400);
-    }
+    // if (updateFields.length === 0) {
+    //   return errorResponse(res, null, "No fields to update", 400);
+    // }
     const localISTTime = getISTTime(); // Assuming this function returns the IST time
     updateFields.push(`updated_at = ?`);
     updateValues.push(localISTTime);
