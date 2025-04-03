@@ -270,7 +270,7 @@ exports.getTask = async (queryParams, res) => {
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
     const historiesQuery = `
-      SELECT h.*,  CONVERT_TZ( h.updated_at, '+00:00', 'Asia/Kolkata') AS updated_at,
+      SELECT h.*, 
         COALESCE(
           CASE 
             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
@@ -372,24 +372,21 @@ exports.getTask = async (queryParams, res) => {
         }))
         : [];
 
-    const historiesData = Array.isArray(histories) && histories[0].length > 0
-      ? await Promise.all(
-        histories[0].map(async (history) => ({
-          old_data: history.old_data,
-          new_data: history.new_data,
-          description: history.status_description || "Changed the status",
-          updated_by: history.updated_by,
-          shortName: history.short_name,
-          time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(),
-          time_1:  history.updated_at,
-          time_2:  moment(history.updated_at).fromNow(),
-        }))
-      )
-      : [];
-
-      // historiesData.forEach(history => {
-      //   console.log("Time:", history.time_1);
-      // });
+        const historiesData = Array.isArray(histories) && histories[0].length > 0
+        ? await Promise.all(
+            histories[0].map(async (history) => ({
+              old_data: history.old_data,
+              new_data: history.new_data,
+              description: history.status_description || "Changed the status",
+              updated_by: history.updated_by,
+              shortName: history.short_name,
+              time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), // Show IST time
+              time_utc: history.updated_at, // Original UTC timestamp
+              time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(), // Show relative time in IST
+            }))
+          )
+        : [];
+      
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0

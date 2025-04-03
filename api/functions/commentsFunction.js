@@ -59,7 +59,7 @@ exports.addComments = async (payload, res) => {
         INSERT INTO task_histories (
           old_data, new_data, task_id, subtask_id, text,
           updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(),  NULL)
       `;
       const historyValues = [
         null,
