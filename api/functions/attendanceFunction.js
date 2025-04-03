@@ -292,7 +292,7 @@ exports.updateAttendanceAndNotify = async (req, res) => {
           [pmUser.id, notificationPayload.title, notificationPayload.body, 0]
         );
       });
-    } else if (role_id === 2) {
+    } else if (role_id === 2 || role_id === 1) {
       // Send notification to all Admins
 
       const userQuery = `
