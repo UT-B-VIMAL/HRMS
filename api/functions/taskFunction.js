@@ -210,8 +210,6 @@ exports.getTask = async (queryParams, res) => {
       return errorResponse(res, "User not found", "Invalid user ID", 404);
     }
 
-
-
     // Base Task Query
     let taskQuery = `
       SELECT 
@@ -271,11 +269,8 @@ exports.getTask = async (queryParams, res) => {
 
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
-
-
-
     const historiesQuery = `
-      SELECT h.*, 
+      SELECT h.*,  CONVERT_TZ( h.updated_at, '+00:00', 'Asia/Kolkata') AS updated_at,
         COALESCE(
           CASE 
             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
@@ -376,15 +371,6 @@ exports.getTask = async (queryParams, res) => {
           status_text: statusMap[subtask.status] || "Unknown",
         }))
         : [];
-      
-
-        
-            const query = `SELECT * FROM task_histories WHERE id = 580`;
-            const history = await db.query(query); // Use parameterized query
-        
-            console.log("History Data:", history);
-       
-        
 
     const historiesData = Array.isArray(histories) && histories[0].length > 0
       ? await Promise.all(
@@ -394,7 +380,7 @@ exports.getTask = async (queryParams, res) => {
           description: history.status_description || "Changed the status",
           updated_by: history.updated_by,
           shortName: history.short_name,
-          time: moment(history.updated_at).tz('Asia/Kolkata').fromNow(),
+          time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(),
           time_1:  history.updated_at,
           time_2:  moment(history.updated_at).fromNow(),
         }))
@@ -425,8 +411,6 @@ exports.getTask = async (queryParams, res) => {
       histories: historiesData,
       comments: commentsData,
     };
-
-
 
     return successResponse(
       res,

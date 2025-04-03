@@ -100,15 +100,14 @@ exports.addComments = async (payload, res) => {
         return errorResponse(res, null, 'Comment not found or has been deleted', 404);
       }
       const { old_comments, task_id, subtask_id } = existingComment[0];
-
-    //   const getISTTime = () => {
-    //     const now = new Date();
-    //     const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-    //     const istTime = new Date(now.getTime() + istOffset);
-    //     return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
-    // };
+      const getISTTime = () => {
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+        const istTime = new Date(now.getTime() + istOffset);
+        return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
+    };
     
-    // const localISTTime = getISTTime();
+    const localISTTime = getISTTime();
         
        const query = `
         UPDATE task_comments
@@ -127,7 +126,7 @@ exports.addComments = async (payload, res) => {
         INSERT INTO task_histories (
           old_data, new_data, task_id, subtask_id, text,
           updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
       `;
       const historyValues = [
         old_comments,
@@ -136,9 +135,7 @@ exports.addComments = async (payload, res) => {
         subtask_id,
         'Comment Updated',
         updated_by,
-        12,
-        now(),
-        now()
+        12
       ];
   
       const [historyResult] = await db.query(historyQuery, historyValues);
