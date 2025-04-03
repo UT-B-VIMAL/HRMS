@@ -1040,13 +1040,22 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
     // Insert task history entries into the task_histories table
     if (taskHistoryEntries.length > 0) {
+      // const historyQuery = `
+      //   INSERT INTO task_histories (
+      //     old_data, new_data, task_id, subtask_id, text,
+      //     updated_by, status_flag, created_at, updated_at, deleted_at
+      //   ) VALUES ?;
+      // `;
+      // await db.query(historyQuery, [taskHistoryEntries]);
       const historyQuery = `
-        INSERT INTO task_histories (
-          old_data, new_data, task_id, subtask_id, text,
-          updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES ?;
-      `;
-      await db.query(historyQuery, [taskHistoryEntries]);
+  INSERT INTO task_histories (
+    old_data, new_data, task_id, subtask_id, text,
+    updated_by, status_flag, created_at, updated_at, deleted_at
+  ) VALUES ${taskHistoryEntries.map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)").join(", ")}
+`;
+
+await db.query(historyQuery, taskHistoryEntries.flat());
+
     }
 
     if (currentTask.user_id) {
