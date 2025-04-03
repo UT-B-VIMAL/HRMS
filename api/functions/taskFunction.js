@@ -270,7 +270,7 @@ exports.getTask = async (queryParams, res) => {
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
     const historiesQuery = `
-      SELECT h.*,  CONVERT_TZ( h.updated_at, '+00:00', 'Asia/Kolkata') AS updated_at,
+      SELECT h.*,
         COALESCE(
           CASE 
             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
@@ -380,9 +380,9 @@ exports.getTask = async (queryParams, res) => {
           description: history.status_description || "Changed the status",
           updated_by: history.updated_by,
           shortName: history.short_name,
-          time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(),
-          time_1:  history.updated_at,
-          time_2:  moment(history.updated_at).fromNow(),
+          time:  moment(history.updated_at).fromNow(),
+          time_date:  history.updated_at,
+
         }))
       )
       : [];
@@ -398,8 +398,8 @@ exports.getTask = async (queryParams, res) => {
           comments: comment.comments,
           updated_by: comment.updated_by || "",
           shortName: comment.updated_by.substr(0, 2),
-          // time: timeago.format(comment.updated_at),
-          time:  moment(comment.updated_at).tz('Asia/Kolkata').fromNow(),
+          time:  moment(comment.updated_at).fromNow(),
+          time_date:  comment.updated_at,
           
         }))
         : [];
