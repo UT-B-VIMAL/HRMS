@@ -56,7 +56,7 @@ exports.get_idleEmployee = async (req, res) => {
             WHERE employee_leave.user_id = users.id
             AND DATE(employee_leave.date) = CURRENT_DATE
         )
-            AND users.role_id != 1 
+            AND users.role_id NOT IN (1, 2, 3)
     `;
 
     if (team_id) {
@@ -93,7 +93,8 @@ exports.get_idleEmployee = async (req, res) => {
             WHERE employee_leave.user_id = users.id
             AND DATE(employee_leave.date) = CURRENT_DATE
         )
-            AND users.role_id != 1 
+           AND users.role_id NOT IN (1, 2, 3)
+
     `;
 
     let countQueryParams = [];
