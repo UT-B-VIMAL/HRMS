@@ -999,7 +999,7 @@ LIMIT ?, ?;
       team_name: row.team_name,
       start_time: row.start_time ? moment(row.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
       end_time: row.end_time ? moment(row.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-      duration: row.start_time && row.end_time ? moment.utc(moment(row.end_time).diff(moment(row.start_time))).format("HH:mm:ss") : "-",
+      task_duration: row.start_time && row.end_time ? moment.utc(moment(row.end_time).diff(moment(row.start_time))).format("HH:mm:ss") : "-",
     }));
 
     const pagination = getPagination(page, perPage, totalRecords);
