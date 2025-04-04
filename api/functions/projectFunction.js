@@ -244,141 +244,287 @@ exports.getAllProjects = async (queryParams, res) => {
     );
   }
 };
+
+
 // exports.projectStatus = async (req, res) => {
 //   try {
 //     const {
 //       product_id,
 //       project_id,
 //       user_id,
+//       employee_id,
 //       date,
-//       status = 0,
+//       status,
 //       search,
+//       page = 1,
+//       perPage = 10,
 //     } = req.query;
 
-//     let query = `
-//         SELECT 
-//           t.id AS task_id,
-//           t.name AS task_name,
-//           t.estimated_hours AS task_estimated_hours,
-//           t.total_hours_worked AS task_total_hours_worked,
-//           t.updated_at AS task_updated_at,
-//           tsut.start_time AS task_start_time,
-//           tsut.end_time AS task_end_time,
-//           u.id AS user_id,
-//           u.first_name AS user_name,
-//           u.employee_id AS employee_id,
-//           p.id AS product_id,
-//           p.name AS product_name,
-//           pr.id AS project_id,
-//           pr.name AS project_name,
-//           st.id AS subtask_id,
-//           st.name AS subtask_name,
-//           st.estimated_hours AS subtask_estimated_hours,
-//           st.total_hours_worked AS subtask_total_hours_worked,
-//           st.updated_at AS subtask_updated_at,
-//           tsut_sub.start_time AS subtask_start_time,
-//           tsut_sub.end_time AS subtask_end_time,
-//           DATE(t.created_at) AS task_date,
-//           t.status AS task_status
-//         FROM 
-//           tasks t
-//         LEFT JOIN 
-//           users u ON u.id = t.user_id
-//         LEFT JOIN 
-//           products p ON p.id = t.product_id
-//         LEFT JOIN 
-//           projects pr ON pr.id = t.project_id
-//         LEFT JOIN 
-//           sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-//         LEFT JOIN 
-//           sub_tasks_user_timeline tsut ON tsut.task_id = t.id AND tsut.deleted_at IS NULL
-//         LEFT JOIN 
-//           sub_tasks_user_timeline tsut_sub ON tsut_sub.subtask_id = st.id AND tsut_sub.deleted_at IS NULL
-//         WHERE 
-//           t.deleted_at IS NULL
-//           ${product_id ? `AND (t.product_id = ? OR st.product_id = ?)` : ""}  
-//           ${project_id ? `AND (t.project_id = ? OR st.project_id = ?)` : ""}  
-//           ${user_id ? `AND t.user_id = ?` : ""}  
-//           ${date ? `AND DATE(t.created_at) = ?` : ""}
-//           ${status !== undefined ? `AND t.status = ?` : ""}  
-//           ${search ? `AND (t.name LIKE ? OR st.name LIKE ?)` : ""}  
-//       `;
+//     const offset = (page - 1) * perPage;
+//     const users = await getAuthUserDetails(user_id, res);
+//     if (!users) return;
 
-//     const values = [];
+//     const taskConditions = [];
+//     const taskValues = [];
+//     const subtaskConditions = [];
+//     const subtaskValues = [];
+
+//     if (users.role_id === 3) {
+//       taskConditions.push("tm.reporting_user_id = ?");
+//       taskValues.push(users.id);
+//       subtaskConditions.push("tm.reporting_user_id = ?");
+//       subtaskValues.push(users.id);
+//     }
+
 //     if (product_id) {
-//       values.push(product_id);
-//       values.push(product_id);
+//       taskConditions.push("t.product_id = ?");
+//       taskValues.push(product_id);
+//       subtaskConditions.push("st.product_id = ?");
+//       subtaskValues.push(product_id);
 //     }
 //     if (project_id) {
-//       values.push(project_id);
-//       values.push(project_id);
+//       taskConditions.push("t.project_id = ?");
+//       taskValues.push(project_id);
+//       subtaskConditions.push("st.project_id = ?");
+//       subtaskValues.push(project_id);
 //     }
-//     if (user_id) values.push(user_id);
-//     if (date) values.push(date);
-//     if (status !== undefined) values.push(status);
+//     if (employee_id) {
+//       taskConditions.push("t.user_id = ?");
+//       taskValues.push(employee_id);
+//       subtaskConditions.push("st.user_id = ?");
+//       subtaskValues.push(employee_id);
+//     }
+//     if (date) {
+//       taskConditions.push("DATE(t.created_at) = ?");
+//       taskValues.push(date);
+//       subtaskConditions.push("DATE(st.created_at) = ?");
+//       subtaskValues.push(date);
+//     }
+    
+//     if (status === '0') {
+//       taskConditions.push("t.status = 0");
+//       taskConditions.push("t.active_status = 0");
+//       taskConditions.push("t.reopen_status = 0");
+//       subtaskConditions.push("st.status = 0");
+//       subtaskConditions.push("st.active_status = 0");
+//       subtaskConditions.push("st.reopen_status = 0");
+//     } else if (status === '1') {
+//       taskConditions.push("t.status = 1");
+//       taskConditions.push("t.active_status = 1");
+//       taskConditions.push("t.reopen_status = 0");
+//       subtaskConditions.push("st.status = 1");
+//       subtaskConditions.push("st.active_status = 1");
+//       subtaskConditions.push("st.reopen_status = 0");
+//     } else if (status === '3') {
+//       taskConditions.push("t.status = 3");
+//       subtaskConditions.push("st.status = 3");
+//     }
 //     if (search) {
 //       const searchTerm = `%${search}%`;
-//       values.push(searchTerm);
-//       values.push(searchTerm);
+//       taskConditions.push(
+//         `(t.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR t.created_at LIKE ?)`
+//       );
+//       taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+
+//       subtaskConditions.push(
+//         `(st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR st.created_at LIKE ?)`
+//       );
+//       subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
 //     }
 
-//     const [result] = await db.execute(query, values);
+//     const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
+//     const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
 
-//     const data = result.map((row) => {
-//       const taskStartTime = row.task_start_time
-//         ? moment(row.task_start_time).format("YYYY-MM-DD HH:mm:ss")
-//         : "Not started";
-//       const taskEndTime = row.task_end_time
-//         ? moment(row.task_end_time).format("YYYY-MM-DD HH:mm:ss")
-//         : "Not completed";
+//     const tasksQuery = `
+//       SELECT 
+//         t.id AS task_id,
+//         t.name AS task_name,
+//         t.estimated_hours AS estimated_time,
+//         t.total_hours_worked AS task_duration,
+//         CONVERT_TZ(stut.start_time, '+00:00', 'Asia/Kolkata') AS start_time,  
+//         CONVERT_TZ(stut.end_time, '+00:00', 'Asia/Kolkata') AS end_time,
+//         t.rating AS rating,
+//         p.id AS product_id,
+//         p.name AS product_name,
+//         pr.id AS project_id,
+//         pr.name AS project_name,
+//         tm.id AS team_id,
+//         tm.name AS team_name,
+//         u.id AS user_id,
+//         t.status AS task_status,
+//         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+//         DATE(t.created_at) AS date
+//       FROM tasks t
+//       LEFT JOIN 
+//         users u ON u.id = t.user_id
+//       LEFT JOIN products p ON p.id = t.product_id
+//       LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id 
+//       LEFT JOIN projects pr ON pr.id = t.project_id
+//       LEFT JOIN teams tm ON tm.id = t.team_id
+//       WHERE t.deleted_at IS NULL
+//       AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
+//       ${taskWhereClause}
+//       GROUP BY 
+//         t.id
+//     `;
 
-//       const subtaskStartTime = row.subtask_start_time
-//         ? moment(row.subtask_start_time).format("YYYY-MM-DD HH:mm:ss")
-//         : "Not started";
-//       const subtaskEndTime = row.subtask_end_time
-//         ? moment(row.subtask_end_time).format("YYYY-MM-DD HH:mm:ss")
-//         : "Not completed";
+//     const subtasksQuery = `
+//       SELECT 
+//         p.name AS product_name,
+//         pr.name AS project_name,
+//         t.name AS task_name,
+//         st.name AS subtask_name,
+//         DATE(st.created_at) AS date, 
+//         st.total_hours_worked AS subtask_duration,
+//         CONVERT_TZ(stut.start_time, '+00:00', 'Asia/Kolkata') AS start_time, 
+//         CONVERT_TZ(stut.end_time, '+00:00', 'Asia/Kolkata') AS end_time,
+//         st.estimated_hours AS estimated_time,
+//         st.total_hours_worked AS time_taken,
+//         st.rating AS subtask_rating,
+//         tm.id AS team_id,
+//         tm.name AS team_name,
+//         t.id AS task_id,
+//         st.id AS subtask_id,
+//         u.id AS user_id,
+//         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+//         st.status AS subtask_status
+//       FROM 
+//         sub_tasks st
+//       LEFT JOIN 
+//         tasks t ON t.id = st.task_id
+//       LEFT JOIN 
+//         users u ON u.id = st.user_id
+//       LEFT JOIN 
+//         products p ON p.id = t.product_id
+//       LEFT JOIN 
+//         projects pr ON pr.id = t.project_id
+//       LEFT JOIN 
+//         sub_tasks_user_timeline stut ON stut.subtask_id = st.id 
+//       LEFT JOIN 
+//         teams tm ON tm.id = st.team_id
+//       WHERE 
+//         st.deleted_at IS NULL
+//         ${subtaskWhereClause}
+//      GROUP BY 
+//         st.id
+//     `;
 
+//     // First fetch tasks
+//     const [tasks] = await db.query(tasksQuery, taskValues);
+
+//     // Then fetch subtasks
+//     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+
+//     const mapStatus = (status, reopenStatus = 0, activeStatus = 0) => {
+//       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+//         return "To Do";
+//       } else if (status === 1 && activeStatus === 1) {
+//         return "In Progress";
+//       } else if (status === 3) {
+//         return "Done";
+//       }
+//       return "Unknown";
+//     };
+    
+//     const formatDuration = (start, end) => {
+//       if (!start || !end) return "-"; 
+    
+//       const startTime = moment(start, "HH:mm:ss");
+//       const endTime = moment(end, "HH:mm:ss");
+    
+//       if (!startTime.isValid() || !endTime.isValid()) return "-"; 
+    
+//       const duration = moment.duration(endTime.diff(startTime));
+    
+//       return duration.asMilliseconds() > 0
+//         ? `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
+//         : "-"; 
+//     };
+    
+//     // Map Subtasks
+//     const Subtasks = subtasks.map((subtask) => {
+//       const statusText = mapStatus(subtask.subtask_status);
+//       const isDone = statusText === "Done";
+//       const isToDo = statusText === "To Do";
+    
 //       return {
-//         task_name: row.task_name || row.subtask_name,
-//         task_start_time: taskStartTime,
-//         task_end_time: taskEndTime,
-//         subtask_start_time: subtaskStartTime,
-//         subtask_end_time: subtaskEndTime,
-//         estimated_time: row.task_estimated_hours || row.subtask_estimated_hours,
-//         task_duration: row.task_updated_at
-//           ? moment(row.task_updated_at).fromNow()
-//           : "Not started",
-//         user_id: row.user_id,
-//         employee_id: row.employee_id,
-//         assignee: row.user_name,
-//         product_id: row.product_id,
-//         product_name: row.product_name,
-//         project_id: row.project_id,
-//         project_name: row.project_name,
-//         task_date: moment(row.task_date).format("YYYY-MM-DD"),
-//         task_status:
-//           row.task_status === 0
-//             ? "TO DO"
-//             : row.task_status === 1
-//             ? "In Progress"
-//             : "Done",
+//         type: "SubTask",
+//         status: statusText,
+//         date: moment(subtask.date).format("YYYY-MM-DD"),
+//         product_name: subtask.product_name,
+//         project_name: subtask.project_name,
+//         task_id: subtask.task_id,
+//         task_name: subtask.task_name,
+//         subtask_id: subtask.subtask_id,
+//         subtask_name: subtask.subtask_name,
+//         user_id: subtask.user_id,
+//         assignee: subtask.assignee,
+//         estimated_time: subtask.estimated_time,
+//         time_taken: subtask.time_taken,
+//         rating: subtask.subtask_rating,
+//         team_id: subtask.team_id,
+//         team_name: subtask.team_name,
+//         start_time: isToDo ? "-" : subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+//         end_time: isDone && subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+//         subtask_duration: isDone ? formatDuration(subtask.start_time, subtask.end_time) : "-",
 //       };
 //     });
+    
+//     // Map Tasks
+//     const Tasks = tasks.map((task) => {
+//       const statusText = mapStatus(task.task_status);
+//       const isDone = statusText === "Done";
+//       const isToDo = statusText === "To Do";
+    
+//       return {
+//         type: "Task",
+//         status: statusText,
+//         date: moment(task.date).format("YYYY-MM-DD"),
+//         product_name: task.product_name,
+//         project_name: task.project_name,
+//         task_id: task.task_id,
+//         task_name: task.task_name,
+//         subtask_name: null,
+//         user_id: task.user_id,
+//         assignee: task.assignee,
+//         estimated_time: task.estimated_time,
+//         rating: task.rating,
+//         team_id: task.team_id,
+//         team_name: task.team_name,
+//         start_time: isToDo ? "-" : task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+//         end_time: isDone && task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+//         task_duration: isDone ? formatDuration(task.start_time, task.end_time) : "-",
+//       };
+//     });
+    
+    
 
-//     successResponse(
-//       res,
-//       data,
-//       data.length === 0
-//         ? "No tasks or subtasks found"
-//         : "Tasks and subtasks retrieved successfully",
-//       200
+//     const groupedTasks = [...Subtasks, ...Tasks];
+
+//     const totalRecords = groupedTasks.length;
+//     const paginatedData = groupedTasks.slice(offset, offset + parseInt(perPage));
+//     const pagination = getPagination(page, perPage, totalRecords);
+    
+//     const data = paginatedData.map((row, index) => ({
+//       s_no: offset + index + 1,
+//       ...row,
+//     }));
+    
+//     // Now wrap the tasks and pagination inside 'data'
+
+//       successResponse(
+//         res,
+//         data,
+//         data.length === 0 ? 'No data found' : 'Tasks and subtasks retrieved successfully',
+//         200,
+//         pagination
 //     );
 //   } catch (error) {
 //     console.error("Error fetching tasks and subtasks:", error);
 //     return errorResponse(res, error.message, "Server error", 500);
 //   }
 // };
+
 
 exports.projectStatus = async (req, res) => {
   try {
@@ -398,86 +544,70 @@ exports.projectStatus = async (req, res) => {
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
 
-    const taskConditions = [];
-    const taskValues = [];
-    const subtaskConditions = [];
-    const subtaskValues = [];
+    const conditions = [];
+    const values = [];
 
     if (users.role_id === 3) {
-      taskConditions.push("tm.reporting_user_id = ?");
-      taskValues.push(users.id);
-      subtaskConditions.push("tm.reporting_user_id = ?");
-      subtaskValues.push(users.id);
+      conditions.push("tm.reporting_user_id = ?");
+      values.push(users.id);
     }
-
     if (product_id) {
-      taskConditions.push("t.product_id = ?");
-      taskValues.push(product_id);
-      subtaskConditions.push("st.product_id = ?");
-      subtaskValues.push(product_id);
+      conditions.push("t.product_id = ? OR st.product_id = ?");
+      values.push(product_id, product_id);
     }
     if (project_id) {
-      taskConditions.push("t.project_id = ?");
-      taskValues.push(project_id);
-      subtaskConditions.push("st.project_id = ?");
-      subtaskValues.push(project_id);
+      conditions.push("t.project_id = ? OR st.project_id = ?");
+      values.push(project_id, project_id);
     }
     if (employee_id) {
-      taskConditions.push("t.user_id = ?");
-      taskValues.push(employee_id);
-      subtaskConditions.push("st.user_id = ?");
-      subtaskValues.push(employee_id);
+      conditions.push("t.user_id = ? OR st.user_id = ?");
+      values.push(employee_id, employee_id);
     }
     if (date) {
-      taskConditions.push("DATE(t.created_at) = ?");
-      taskValues.push(date);
-      subtaskConditions.push("DATE(st.created_at) = ?");
-      subtaskValues.push(date);
+      conditions.push("DATE(stut.start_time) = ?");
+      values.push(date);
     }
-    
+
     if (status === '0') {
-      taskConditions.push("t.status = 0");
-      taskConditions.push("t.active_status = 0");
-      taskConditions.push("t.reopen_status = 0");
-      subtaskConditions.push("st.status = 0");
-      subtaskConditions.push("st.active_status = 0");
-      subtaskConditions.push("st.reopen_status = 0");
+      conditions.push(`(
+        (stut.subtask_id IS NULL AND t.status = 0 AND t.active_status = 0 AND t.reopen_status = 0)
+        OR
+        (stut.subtask_id IS NOT NULL AND st.status = 0 AND st.active_status = 0 AND st.reopen_status = 0)
+      )`);
     } else if (status === '1') {
-      taskConditions.push("t.status = 1");
-      taskConditions.push("t.active_status = 1");
-      taskConditions.push("t.reopen_status = 0");
-      subtaskConditions.push("st.status = 1");
-      subtaskConditions.push("st.active_status = 1");
-      subtaskConditions.push("st.reopen_status = 0");
+      conditions.push(`(
+        (stut.subtask_id IS NULL AND t.status = 1 AND t.active_status = 1 AND t.reopen_status = 0)
+        OR
+        (stut.subtask_id IS NOT NULL AND st.status = 1 AND st.active_status = 1 AND st.reopen_status = 0)
+      )`);
     } else if (status === '3') {
-      taskConditions.push("t.status = 3");
-      subtaskConditions.push("st.status = 3");
+      conditions.push(`(
+        (stut.subtask_id IS NULL AND t.status = 3)
+        OR
+        (stut.subtask_id IS NOT NULL AND st.status = 3)
+      )`);
     }
+
     if (search) {
       const searchTerm = `%${search}%`;
-      taskConditions.push(
-        `(t.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR t.created_at LIKE ?)`
+      conditions.push(
+        "(COALESCE(st.name, t.name) LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR stut.start_time LIKE ? OR stut.end_time LIKE ? )"
       );
-      taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
-
-      subtaskConditions.push(
-        `(st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR st.created_at LIKE ?)`
-      );
-      subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      values.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
-    const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
+    const whereClause = conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
 
-    const tasksQuery = `
-      SELECT 
-        t.id AS task_id,
-        t.name AS task_name,
-        t.estimated_hours AS estimated_time,
-        t.total_hours_worked AS task_duration,
-        CONVERT_TZ(stut.start_time, '+00:00', 'Asia/Kolkata') AS start_time,  
+    const query = `
+      SELECT
+        COALESCE(st.id, t.id) AS id,
+        COALESCE(st.name, t.name) AS name,
+        COALESCE(st.estimated_hours, t.estimated_hours) AS estimated_time,
+        COALESCE(st.total_hours_worked, t.total_hours_worked) AS duration,
+        CONVERT_TZ(stut.start_time, '+00:00', 'Asia/Kolkata') AS start_time,
         CONVERT_TZ(stut.end_time, '+00:00', 'Asia/Kolkata') AS end_time,
-        t.rating AS rating,
+        COALESCE(st.rating, t.rating) AS rating,
+        stut.subtask_id,
         p.id AS product_id,
         p.name AS product_name,
         pr.id AS project_id,
@@ -485,180 +615,74 @@ exports.projectStatus = async (req, res) => {
         tm.id AS team_id,
         tm.name AS team_name,
         u.id AS user_id,
-        t.status AS task_status,
+        COALESCE(st.status, t.status) AS status,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-        DATE(t.created_at) AS date
-      FROM tasks t
-      LEFT JOIN 
-        users u ON u.id = t.user_id
-      LEFT JOIN products p ON p.id = t.product_id
-      LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id 
-      LEFT JOIN projects pr ON pr.id = t.project_id
-      LEFT JOIN teams tm ON tm.id = t.team_id
-      WHERE t.deleted_at IS NULL
-      AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
-      ${taskWhereClause}
-      GROUP BY 
-        t.id
+        DATE(stut.start_time) AS date,
+        CASE
+          WHEN st.id IS NOT NULL THEN 'SubTask'
+          ELSE 'Task'
+        END AS type
+      FROM sub_tasks_user_timeline stut
+      LEFT JOIN sub_tasks st ON st.id = stut.subtask_id
+      LEFT JOIN tasks t ON t.id = stut.task_id AND stut.subtask_id IS NULL
+      LEFT JOIN users u ON u.id = COALESCE(st.user_id, t.user_id)
+      LEFT JOIN products p ON p.id = COALESCE(st.product_id, t.product_id)
+      LEFT JOIN projects pr ON pr.id = COALESCE(st.project_id, t.project_id)
+      LEFT JOIN teams tm ON tm.id = COALESCE(st.team_id, t.team_id)
+      WHERE stut.start_time IS NOT NULL
+      ${whereClause}
+      GROUP BY COALESCE(st.id, t.id)
+      LIMIT ?, ?
     `;
 
-    const subtasksQuery = `
-      SELECT 
-        p.name AS product_name,
-        pr.name AS project_name,
-        t.name AS task_name,
-        st.name AS subtask_name,
-        DATE(st.created_at) AS date, 
-        st.total_hours_worked AS subtask_duration,
-        CONVERT_TZ(stut.start_time, '+00:00', 'Asia/Kolkata') AS start_time, 
-        CONVERT_TZ(stut.end_time, '+00:00', 'Asia/Kolkata') AS end_time,
-        st.estimated_hours AS estimated_time,
-        st.total_hours_worked AS time_taken,
-        st.rating AS subtask_rating,
-        tm.id AS team_id,
-        tm.name AS team_name,
-        t.id AS task_id,
-        st.id AS subtask_id,
-        u.id AS user_id,
-        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-        st.status AS subtask_status
-      FROM 
-        sub_tasks st
-      LEFT JOIN 
-        tasks t ON t.id = st.task_id
-      LEFT JOIN 
-        users u ON u.id = st.user_id
-      LEFT JOIN 
-        products p ON p.id = t.product_id
-      LEFT JOIN 
-        projects pr ON pr.id = t.project_id
-      LEFT JOIN 
-        sub_tasks_user_timeline stut ON stut.subtask_id = st.id 
-      LEFT JOIN 
-        teams tm ON tm.id = st.team_id
-      WHERE 
-        st.deleted_at IS NULL
-        ${subtaskWhereClause}
-     GROUP BY 
-        st.id
-    `;
+    values.push(offset, parseInt(perPage));
+    const [results] = await db.query(query, values);
 
-    // First fetch tasks
-    const [tasks] = await db.query(tasksQuery, taskValues);
-
-    // Then fetch subtasks
-    const [subtasks] = await db.query(subtasksQuery, subtaskValues);
-
-    const mapStatus = (status, reopenStatus = 0, activeStatus = 0) => {
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-        return "To Do";
-      } else if (status === 1 && activeStatus === 1) {
-        return "In Progress";
-      } else if (status === 3) {
-        return "Done";
-      }
-      return "Unknown";
+    const mapStatus = (status) => {
+      return status === 0 ? "To Do" : status === 1 ? "In Progress" : status === 3 ? "Done" : "Unknown";
     };
-    
+
     const formatDuration = (start, end) => {
-      if (!start || !end) return "-"; 
-    
-      const startTime = moment(start, "HH:mm:ss");
-      const endTime = moment(end, "HH:mm:ss");
-    
-      if (!startTime.isValid() || !endTime.isValid()) return "-"; 
-    
-      const duration = moment.duration(endTime.diff(startTime));
-    
-      return duration.asMilliseconds() > 0
-        ? `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`
-        : "-"; 
+      if (!start || !end) return "-";
+      const duration = moment.duration(moment(end, "HH:mm:ss").diff(moment(start, "HH:mm:ss")));
+      return duration.asMilliseconds() > 0 ? `${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s` : "-";
     };
-    
-    // Map Subtasks
-    const Subtasks = subtasks.map((subtask) => {
-      const statusText = mapStatus(subtask.subtask_status);
+
+    const formattedResults = results.map((row, index) => {
+      const statusText = mapStatus(row.status);
       const isDone = statusText === "Done";
       const isToDo = statusText === "To Do";
-    
       return {
-        type: "SubTask",
+        s_no: offset + index + 1,
+        type: row.subtask_id ? "SubTask" : "Task",
         status: statusText,
-        date: moment(subtask.date).format("YYYY-MM-DD"),
-        product_name: subtask.product_name,
-        project_name: subtask.project_name,
-        task_id: subtask.task_id,
-        task_name: subtask.task_name,
-        subtask_id: subtask.subtask_id,
-        subtask_name: subtask.subtask_name,
-        user_id: subtask.user_id,
-        assignee: subtask.assignee,
-        estimated_time: subtask.estimated_time,
-        time_taken: subtask.time_taken,
-        rating: subtask.subtask_rating,
-        team_id: subtask.team_id,
-        team_name: subtask.team_name,
-        start_time: isToDo ? "-" : subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-        end_time: isDone && subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-        subtask_duration: isDone ? formatDuration(subtask.start_time, subtask.end_time) : "-",
+        date: moment(row.date).format("YYYY-MM-DD"),
+        product_name: row.product_name,
+        project_name: row.project_name,
+        task_id: row.type === "Task" ? row.id : null,
+        task_name: row.type === "Task" ? row.name : null,
+        subtask_id: row.type === "SubTask" ? row.id : null,
+        subtask_name: row.type === "SubTask" ? row.name : null,
+        user_id: row.user_id,
+        assignee: row.assignee,
+        estimated_time: row.estimated_time,
+        rating: row.rating,
+        team_id: row.team_id,
+        team_name: row.team_name,
+        start_time: isToDo ? "-" : row.start_time ? moment(row.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        end_time: isDone && row.end_time ? moment(row.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+        duration: isDone ? formatDuration(row.start_time, row.end_time) : "-",
       };
     });
-    
-    // Map Tasks
-    const Tasks = tasks.map((task) => {
-      const statusText = mapStatus(task.task_status);
-      const isDone = statusText === "Done";
-      const isToDo = statusText === "To Do";
-    
-      return {
-        type: "Task",
-        status: statusText,
-        date: moment(task.date).format("YYYY-MM-DD"),
-        product_name: task.product_name,
-        project_name: task.project_name,
-        task_id: task.task_id,
-        task_name: task.task_name,
-        subtask_name: null,
-        user_id: task.user_id,
-        assignee: task.assignee,
-        estimated_time: task.estimated_time,
-        rating: task.rating,
-        team_id: task.team_id,
-        team_name: task.team_name,
-        start_time: isToDo ? "-" : task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-        end_time: isDone && task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
-        task_duration: isDone ? formatDuration(task.start_time, task.end_time) : "-",
-      };
-    });
-    
-    
 
-    const groupedTasks = [...Subtasks, ...Tasks];
-
-    const totalRecords = groupedTasks.length;
-    const paginatedData = groupedTasks.slice(offset, offset + parseInt(perPage));
+    const totalRecords = formattedResults.length;
     const pagination = getPagination(page, perPage, totalRecords);
-    
-    const data = paginatedData.map((row, index) => ({
-      s_no: offset + index + 1,
-      ...row,
-    }));
-    
-    // Now wrap the tasks and pagination inside 'data'
-
-      successResponse(
-        res,
-        data,
-        data.length === 0 ? 'No data found' : 'Tasks and subtasks retrieved successfully',
-        200,
-        pagination
-    );
+    successResponse(res, formattedResults, totalRecords === 0 ? "No data found" : "Data retrieved successfully", 200, pagination);
   } catch (error) {
     console.error("Error fetching tasks and subtasks:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
 
 
 
