@@ -144,11 +144,20 @@ exports.createOt = async (payload, res, req) => {
     }
     const { team_id, role_id } = userResult[0];
 
-    let tl_status = role_id == 2 ? 2 : 0;
+    let tl_status;
+    let statuss;
+
+    if (role_id == 2 || role_id == 3) {
+      tl_status = 2;
+      statuss = 2;
+    } else {
+      tl_status = 0;
+      statuss = 0;
+    }
 
     const insertQuery = `
       INSERT INTO ot_details (
-        user_id, product_id, project_id, task_id, team_id, comments, tl_status, date, time, created_by, updated_by, created_at, updated_at
+        user_id, product_id, project_id, task_id, team_id, comments, status, tl_status, date, time, created_by, updated_by, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
     const values = [
@@ -158,6 +167,7 @@ exports.createOt = async (payload, res, req) => {
       task_id,
       team_id,
       comments,
+      statuss,
       tl_status,
       date,
       payload.time,
