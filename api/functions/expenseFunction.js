@@ -745,17 +745,32 @@ exports.getAllpmemployeexpense = async (req, res) => {
       tlstatus: row.tl_status,
       pmstatus: row.pm_status,
     }));
+    const countZeroQuery = `
+    SELECT COUNT(*) AS count
+    FROM expense_details et
+    WHERE et.tl_status != 0
+      AND et.pm_status = 0
+      AND et.deleted_at IS NULL
+  `;
+  const [countResult] = await db.query(countZeroQuery);
+  const statusZeroCount = countResult[0]?.count || 0;
+
+    
 
     // Send success response
     successResponse(
       res,
-      formattedData,
+      {
+        data: formattedData,
+        pagination,
+        expensepm_status_zero_count: statusZeroCount,
+      },
       formattedData.length === 0
-        ? "No Expense details found"
+        ? "No expense details found"
         : "Expense details retrieved successfully",
-      200,
-      pagination
+      200
     );
+    
   } catch (error) {
     console.error("Error fetching Expense details:", error);
     return errorResponse(res, error.message, "Server error", 500);
@@ -1130,6 +1145,17 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       pmstatus: row.pm_status,
     }));
 
+    const countZeroQuery = `
+      SELECT COUNT(*) AS count
+      FROM expense_details et
+      WHERE et.status = 0
+        AND et.tl_status = 0
+        AND et.team_id IN (?)
+        AND et.deleted_at IS NULL
+    `;
+    const [countResult] = await db.query(countZeroQuery, [teamIds]);
+    const statusZeroCount = countResult[0]?.count || 0;
+
     // Response with data and pagination
     return successResponse(
       res,
@@ -1137,6 +1163,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         totalRecords,
         data: formattedData,
         pagination,
+        expensetl_status_zero_count: statusZeroCount,
       },
       formattedData.length === 0
         ? "No expense details found"
