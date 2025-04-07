@@ -75,16 +75,19 @@ exports.createexpense = async (req, res) => {
     }
     const { team_id, role_id } = userResult[0];
     let tl_status;
+    let statuss;
 
     if (role_id == 2 || role_id == 3) {
       tl_status = 2;
+      statuss = 2;
     } else {
       tl_status = 0;
+      statuss = 0;
     }
 
     const insertQuery = `
         INSERT INTO expense_details (
-          user_id, category, team_id, description, expense_amount, date, file, tl_status, created_by, updated_by, created_at, updated_at
+          user_id, category, team_id, description, expense_amount, date, file, status, tl_status, created_by, updated_by, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
     const values = [
@@ -95,6 +98,7 @@ exports.createexpense = async (req, res) => {
       amount,
       date,
       fileUrl,
+      statuss,
       tl_status,
       created_by,
       created_by,
