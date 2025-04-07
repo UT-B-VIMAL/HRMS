@@ -155,7 +155,8 @@ const getPendingTasksCount = async (userId) => {
        FROM sub_tasks 
        WHERE user_id = ? 
        AND (status = 0 OR status = 1) 
-       AND active_status = 0`, 
+       AND active_status = 0
+       AND deleted_at IS NULL`,
       [userId]
     );
 
@@ -170,7 +171,8 @@ const getPendingTasksCount = async (userId) => {
        FROM tasks 
        WHERE user_id = ? 
        AND (status = 0 OR status = 1) 
-       AND active_status = 0`, 
+       AND active_status = 0
+       AND deleted_at IS NULL`,
       [userId]
     );
 
