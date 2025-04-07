@@ -108,92 +108,100 @@ exports.getUser = async (id, res) => {
   }
 };
 
-// Get All Users
 exports.getAllUsers = async (req, res) => {
   try {
-      const { search = '', page = 1, perPage = 10 } = req.query;
-      const currentPage = parseInt(page, 10);
-      const perPageLimit = parseInt(perPage, 10);
-      const offset = (currentPage - 1) * perPageLimit;
+    const { search = '', page = 1, perPage = 10, team_id } = req.query;
+    const currentPage = parseInt(page, 10);
+    const perPageLimit = parseInt(perPage, 10);
+    const offset = (currentPage - 1) * perPageLimit;
 
-      let query = `
-          SELECT 
-              u.id, 
-              u.employee_id, 
-              u.first_name, u.last_name, 
-              u.role_id,
-              r.name AS role_name, 
-              u.designation_id, 
-              u.email,
-              u.team_id,
-              u.keycloak_id, 
-              t.name AS team_name
-          FROM users u
-          LEFT JOIN teams t ON t.id = u.team_id
-          LEFT JOIN roles r ON r.id = u.role_id
-          LEFT JOIN designations d ON d.id = u.designation_id
-          WHERE u.deleted_at IS NULL
-      `;
+    let query = `
+      SELECT 
+        u.id, 
+        u.employee_id, 
+        u.first_name, u.last_name, 
+        u.role_id,
+        r.name AS role_name, 
+        u.designation_id, 
+        u.email,
+        u.team_id,
+        u.keycloak_id, 
+        t.name AS team_name
+      FROM users u
+      LEFT JOIN teams t ON t.id = u.team_id
+      LEFT JOIN roles r ON r.id = u.role_id
+      LEFT JOIN designations d ON d.id = u.designation_id
+      WHERE u.deleted_at IS NULL
+    `;
 
-      let params = [];
-      let searchValue = `%${search}%`;
+    let params = [];
+    let searchValue = `%${search}%`;
 
-      if (search.trim() !== '') {
-          query += ` AND (
-              CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
-              u.first_name LIKE ? OR 
-              u.last_name LIKE ? OR 
-              u.email LIKE ? OR 
-              r.name LIKE ? OR 
-              u.designation_id LIKE ? OR 
-              u.employee_id LIKE ? OR 
-              t.name LIKE ?
-          )`;
+    if (search.trim() !== '') {
+      query += ` AND (
+        CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
+        u.first_name LIKE ? OR 
+        u.last_name LIKE ? OR 
+        u.email LIKE ? OR 
+        r.name LIKE ? OR 
+        u.designation_id LIKE ? OR 
+        u.employee_id LIKE ? OR 
+        t.name LIKE ?
+      )`;
+      params.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
+    }
 
-          params.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
-      }
+    if (team_id) {
+      query += ` AND u.team_id = ?`; 
+      params.push(team_id);
+    }
 
-      query += ` ORDER BY u.id DESC LIMIT ? OFFSET ?`;
-      params.push(perPageLimit, offset);
+    query += ` ORDER BY u.id DESC LIMIT ? OFFSET ?`;
+    params.push(perPageLimit, offset);
 
-      let countQuery = `
-          SELECT COUNT(*) AS total_records 
-          FROM users u
-          LEFT JOIN teams t ON t.id = u.team_id
-          LEFT JOIN roles r ON r.id = u.role_id
-          WHERE u.deleted_at IS NULL
-      `;
+    let countQuery = `
+      SELECT COUNT(*) AS total_records 
+      FROM users u
+      LEFT JOIN teams t ON t.id = u.team_id
+      LEFT JOIN roles r ON r.id = u.role_id
+      WHERE u.deleted_at IS NULL
+    `;
 
-      let countParams = [];
-      if (search.trim() !== '') {
-          countQuery += ` AND (
-              CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
-              u.first_name LIKE ? OR 
-              u.last_name LIKE ? OR 
-              u.email LIKE ? OR 
-              r.name LIKE ? OR 
-              u.designation_id LIKE ? OR 
-              t.name LIKE ?
-          )`;
-          countParams.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
-      }
+    let countParams = [];
+    if (search.trim() !== '') {
+      countQuery += ` AND (
+        CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
+        u.first_name LIKE ? OR 
+        u.last_name LIKE ? OR 
+        u.email LIKE ? OR 
+        r.name LIKE ? OR 
+        u.designation_id LIKE ? OR 
+        t.name LIKE ?
+      )`;
+      countParams.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
+    }
 
-      // Execute the queries
-      const [users] = await db.query(query, params);
-      const [countResult] = await db.query(countQuery, countParams);
+    if (team_id) {
+      countQuery += ` AND u.team_id = ?`; 
+      countParams.push(team_id);
+    }
 
-      const totalRecords = countResult[0].total_records;
-      const pagination = getPagination(currentPage, perPageLimit, totalRecords);
+    // Execute the queries
+    const [users] = await db.query(query, params);
+    const [countResult] = await db.query(countQuery, countParams);
 
-      const data = users.map((user, index) => ({
-          s_no: offset + index + 1,
-          ...user,
-      }));
+    const totalRecords = countResult[0].total_records;
+    const pagination = getPagination(currentPage, perPageLimit, totalRecords);
 
-      return successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
+    const data = users.map((user, index) => ({
+      s_no: offset + index + 1,
+      ...user,
+    }));
+
+    return successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
   } catch (error) {
-      console.error('Error retrieving users:', error.message);
-      return errorResponse(res, error.message, 'Error retrieving users', 500);
+    console.error('Error retrieving users:', error.message);
+    return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
 
