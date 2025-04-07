@@ -909,16 +909,27 @@ exports.getAllpmemployeeOts = async (req, res) => {
       details: group.details,
     }));
 
-    successResponse(
-      res,
-      formattedData,
-      formattedData.length === 0
-        ? "No OT details found"
-        : "OT details retrieved successfully",
-      200,
+    const countZeroQuery = `
+    SELECT COUNT(*) AS count
+    FROM ot_details ot
+    WHERE ot.tl_status != 0
+      AND ot.pm_status = 0
+      AND ot.deleted_at IS NULL
+  `;
+  const [countResult] = await db.query(countZeroQuery);
+  const statusZeroCount = countResult[0]?.count || 0;
+  successResponse(
+    res,
+    {
+      data: formattedData,
       pagination,
-      totalPendingCounts
-    );
+      otpm_status_zero_count: statusZeroCount,
+    },
+    formattedData.length === 0
+      ? "No OT details found"
+      : "OT details retrieved successfully",
+    200
+  );
   } catch (error) {
     console.error("Error fetching OT details:", error);
     return errorResponse(res, error.message, "Server error", 500);
@@ -1360,16 +1371,29 @@ exports.getAlltlemployeeOts = async (req, res) => {
       details: group.details,
     }));
 
+    const countZeroQuery = `
+      SELECT COUNT(*) AS count
+      FROM ot_details et
+      WHERE et.status = 0
+        AND et.tl_status = 0
+        AND et.team_id IN (?)
+        AND et.deleted_at IS NULL
+    `;
+    const [countResult] = await db.query(countZeroQuery, [teamIds]);
+    const statusZeroCount = countResult[0]?.count || 0;
+
     // Send success response with formatted data and pagination
     successResponse(
       res,
-      formattedData,
+      {
+        data: formattedData,
+        pagination,
+        ottl_status_zero_count: statusZeroCount, // Or totalPendingCounts if that's what you meant
+      },
       formattedData.length === 0
         ? "No OT details found"
         : "OT details retrieved successfully",
-      200,
-      pagination,
-      totalPendingCounts // Include the totalPendingCounts in the response
+      200
     );
   } catch (error) {
     console.error("Error fetching OT details:", error);
