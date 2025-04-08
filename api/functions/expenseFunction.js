@@ -88,7 +88,7 @@ exports.createexpense = async (req, res) => {
     const insertQuery = `
         INSERT INTO expense_details (
           user_id, category, team_id, description, expense_amount, date, file, status, tl_status, created_by, updated_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
     const values = [
       user_id,
