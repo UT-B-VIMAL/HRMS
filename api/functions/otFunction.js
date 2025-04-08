@@ -158,7 +158,7 @@ exports.createOt = async (payload, res, req) => {
     const insertQuery = `
       INSERT INTO ot_details (
         user_id, product_id, project_id, task_id, team_id, comments, status, tl_status, date, time, created_by, updated_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
     const values = [
       user_id,
