@@ -83,10 +83,10 @@ exports.fetchPendingTask = async (req, res) => {
 
               const remainingHours =
                 extendedSeconds > estimatedSeconds
-                  ? "00:00"
+                  ? "00:00:00"
                   : new Date(Math.max(0, remainingSeconds) * 1000)
                       .toISOString()
-                      .slice(11, 16);
+                      .slice(11, 19);
 
               pendingTaskResult.push({
                 project_name: task.project_name || "N/A",
@@ -123,10 +123,10 @@ exports.fetchPendingTask = async (req, res) => {
 
             const remainingHours =
               extendedSeconds > estimatedSeconds
-                ? "00:00"
+                ? "00:00:00"
                 : new Date(Math.max(0, remainingSeconds) * 1000)
                     .toISOString()
-                    .slice(11, 16);
+                    .slice(11, 19);
 
             pendingTaskResult.push({
               project_name: task.project_name || "N/A",
