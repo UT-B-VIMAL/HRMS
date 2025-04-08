@@ -803,15 +803,15 @@ exports.projectStatus = async (req, res) => {
       values.push(users.id);
     }
     if (product_id) {
-      conditions.push("t.product_id = ? OR st.product_id = ?");
+      conditions.push("(t.product_id = ? OR st.product_id = ?)");
       values.push(product_id, product_id);
     }
     if (project_id) {
-      conditions.push("t.project_id = ? OR st.project_id = ?");
+      conditions.push("(t.project_id = ? OR st.project_id = ?)");
       values.push(project_id, project_id);
     }
     if (employee_id) {
-      conditions.push("t.user_id = ? OR st.user_id = ?");
+      conditions.push("(t.user_id = ? OR st.user_id = ?)");
       values.push(employee_id, employee_id);
     }
     if (date) {
@@ -820,7 +820,7 @@ exports.projectStatus = async (req, res) => {
     }
     if (search) {
       const searchTerm = `%${search}%`;
-      conditions.push("(t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ?)");
+      conditions.push(`(t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ?)`);
       values.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
@@ -829,83 +829,92 @@ exports.projectStatus = async (req, res) => {
     if (status == 0) {
       query = `
         WITH TaskData AS (
-    SELECT 
-        t.id AS id,
-        t.name AS name,
-        t.estimated_hours AS estimated_time,
-        t.total_hours_worked AS duration,
-        NULL AS start_time,
-        NULL AS end_time,
-        t.rating AS rating,
-        NULL AS subtask_id,
-        p.id AS product_id,
-        p.name AS product_name,
-        pr.id AS project_id,
-        pr.name AS project_name,
-        tm.id AS team_id,
-        tm.name AS team_name,
-        u.id AS user_id,
-        t.status AS status,
-        CONCAT(u.first_name, ' ', u.last_name) AS assignee,
-        t.created_at AS date,
-        'Task' AS type
-    FROM tasks t
-    LEFT JOIN users u ON u.id = t.user_id
-    LEFT JOIN products p ON p.id = t.product_id
-    LEFT JOIN projects pr ON pr.id = t.project_id
-    LEFT JOIN teams tm ON tm.id = t.team_id
-    WHERE t.status = 0 
-      AND t.active_status = 0 
-      AND t.reopen_status = 0
-      AND t.deleted_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id) -- Only include tasks with no subtasks 
-      ORDER BY t.updated_at DESC
-),
-SubTaskData AS (
-    SELECT 
-        st.id AS id,
-        st.name AS name,
-        st.estimated_hours AS estimated_time,
-        st.total_hours_worked AS duration,
-        NULL AS start_time,
-        NULL AS end_time,
-        st.rating AS rating,
-        st.id AS subtask_id,
-        p.id AS product_id,
-        p.name AS product_name,
-        pr.id AS project_id,
-        pr.name AS project_name,
-        tm.id AS team_id,
-        tm.name AS team_name,
-        u.id AS user_id,
-        st.status AS status,
-        CONCAT(u.first_name, ' ', u.last_name) AS assignee,
-        st.created_at AS date,
-        'SubTask' AS type
-    FROM sub_tasks st
-    LEFT JOIN users u ON u.id = st.user_id
-    LEFT JOIN products p ON p.id = st.product_id
-    LEFT JOIN projects pr ON pr.id = st.project_id
-    LEFT JOIN teams tm ON tm.id = st.team_id
-    WHERE st.status = 0 
-      AND st.active_status = 0 
-      AND st.reopen_status = 0
-      AND st.deleted_at IS NULL
-      ORDER BY st.updated_at DESC
-)
-SELECT * FROM SubTaskData
-UNION ALL
-SELECT * FROM TaskData
-LIMIT ?, ?;
-
+          SELECT 
+            t.id AS id,
+            t.name AS name,
+            t.estimated_hours AS estimated_time,
+            t.total_hours_worked AS duration,
+            NULL AS start_time,
+            NULL AS end_time,
+            t.rating AS rating,
+            NULL AS subtask_id,
+            NULL AS subtask_name,
+            p.id AS product_id,
+            p.name AS product_name,
+            pr.id AS project_id,
+            pr.name AS project_name,
+            tm.id AS team_id,
+            tm.name AS team_name,
+            u.id AS user_id,
+            t.status AS status,
+            CONCAT(u.first_name, ' ', u.last_name) AS assignee,
+            t.created_at AS date,
+            NULL AS task_id,
+            NULL AS task_name,
+            'Task' AS type
+          FROM tasks t
+          LEFT JOIN users u ON u.id = t.user_id
+          LEFT JOIN products p ON p.id = t.product_id
+          LEFT JOIN projects pr ON pr.id = t.project_id
+          LEFT JOIN teams tm ON tm.id = t.team_id
+          WHERE t.status = 0 
+            AND t.active_status = 0 
+            AND t.reopen_status = 0
+            AND t.deleted_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id)
+        ),
+        SubTaskData AS (
+          SELECT 
+            st.id AS id,
+            st.name AS name,
+            st.estimated_hours AS estimated_time,
+            st.total_hours_worked AS duration,
+            NULL AS start_time,
+            NULL AS end_time,
+            st.rating AS rating,
+            st.id AS subtask_id,
+            st.name AS subtask_name,
+            p.id AS product_id,
+            p.name AS product_name,
+            pr.id AS project_id,
+            pr.name AS project_name,
+            tm.id AS team_id,
+            tm.name AS team_name,
+            u.id AS user_id,
+            st.status AS status,
+            CONCAT(u.first_name, ' ', u.last_name) AS assignee,
+            st.created_at AS date,
+            t.id AS task_id,
+            t.name AS task_name,
+            'SubTask' AS type
+          FROM sub_tasks st
+          LEFT JOIN products p ON p.id = st.product_id
+          LEFT JOIN projects pr ON pr.id = st.project_id
+          LEFT JOIN teams tm ON tm.id = st.team_id
+          LEFT JOIN users u ON u.id = st.user_id
+          LEFT JOIN tasks t ON t.id = st.task_id
+          WHERE st.status = 0 
+            AND st.active_status = 0 
+            AND st.reopen_status = 0
+            AND st.deleted_at IS NULL
+        )
+        SELECT * FROM (
+          SELECT * FROM TaskData
+          UNION ALL
+          SELECT * FROM SubTaskData
+        ) AS final_data
+        ORDER BY date DESC
+        LIMIT ?, ?
       `;
 
       countQuery = `
         SELECT COUNT(*) AS total_records FROM (
-          SELECT t.id FROM tasks t WHERE t.status = 0 AND t.active_status = 0 AND t.reopen_status = 0 AND t.deleted_at IS NULL
+          SELECT t.id FROM tasks t 
+          WHERE t.status = 0 AND t.active_status = 0 AND t.reopen_status = 0 AND t.deleted_at IS NULL
             AND NOT EXISTS (SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id)
           UNION ALL
-          SELECT st.id FROM sub_tasks st WHERE st.status = 0 AND st.active_status = 0 AND st.reopen_status = 0 AND st.deleted_at IS NULL
+          SELECT st.id FROM sub_tasks st 
+          WHERE st.status = 0 AND st.active_status = 0 AND st.reopen_status = 0 AND st.deleted_at IS NULL
         ) AS combined_records
       `;
     } else {
@@ -934,6 +943,7 @@ LIMIT ?, ?;
           CONVERT_TZ(stut.end_time, '+00:00', 'Asia/Kolkata') AS end_time,
           COALESCE(st.rating, t.rating) AS rating,
           stut.subtask_id,
+          st.name AS subtask_name,
           p.id AS product_id,
           p.name AS product_name,
           pr.id AS project_id,
@@ -944,6 +954,8 @@ LIMIT ?, ?;
           COALESCE(st.status, t.status) AS status,
           COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
           DATE(stut.start_time) AS date,
+          t.id AS task_id,
+          t.name AS task_name,
           CASE 
             WHEN st.id IS NOT NULL THEN 'SubTask'
             ELSE 'Task'
@@ -956,14 +968,13 @@ LIMIT ?, ?;
         LEFT JOIN projects pr ON pr.id = COALESCE(st.project_id, t.project_id)
         LEFT JOIN teams tm ON tm.id = COALESCE(st.team_id, t.team_id)
         WHERE stut.start_time IS NOT NULL 
-        
         ${whereClause}
         ORDER BY stut.updated_at DESC
         LIMIT ?, ?
       `;
 
       countQuery = `
-        SELECT COUNT (COALESCE(st.id, t.id)) AS total_records
+        SELECT COUNT(COALESCE(st.id, t.id)) AS total_records
         FROM sub_tasks_user_timeline stut
         LEFT JOIN sub_tasks st ON st.id = stut.subtask_id AND st.deleted_at IS NULL
         LEFT JOIN tasks t ON t.id = stut.task_id AND stut.subtask_id IS NULL AND t.deleted_at IS NULL
@@ -979,7 +990,7 @@ LIMIT ?, ?;
     values.push(offset, parseInt(perPage));
     const [results] = await db.query(query, values);
 
-    const [[countResult]] = await db.query(countQuery, values.slice(0, -2)); // Remove offset and limit from values
+    const [[countResult]] = await db.query(countQuery, values.slice(0, -2));
     const totalRecords = countResult.total_records || 0;
 
     const formattedResults = results.map((row, index) => ({
@@ -989,10 +1000,10 @@ LIMIT ?, ?;
       date: row.date ? moment(row.date).format("YYYY-MM-DD") : "-",
       product_name: row.product_name,
       project_name: row.project_name,
-      task_id: row.type === "Task" ? row.id : null,
-      task_name: row.type === "Task" ? row.name : null,
-      subtask_id: row.type === "SubTask" ? row.id : null,
-      subtask_name: row.type === "SubTask" ? row.name : null,
+      task_id: row.type === "Task" ? row.id : row.task_id || null,
+      task_name: row.type === "Task" ? row.name : row.task_name || null,
+      subtask_id: row.type === "SubTask" ? row.id : row.subtask_id || null,
+      subtask_name: row.type === "SubTask" ? row.name : row.subtask_name || null,
       user_id: row.user_id,
       assignee: row.assignee,
       estimated_time: row.estimated_time,
