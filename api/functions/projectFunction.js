@@ -847,7 +847,7 @@ exports.projectStatus = async (req, res) => {
         u.id AS user_id,
         t.status AS status,
         CONCAT(u.first_name, ' ', u.last_name) AS assignee,
-        NULL AS date,
+        t.created_at AS date,
         'Task' AS type
     FROM tasks t
     LEFT JOIN users u ON u.id = t.user_id
@@ -858,7 +858,8 @@ exports.projectStatus = async (req, res) => {
       AND t.active_status = 0 
       AND t.reopen_status = 0
       AND t.deleted_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id) -- Only include tasks with no subtasks
+      AND NOT EXISTS (SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id) -- Only include tasks with no subtasks 
+      ORDER BY t.updated_at DESC
 ),
 SubTaskData AS (
     SELECT 
@@ -879,7 +880,7 @@ SubTaskData AS (
         u.id AS user_id,
         st.status AS status,
         CONCAT(u.first_name, ' ', u.last_name) AS assignee,
-        NULL AS date,
+        st.created_at AS date,
         'SubTask' AS type
     FROM sub_tasks st
     LEFT JOIN users u ON u.id = st.user_id
@@ -890,6 +891,7 @@ SubTaskData AS (
       AND st.active_status = 0 
       AND st.reopen_status = 0
       AND st.deleted_at IS NULL
+      ORDER BY st.updated_at DESC
 )
 SELECT * FROM SubTaskData
 UNION ALL
@@ -954,9 +956,9 @@ LIMIT ?, ?;
         LEFT JOIN projects pr ON pr.id = COALESCE(st.project_id, t.project_id)
         LEFT JOIN teams tm ON tm.id = COALESCE(st.team_id, t.team_id)
         WHERE stut.start_time IS NOT NULL 
-       
-       
+        
         ${whereClause}
+        ORDER BY stut.updated_at DESC
         LIMIT ?, ?
       `;
 
