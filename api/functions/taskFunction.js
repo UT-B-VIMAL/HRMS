@@ -219,25 +219,320 @@ exports.createTask = async (payload, res) => {
   }
 };
 
+// exports.getTask = async (queryParams, res) => {
+//   try {
+//     const { id, user_id, status,reopen_status, active_status } = queryParams;
+
+//     if (!user_id) {
+//       return errorResponse(
+//         res,
+//         "User ID is required",
+//         "Missing user_id in query parameters",
+//         400
+//       );
+//     }
+//     if (!status) {
+//       return errorResponse(
+//         res,
+//         "Status is required",
+//         "Missing Status in query parameters",
+//         400
+//       );
+//     }
+
+//     const userDetails = await getAuthUserDetails(user_id, res);
+//     if (!userDetails || userDetails.id === undefined) {
+//       return errorResponse(res, "User not found", "Invalid user ID", 404);
+//     }
+
+//     // Base Task Query
+//     let taskQuery = `
+//       SELECT 
+//         t.*, 
+//         te.name AS team_name, 
+//         COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
+//         COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
+//         p.name AS product_name, 
+//         pj.name AS project_name,
+//         CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
+//         CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
+//       FROM tasks t 
+//       LEFT JOIN teams te ON t.team_id = te.id 
+//       LEFT JOIN users assignee ON t.user_id = assignee.id 
+//       LEFT JOIN users owner ON t.assigned_user_id = owner.id 
+//       LEFT JOIN products p ON t.product_id = p.id 
+//       LEFT JOIN projects pj ON t.project_id = pj.id 
+//       WHERE t.id = ?
+//       AND t.deleted_at IS NULL
+//     `;
+
+//     let taskParams = [id];
+
+//     // Role-based filtering
+//     if (userDetails.role_id === 3) {
+//       taskQuery += ` AND t.team_id = ?`;
+//       taskParams.push(userDetails.team_id);
+//     }
+
+//     const [task] = await db.query(taskQuery, taskParams);
+//     if (!task || task.length === 0) {
+//       return errorResponse(res, "Task not found", "Error retrieving task", 404);
+//     }
+//     // Subtasks query
+//     let subtaskQuery = `
+//   SELECT 
+//     st.*, 
+//     COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown Assignee') AS assignee_name 
+//   FROM sub_tasks st
+//   LEFT JOIN users u ON st.user_id = u.id 
+//   WHERE st.task_id = ?
+//     AND st.status = ?
+//     AND st.reopen_status = ?
+//     AND st.active_status = ?
+//     AND st.deleted_at IS NULL
+// `;
+
+//     let subtaskParams = [id, status,reopen_status, active_status];
+
+//     if (userDetails.role_id === 3) {
+//       subtaskQuery += ` AND st.team_id = ?`;
+//       subtaskParams.push(userDetails.team_id);
+//     } else if (userDetails.role_id === 4) {
+//       subtaskQuery += ` AND st.user_id = ?`;
+//       subtaskParams.push(user_id);
+//     }
+
+//     const subtasks = await db.query(subtaskQuery, subtaskParams);
+
+//     const historiesQuery = `
+//       SELECT h.*, 
+//         COALESCE(
+//           CASE 
+//             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
+//               UPPER(CONCAT(SUBSTRING(u.first_name, 1, 1), SUBSTRING(u.last_name, 1, 1)))
+//             WHEN u.first_name IS NOT NULL THEN 
+//               UPPER(SUBSTRING(u.first_name, 1, 2))
+//             ELSE 
+//               'UNKNOWN'
+//           END, 
+//           ' '
+//         ) AS short_name, 
+//         COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,  
+//         s.description as status_description
+//       FROM task_histories h
+//       LEFT JOIN users u ON h.updated_by = u.id
+//       LEFT JOIN task_status_flags s ON h.status_flag = s.id
+//       WHERE h.task_id = ? 
+//       AND h.deleted_at IS NULL
+//       ORDER BY h.id DESC;
+//     `;
+//     const histories = await db.query(historiesQuery, [id]);
+
+//     // // Comments query
+//     const commentsQuery = `
+//       SELECT c.*,  COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
+//       FROM task_comments c
+//       LEFT JOIN users u ON c.updated_by = u.id
+//       WHERE c.task_id = ? AND c.subtask_id IS NULL
+//       AND c.deleted_at IS NULL
+//       ORDER BY c.id DESC;
+//     `;
+
+//     const comments = await db.query(commentsQuery, [id]);
+
+//     const getStatusGroup = (status, reopenStatus, activeStatus) => {
+//       status = Number(status);
+//       reopenStatus = Number(reopenStatus);
+//       activeStatus = Number(activeStatus);
+//     console.log("status", status, "reopenStatus", reopenStatus, "activeStatus", activeStatus);
+    
+//       // 1. New subtask, not started
+//       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+//         return "To Do";
+//       }
+    
+//       // 2. On hold (created but not restarted)
+//       if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+//         return "On Hold";
+//       }
+    
+//       // 3. Pending approval
+//       if (status === 2 && reopenStatus === 0) {
+//         return "Pending Approval";
+//       }
+    
+//       // 4. Reopened and not active yet
+//       if (reopenStatus === 1 && activeStatus === 0) {
+//         return "Reopen";
+//       }
+    
+//       // 5. In progress (active)
+//       if (status === 1 && activeStatus === 1) {
+//         return "InProgress";
+//       }
+    
+//       // 6. Done
+//       if (status === 3) {
+//         return "Done";
+//       }
+    
+//       return "";
+//     };
+    
+
+//     // Status mapping
+//     const statusMap = {
+//       0: "To Do",
+//       1: "In Progress",
+//       2: "In Review",
+//       3: "Done",
+//     };
+
+//     // Prepare task data
+//     const taskData = task.map((task) => {
+//       const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
+//       const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
+
+//       // Calculate remaining hours and ensure consistent formatting
+//       const remainingHours = calculateRemainingHours(
+//         totalEstimatedHours,
+//         timeTaken
+//       );
+
+//       // Calculate percentage for hours
+//       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
+//       const timeTakenInSeconds = convertToSeconds(timeTaken);
+//       const remainingInSeconds = convertToSeconds(remainingHours);
+
+//       return {
+//         task_id: task.id || "",
+//         name: task.name || "",
+//         status: task.status,
+//         active_status: task.active_status,
+//         reopen_status: task.reopen_status,
+//         project_id: task.project_id || "",
+//         project: task.project_name || "",
+//         product_id: task.product_id || "",
+//         product: task.product_name || "",
+//         owner_id: task.assigned_user_id || "",
+//         owner: task.owner_name || "",
+//         team_id: task.team_id || "",
+//         team: task.team_name || "",
+//         assignee_id: task.user_id || "",
+//         assignee: task.assignee_name || "",
+//         estimated_hours: formatTimeDHMS(totalEstimatedHours),
+//         estimated_hours_percentage: calculatePercentage(
+//           estimatedInSeconds,
+//           estimatedInSeconds
+//         ),
+//         time_taken: formatTimeDHMS(timeTaken),
+//         time_taken_percentage: calculatePercentage(
+//           timeTakenInSeconds,
+//           estimatedInSeconds
+//         ),
+//         remaining_hours: formatTimeDHMS(remainingHours),
+//         remaining_hours_percentage: calculatePercentage(
+//           remainingInSeconds,
+//           estimatedInSeconds
+//         ),
+//         start_date: task.start_date,
+//         end_date: task.end_date,
+//         priority: task.priority,
+//         description: task.description,
+//         status_text: getStatusGroup(task.status, task.reopen_status, task.active_status) || "Unknown"
+//       };
+//     });
+
+//     // Prepare subtasks data
+//     const subtasksData =
+//       Array.isArray(subtasks) && subtasks[0].length > 0
+//         ? subtasks[0].map((subtask) => ({
+//             subtask_id: subtask.id,
+//             name: subtask.name || "",
+//             status: subtask.status,
+//             active_status: subtask.active_status,
+//             assignee: subtask.user_id,
+//             assigneename: subtask.assignee_name || "",
+//             reopen_status: subtask.reopen_status,
+//             short_name: (subtask.assignee_name || "").substr(0, 2),
+//             status_text: getStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status) || "Unknown"
+//           }))
+//         : [];
+
+//     const historiesData =
+//       Array.isArray(histories) && histories[0].length > 0
+//         ? await Promise.all(
+//             histories[0].map(async (history) => ({
+//               old_data: history.old_data,
+//               new_data: history.new_data,
+//               description: history.status_description || "Changed the status",
+//               updated_by: history.updated_by,
+//               shortName: history.short_name,
+//               time_date: moment
+//                 .utc(history.updated_at)
+//                 .tz("Asia/Kolkata")
+//                 .format("YYYY-MM-DD HH:mm:ss"),
+//               time_utc: history.updated_at,
+//               time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+//             }))
+//           )
+//         : [];
+
+//     const commentsData =
+//       Array.isArray(comments) && comments[0].length > 0
+//         ? comments[0].map((comment) => ({
+//             comment_id: comment.id,
+//             comments: comment.comments,
+//             updated_by: comment.updated_by || "",
+//             shortName: comment.updated_by.substr(0, 2),
+//             time_date: moment
+//               .utc(comment.updated_at)
+//               .tz("Asia/Kolkata")
+//               .format("YYYY-MM-DD HH:mm:ss"),
+//             time_utc: comment.updated_at,
+//             time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+//           }))
+//         : [];
+
+//     let data = {};
+
+//     if (subtasksData.length > 0) {
+//       data = {
+//          type: "subtask",
+//          task: taskData,
+//         subtasks: subtasksData,
+//         histories: historiesData,
+//         comments: commentsData,
+//       };
+//     } else {
+//       data = {
+//         type: "task",
+//         task: taskData,
+//         histories: historiesData,
+//         comments: commentsData,
+//       };
+//     }
+
+//     return successResponse(
+//       res,
+//       data,
+//       "Task details retrieved successfully",
+//       200
+//     );
+//   } catch (error) {
+//     console.error("Error retrieving task:", error.message);
+//     return errorResponse(res, error.message, "Error retrieving task", 500);
+//   }
+// };
+
+// Get All Tasks
+
 exports.getTask = async (queryParams, res) => {
   try {
-    const { id, user_id, status } = queryParams;
+    const { id, user_id } = queryParams;
 
     if (!user_id) {
-      return errorResponse(
-        res,
-        "User ID is required",
-        "Missing user_id in query parameters",
-        400
-      );
-    }
-    if (!status) {
-      return errorResponse(
-        res,
-        "Status is required",
-        "Missing Status in query parameters",
-        400
-      );
+      return errorResponse(res, "User ID is required", "Missing user_id in query parameters", 400);
     }
 
     const userDetails = await getAuthUserDetails(user_id, res);
@@ -272,7 +567,7 @@ exports.getTask = async (queryParams, res) => {
     if (userDetails.role_id === 3) {
       taskQuery += ` AND t.team_id = ?`;
       taskParams.push(userDetails.team_id);
-    }
+    } 
 
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
@@ -280,23 +575,22 @@ exports.getTask = async (queryParams, res) => {
     }
     // Subtasks query
     let subtaskQuery = `
-  SELECT 
-    st.*, 
-    COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown Assignee') AS assignee_name 
-  FROM sub_tasks st
-  LEFT JOIN users u ON st.user_id = u.id 
-  WHERE st.task_id = ?
-    AND st.status = ?
-    AND st.deleted_at IS NULL
-`;
+      SELECT 
+        st.*, 
+        COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown Assignee') AS assignee_name 
+      FROM sub_tasks st
+      LEFT JOIN users u ON st.user_id = u.id 
+      WHERE st.task_id = ?
+      AND st.deleted_at IS NULL
+    `;
 
-    let subtaskParams = [id, status];
+    let subtaskParams = [id];
 
     if (userDetails.role_id === 3) {
       subtaskQuery += ` AND st.team_id = ?`;
       subtaskParams.push(userDetails.team_id);
     } else if (userDetails.role_id === 4) {
-      subtaskQuery += ` AND st.user_id = ?`;
+      subtaskQuery += ` AND (st.user_id = ?)`;
       subtaskParams.push(user_id);
     }
 
@@ -338,46 +632,6 @@ exports.getTask = async (queryParams, res) => {
 
     const comments = await db.query(commentsQuery, [id]);
 
-    const getStatusGroup = (status, reopenStatus, activeStatus) => {
-      status = Number(status);
-      reopenStatus = Number(reopenStatus);
-      activeStatus = Number(activeStatus);
-    console.log("status", status, "reopenStatus", reopenStatus, "activeStatus", activeStatus);
-    
-      // 1. New subtask, not started
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-        return "To Do";
-      }
-    
-      // 2. On hold (created but not restarted)
-      if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
-        return "On Hold";
-      }
-    
-      // 3. Pending approval
-      if (status === 2 && reopenStatus === 0) {
-        return "Pending Approval";
-      }
-    
-      // 4. Reopened and not active yet
-      if (reopenStatus === 1 && activeStatus === 0) {
-        return "Reopen";
-      }
-    
-      // 5. In progress (active)
-      if (status === 1 && activeStatus === 1) {
-        return "InProgress";
-      }
-    
-      // 6. Done
-      if (status === 3) {
-        return "Done";
-      }
-    
-      return "";
-    };
-    
-
     // Status mapping
     const statusMap = {
       0: "To Do",
@@ -388,14 +642,11 @@ exports.getTask = async (queryParams, res) => {
 
     // Prepare task data
     const taskData = task.map((task) => {
-      const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
-      const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
+      const totalEstimatedHours = task.estimated_hours || "00:00:00";  // Ensure default format as "HH:MM:SS"
+      const timeTaken = task.total_hours_worked || "00:00:00";  // Ensure default format as "HH:MM:SS"
 
       // Calculate remaining hours and ensure consistent formatting
-      const remainingHours = calculateRemainingHours(
-        totalEstimatedHours,
-        timeTaken
-      );
+      const remainingHours = calculateRemainingHours(totalEstimatedHours, timeTaken);
 
       // Calculate percentage for hours
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
@@ -419,25 +670,16 @@ exports.getTask = async (queryParams, res) => {
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
         estimated_hours: formatTimeDHMS(totalEstimatedHours),
-        estimated_hours_percentage: calculatePercentage(
-          estimatedInSeconds,
-          estimatedInSeconds
-        ),
+        estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
         time_taken: formatTimeDHMS(timeTaken),
-        time_taken_percentage: calculatePercentage(
-          timeTakenInSeconds,
-          estimatedInSeconds
-        ),
+        time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
         remaining_hours: formatTimeDHMS(remainingHours),
-        remaining_hours_percentage: calculatePercentage(
-          remainingInSeconds,
-          estimatedInSeconds
-        ),
+        remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
         start_date: task.start_date,
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
-        status_text: getStatusGroup(task.status, task.reopen_status, task.active_status) || "Unknown"
+        status_text: statusMap[task.status] || "Unknown",
       };
     });
 
@@ -445,20 +687,19 @@ exports.getTask = async (queryParams, res) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-            subtask_id: subtask.id,
-            name: subtask.name || "",
-            status: subtask.status,
-            active_status: subtask.active_status,
-            assignee: subtask.user_id,
-            assigneename: subtask.assignee_name || "",
-            reopen_status: subtask.reopen_status,
-            short_name: (subtask.assignee_name || "").substr(0, 2),
-            status_text: getStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status) || "Unknown"
-          }))
+          subtask_id: subtask.id,
+          name: subtask.name || "",
+          status: subtask.status,
+          active_status: subtask.active_status,
+          assignee: subtask.user_id,
+          assigneename: subtask.assignee_name || "",
+          reopen_status: subtask.reopen_status,
+          short_name: (subtask.assignee_name || "").substr(0, 2),
+          status_text: statusMap[subtask.status] || "Unknown",
+        }))
         : [];
 
-    const historiesData =
-      Array.isArray(histories) && histories[0].length > 0
+        const historiesData = Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
             histories[0].map(async (history) => ({
               old_data: history.old_data,
@@ -466,30 +707,26 @@ exports.getTask = async (queryParams, res) => {
               description: history.status_description || "Changed the status",
               updated_by: history.updated_by,
               shortName: history.short_name,
-              time_date: moment
-                .utc(history.updated_at)
-                .tz("Asia/Kolkata")
-                .format("YYYY-MM-DD HH:mm:ss"),
-              time_utc: history.updated_at,
-              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+              time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
+              time_utc: history.updated_at, 
+              time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(), 
             }))
           )
         : [];
+      
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-            comment_id: comment.id,
-            comments: comment.comments,
-            updated_by: comment.updated_by || "",
-            shortName: comment.updated_by.substr(0, 2),
-            time_date: moment
-              .utc(comment.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: comment.updated_at,
-            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
-          }))
+          comment_id: comment.id,
+          comments: comment.comments,
+          updated_by: comment.updated_by || "",
+          shortName: comment.updated_by.substr(0, 2),
+          time_date: moment.utc(comment.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
+          time_utc: comment.updated_at, 
+          time: moment.utc(comment.updated_at).tz('Asia/Kolkata').fromNow(), 
+          
+        }))
         : [];
 
     // Final response
@@ -512,7 +749,8 @@ exports.getTask = async (queryParams, res) => {
   }
 };
 
-// Get All Tasks
+
+
 exports.getAllTasks = async (res) => {
   try {
     const query = "SELECT * FROM tasks ORDER BY id DESC";
