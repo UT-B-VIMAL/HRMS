@@ -400,6 +400,8 @@ exports.getAllOts = async (req, res) => {
           ot.time,
           ot.comments,
           ot.status,
+          ot.tl_status,
+          ot.pm_status,
           ot.id AS ot_id,
           ot.user_id,
           u.employee_id,
@@ -438,6 +440,8 @@ exports.getAllOts = async (req, res) => {
       task_name: row.task_name,
       comments: row.comments,
       status: row.status,
+      tl_status: row.tl_status,
+      pm_status: row.pm_status,
       user_name: `${row.user_first_name} ${row.user_last_name}`,
     }));
 
