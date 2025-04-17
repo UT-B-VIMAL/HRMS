@@ -38,10 +38,6 @@ const validationshems = {
 
   updateTaskSchema: Joi.object({
  
-    name: Joi.string().required().messages({
-      'string.empty': 'Subtask name is required',
-      'any.required': 'Subtask name is required',
-    }),
     estimated_hours: Joi.string()
     .pattern(/^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?$/)
     .required()
