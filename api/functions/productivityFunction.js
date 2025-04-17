@@ -21,7 +21,7 @@ const convertSecondsToReadableTime = (seconds) => {
 
 exports.getTeamwiseProductivity = async (req, res) => {
     try {
-        const { team_id, from_date,to_date, user_id, employee_id, search, page = 1, perPage = 10 } = req.query;
+        const { team_id, from_date, to_date, user_id, employee_id, search, page = 1, perPage = 10 } = req.query;
 
         const offset = (page - 1) * perPage;
 
@@ -53,7 +53,6 @@ exports.getTeamwiseProductivity = async (req, res) => {
                 sub_tasks st
             WHERE 
                 st.deleted_at IS NULL
-           
         `;
 
         // Combine task and subtask queries
@@ -75,8 +74,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
             ON u.id = combined.user_id
             WHERE u.deleted_at IS NULL
             ${team_id ? `AND combined.team_id = ?` : ''}
-            ${from_date ? `AND combined.created_at >= ?` : ''}
-            ${to_date ? `AND combined.created_at <= ?` : ''}
+            ${(from_date && to_date) ? `AND combined.created_at BETWEEN ? AND ?` : ''}
             ${user_id ? `AND u.id = ?` : ''}
             ${employee_id ? `AND u.employee_id = ?` : ''}
             ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
@@ -84,33 +82,25 @@ exports.getTeamwiseProductivity = async (req, res) => {
             LIMIT ? OFFSET ?
         `;
 
-        // Query parameters for task and subtask
         let queryParams = [];
-        if (team_id) {
-            queryParams.push(team_id);
+        if (team_id) queryParams.push(team_id);
+        if (from_date && to_date) {
+            if (from_date && to_date) {
+                queryParams.push(`${from_date} 00:00:00`);
+                queryParams.push(`${to_date} 23:59:59`);
+            }
+            
         }
-        if (from_date){
-             queryParams.push(from_date);
-        }
-        if (to_date) {
-            queryParams.push(to_date);
-        }
-        if (user_id) {
-            queryParams.push(user_id);
-        }
-        if (employee_id) {
-            queryParams.push(employee_id);
-        }
+        if (user_id) queryParams.push(user_id);
+        if (employee_id) queryParams.push(employee_id);
         if (search) {
             queryParams.push(`%${search}%`);
             queryParams.push(`%${search}%`);
         }
-
-        // Add pagination limit and offset
         queryParams.push(parseInt(perPage));
         queryParams.push(parseInt(offset));
 
-        // Query to count total users
+        // Count Query
         const countQuery = `
             SELECT COUNT(DISTINCT u.id) AS total_users
             FROM users u
@@ -122,40 +112,30 @@ exports.getTeamwiseProductivity = async (req, res) => {
             ON u.id = combined.user_id
             WHERE u.deleted_at IS NULL
             ${team_id ? `AND combined.team_id = ?` : ''}
-            ${from_date ? `AND combined.created_at >= ?` : ''}
-            ${to_date ? `AND combined.created_at <= ?` : ''}
+            ${(from_date && to_date) ? `AND combined.created_at BETWEEN ? AND ?` : ''}
             ${user_id ? `AND u.id = ?` : ''}
             ${employee_id ? `AND u.employee_id = ?` : ''}
             ${search ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)` : ''}
         `;
-        const countValues = [];
-        if (team_id) {
-            countValues.push(team_id);
+
+        let countValues = [];
+        if (team_id) countValues.push(team_id);
+        if (from_date && to_date) {
+            countValues.push(`${from_date} 00:00:00`);
+            countValues.push(`${to_date} 23:59:59`);
         }
-        if (from_date){
-            countValues.push(from_date);
-       }
-       if (to_date) {
-            countValues.push(to_date);
-       }
-        if (user_id) {
-            countValues.push(user_id);
-        }
-        if (employee_id) {
-            countValues.push(employee_id);
-        }
+        if (user_id) countValues.push(user_id);
+        if (employee_id) countValues.push(employee_id);
         if (search) {
             countValues.push(`%${search}%`);
             countValues.push(`%${search}%`);
         }
 
-        // Execute the queries
         const [results] = await db.query(query, queryParams);
         const [countResults] = await db.query(countQuery, countValues);
 
         const totalUsers = countResults[0].total_users;
 
-        // Format data
         const data = results.map((item, index) => ({
             s_no: offset + index + 1,
             user_id: item.user_id,
@@ -163,7 +143,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
             employee_id: item.employee_id,
             team_id: item.team_id || null,
             total_estimated_hours: convertSecondsToReadableTime(item.total_estimated_seconds),
-            total_worked_hours:   convertSecondsToReadableTime(item.total_worked_seconds),
+            total_worked_hours: convertSecondsToReadableTime(item.total_worked_seconds),
             total_extended_hours: convertSecondsToReadableTime(item.total_extended_seconds),
         }));
 
@@ -182,6 +162,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
         res.status(500).json({ success: false, message: 'An error occurred', error: error.message });
     }
 };
+
 
 
 
