@@ -223,6 +223,7 @@ apiRouter.post('/ticket-comments',RoleController.checkRole(),(req, res) => ticke
 // OT Details
 apiRouter.post('/otdetail', RoleController.checkRole(),otdetailController.createOtdetail);
 apiRouter.put('/otdetail/:id',RoleController.checkRole(), otdetailController.updateOtdetail);
+apiRouter.put('/approverejectotdetail/:id', otdetailController.approve_reject_updateOtdetail);
 apiRouter.delete('/otdetail/:id',RoleController.checkRole(),otdetailController.deleteOtdetail);
 apiRouter.get('/otdetail/:id', RoleController.checkRole(),otdetailController.getOtdetail);
 apiRouter.get('/otdetail',RoleController.checkRole(), otdetailController.getAllOtdetails);
