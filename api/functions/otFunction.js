@@ -802,7 +802,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
         case "2":
           otConditions.push(
-            "ot.pm_status = 2 AND (ot.tl_status = 2 OR ot.status = 2)"
+            "ot.pm_status = 2 OR ot.tl_status = 2"
           );
           break;
 
@@ -1263,7 +1263,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
 
         case "2":
           // All statuses must be 2
-          otConditions.push("ot.tl_status = 2");
+          otConditions.push("ot.tl_status = 2 OR ot.pm_status = 2");
           break;
 
         default:
