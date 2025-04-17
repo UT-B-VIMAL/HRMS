@@ -767,114 +767,371 @@ exports.getAllTasks = async (res) => {
 };
 
 // Update Task
+// exports.updateTask = async (id, payload, res) => {
+//   const {
+//     product_id,
+//     project_id,
+//     user_id,
+//     name,
+//     estimated_hours,
+//     start_date,
+//     end_date,
+//     extended_status,
+//     extended_hours,
+//     active_status,
+//     status,
+//     total_hours_worked,
+//     rating,
+//     command,
+//     assigned_user_id,
+//     remark,
+//     reopen_status,
+//     description,
+//     team_id,
+//     priority,
+//     created_by,
+//     updated_by,
+//     deleted_at,
+//     created_at,
+//     updated_at,
+//   } = payload;
+
+//   try {
+//     const [updatduser] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [updated_by]
+//     );
+//     if (updatduser.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Updated User not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [product] = await db.query(
+//       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+//       [product_id]
+//     );
+//     if (product.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Product not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [project] = await db.query(
+//       "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
+//       [project_id]
+//     );
+//     if (project.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Project not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [assigned_user] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [assigned_user_id]
+//     );
+//     if (assigned_user.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Assigned User not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [user] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [user_id]
+//     );
+//     if (user.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "User not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [team] = await db.query(
+//       "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+//       [team_id]
+//     );
+//     if (team.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Team not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [currentTask] = await db.query(
+//       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
+//       [id]
+//     );
+
+//     if (currentTask.length === 0) {
+//       return errorResponse(res, null, "Task not found", 200);
+//     }
+
+//     if (estimated_hours) {
+//       const timeMatch = estimated_hours.match(
+//         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+//       );
+
+//       if (!timeMatch) {
+//         return errorResponse(
+//           res,
+//           null,
+//           'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+//           400
+//         );
+//       }
+
+//       const days = parseInt(timeMatch[2] || "0", 10);
+//       const hours = parseInt(timeMatch[4] || "0", 10);
+//       const minutes = parseInt(timeMatch[6] || "0", 10);
+//       const seconds = parseInt(timeMatch[8] || "0", 10);
+
+//       if (
+//         days < 0 ||
+//         hours < 0 ||
+//         minutes < 0 ||
+//         seconds < 0 ||
+//         minutes >= 60 ||
+//         seconds >= 60
+//       ) {
+//         return errorResponse(
+//           res,
+//           null,
+//           "Invalid time values in estimated_hours",
+//           400
+//         );
+//       }
+
+//       // Convert days to hours and calculate total hours
+//       const totalHours = days * 8 + hours;
+
+//       // Format as "HH:MM:SS"
+//       payload.estimated_hours = `${String(totalHours).padStart(
+//         2,
+//         "0"
+//       )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+//         2,
+//         "0"
+//       )}`;
+//     }
+//     // Update query
+//     const query = `
+//       UPDATE tasks SET
+//         product_id = IF(? = product_id, product_id, ?),
+//         project_id = IF(? = project_id, project_id, ?),
+//         user_id = IF(? = user_id, user_id, ?),
+//         name = IF(? = name, name, ?),
+//         estimated_hours = IF(? = estimated_hours, estimated_hours, ?),
+//         start_date = IF(? = start_date, start_date, ?),
+//         end_date = IF(? = end_date, end_date, ?),
+//         extended_status = IF(? = extended_status, extended_status, ?),
+//         extended_hours = IF(? = extended_hours, extended_hours, ?),
+//         total_hours_worked = IF(? = total_hours_worked, total_hours_worked, ?),
+//         rating = IF(? = rating, rating, ?),
+//         command = IF(? = command, command, ?),
+//         assigned_user_id = IF(? = assigned_user_id, assigned_user_id, ?),
+//         remark = IF(? = remark, remark, ?),
+//         reopen_status = IF(? = reopen_status, reopen_status, ?),
+//         description = IF(? = description, description, ?),
+//         team_id = IF(? = team_id, team_id, ?),
+//         priority = IF(? = priority, priority, ?),
+//         created_by = IF(? = created_by, created_by, ?),
+//         updated_by = IF(? = updated_by, updated_by, ?),
+//         deleted_at = IF(? = deleted_at, deleted_at, ?),
+//         created_at = IF(? = created_at, created_at, ?),
+//         updated_at = NOW()
+//       WHERE id = ?
+//     `;
+
+//     const values = [
+//       product_id,
+//       product_id,
+//       project_id,
+//       project_id,
+//       user_id,
+//       user_id,
+//       name,
+//       name,
+//       payload.estimated_hours,
+//       payload.estimated_hours,
+//       start_date,
+//       start_date,
+//       end_date,
+//       end_date,
+//       extended_status,
+//       extended_status,
+//       extended_hours,
+//       extended_hours,
+//       total_hours_worked,
+//       total_hours_worked,
+//       rating,
+//       rating,
+//       command,
+//       command,
+//       assigned_user_id,
+//       assigned_user_id,
+//       remark,
+//       remark,
+//       reopen_status,
+//       reopen_status,
+//       description,
+//       description,
+//       team_id,
+//       team_id,
+//       priority,
+//       priority,
+//       created_by,
+//       created_by,
+//       updated_by,
+//       updated_by,
+//       deleted_at,
+//       deleted_at,
+//       created_at,
+//       created_at,
+//       id,
+//     ];
+
+//     const [result] = await db.query(query, values);
+
+//     if (result.affectedRows === 0) {
+//       return errorResponse(res, null, "No changes made to the task", 200);
+//     }
+
+//     return successResponse(
+//       res,
+//       { id, ...payload },
+//       "Task updated successfully"
+//     );
+//   } catch (error) {
+//     return errorResponse(res, error.message, "Error updating task", 500);
+//   }
+// };
+
 exports.updateTask = async (id, payload, res) => {
-  const {
-    product_id,
-    project_id,
-    user_id,
-    name,
-    estimated_hours,
-    start_date,
-    end_date,
-    extended_status,
-    extended_hours,
-    active_status,
-    status,
-    total_hours_worked,
-    rating,
-    command,
-    assigned_user_id,
-    remark,
-    reopen_status,
-    description,
-    team_id,
-    priority,
-    created_by,
-    updated_by,
-    deleted_at,
-    created_at,
-    updated_at,
-  } = payload;
-
   try {
-    const [updatduser] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-      [updated_by]
-    );
-    if (updatduser.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Updated User not found or has been deleted",
-        404
+    const {
+      product_id,
+      project_id,
+      user_id,
+      assigned_user_id,
+      updated_by,
+      team_id,
+    } = payload;
+
+    // Validate updated_by
+    if (updated_by) {
+      const [updatduser] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [updated_by]
       );
+      if (updatduser.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "Updated User not found or has been deleted",
+          404
+        );
+      }
     }
 
-    const [product] = await db.query(
-      "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
-      [product_id]
-    );
-    if (product.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Product not found or has been deleted",
-        404
+    // Validate product
+    if (product_id) {
+      const [product] = await db.query(
+        "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+        [product_id]
       );
+      if (product.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "Product not found or has been deleted",
+          404
+        );
+      }
     }
 
-    const [project] = await db.query(
-      "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
-      [project_id]
-    );
-    if (project.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Project not found or has been deleted",
-        404
+    // Validate project
+    if (project_id) {
+      const [project] = await db.query(
+        "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
+        [project_id]
       );
+      if (project.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "Project not found or has been deleted",
+          404
+        );
+      }
     }
 
-    const [assigned_user] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-      [assigned_user_id]
-    );
-    if (assigned_user.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Assigned User not found or has been deleted",
-        404
+    // Validate assigned user
+    if (assigned_user_id) {
+      const [assigned_user] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [assigned_user_id]
       );
+      if (assigned_user.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "Assigned User not found or has been deleted",
+          404
+        );
+      }
     }
 
-    const [user] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-      [user_id]
-    );
-    if (user.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "User not found or has been deleted",
-        404
+    // Validate user
+    if (user_id) {
+      const [user] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [user_id]
       );
+      if (user.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "User not found or has been deleted",
+          404
+        );
+      }
     }
 
-    const [team] = await db.query(
-      "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
-      [team_id]
-    );
-    if (team.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Team not found or has been deleted",
-        404
+    // Validate team
+    if (team_id) {
+      const [team] = await db.query(
+        "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+        [team_id]
       );
+      if (team.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "Team not found or has been deleted",
+          404
+        );
+      }
     }
 
+    // Fetch existing task
     const [currentTask] = await db.query(
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
       [id]
@@ -884,8 +1141,11 @@ exports.updateTask = async (id, payload, res) => {
       return errorResponse(res, null, "Task not found", 200);
     }
 
-    if (estimated_hours) {
-      const timeMatch = estimated_hours.match(
+    const existingTask = currentTask[0];
+
+    // If estimated_hours is passed, validate and convert it
+    if (payload.estimated_hours) {
+      const timeMatch = payload.estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
 
@@ -919,10 +1179,7 @@ exports.updateTask = async (id, payload, res) => {
         );
       }
 
-      // Convert days to hours and calculate total hours
       const totalHours = days * 8 + hours;
-
-      // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
         "0"
@@ -931,80 +1188,68 @@ exports.updateTask = async (id, payload, res) => {
         "0"
       )}`;
     }
+
+    // Merge payload with existing task
+    const updatedData = {
+      ...existingTask,
+      ...payload,
+      updated_at: new Date()
+    };
+
     // Update query
     const query = `
       UPDATE tasks SET
-        product_id = IF(? = product_id, product_id, ?),
-        project_id = IF(? = project_id, project_id, ?),
-        user_id = IF(? = user_id, user_id, ?),
-        name = IF(? = name, name, ?),
-        estimated_hours = IF(? = estimated_hours, estimated_hours, ?),
-        start_date = IF(? = start_date, start_date, ?),
-        end_date = IF(? = end_date, end_date, ?),
-        extended_status = IF(? = extended_status, extended_status, ?),
-        extended_hours = IF(? = extended_hours, extended_hours, ?),
-        total_hours_worked = IF(? = total_hours_worked, total_hours_worked, ?),
-        rating = IF(? = rating, rating, ?),
-        command = IF(? = command, command, ?),
-        assigned_user_id = IF(? = assigned_user_id, assigned_user_id, ?),
-        remark = IF(? = remark, remark, ?),
-        reopen_status = IF(? = reopen_status, reopen_status, ?),
-        description = IF(? = description, description, ?),
-        team_id = IF(? = team_id, team_id, ?),
-        priority = IF(? = priority, priority, ?),
-        created_by = IF(? = created_by, created_by, ?),
-        updated_by = IF(? = updated_by, updated_by, ?),
-        deleted_at = IF(? = deleted_at, deleted_at, ?),
-        updated_at = NOW()
+        product_id = ?,
+        project_id = ?,
+        user_id = ?,
+        name = ?,
+        estimated_hours = ?,
+        start_date = ?,
+        end_date = ?,
+        extended_status = ?,
+        extended_hours = ?,
+        total_hours_worked = ?,
+        rating = ?,
+        command = ?,
+        assigned_user_id = ?,
+        remark = ?,
+        reopen_status = ?,
+        description = ?,
+        team_id = ?,
+        priority = ?,
+        created_by = ?,
+        updated_by = ?,
+        deleted_at = ?,
+        created_at = ?,
+        updated_at = ?
       WHERE id = ?
     `;
 
     const values = [
-      product_id,
-      product_id,
-      project_id,
-      project_id,
-      user_id,
-      user_id,
-      name,
-      name,
-      payload.estimated_hours,
-      payload.estimated_hours,
-      start_date,
-      start_date,
-      end_date,
-      end_date,
-      extended_status,
-      extended_status,
-      extended_hours,
-      extended_hours,
-      total_hours_worked,
-      total_hours_worked,
-      rating,
-      rating,
-      command,
-      command,
-      assigned_user_id,
-      assigned_user_id,
-      remark,
-      remark,
-      reopen_status,
-      reopen_status,
-      description,
-      description,
-      team_id,
-      team_id,
-      priority,
-      priority,
-      created_by,
-      created_by,
-      updated_by,
-      updated_by,
-      deleted_at,
-      deleted_at,
-      created_at,
-      created_at,
-      id,
+      updatedData.product_id,
+      updatedData.project_id,
+      updatedData.user_id,
+      updatedData.name,
+      updatedData.estimated_hours,
+      updatedData.start_date,
+      updatedData.end_date,
+      updatedData.extended_status,
+      updatedData.extended_hours,
+      updatedData.total_hours_worked,
+      updatedData.rating,
+      updatedData.command,
+      updatedData.assigned_user_id,
+      updatedData.remark,
+      updatedData.reopen_status,
+      updatedData.description,
+      updatedData.team_id,
+      updatedData.priority,
+      updatedData.created_by,
+      updatedData.updated_by,
+      updatedData.deleted_at,
+      updatedData.created_at,
+      updatedData.updated_at,
+      id
     ];
 
     const [result] = await db.query(query, values);
@@ -1015,13 +1260,14 @@ exports.updateTask = async (id, payload, res) => {
 
     return successResponse(
       res,
-      { id, ...payload },
+      { id, ...updatedData },
       "Task updated successfully"
     );
   } catch (error) {
     return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
+
 
 exports.updateTaskData = async (id, payload, res, req) => {
   const {
