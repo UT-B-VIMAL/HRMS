@@ -1,6 +1,7 @@
 const {
   createOt,
   updateOt,
+  approve_reject_updateOt,
   deleteOt,
   getOt,
   getAllOts,
@@ -60,6 +61,25 @@ exports.updateOtdetail = async (req, res) => {
     }
 
     await updateOt(id, payload, res);
+  } catch (error) {
+    return errorResponse(res, error.message, "Error updating OT detail", 500);
+  }
+};
+exports.approve_reject_updateOtdetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const payload = req.body;
+    const { error } = updateOTSchema.validate(payload, { abortEarly: false });
+    if (error) {
+      const errorMessages = error.details.reduce((acc, err) => {
+        acc[err.path[0]] = err.message;
+        return acc;
+      }, {});
+
+      return errorResponse(res, errorMessages, "Validation Error", 403);
+    }
+
+    await approve_reject_updateOt(id, payload, res);
   } catch (error) {
     return errorResponse(res, error.message, "Error updating OT detail", 500);
   }
