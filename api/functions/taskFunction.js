@@ -955,7 +955,6 @@ exports.updateTask = async (id, payload, res) => {
         created_by = IF(? = created_by, created_by, ?),
         updated_by = IF(? = updated_by, updated_by, ?),
         deleted_at = IF(? = deleted_at, deleted_at, ?),
-        created_at = IF(? = created_at, created_at, ?),
         updated_at = NOW()
       WHERE id = ?
     `;
