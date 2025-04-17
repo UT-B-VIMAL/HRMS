@@ -181,7 +181,8 @@ exports.get_individualStatus = async (req, res) => {
                 users.employee_id,
                 COUNT(tasks.id) AS assigned_tasks,
                 SUM(CASE WHEN tasks.status = 1 THEN 1 ELSE 0 END) AS ongoing_tasks,
-                SUM(CASE WHEN tasks.status = 3 THEN 1 ELSE 0 END) AS completed_tasks
+                SUM(CASE WHEN tasks.status = 3 THEN 1 ELSE 0 END) AS completed_tasks,
+                MIN(tasks.created_at) AS task_created_at
             FROM users
             LEFT JOIN tasks ON tasks.user_id = users.id AND tasks.deleted_at IS NULL
             WHERE users.deleted_at IS NULL
@@ -195,23 +196,22 @@ exports.get_individualStatus = async (req, res) => {
         `;
 
         let whereConditions = [];
-
-        if (team_id) whereConditions.push(`users.team_id = ?`);
-        if (from_date && to_date) {
-            whereConditions.push(`tasks.created_at BETWEEN ? AND ?`);
-        }
-
-        if (search) {
-            whereConditions.push(`(users.first_name LIKE ? OR users.employee_id LIKE ?)`); 
-        }
-
         const queryParams = [];
-        if (team_id) queryParams.push(team_id);
+
+        if (team_id) {
+            whereConditions.push(`users.team_id = ?`);
+            queryParams.push(team_id);
+        }
+
         if (from_date && to_date) {
-            queryParams.push(from_date, to_date);
+            const fromDateTime = `${from_date} 00:00:00`;
+            const toDateTime = `${to_date} 23:59:59`;
+            whereConditions.push(`tasks.created_at BETWEEN ? AND ?`);
+            queryParams.push(fromDateTime, toDateTime);
         }
 
         if (search) {
+            whereConditions.push(`(users.first_name LIKE ? OR users.employee_id LIKE ?)`);
             queryParams.push(`%${search}%`, `%${search}%`);
         }
 
@@ -235,6 +235,7 @@ exports.get_individualStatus = async (req, res) => {
             assigned_tasks: user.assigned_tasks || 0,
             ongoing_tasks: user.ongoing_tasks || 0,
             completed_tasks: user.completed_tasks || 0,
+            task_created_at: user.task_created_at || null,
         }));
 
         successResponse(res, data, data.length === 0 ? 'No Individual status found' : 'Individual status retrieved successfully', 200, pagination);
@@ -244,6 +245,7 @@ exports.get_individualStatus = async (req, res) => {
         return errorResponse(res, error.message, 'Server error', 500);
     }
 };
+
 
 
 
