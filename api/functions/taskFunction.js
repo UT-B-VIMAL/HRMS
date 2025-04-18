@@ -3055,8 +3055,8 @@ exports.getWorkReportData = async (queryParams, res) => {
   -- Mark as completed if status or active_status is not 1 (not in progress)
   CASE 
     WHEN (
-      (su.subtask_id IS NULL AND t.active_status != 1) 
-      OR (su.subtask_id IS NOT NULL AND st.active_status != 1)
+      (su.subtask_id IS NULL AND t.status = 3 AND) 
+      OR (su.subtask_id IS NOT NULL AND st.status = 3)
     ) THEN 
       CASE 
         WHEN su.subtask_id IS NULL THEN t.name
