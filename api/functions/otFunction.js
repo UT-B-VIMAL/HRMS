@@ -859,7 +859,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       ${otWhereClause} 
       AND ot.deleted_at IS NULL 
       ORDER BY 
-        ot.id DESC
+        ot.updated_at DESC
     `;
 
     const [ots] = await db.query(otQuery, otValues);
@@ -1318,7 +1318,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
         ${otWhereClause}
         AND ot.deleted_at IS NULL
         ORDER BY 
-          ot.id DESC
+          ot.updated_at DESC
       `;
 
     // Execute the query
