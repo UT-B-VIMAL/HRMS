@@ -30,7 +30,16 @@ exports.getAttendance = async (req, res) => {
     const user = await getAuthUserDetails(user_id, res);
     const today = new Date().toISOString().slice(0, 10);
     const dynamicDate = date || today;
+    if (user.role_id == 3) {
+      const [teamResult] = await db.query(
+        `SELECT reporting_user_id FROM teams WHERE id = ?`,
+        [user.team_id]
+      );
 
+      if (!teamResult.length || teamResult[0].reporting_user_id === null) {
+        return errorResponse(res, null, "No teams found for the given user_id", 400);
+      }
+    }
     // Base Query
     query = `
       SELECT 
