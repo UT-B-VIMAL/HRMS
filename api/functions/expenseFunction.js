@@ -661,7 +661,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
     // Handle status conditions
     switch (status) {
       case "0":
-        otConditions.push("et.tl_status != 0 AND et.pm_status = 0");
+        otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
         break;
       case "1":
         otConditions.push(
