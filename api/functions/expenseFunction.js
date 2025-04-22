@@ -703,6 +703,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
+        u.role_id,
         tm.name AS team_name,
         d.name AS designation
       FROM 
@@ -737,6 +738,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
       employee_name: `${row.user_first_name} ${row.user_last_name}`,
       employee_id: row.employee_id,
       designation: row.designation,
+      role_id: row.role_id,
       date: row.date,
       category: row.category,
       project_name: row.project_name,
@@ -1107,6 +1109,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
+        u.role_id,
         d.name AS designation,
         et.category,
         et.description,
@@ -1139,6 +1142,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       employee_name: `${row.user_first_name} ${row.user_last_name}`.trim(),
       employee_id: row.employee_id,
       designation: row.designation,
+      role_id: row.role_id,
       date: row.date,
       category: row.category,
       description: row.description,
