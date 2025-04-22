@@ -141,7 +141,7 @@ exports.getAlltickets = async (req, res) => {
             countValues.push( searchPattern,searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
         }
 
-        query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
+        query += ` ORDER BY t.updated_at DESC LIMIT ? OFFSET ?`;
         values.push(parseInt(perPage), parseInt(offset));
 
         const [result] = await db.query(query, values);
