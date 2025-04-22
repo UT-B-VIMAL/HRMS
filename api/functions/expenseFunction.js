@@ -661,7 +661,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
     // Handle status conditions
     switch (status) {
       case "0":
-        otConditions.push("et.tl_status != 0 AND et.pm_status = 0");
+        otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
         break;
       case "1":
         otConditions.push(
@@ -1076,13 +1076,13 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     // Status-based filtering
     switch (status) {
       case "0": // All statuses must be 0
-        otConditions.push("et.status = 0 AND et.tl_status = 0");
+        otConditions.push("(et.status = 0 AND et.tl_status = 0)");
         break;
-      case "1": // et.status must be 1, and at least one of tl_status or pm_status must be 1
+      case "1": // et.status must) be 1, and at least one of tl_status or pm_status must be 1
         otConditions.push("(et.tl_status = 1 OR et.pm_status = 1)");
         break;
       case "2": // All statuses must be 2
-        otConditions.push("et.tl_status = 2 OR et.pm_status = 2");
+        otConditions.push("(et.tl_status = 2 OR et.pm_status = 2)");
         break;
       default:
         return errorResponse(
@@ -1126,6 +1126,8 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       ORDER BY 
         et.updated_at DESC
     `;
+    console.log(otQuery);
+    
 
     const [ots] = await db.query(otQuery, otValues);
 
