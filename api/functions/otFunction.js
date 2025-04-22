@@ -842,6 +842,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
+        u.role_id,
         d.name AS designation,
         te.name AS team_name
       FROM 
@@ -877,6 +878,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
             employee_name: `${row.user_first_name} ${row.user_last_name}`,
             employee_id: row.employee_id,
             designation: row.designation,
+            role_id: row.role_id,
             team_name: row.team_name,
             total_hours: "00:00:00",
             pending_counts: 0,
@@ -923,6 +925,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       employee_name: group.employee_name,
       employee_id: group.employee_id,
       designation: group.designation,
+      role_id: group.role_id,
       team_name: group.team_name,
       total_hours: group.total_hours,
       pending_counts: group.pending_counts,
@@ -1304,6 +1307,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
           u.first_name AS user_first_name,
           u.last_name AS user_last_name,
           u.employee_id,
+          u.role_id,
           d.name AS designation
         FROM 
           ot_details ot
@@ -1341,6 +1345,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               employee_name: `${row.user_first_name} ${row.user_last_name}`,
               employee_id: row.employee_id,
               designation: row.designation,
+              role_id: row.role_id,
               pending_counts: 0,
               details: [],
             };
@@ -1349,6 +1354,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               employee_name: `${row.user_first_name} ${row.user_last_name}`,
               employee_id: row.employee_id,
               designation: row.designation,
+              role_id: row.role_id,
               details: [],
             };
           }
@@ -1388,6 +1394,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
       employee_name: group.employee_name,
       employee_id: group.employee_id,
       designation: group.designation,
+      role_id: group.role_id,
       pending_counts: group.pending_counts,
       details: group.details,
     }));
