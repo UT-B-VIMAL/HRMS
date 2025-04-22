@@ -801,7 +801,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
       switch (status) {
         case "0":
-          otConditions.push("ot.tl_status != 0 AND ot.pm_status = 0");
+          otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
           break;
 
         case "1":
@@ -1268,12 +1268,12 @@ exports.getAlltlemployeeOts = async (req, res) => {
 
         case "1":
           // ot.status must be 1, and at least one of tl_status or pm_status must be 1
-          otConditions.push("ot.tl_status = 1 OR ot.pm_status = 1");
+          otConditions.push("(ot.tl_status = 1 OR ot.pm_status = 1)");
           break;
 
         case "2":
           // All statuses must be 2
-          otConditions.push("ot.tl_status = 2 OR ot.pm_status = 2");
+          otConditions.push("(ot.tl_status = 2 OR ot.pm_status = 2)");
           break;
 
         default:
