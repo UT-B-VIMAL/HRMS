@@ -158,7 +158,7 @@ exports.createOt = async (payload, res, req) => {
     const insertQuery = `
       INSERT INTO ot_details (
         user_id, product_id, project_id, task_id, team_id, comments, status, tl_status, date, time, created_by, updated_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
     const values = [
       user_id,
@@ -209,21 +209,29 @@ exports.createOt = async (payload, res, req) => {
 
         // Notification payload
         const notificationPayload = {
-          title: 'Review Employee OT Requests',
-          body: 'Pending overtime requests for your team. Review and approve/reject as necessary.',
+          title: "Review Employee OT Requests",
+          body: "Pending overtime requests for your team. Review and approve/reject as necessary.",
         };
 
         const socketIds = userSockets[reportingUserId];
 
         if (Array.isArray(socketIds)) {
           socketIds.forEach((socketId) => {
-            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
+            req.io
+              .of("/notifications")
+              .to(socketId)
+              .emit("push_notification", notificationPayload);
           });
         }
 
         await db.execute(
-          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
-          [reportingUserId, notificationPayload.title, notificationPayload.body, 0]
+          "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+          [
+            reportingUserId,
+            notificationPayload.title,
+            notificationPayload.body,
+            0,
+          ]
         );
       }
     }
@@ -400,6 +408,8 @@ exports.getAllOts = async (req, res) => {
           ot.time,
           ot.comments,
           ot.status,
+          ot.tl_status,
+          ot.pm_status,
           ot.id AS ot_id,
           ot.user_id,
           u.employee_id,
@@ -438,6 +448,8 @@ exports.getAllOts = async (req, res) => {
       task_name: row.task_name,
       comments: row.comments,
       status: row.status,
+      tl_status: row.tl_status,
+      pm_status: row.pm_status,
       user_name: `${row.user_first_name} ${row.user_last_name}`,
     }));
 
@@ -789,7 +801,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
       switch (status) {
         case "0":
-          otConditions.push("ot.tl_status != 0 AND ot.pm_status = 0");
+          otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
           break;
 
         case "1":
@@ -797,9 +809,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
           break;
 
         case "2":
-          otConditions.push(
-            "ot.pm_status = 2 AND (ot.tl_status = 2 OR ot.status = 2)"
-          );
+          otConditions.push("ot.pm_status = 2 OR ot.tl_status = 2");
           break;
 
         default:
@@ -832,6 +842,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
+        u.role_id,
         d.name AS designation,
         te.name AS team_name
       FROM 
@@ -849,7 +860,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       ${otWhereClause} 
       AND ot.deleted_at IS NULL 
       ORDER BY 
-        ot.id DESC
+        ot.created_at DESC
     `;
 
     const [ots] = await db.query(otQuery, otValues);
@@ -867,6 +878,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
             employee_name: `${row.user_first_name} ${row.user_last_name}`,
             employee_id: row.employee_id,
             designation: row.designation,
+            role_id: row.role_id,
             team_name: row.team_name,
             total_hours: "00:00:00",
             pending_counts: 0,
@@ -913,6 +925,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       employee_name: group.employee_name,
       employee_id: group.employee_id,
       designation: group.designation,
+      role_id: group.role_id,
       team_name: group.team_name,
       total_hours: group.total_hours,
       pending_counts: group.pending_counts,
@@ -926,20 +939,20 @@ exports.getAllpmemployeeOts = async (req, res) => {
       AND ot.pm_status = 0
       AND ot.deleted_at IS NULL
   `;
-  const [countResult] = await db.query(countZeroQuery);
-  const statusZeroCount = countResult[0]?.count || 0;
-  successResponse(
-    res,
-    {
-      data: formattedData,
-      pagination,
-      otpm_status_zero_count: statusZeroCount,
-    },
-    formattedData.length === 0
-      ? "No OT details found"
-      : "OT details retrieved successfully",
-    200
-  );
+    const [countResult] = await db.query(countZeroQuery);
+    const statusZeroCount = countResult[0]?.count || 0;
+    successResponse(
+      res,
+      {
+        data: formattedData,
+        pagination,
+        otpm_status_zero_count: statusZeroCount,
+      },
+      formattedData.length === 0
+        ? "No OT details found"
+        : "OT details retrieved successfully",
+      200
+    );
   } catch (error) {
     console.error("Error fetching OT details:", error);
     return errorResponse(res, error.message, "Server error", 500);
@@ -969,7 +982,6 @@ exports.approve_reject_ot = async (payload, res, req) => {
   const { user_id, status, updated_by, role } = payload;
 
   try {
-
     // Validate required fields
     if (!user_id) {
       return errorResponse(
@@ -1037,7 +1049,7 @@ exports.approve_reject_ot = async (payload, res, req) => {
         404
       );
     }
-    
+
     // Build the update query based on role
     let updateQuery = `
       UPDATE ot_details
@@ -1072,27 +1084,29 @@ exports.approve_reject_ot = async (payload, res, req) => {
         400
       );
     }
-    if(role === "pm" && status === "2") {
-    // Send notification to the user
-    const notificationPayload = {
-      title: status === 2 ? "Overtime Approved" : "Overtime Rejected",
-      body: `Your overtime request for ${date} has been ${
-        status === 2 ? "approved" : "rejected"
-      }.`,
-    };
+    if (role === "pm" && status === "2") {
+      // Send notification to the user
+      const notificationPayload = {
+        title: status === 2 ? "Overtime Approved" : "Overtime Rejected",
+        body: `Your overtime request for ${date} has been ${
+          status === 2 ? "approved" : "rejected"
+        }.`,
+      };
 
-    const socketIds = userSockets[user_id];
-    if (Array.isArray(socketIds)) {
-      socketIds.forEach((socketId) => {
-       
-        req.io.of("/notifications").to(socketId).emit("push_notification", notificationPayload);
-      });
+      const socketIds = userSockets[user_id];
+      if (Array.isArray(socketIds)) {
+        socketIds.forEach((socketId) => {
+          req.io
+            .of("/notifications")
+            .to(socketId)
+            .emit("push_notification", notificationPayload);
+        });
+      }
+      await db.execute(
+        "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+        [user_id, notificationPayload.title, notificationPayload.body, 0]
+      );
     }
-    await db.execute(
-      "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-      [user_id, notificationPayload.title, notificationPayload.body, 0]
-    );
-  }
 
     // Return success response immediately
     successResponse(
@@ -1103,7 +1117,6 @@ exports.approve_reject_ot = async (payload, res, req) => {
 
     // Handle notification sending asynchronously
     if (role == "tl" && status == "2") {
-
       (async () => {
         const pmUsersQuery = `
           SELECT id FROM users 
@@ -1120,26 +1133,27 @@ exports.approve_reject_ot = async (payload, res, req) => {
           if (Array.isArray(pmSocketIds)) {
             pmSocketIds.forEach((socketId) => {
               req.io
-                .of("/notifications").to(socketId)
+                .of("/notifications")
+                .to(socketId)
                 .emit("push_notification", pmNotificationPayload);
             });
           }
 
           await db.execute(
             "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-            [pmUser.id, pmNotificationPayload.title, pmNotificationPayload.body, 0]
+            [
+              pmUser.id,
+              pmNotificationPayload.title,
+              pmNotificationPayload.body,
+              0,
+            ]
           );
         }
       })();
     }
   } catch (error) {
     console.error("Error approving or rejecting OT details:", error.message);
-    return errorResponse(
-      res,
-      error.message,
-      "Error updating OT details",
-      500
-    );
+    return errorResponse(res, error.message, "Error updating OT details", 500);
   }
 };
 
@@ -1254,12 +1268,12 @@ exports.getAlltlemployeeOts = async (req, res) => {
 
         case "1":
           // ot.status must be 1, and at least one of tl_status or pm_status must be 1
-          otConditions.push("ot.tl_status = 1 OR ot.pm_status = 1");
+          otConditions.push("(ot.tl_status = 1 OR ot.pm_status = 1)");
           break;
 
         case "2":
           // All statuses must be 2
-          otConditions.push("ot.tl_status = 2");
+          otConditions.push("(ot.tl_status = 2 OR ot.pm_status = 2)");
           break;
 
         default:
@@ -1293,6 +1307,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
           u.first_name AS user_first_name,
           u.last_name AS user_last_name,
           u.employee_id,
+          u.role_id,
           d.name AS designation
         FROM 
           ot_details ot
@@ -1307,7 +1322,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
         ${otWhereClause}
         AND ot.deleted_at IS NULL
         ORDER BY 
-          ot.id DESC
+          ot.created_at DESC
       `;
 
     // Execute the query
@@ -1330,6 +1345,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               employee_name: `${row.user_first_name} ${row.user_last_name}`,
               employee_id: row.employee_id,
               designation: row.designation,
+              role_id: row.role_id,
               pending_counts: 0,
               details: [],
             };
@@ -1338,6 +1354,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               employee_name: `${row.user_first_name} ${row.user_last_name}`,
               employee_id: row.employee_id,
               designation: row.designation,
+              role_id: row.role_id,
               details: [],
             };
           }
@@ -1377,6 +1394,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
       employee_name: group.employee_name,
       employee_id: group.employee_id,
       designation: group.designation,
+      role_id: group.role_id,
       pending_counts: group.pending_counts,
       details: group.details,
     }));
@@ -1566,5 +1584,292 @@ exports.getOtReportData = async (queryParams, res) => {
   } catch (error) {
     console.error("Error generating OT report:", error);
     return errorResponse(res, error.message, "Server error", 500);
+  }
+};
+
+// Update OT
+exports.approve_reject_updateOt = async (id, payload, res) => {
+  const {
+    date,
+    time,
+    tltime,
+    pmtime,
+    project_id,
+    task_id,
+    user_id,
+    comments,
+    updated_by,
+    approve_reject_flag,
+    role,
+  } = payload;
+
+  if (!approve_reject_flag || ![1, 2].includes(Number(approve_reject_flag))) {
+    return errorResponse(
+      res,
+      "approve_reject_flag is required and must be either 1 (reject) or 2 (approve)",
+      "Error updating OT details",
+      400
+    );
+  }
+  
+  if (!role) {
+    return errorResponse(
+      res,
+      "Role is required",
+      "Error updating OT details",
+      400
+    );
+  }
+  if (!updated_by) {
+    return errorResponse(
+      res,
+      "Updated_by is required",
+      "Error updating OT details",
+      400
+    );
+  }
+
+  const updatedByQuery = `
+  SELECT id FROM users 
+  WHERE deleted_at IS NULL AND id = ?
+`;
+  const [updatedByResult] = await db.query(updatedByQuery, [updated_by]);
+
+  if (updatedByResult.length === 0) {
+    return errorResponse(
+      res,
+      "Updated_by user not found or deleted",
+      "Error fetching OT details",
+      404
+    );
+  }
+
+  const formatTime = (timeValue, fieldName) => {
+    if (timeValue) {
+      const timeMatch = timeValue.match(
+        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      );
+
+      if (!timeMatch) {
+        return errorResponse(
+          res,
+          null,
+          `Invalid format for ${fieldName}. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".`,
+          400
+        );
+      }
+
+      const days = parseInt(timeMatch[2] || "0", 10);
+      const hours = parseInt(timeMatch[4] || "0", 10);
+      const minutes = parseInt(timeMatch[6] || "0", 10);
+      const seconds = parseInt(timeMatch[8] || "0", 10);
+
+      if (
+        days < 0 ||
+        hours < 0 ||
+        minutes < 0 ||
+        seconds < 0 ||
+        minutes >= 60 ||
+        seconds >= 60
+      ) {
+        return errorResponse(
+          res,
+          null,
+          `Invalid time values in ${fieldName}`,
+          400
+        );
+      }
+
+      // Convert days to hours and calculate total hours
+      const totalHours = days * 8 + hours;
+
+      // Format as "HH:MM:SS"
+      return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(
+        2,
+        "0"
+      )}:${String(seconds).padStart(2, "0")}`;
+    }
+    return null; // If timeValue is null/undefined, return null
+  };
+
+  // Apply the function to time, pmtime, and tltime
+  payload.time = formatTime(time, "time");
+  payload.pmtime = formatTime(pmtime, "pmtime");
+  payload.tltime = formatTime(tltime, "tltime");
+
+  try {
+    const checkQuery = `
+        SELECT id 
+        FROM ot_details 
+        WHERE id = ? AND deleted_at IS NULL
+      `;
+    const [existingOt] = await db.query(checkQuery, [id]);
+
+    if (existingOt.length === 0) {
+      return errorResponse(
+        res,
+        "OT detail not found or already deleted",
+        "Error updating OT",
+        404
+      );
+    }
+
+    const projectQuery = `
+        SELECT product_id 
+        FROM projects 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+    const [projectResult] = await db.query(projectQuery, [project_id]);
+
+    if (projectResult.length === 0) {
+      return errorResponse(
+        res,
+        "Project not found or deleted",
+        "Error updating OT",
+        404
+      );
+    }
+    const { product_id } = projectResult[0];
+
+    const productQuery = `
+        SELECT id 
+        FROM products 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+    const [productResult] = await db.query(productQuery, [product_id]);
+
+    if (productResult.length === 0) {
+      return errorResponse(
+        res,
+        "Product not found or deleted",
+        "Error updating OT",
+        404
+      );
+    }
+
+    const taskQuery = `
+        SELECT id 
+        FROM tasks 
+        WHERE deleted_at IS NULL AND id = ? AND project_id = ?
+      `;
+    const [taskResult] = await db.query(taskQuery, [task_id, project_id]);
+
+    if (taskResult.length === 0) {
+      return errorResponse(
+        res,
+        "Task not found or does not belong to the specified project",
+        "Error updating OT",
+        404
+      );
+    }
+
+    const userQuery = `
+        SELECT id 
+        FROM users 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+    const [userResult] = await db.query(userQuery, [user_id]);
+
+    if (userResult.length === 0) {
+      return errorResponse(
+        res,
+        "User not found or deleted",
+        "Error updating OT",
+        404
+      );
+    }
+
+    let statusColumn = "";
+    if (role === "tl") {
+      statusColumn = "tl_status = ?";
+    } else if (role === "pm" || role === "admin") {
+      statusColumn = "pm_status = ?";
+    } else {
+      return errorResponse(
+        res,
+        "Invalid role",
+        "Error updating OT details",
+        400
+      );
+    }
+
+    // Final update query
+    const updateQuery = `
+  UPDATE ot_details 
+  SET 
+    ${statusColumn},
+    status = ?, 
+    user_id = ?, 
+    product_id = ?, 
+    project_id = ?, 
+    task_id = ?, 
+    comments = ?, 
+    date = ?, 
+    time = ?, 
+    tledited_time = ?, 
+    pmedited_time = ?, 
+    updated_by = ?, 
+    updated_at = NOW() 
+  WHERE id = ? AND deleted_at IS NULL
+`;
+
+    // Match the ? placeholders in order
+    const values = [
+      approve_reject_flag, // tl_status or pm_status value
+      approve_reject_flag, // tl_status or pm_status value
+      user_id,
+      product_id,
+      project_id,
+      task_id,
+      comments,
+      date,
+      payload.time,
+      payload.tltime,
+      payload.pmtime,
+      updated_by,
+      id,
+    ];
+
+    const [result] = await db.query(updateQuery, values);
+
+    if (result.affectedRows === 0) {
+      return errorResponse(
+        res,
+        "OT detail not found or no changes made",
+        "Error updating OT",
+        404
+      );
+    }
+
+    const selectQuery = `
+        SELECT status 
+        FROM ot_details 
+        WHERE id = ?
+      `;
+    const [statusResult] = await db.query(selectQuery, [id]);
+
+    const status = statusResult.length > 0 ? statusResult[0].status : 0;
+
+    return successResponse(
+      res,
+      {
+        id,
+        task_id,
+        project_id,
+        product_id,
+        status,
+        user_id,
+        updated_by,
+        date,
+        tltime,
+        pmtime,
+        comments,
+      },
+      "OT detail updated successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Error updating OT detail:", error.message);
+    return errorResponse(res, error.message, "Error updating OT detail", 500);
   }
 };

@@ -61,7 +61,7 @@ exports.getAlltickets = async (req, res) => {
                 t.id,
                 t.user_id,
                 COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS name, 
-                CONVERT_TZ(t.created_at, '+00:00', '+05:30') AS created_at,
+                t.created_at AS created_at,
                 t.description,
                 i.issue_name AS issue_type,
                 CONVERT_TZ(t.issue_date, '+00:00', '+05:30') AS issue_date,
@@ -141,7 +141,7 @@ exports.getAlltickets = async (req, res) => {
             countValues.push( searchPattern,searchPattern, searchPattern,searchPattern, searchPattern, searchPattern);
         }
 
-        query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
+        query += ` ORDER BY t.updated_at DESC LIMIT ? OFFSET ?`;
         values.push(parseInt(perPage), parseInt(offset));
 
         const [result] = await db.query(query, values);

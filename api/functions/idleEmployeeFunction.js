@@ -148,41 +148,96 @@ exports.get_idleEmployee = async (req, res) => {
 };
 
 const getPendingTasksCount = async (userId) => {
-  try {
-    // First, check if the user has sub_tasks
-    const [subTasksCount] = await db.query(
-      `SELECT COUNT(*) AS pending_count 
-       FROM sub_tasks 
-       WHERE user_id = ? 
-       AND (status = 0 OR status = 1) 
-       AND active_status = 0
-       AND deleted_at IS NULL`,
-      [userId]
-    );
+    try {
+      let toDoCount = 0;
+      let onHoldCount = 0;
+      let reopenedCount = 0;
+  
+      // 1. Get all subtasks for the user
+      const [subTasks] = await db.query(
+        `SELECT status, active_status, reopen_status 
+         FROM sub_tasks 
+         WHERE user_id = ? 
+         AND deleted_at IS NULL`,
+        [userId]
+      );
+  
+      // 2. Get all tasks for the user
+      const [tasks] = await db.query(
+        `SELECT id, status, active_status, reopen_status 
+         FROM tasks 
+         WHERE user_id = ? 
+         AND deleted_at IS NULL`,
+        [userId]
+      );
+  
+      // 3. Count subtasks
+      for (const task of subTasks) {
+        if (task.status === 1 && task.active_status === 0) {
+          onHoldCount++;
+        } else if (task.status === 0 && task.reopen_status === 1) {
+          reopenedCount++;
+        } else if (task.status === 0 && task.active_status === 0) {
+          toDoCount++;
+        }
+      }
+  
+      // 4. Count tasks (only if they have no subtasks)
+      for (const task of tasks) {
+        // Check if this task has subtasks
+        const [subTaskCheck] = await db.query(
+          `SELECT COUNT(*) AS count FROM sub_tasks 
+           WHERE task_id = ? AND deleted_at IS NULL`,
+          [task.id]
+        );
+        const hasSubTasks = parseInt(subTaskCheck[0]?.count || 0) > 0;
+  
+        if (!hasSubTasks) {
+          if (task.status === 1 && task.active_status === 0) {
+            onHoldCount++;
+          } else if (task.status === 0 && task.reopen_status === 1) {
+            reopenedCount++;
+          } else if (task.status === 0 && task.active_status === 0) {
+            toDoCount++;
+          }
+        }
+      }
+  
+      // 5. Return based on priority logic
+      if (onHoldCount > 0) {
+        return {
+          reason: "On Hold",
+          count: onHoldCount
+        };
+      }
+  
+      if (toDoCount > 0) {
+        return {
+          reason: "Task Not Yet Started",
+          count: toDoCount
+        };
+      }
 
-    // If sub_tasks are found, return the count from sub_tasks
-    if (subTasksCount && subTasksCount[0].pending_count > 0) {
-      return subTasksCount[0].pending_count;
+      if (reopenedCount > 0) {
+        return {
+          reason: "Re-opened",
+          count: reopenedCount
+        };
+      }
+  
+      return {
+        reason: "Task Unassigned",
+        count: 0
+      };
+    } catch (error) {
+      console.error("Error in getPendingTasksCountWithStatus:", error);
+      return {
+        reason: "Error retrieving data",
+        count: 0
+      };
     }
-
-    // If no sub_tasks, check the tasks table for pending tasks
-    const [tasksCount] = await db.query(
-      `SELECT COUNT(*) AS pending_count 
-       FROM tasks 
-       WHERE user_id = ? 
-       AND (status = 0 OR status = 1) 
-       AND active_status = 0
-       AND deleted_at IS NULL`,
-      [userId]
-    );
-
-    return tasksCount[0].pending_count;
-
-  } catch (error) {
-    console.error("Error in getPendingTasksCount:", error);
-    throw new Error("Error retrieving pending tasks count");
-  }
-};
+  };
+  
 
 const getIdleReason = async (userId) => {
   try {
@@ -208,6 +263,10 @@ const getIdleReason = async (userId) => {
 
     if (allTasks.some(task => task.status === 1 && task.active_status === 0)) {
       return "On Hold";
+    }
+
+    if (allTasks.some(task => task.status === 0 && task.reopen_status === 1)) {
+      return "Re-opened";
     }
 
     if (allTasks.some(task => task.status === 0 && task.active_status === 0)) {

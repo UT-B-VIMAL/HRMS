@@ -88,7 +88,7 @@ exports.createexpense = async (req, res) => {
     const insertQuery = `
         INSERT INTO expense_details (
           user_id, category, team_id, description, expense_amount, date, file, status, tl_status, created_by, updated_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
     const values = [
       user_id,
@@ -661,16 +661,16 @@ exports.getAllpmemployeexpense = async (req, res) => {
     // Handle status conditions
     switch (status) {
       case "0":
-        otConditions.push("et.tl_status != 0 AND et.pm_status = 0");
+        otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
         break;
       case "1":
         otConditions.push(
-          "et.tl_status = 1 AND et.pm_status = 1"
+          "et.tl_status = 1 OR et.pm_status = 1"
         );
         break;
       case "2":
         otConditions.push(
-          "et.pm_status = 2 AND et.tl_status = 2 AND et.status = 2"
+          "et.pm_status = 2 OR et.tl_status = 2"
         );
         break;
       default:
@@ -703,6 +703,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
+        u.role_id,
         tm.name AS team_name,
         d.name AS designation
       FROM 
@@ -718,7 +719,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
       ${otWhereClause}
       AND et.deleted_at IS NULL
       ORDER BY 
-        et.id
+        et.updated_at DESC
     `;
 
     // Execute the query
@@ -737,6 +738,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
       employee_name: `${row.user_first_name} ${row.user_last_name}`,
       employee_id: row.employee_id,
       designation: row.designation,
+      role_id: row.role_id,
       date: row.date,
       category: row.category,
       project_name: row.project_name,
@@ -1074,13 +1076,13 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     // Status-based filtering
     switch (status) {
       case "0": // All statuses must be 0
-        otConditions.push("et.status = 0 AND et.tl_status = 0");
+        otConditions.push("(et.status = 0 AND et.tl_status = 0)");
         break;
-      case "1": // et.status must be 1, and at least one of tl_status or pm_status must be 1
+      case "1": // et.status must) be 1, and at least one of tl_status or pm_status must be 1
         otConditions.push("(et.tl_status = 1 OR et.pm_status = 1)");
         break;
       case "2": // All statuses must be 2
-        otConditions.push("et.tl_status = 2");
+        otConditions.push("(et.tl_status = 2 OR et.pm_status = 2)");
         break;
       default:
         return errorResponse(
@@ -1107,6 +1109,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.employee_id,
+        u.role_id,
         d.name AS designation,
         et.category,
         et.description,
@@ -1121,8 +1124,10 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       ${otWhereClause}
       AND et.deleted_at IS NULL
       ORDER BY 
-        et.id
+        et.updated_at DESC
     `;
+    console.log(otQuery);
+    
 
     const [ots] = await db.query(otQuery, otValues);
 
@@ -1139,6 +1144,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       employee_name: `${row.user_first_name} ${row.user_last_name}`.trim(),
       employee_id: row.employee_id,
       designation: row.designation,
+      role_id: row.role_id,
       date: row.date,
       category: row.category,
       description: row.description,
