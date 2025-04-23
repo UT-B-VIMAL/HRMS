@@ -485,6 +485,7 @@ exports.fetchStatisticschart = async (req, res) => {
           400
         );
       }
+      
 
       const dateParts = date.split(/[\s_]/);
 
