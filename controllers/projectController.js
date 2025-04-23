@@ -6,6 +6,7 @@ const {
   getAllProjects,
   projectRequest,
   projectStatus,
+  projectStatus_ToDo,
   getRequestupdate,
   getRequestchange
 } = require('../api/functions/projectFunction');
@@ -68,7 +69,13 @@ const projectController = {
 
 project_status: async (req, res) => {
   try {
-    await projectStatus(req,res);
+    const { status } = req.params;
+    if (status == 0) {
+      await projectStatus_ToDo(req, res);
+    } else {
+      await projectStatus(req,res);
+    }
+    
 } catch (error) {
     return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
 }
