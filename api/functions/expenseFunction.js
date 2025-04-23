@@ -754,7 +754,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
     const countZeroQuery = `
     SELECT COUNT(*) AS count
     FROM expense_details et
-    WHERE et.tl_status != 0
+    WHERE et.tl_status = 2
       AND et.pm_status = 0
       AND et.deleted_at IS NULL
   `;
