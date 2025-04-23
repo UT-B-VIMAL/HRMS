@@ -69,8 +69,9 @@ const projectController = {
 
 project_status: async (req, res) => {
   try {
-    const { status } = req.params;
-    if (status == 0) {
+    const { status } = req.query;
+    console.log(status);
+    if (status == "0") {
       await projectStatus_ToDo(req, res);
     } else {
       await projectStatus(req,res);
