@@ -34,11 +34,11 @@ exports.fetchPendingTask = async (req, res) => {
         WHERE t.deleted_at IS NULL
       `;
     const [tasks] = await db.query(tasksQuery);
-    
+
     const result = await Promise.all(
       tasks.map(async (task) => {
         console.log(task.task_id);
-        
+
         // Fetch subtasks for each task
         const subtasksQuery = `
             SELECT 
@@ -62,8 +62,11 @@ exports.fetchPendingTask = async (req, res) => {
           subtasks.forEach((subtask) => {
             if (
               subtask.subtask_user_id === parseInt(userId) &&
-              subtask.subtask_status !== 3 && 
-              !(subtask.subtask_status === 2 && subtask.subtask_reopen_status === 0) // Check the subtask status and reopen_status
+              subtask.subtask_status !== 3 &&
+              !(
+                subtask.subtask_status === 2 &&
+                subtask.subtask_reopen_status === 0
+              ) // Check the subtask status and reopen_status
             ) {
               const estimatedSeconds = timeToSeconds(subtask.estimated_hours);
               const workedSeconds = timeToSeconds(subtask.total_hours_worked);
@@ -72,12 +75,15 @@ exports.fetchPendingTask = async (req, res) => {
               const remainingSeconds = estimatedSeconds - workedSeconds;
 
               const workedPercentage = estimatedSeconds
-                ? Math.round((workedSeconds / estimatedSeconds) * 100 * 100) / 100
+                ? Math.round((workedSeconds / estimatedSeconds) * 100 * 100) /
+                  100
                 : 0;
 
               const remainingPercentage = estimatedSeconds
                 ? Math.round(
-                    (Math.max(0, remainingSeconds) / estimatedSeconds) * 100 * 100
+                    (Math.max(0, remainingSeconds) / estimatedSeconds) *
+                      100 *
+                      100
                   ) / 100
                 : 0;
 
@@ -161,7 +167,6 @@ exports.fetchPendingTask = async (req, res) => {
   }
 };
 
-
 exports.fetchDailybreakdown = async (req, res) => {
   try {
     const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
@@ -195,8 +200,12 @@ exports.fetchDailybreakdown = async (req, res) => {
       const endTimeUTC = record.end_time ? new Date(record.end_time) : null;
 
       // Convert to IST (UTC+5:30)
-      const startTimeIST = new Date(startTimeUTC.getTime() + 5.5 * 60 * 60 * 1000);
-      const endTimeIST = endTimeUTC ? new Date(endTimeUTC.getTime() + 5.5 * 60 * 60 * 1000) : null;
+      const startTimeIST = new Date(
+        startTimeUTC.getTime() + 5.5 * 60 * 60 * 1000
+      );
+      const endTimeIST = endTimeUTC
+        ? new Date(endTimeUTC.getTime() + 5.5 * 60 * 60 * 1000)
+        : null;
 
       // Format times as h:i A (12-hour format)
       const formattedStartTime = startTimeIST.toLocaleTimeString("en-US", {
@@ -278,7 +287,6 @@ exports.fetchDailybreakdown = async (req, res) => {
   }
 };
 
-
 exports.fetchStatistics = async (req, res) => {
   try {
     const user_id = req.query.user_id;
@@ -292,7 +300,8 @@ exports.fetchStatistics = async (req, res) => {
 
     if (date) {
       // Updated regex to support 'MM_YYYY', 'MM YYYY', and 'MMM YYYY'
-      const monthYearRegex = /^(0[1-9]|1[0-2])[\s_](\d{4})$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s_](\d{4})$/;
+      const monthYearRegex =
+        /^(0[1-9]|1[0-2])[\s_](\d{4})$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s_](\d{4})$/;
 
       if (!monthYearRegex.test(date)) {
         return errorResponse(
@@ -307,12 +316,18 @@ exports.fetchStatistics = async (req, res) => {
       const dateParts = date.split(/[\s_]/);
 
       if (dateParts.length !== 2) {
-        return errorResponse(res, null, "Invalid date format. Use 'MMM YYYY', 'MM YYYY', or 'MM_YYYY'", 400);
+        return errorResponse(
+          res,
+          null,
+          "Invalid date format. Use 'MMM YYYY', 'MM YYYY', or 'MM_YYYY'",
+          400
+        );
       }
 
       if (isNaN(dateParts[0])) {
         // Format: "Mar 2024" or "Mar_2024"
-        selectedMonth = new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1;
+        selectedMonth =
+          new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1;
       } else {
         // Format: "03 2024" or "03_2024"
         selectedMonth = parseInt(dateParts[0], 10);
@@ -340,6 +355,18 @@ exports.fetchStatistics = async (req, res) => {
     let todoTaskCount = 0;
 
     for (const task of tasks) {
+      const checkSubtasksQuery = `
+    SELECT id 
+    FROM sub_tasks 
+    WHERE task_id = ? AND deleted_at IS NULL
+  `;
+      const [subtaskCheck] = await db.query(checkSubtasksQuery, [task.id]);
+
+      // If subtasks exist, skip this task
+      if (subtaskCheck.length > 0) {
+        continue;
+      }
+
       // Fetch subtasks for each task
       const subtasksQuery = `
         SELECT id, status, active_status, reopen_status, created_at 
@@ -350,23 +377,27 @@ exports.fetchStatistics = async (req, res) => {
 
       // Check if the task was created in the selected month and year
       const taskDate = new Date(task.created_at);
-      const isTaskInMonthYear = taskDate.getMonth() + 1 === selectedMonth && taskDate.getFullYear() === selectedYear;
+      const isTaskInMonthYear =
+        taskDate.getMonth() + 1 === selectedMonth &&
+        taskDate.getFullYear() === selectedYear;
 
       // Filter subtasks based on month and year
       const subtasksInMonthYear = subtasks.filter((subtask) => {
         const subtaskDate = new Date(subtask.created_at);
-        return subtaskDate.getMonth() + 1 === selectedMonth && subtaskDate.getFullYear() === selectedYear;
+        return (
+          subtaskDate.getMonth() + 1 === selectedMonth &&
+          subtaskDate.getFullYear() === selectedYear
+        );
       });
 
       if (subtasks.length === 0) {
-        
         if (isTaskInMonthYear) {
-          
           if (
-            (task.status === 1 &&
-            task.active_status === 1) ||
+            (task.status === 1 && task.active_status === 1) ||
             task.status === 3 ||
-            (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)
+            (task.status === 0 &&
+              task.reopen_status === 0 &&
+              task.active_status === 0)
           ) {
             totalTaskCount++;
           }
@@ -375,8 +406,11 @@ exports.fetchStatistics = async (req, res) => {
             inProgressTaskCount++;
           } else if (task.status === 3) {
             completedTaskCount++;
-          } else if (task.status === 0 && task.reopen_status === 0 && task.active_status === 0) {
-            
+          } else if (
+            task.status === 0 &&
+            task.reopen_status === 0 &&
+            task.active_status === 0
+          ) {
             todoTaskCount++;
           }
         }
@@ -385,14 +419,21 @@ exports.fetchStatistics = async (req, res) => {
           if (
             (task.status === 1 && task.active_status === 1) ||
             task.status === 3 ||
-            (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)
+            (task.status === 0 &&
+              task.reopen_status === 0 &&
+              task.active_status === 0)
           ) {
             totalTaskCount++;
           }
 
-          const allCompleted = subtasksInMonthYear.every((subtask) => subtask.status === 3);
+          const allCompleted = subtasksInMonthYear.every(
+            (subtask) => subtask.status === 3
+          );
           const allTodo = subtasksInMonthYear.every(
-            (subtask) => subtask.status === 0 && subtask.reopen_status === 0 && subtask.active_status === 0
+            (subtask) =>
+              subtask.status === 0 &&
+              subtask.reopen_status === 0 &&
+              subtask.active_status === 0
           );
           const inProgress = subtasksInMonthYear.some(
             (subtask) => subtask.status === 1 && subtask.active_status === 1
@@ -408,12 +449,16 @@ exports.fetchStatistics = async (req, res) => {
         }
       }
     }
-    const totalTaskCounts = completedTaskCount+todoTaskCount+inProgressTaskCount;
+    const totalTaskCounts =
+      completedTaskCount + todoTaskCount + inProgressTaskCount;
 
     // Calculate percentages
-    const completedPercentage = totalTaskCounts > 0 ? (completedTaskCount / totalTaskCounts) * 100 : 0;
-    const todoPercentage = totalTaskCounts > 0 ? (todoTaskCount / totalTaskCounts) * 100 : 0;
-    const inProgressPercentage = totalTaskCounts > 0 ? (inProgressTaskCount / totalTaskCounts) * 100 : 0;
+    const completedPercentage =
+      totalTaskCounts > 0 ? (completedTaskCount / totalTaskCounts) * 100 : 0;
+    const todoPercentage =
+      totalTaskCounts > 0 ? (todoTaskCount / totalTaskCounts) * 100 : 0;
+    const inProgressPercentage =
+      totalTaskCounts > 0 ? (inProgressTaskCount / totalTaskCounts) * 100 : 0;
 
     // Build the result
     const statisticsResult = {
@@ -426,13 +471,17 @@ exports.fetchStatistics = async (req, res) => {
       in_progress_percentage: Math.round(inProgressPercentage),
     };
 
-    return successResponse(res, statisticsResult, "Task statistics retrieved successfully", 200);
+    return successResponse(
+      res,
+      statisticsResult,
+      "Task statistics retrieved successfully",
+      200
+    );
   } catch (error) {
     console.error("Error fetching statistics:", error);
     return errorResponse(res, error.message, "Error fetching statistics", 500);
   }
 };
-
 
 exports.fetchStatisticschart = async (req, res) => {
   try {
@@ -447,7 +496,8 @@ exports.fetchStatisticschart = async (req, res) => {
 
     if (date) {
       // Updated regex to support 'MM_YYYY', 'MM YYYY', and 'MMM YYYY'
-      const monthYearRegex = /^(0[1-9]|1[0-2])[\s_](\d{4})$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s_](\d{4})$/;
+      const monthYearRegex =
+        /^(0[1-9]|1[0-2])[\s_](\d{4})$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s_](\d{4})$/;
 
       if (!monthYearRegex.test(date)) {
         return errorResponse(
@@ -462,12 +512,18 @@ exports.fetchStatisticschart = async (req, res) => {
       const dateParts = date.split(/[\s_]/);
 
       if (dateParts.length !== 2) {
-        return errorResponse(res, null, "Invalid date format. Use 'MMM YYYY', 'MM YYYY', or 'MM_YYYY'", 400);
+        return errorResponse(
+          res,
+          null,
+          "Invalid date format. Use 'MMM YYYY', 'MM YYYY', or 'MM_YYYY'",
+          400
+        );
       }
 
       if (isNaN(dateParts[0])) {
         // Format: "Mar 2024" or "Mar_2024"
-        selectedMonth = new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1;
+        selectedMonth =
+          new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1;
       } else {
         // Format: "03 2024" or "03_2024"
         selectedMonth = parseInt(dateParts[0], 10);
@@ -482,7 +538,7 @@ exports.fetchStatisticschart = async (req, res) => {
     }
 
     const totalDaysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-    
+
     // Distribute days into weeks dynamically
     const weekDays = [0, 0, 0, 0, 0]; // Up to 5 weeks
     let weekIndex = 0;
@@ -494,7 +550,7 @@ exports.fetchStatisticschart = async (req, res) => {
       }
     }
 
-    const weeksInMonth = weekDays.filter(week => week > 0).length;
+    const weeksInMonth = weekDays.filter((week) => week > 0).length;
 
     // Initialize week statistics
     const weekTaskCounts = Array.from({ length: weeksInMonth }, (_, i) => ({
@@ -517,6 +573,17 @@ exports.fetchStatisticschart = async (req, res) => {
     const [tasks] = await db.query(tasksQuery, [user_id]);
 
     for (const task of tasks) {
+      const checkSubtasksQuery = `
+    SELECT id 
+    FROM sub_tasks 
+    WHERE task_id = ? AND deleted_at IS NULL
+  `;
+      const [subtaskCheck] = await db.query(checkSubtasksQuery, [task.id]);
+
+      // If subtasks exist, skip this task
+      if (subtaskCheck.length > 0) {
+        continue;
+      }
       // Fetch subtasks for the task
       const subtasksQuery = `
         SELECT id, status, active_status, reopen_status, created_at 
@@ -527,7 +594,10 @@ exports.fetchStatisticschart = async (req, res) => {
 
       // Determine the week of the month based on created_at date
       const taskDate = new Date(task.created_at);
-      if (taskDate.getMonth() + 1 !== selectedMonth || taskDate.getFullYear() !== selectedYear) {
+      if (
+        taskDate.getMonth() + 1 !== selectedMonth ||
+        taskDate.getFullYear() !== selectedYear
+      ) {
         continue;
       }
 
@@ -540,7 +610,9 @@ exports.fetchStatisticschart = async (req, res) => {
         if (
           (task.status === 1 && task.active_status === 1) ||
           task.status === 3 ||
-          (task.status === 0 && task.reopen_status === 0 && task.active_status === 0)
+          (task.status === 0 &&
+            task.reopen_status === 0 &&
+            task.active_status === 0)
         ) {
           weekData.total_task_count++;
         }
@@ -549,13 +621,20 @@ exports.fetchStatisticschart = async (req, res) => {
           weekData.in_progress_task_count++;
         } else if (task.status === 3) {
           weekData.completed_task_count++;
-        } else if (task.status === 0 && task.reopen_status === 0 && task.active_status === 0) {
+        } else if (
+          task.status === 0 &&
+          task.reopen_status === 0 &&
+          task.active_status === 0
+        ) {
           weekData.todo_task_count++;
         }
       } else {
         subtasks.forEach((subtask) => {
           const subtaskDate = new Date(subtask.created_at);
-          if (subtaskDate.getMonth() + 1 !== selectedMonth || subtaskDate.getFullYear() !== selectedYear) {
+          if (
+            subtaskDate.getMonth() + 1 !== selectedMonth ||
+            subtaskDate.getFullYear() !== selectedYear
+          ) {
             return;
           }
 
@@ -567,7 +646,9 @@ exports.fetchStatisticschart = async (req, res) => {
           if (
             (subtask.status === 1 && subtask.active_status === 1) ||
             subtask.status === 3 ||
-            (subtask.status === 0 && subtask.reopen_status === 0 && subtask.active_status === 0)
+            (subtask.status === 0 &&
+              subtask.reopen_status === 0 &&
+              subtask.active_status === 0)
           ) {
             subtaskWeekData.total_task_count++;
           }
@@ -576,7 +657,11 @@ exports.fetchStatisticschart = async (req, res) => {
             subtaskWeekData.in_progress_task_count++;
           } else if (subtask.status === 3) {
             subtaskWeekData.completed_task_count++;
-          } else if (subtask.status === 0 && subtask.reopen_status === 0 && subtask.active_status === 0) {
+          } else if (
+            subtask.status === 0 &&
+            subtask.reopen_status === 0 &&
+            subtask.active_status === 0
+          ) {
             subtaskWeekData.todo_task_count++;
           }
         });
@@ -586,9 +671,15 @@ exports.fetchStatisticschart = async (req, res) => {
     // Recalculate percentages for each week
     weekTaskCounts.forEach((weekData) => {
       if (weekData.total_task_count > 0) {
-        weekData.in_progress_percentage = Math.round((weekData.in_progress_task_count / weekData.total_task_count) * 100);
-        weekData.completed_percentage = Math.round((weekData.completed_task_count / weekData.total_task_count) * 100);
-        weekData.todo_percentage = Math.round((weekData.todo_task_count / weekData.total_task_count) * 100);
+        weekData.in_progress_percentage = Math.round(
+          (weekData.in_progress_task_count / weekData.total_task_count) * 100
+        );
+        weekData.completed_percentage = Math.round(
+          (weekData.completed_task_count / weekData.total_task_count) * 100
+        );
+        weekData.todo_percentage = Math.round(
+          (weekData.todo_task_count / weekData.total_task_count) * 100
+        );
       }
     });
 
@@ -603,7 +694,6 @@ exports.fetchStatisticschart = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching statistics", 500);
   }
 };
-
 
 exports.fetchRatings = async (req, res) => {
   try {
