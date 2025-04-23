@@ -29,7 +29,7 @@ exports.getTimeListReport = async (req, res) => {
                 WHERE ADDDATE('${from_date}', t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1) <= '${to_date}'
             )
             SELECT 
-                ROW_NUMBER() OVER (ORDER BY dr.date, u.id) AS s_no,
+                ROW_NUMBER() OVER (ORDER BY u.id DESC) AS s_no,
                 u.id AS user_id,
                 CONCAT(u.first_name, ' ', u.last_name) AS name,
                 u.employee_id,
@@ -54,6 +54,8 @@ exports.getTimeListReport = async (req, res) => {
             LEFT JOIN employee_leave el ON u.id = el.user_id AND el.date = dr.date
             LEFT JOIN sub_tasks_user_timeline stut ON u.id = stut.user_id AND DATE(stut.start_time) = dr.date
             WHERE dr.date BETWEEN '${from_date}' AND '${to_date}'
+            AND u.deleted_at IS NULL
+           
         `;
 
         if (team_id) {
@@ -70,7 +72,7 @@ exports.getTimeListReport = async (req, res) => {
 
         query += `
             GROUP BY u.id, dr.date, el.day_type, el.id, t.name
-            ORDER BY dr.date, u.id
+            ORDER BY u.id DESC
             LIMIT ${limit} OFFSET ${offset};
         `;
 
@@ -117,7 +119,10 @@ exports.getTimeListReport = async (req, res) => {
             WHERE ADDDATE('${from_date}', INTERVAL t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1 DAY) <= '${to_date}'
         ) dr
         WHERE dr.date BETWEEN '${from_date}' AND '${to_date}'
+        AND u.deleted_at IS NULL
+       ORDER BY u.id DESC
     ) AS subquery
+     
 `;
 
         if (team_id) {
