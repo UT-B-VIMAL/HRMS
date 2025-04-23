@@ -299,7 +299,6 @@ exports.fetchStatistics = async (req, res) => {
     let selectedMonth, selectedYear;
 
     if (date) {
-      // Updated regex to support 'MM_YYYY', 'MM YYYY', and 'MMM YYYY'
       const monthYearRegex =
         /^(0[1-9]|1[0-2])[\s_](\d{4})$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s_](\d{4})$/;
 
@@ -312,36 +311,22 @@ exports.fetchStatistics = async (req, res) => {
         );
       }
 
-      // Split using space or underscore
       const dateParts = date.split(/[\s_]/);
 
-      if (dateParts.length !== 2) {
-        return errorResponse(
-          res,
-          null,
-          "Invalid date format. Use 'MMM YYYY', 'MM YYYY', or 'MM_YYYY'",
-          400
-        );
-      }
-
       if (isNaN(dateParts[0])) {
-        // Format: "Mar 2024" or "Mar_2024"
         selectedMonth =
           new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1;
       } else {
-        // Format: "03 2024" or "03_2024"
         selectedMonth = parseInt(dateParts[0], 10);
       }
 
       selectedYear = parseInt(dateParts[1], 10);
     } else {
-      // Default to current month and year
       const currentDate = new Date();
       selectedMonth = currentDate.getMonth() + 1;
       selectedYear = currentDate.getFullYear();
     }
 
-    // Fetch all tasks for the user
     const tasksQuery = `
       SELECT id, name, status, active_status, reopen_status, created_at 
       FROM tasks 
@@ -355,34 +340,27 @@ exports.fetchStatistics = async (req, res) => {
     let todoTaskCount = 0;
 
     for (const task of tasks) {
-      const checkSubtasksQuery = `
-    SELECT id 
-    FROM sub_tasks 
-    WHERE task_id = ? AND deleted_at IS NULL
-  `;
-      const [subtaskCheck] = await db.query(checkSubtasksQuery, [task.id]);
+      const allSubtasksQuery = `
+        SELECT id, status, active_status, reopen_status, created_at, user_id 
+        FROM sub_tasks 
+        WHERE task_id = ? AND deleted_at IS NULL
+      `;
+      const [allSubtasks] = await db.query(allSubtasksQuery, [task.id]);
 
-      // If subtasks exist, skip this task
-      if (subtaskCheck.length > 0) {
-        continue;
+      const userSubtasks = allSubtasks.filter(
+        (subtask) => subtask.user_id === parseInt(user_id)
+      );
+
+      if (allSubtasks.length > 0 && userSubtasks.length === 0) {
+        continue; // Skip if no matching user_id in subtasks
       }
 
-      // Fetch subtasks for each task
-      const subtasksQuery = `
-        SELECT id, status, active_status, reopen_status, created_at 
-        FROM sub_tasks 
-        WHERE task_id = ? AND user_id = ? AND deleted_at IS NULL
-      `;
-      const [subtasks] = await db.query(subtasksQuery, [task.id, user_id]);
-
-      // Check if the task was created in the selected month and year
       const taskDate = new Date(task.created_at);
       const isTaskInMonthYear =
         taskDate.getMonth() + 1 === selectedMonth &&
         taskDate.getFullYear() === selectedYear;
 
-      // Filter subtasks based on month and year
-      const subtasksInMonthYear = subtasks.filter((subtask) => {
+      const subtasksInMonthYear = userSubtasks.filter((subtask) => {
         const subtaskDate = new Date(subtask.created_at);
         return (
           subtaskDate.getMonth() + 1 === selectedMonth &&
@@ -390,7 +368,7 @@ exports.fetchStatistics = async (req, res) => {
         );
       });
 
-      if (subtasks.length === 0) {
+      if (userSubtasks.length === 0) {
         if (isTaskInMonthYear) {
           if (
             (task.status === 1 && task.active_status === 1) ||
@@ -436,7 +414,8 @@ exports.fetchStatistics = async (req, res) => {
               subtask.active_status === 0
           );
           const inProgress = subtasksInMonthYear.some(
-            (subtask) => subtask.status === 1 && subtask.active_status === 1
+            (subtask) =>
+              subtask.status === 1 && subtask.active_status === 1
           );
 
           if (allCompleted) {
@@ -449,10 +428,10 @@ exports.fetchStatistics = async (req, res) => {
         }
       }
     }
+
     const totalTaskCounts =
       completedTaskCount + todoTaskCount + inProgressTaskCount;
 
-    // Calculate percentages
     const completedPercentage =
       totalTaskCounts > 0 ? (completedTaskCount / totalTaskCounts) * 100 : 0;
     const todoPercentage =
@@ -460,7 +439,6 @@ exports.fetchStatistics = async (req, res) => {
     const inProgressPercentage =
       totalTaskCounts > 0 ? (inProgressTaskCount / totalTaskCounts) * 100 : 0;
 
-    // Build the result
     const statisticsResult = {
       total_task_count: totalTaskCounts,
       completed_task_count: completedTaskCount,
@@ -483,6 +461,7 @@ exports.fetchStatistics = async (req, res) => {
   }
 };
 
+
 exports.fetchStatisticschart = async (req, res) => {
   try {
     const user_id = req.query.user_id;
@@ -495,7 +474,6 @@ exports.fetchStatisticschart = async (req, res) => {
     let selectedMonth, selectedYear;
 
     if (date) {
-      // Updated regex to support 'MM_YYYY', 'MM YYYY', and 'MMM YYYY'
       const monthYearRegex =
         /^(0[1-9]|1[0-2])[\s_](\d{4})$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s_](\d{4})$/;
 
@@ -507,8 +485,8 @@ exports.fetchStatisticschart = async (req, res) => {
           400
         );
       }
+      
 
-      // Split using space or underscore
       const dateParts = date.split(/[\s_]/);
 
       if (dateParts.length !== 2) {
@@ -521,17 +499,14 @@ exports.fetchStatisticschart = async (req, res) => {
       }
 
       if (isNaN(dateParts[0])) {
-        // Format: "Mar 2024" or "Mar_2024"
         selectedMonth =
           new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1;
       } else {
-        // Format: "03 2024" or "03_2024"
         selectedMonth = parseInt(dateParts[0], 10);
       }
 
       selectedYear = parseInt(dateParts[1], 10);
     } else {
-      // Default to current month and year
       const currentDate = new Date();
       selectedMonth = currentDate.getMonth() + 1;
       selectedYear = currentDate.getFullYear();
@@ -539,8 +514,7 @@ exports.fetchStatisticschart = async (req, res) => {
 
     const totalDaysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
 
-    // Distribute days into weeks dynamically
-    const weekDays = [0, 0, 0, 0, 0]; // Up to 5 weeks
+    const weekDays = [0, 0, 0, 0, 0];
     let weekIndex = 0;
 
     for (let day = 1; day <= totalDaysInMonth; day++) {
@@ -552,7 +526,6 @@ exports.fetchStatisticschart = async (req, res) => {
 
     const weeksInMonth = weekDays.filter((week) => week > 0).length;
 
-    // Initialize week statistics
     const weekTaskCounts = Array.from({ length: weeksInMonth }, (_, i) => ({
       week: `week_${i + 1}`,
       total_task_count: 0,
@@ -564,7 +537,6 @@ exports.fetchStatisticschart = async (req, res) => {
       todo_percentage: 0,
     }));
 
-    // Fetch all tasks for the user
     const tasksQuery = `
       SELECT id, name, status, active_status, reopen_status, created_at 
       FROM tasks 
@@ -573,26 +545,21 @@ exports.fetchStatisticschart = async (req, res) => {
     const [tasks] = await db.query(tasksQuery, [user_id]);
 
     for (const task of tasks) {
-      const checkSubtasksQuery = `
-    SELECT id 
-    FROM sub_tasks 
-    WHERE task_id = ? AND deleted_at IS NULL
-  `;
-      const [subtaskCheck] = await db.query(checkSubtasksQuery, [task.id]);
-
-      // If subtasks exist, skip this task
-      if (subtaskCheck.length > 0) {
-        continue;
-      }
-      // Fetch subtasks for the task
-      const subtasksQuery = `
-        SELECT id, status, active_status, reopen_status, created_at 
+      const allSubtasksQuery = `
+        SELECT id, status, active_status, reopen_status, created_at, user_id 
         FROM sub_tasks 
-        WHERE task_id = ? AND user_id = ? AND deleted_at IS NULL
+        WHERE task_id = ? AND deleted_at IS NULL
       `;
-      const [subtasks] = await db.query(subtasksQuery, [task.id, user_id]);
+      const [allSubtasks] = await db.query(allSubtasksQuery, [task.id]);
 
-      // Determine the week of the month based on created_at date
+      const userSubtasks = allSubtasks.filter(
+        (sub) => sub.user_id === parseInt(user_id)
+      );
+
+      if (allSubtasks.length > 0 && userSubtasks.length === 0) {
+        continue; // Skip task if no user's subtasks
+      }
+
       const taskDate = new Date(task.created_at);
       if (
         taskDate.getMonth() + 1 !== selectedMonth ||
@@ -604,9 +571,9 @@ exports.fetchStatisticschart = async (req, res) => {
       const taskWeek = Math.floor((taskDate.getDate() - 1) / 7);
       if (taskWeek >= weeksInMonth) continue;
 
-      const weekData = weekTaskCounts[taskWeek];
+      if (userSubtasks.length === 0) {
+        const weekData = weekTaskCounts[taskWeek];
 
-      if (subtasks.length === 0) {
         if (
           (task.status === 1 && task.active_status === 1) ||
           task.status === 3 ||
@@ -629,17 +596,17 @@ exports.fetchStatisticschart = async (req, res) => {
           weekData.todo_task_count++;
         }
       } else {
-        subtasks.forEach((subtask) => {
+        for (const subtask of userSubtasks) {
           const subtaskDate = new Date(subtask.created_at);
           if (
             subtaskDate.getMonth() + 1 !== selectedMonth ||
             subtaskDate.getFullYear() !== selectedYear
           ) {
-            return;
+            continue;
           }
 
           const subtaskWeek = Math.floor((subtaskDate.getDate() - 1) / 7);
-          if (subtaskWeek >= weeksInMonth) return;
+          if (subtaskWeek >= weeksInMonth) continue;
 
           const subtaskWeekData = weekTaskCounts[subtaskWeek];
 
@@ -664,11 +631,10 @@ exports.fetchStatisticschart = async (req, res) => {
           ) {
             subtaskWeekData.todo_task_count++;
           }
-        });
+        }
       }
     }
 
-    // Recalculate percentages for each week
     weekTaskCounts.forEach((weekData) => {
       if (weekData.total_task_count > 0) {
         weekData.in_progress_percentage = Math.round(
@@ -694,6 +660,7 @@ exports.fetchStatisticschart = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching statistics", 500);
   }
 };
+
 
 exports.fetchRatings = async (req, res) => {
   try {
