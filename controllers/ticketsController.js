@@ -4,7 +4,7 @@ const { createTicketSchema, updateTicketSchema, ticketCommentSchema } = require(
 const fileUpload = require('express-fileupload');
 const { uploadFileToS3 } = require('../config/s3');
 const db = require('../config/db');
-const { getAlltickets, getTickets, updateTickets } = require("../api/functions/ticketFunction");
+const { getAlltickets, getTickets,readPendingTickets, updateTickets } = require("../api/functions/ticketFunction");
 const { userSockets } = require('../helpers/notificationHelper');
 
 exports.createTicket = async (req, res) => { 
@@ -80,6 +80,14 @@ exports.createTicket = async (req, res) => {
 exports.getAlltickets = async (req, res) => {
   try {
     await getAlltickets(req, res);
+  } catch (error) {
+    return errorResponse(res, error.message, 'Error retrieving tasks', 500);
+  }
+};
+
+exports.readPendingTickets = async (req, res) => {
+  try {
+    await readPendingTickets(req, res);
   } catch (error) {
     return errorResponse(res, error.message, 'Error retrieving tasks', 500);
   }

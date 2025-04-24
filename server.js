@@ -216,6 +216,7 @@ apiRouter.delete('/comments',RoleController.checkRole(),commentsController.delet
 //tickets
 apiRouter.get('/tickets',RoleController.checkRole(),ticketsController.getAlltickets);
 apiRouter.get('/tickets/:id',RoleController.checkRole(),ticketsController.getTickets);
+apiRouter.post('/read-pending-tickets',ticketsController.readPendingTickets);
 apiRouter.post('/tickets',RoleController.checkRole(),(req, res) => ticketsController.createTicket(req, res, req.io));
 apiRouter.put('/tickets/:id',RoleController.checkRole(), (req, res) => ticketsController.updateTickets(req, res, req.io));
 apiRouter.post('/ticket-comments',RoleController.checkRole(),(req, res) => ticketsController.ticketComments(req, res, req.io));
