@@ -805,11 +805,11 @@ exports.getAllpmemployeeOts = async (req, res) => {
           break;
 
         case "1":
-          otConditions.push("ot.tl_status = 1 OR ot.pm_status = 1");
+          otConditions.push("(ot.tl_status = 1 OR ot.pm_status = 1)");
           break;
 
         case "2":
-          otConditions.push("ot.pm_status = 2 OR ot.tl_status = 2");
+          otConditions.push("(ot.pm_status = 2 OR ot.tl_status = 2)");
           break;
 
         default:
