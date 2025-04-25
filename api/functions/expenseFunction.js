@@ -665,12 +665,12 @@ exports.getAllpmemployeexpense = async (req, res) => {
         break;
       case "1":
         otConditions.push(
-          "et.tl_status = 1 OR et.pm_status = 1"
+          "(et.tl_status = 1 OR et.pm_status = 1)"
         );
         break;
       case "2":
         otConditions.push(
-          "et.pm_status = 2 OR et.tl_status = 2"
+          "(et.pm_status = 2 OR et.tl_status = 2)"
         );
         break;
       default:
