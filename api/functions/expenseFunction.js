@@ -330,6 +330,7 @@ exports.getAllexpense = async (req, res) => {
         et.id AS expense_id,
         et.user_id,
         et.file,
+        u.role_id,
         u.first_name AS user_first_name,
         u.last_name AS user_last_name
       FROM 
@@ -368,6 +369,7 @@ exports.getAllexpense = async (req, res) => {
       s_no: offset + index + 1,
       id: row.expense_id,
       user_id: row.user_id,
+      role_id: row.role_id,
       date: row.date,
       expense_amount: row.expense_amount,
       description: row.description,

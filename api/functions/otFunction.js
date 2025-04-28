@@ -413,6 +413,7 @@ exports.getAllOts = async (req, res) => {
           ot.id AS ot_id,
           ot.user_id,
           u.employee_id,
+          u.role_id,
           u.first_name AS user_first_name,
           u.last_name AS user_last_name
         FROM 
@@ -442,6 +443,7 @@ exports.getAllOts = async (req, res) => {
       id: row.ot_id,
       user_id: row.user_id,
       employee_id: row.employee_id,
+      role_id: row.role_id,
       date: row.date,
       time: row.time,
       project_name: row.project_name,
