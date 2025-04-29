@@ -1474,13 +1474,13 @@ exports.getAlltlemployeeOts = async (req, res) => {
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
-    const [rows] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+    const [userCheck] = await db.query(
+      "SELECT id,role_id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
 
     // Check if no rows are returned
-    if (rows.length === 0) {
+    if (userCheck.length === 0) {
       return errorResponse(res, null, "User Not Found", 400);
     }
 
@@ -1561,22 +1561,29 @@ exports.getAlltlemployeeOts = async (req, res) => {
         );
       }
 
+      const currentRoleId = userCheck[0].role_id;
+
       switch (status) {
-        case "0":
-          // All statuses must be 0
-          otConditions.push("ot.status = 0 AND ot.tl_status = 0");
+        case "0": // Pending
+          if (currentRoleId == 3) {
+            otConditions.push("ot.pm_status = 0");
+          } else if (currentRoleId == 4) {
+            otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
+          }
           break;
-
-        case "1":
-          // ot.status must be 1, and at least one of tl_status or pm_status must be 1
-          otConditions.push("(ot.tl_status = 1 OR ot.pm_status = 1)");
+      
+        case "1": // Rejected
+          otConditions.push("ot.status = 1");
           break;
-
-        case "2":
-          // All statuses must be 2
-          otConditions.push("(ot.tl_status = 2 OR ot.pm_status = 2)");
+      
+        case "2": // Approved
+          if (currentRoleId == 3) {
+            otConditions.push("ot.pm_status = 2");
+          } else if (currentRoleId == 4) {
+            otConditions.push("ot.tl_status = 2 AND ot.pm_status = 2");
+          }
           break;
-
+      
         default:
           return errorResponse(
             res,
@@ -1585,6 +1592,32 @@ exports.getAlltlemployeeOts = async (req, res) => {
             400
           );
       }
+      
+
+      // switch (status) {
+      //   case "0":
+      //     // All statuses must be 0
+      //     otConditions.push("ot.status = 0 AND ot.tl_status = 0");
+      //     break;
+
+      //   case "1":
+      //     // ot.status must be 1, and at least one of tl_status or pm_status must be 1
+      //     otConditions.push("(ot.tl_status = 1 OR ot.pm_status = 1)");
+      //     break;
+
+      //   case "2":
+      //     // All statuses must be 2
+      //     otConditions.push("(ot.tl_status = 2 OR ot.pm_status = 2)");
+      //     break;
+
+      //   default:
+      //     return errorResponse(
+      //       res,
+      //       "Invalid status value.",
+      //       "Error fetching OT details",
+      //       400
+      //     );
+      // }
     }
 
     // Combine all conditions into a WHERE clause
