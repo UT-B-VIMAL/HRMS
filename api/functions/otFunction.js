@@ -1578,7 +1578,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
       
         case "2": // Approved
           if (currentRoleId == 3) {
-            otConditions.push("ot.pm_status = 2");
+            otConditions.push("ot.tl_status = 2");
           } else if (currentRoleId == 4) {
             otConditions.push("ot.tl_status = 2 AND ot.pm_status = 2");
           }
