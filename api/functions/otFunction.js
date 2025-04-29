@@ -317,6 +317,159 @@ WHERE
   }
 };
 // Show All OT
+// exports.getAllOts = async (req, res) => {
+//   try {
+//     const {
+//       project_id,
+//       user_id,
+//       date,
+//       status,
+//       product_id,
+//       search,
+//       page = 1,
+//       perPage = 10,
+//     } = req.query;
+
+//     if (!user_id) {
+//       return errorResponse(
+//         res,
+//         "user_id is required",
+//         "Error fetching OT details",
+//         400
+//       );
+//     }
+//     if (!status) {
+//       return errorResponse(
+//         res,
+//         "status is required",
+//         "Error fetching OT details",
+//         400
+//       );
+//     }
+
+//     const [userCheck] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [user_id]
+//     );
+//     if (userCheck.length === 0) {
+//       return errorResponse(
+//         res,
+//         "User not found or deleted",
+//         "Error fetching OT details",
+//         404
+//       );
+//     }
+
+//     const offset = (page - 1) * perPage;
+
+//     const otConditions = [];
+//     const otValues = [];
+
+//     if (project_id) {
+//       const projectIds = project_id.split(",");
+//       otConditions.push(`ot.project_id IN (?)`);
+//       otValues.push(projectIds);
+//     }
+//     if (user_id) {
+//       otConditions.push("ot.user_id = ?");
+//       otValues.push(user_id);
+//     }
+//     if (date) {
+//       otConditions.push("DATE(ot.date) = ?");
+//       otValues.push(date);
+//     }
+//     if (product_id) {
+//       const productIds = product_id.split(",");
+//       otConditions.push(`ot.product_id IN (?)`);
+//       otValues.push(productIds);
+//     }
+//     if (search) {
+//       const searchTerm = `%${search}%`;
+//       otConditions.push(
+//         `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
+//       );
+//       otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+//     }
+
+//     if (status) {
+//       const statusArray = status.split(",");
+//       otConditions.push(`ot.status IN (?)`);
+//       otValues.push(statusArray);
+//     }
+
+//     const otWhereClause =
+//       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
+
+//     const otQuery = `
+//         SELECT 
+//           pr.name AS project_name,
+//           t.name AS task_name,
+//           DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
+//           ot.time,
+//           ot.comments,
+//           ot.status,
+//           ot.tl_status,
+//           ot.pm_status,
+//           ot.id AS ot_id,
+//           ot.user_id,
+//           u.employee_id,
+//           u.role_id,
+//           u.first_name AS user_first_name,
+//           u.last_name AS user_last_name
+//         FROM 
+//           ot_details ot
+//         LEFT JOIN 
+//           tasks t ON t.id = ot.task_id
+//         LEFT JOIN 
+//           projects pr ON pr.id = ot.project_id
+//         LEFT JOIN 
+//           users u ON u.id = ot.user_id
+//         ${otWhereClause}
+//         AND ot.deleted_at IS NULL
+//         ORDER BY 
+//           ot.id DESC
+//       `;
+
+//     const [ots] = await db.query(otQuery, otValues);
+
+//     // Pagination logic
+//     const totalRecords = ots.length;
+//     const paginatedData = ots.slice(offset, offset + parseInt(perPage));
+//     const pagination = getPagination(page, perPage, totalRecords);
+
+//     // Add serial numbers and include id, user_id in the paginated data
+//     const data = paginatedData.map((row, index) => ({
+//       s_no: offset + index + 1,
+//       id: row.ot_id,
+//       user_id: row.user_id,
+//       employee_id: row.employee_id,
+//       role_id: row.role_id,
+//       date: row.date,
+//       time: row.time,
+//       project_name: row.project_name,
+//       task_name: row.task_name,
+//       comments: row.comments,
+//       status: row.status,
+//       tl_status: row.tl_status,
+//       pm_status: row.pm_status,
+//       user_name: `${row.user_first_name} ${row.user_last_name}`,
+//     }));
+
+//     successResponse(
+//       res,
+//       data,
+//       data.length === 0
+//         ? "No OT details found"
+//         : "OT details retrieved successfully",
+//       200,
+//       pagination
+//     );
+//   } catch (error) {
+//     console.error("Error fetching OT details:", error);
+//     return errorResponse(res, error.message, "Server error", 500);
+//   }
+// };
+
 exports.getAllOts = async (req, res) => {
   try {
     const {
@@ -330,116 +483,109 @@ exports.getAllOts = async (req, res) => {
       perPage = 10,
     } = req.query;
 
-    if (!user_id) {
-      return errorResponse(
-        res,
-        "user_id is required",
-        "Error fetching OT details",
-        400
-      );
-    }
-    if (!status) {
-      return errorResponse(
-        res,
-        "status is required",
-        "Error fetching OT details",
-        400
-      );
+    if (!user_id || !status) {
+      return errorResponse(res, "user_id and status are required", "Validation error", 400);
     }
 
-    const [userCheck] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+    const [user] = await db.query(
+      "SELECT id, role_id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
-    if (userCheck.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error fetching OT details",
-        404
-      );
+    if (user.length === 0) {
+      return errorResponse(res, "User not found", "Error", 404);
     }
 
+    const { role_id } = user[0];
     const offset = (page - 1) * perPage;
 
-    const otConditions = [];
-    const otValues = [];
+    const conditions = ["ot.deleted_at IS NULL"];
+    const values = [];
 
     if (project_id) {
-      const projectIds = project_id.split(",");
-      otConditions.push(`ot.project_id IN (?)`);
-      otValues.push(projectIds);
+      conditions.push(`ot.project_id IN (?)`);
+      values.push(project_id.split(","));
     }
-    if (user_id) {
-      otConditions.push("ot.user_id = ?");
-      otValues.push(user_id);
-    }
+
+    conditions.push(`ot.user_id = ?`);
+    values.push(user_id);
+
     if (date) {
-      otConditions.push("DATE(ot.date) = ?");
-      otValues.push(date);
+      conditions.push(`DATE(ot.date) = ?`);
+      values.push(date);
     }
+
     if (product_id) {
-      const productIds = product_id.split(",");
-      otConditions.push(`ot.product_id IN (?)`);
-      otValues.push(productIds);
+      conditions.push(`ot.product_id IN (?)`);
+      values.push(product_id.split(","));
     }
+
     if (search) {
-      const searchTerm = `%${search}%`;
-      otConditions.push(
-        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
-      );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      const keyword = `%${search}%`;
+      conditions.push(`(
+        t.name LIKE ? OR 
+        u.first_name LIKE ? OR 
+        u.last_name LIKE ? OR 
+        pr.name LIKE ? OR 
+        ot.comments LIKE ?
+      )`);
+      values.push(keyword, keyword, keyword, keyword, keyword);
     }
 
-    if (status) {
-      const statusArray = status.split(",");
-      otConditions.push(`ot.status IN (?)`);
-      otValues.push(statusArray);
+    // Handle status filtering based on role
+    const statusArray = status.split(",");
+    const statusFilters = [];
+
+    statusArray.forEach((s) => {
+      if (s === "0") {
+        if (role_id == 3) statusFilters.push(`(ot.pm_status = 0 AND ot.user_id = ${user_id})`);
+        else if (role_id == 4) statusFilters.push(`(ot.tl_status = 2 AND ot.pm_status = 0)`);
+        else statusFilters.push(`ot.status = 2  AND ot.tl_status = 2  AND ot.pm_status = 0`);
+      } else if (s === "1") {
+        statusFilters.push(`ot.status = 1`);
+      } else if (s === "2") {
+        if (role_id == 3) statusFilters.push(`ot.pm_status = 2`);
+        else if (role_id == 4) statusFilters.push(`(ot.tl_status = 2 AND ot.pm_status = 2)`);
+        else statusFilters.push(`ot.status = 2  AND ot.tl_status = 2  AND ot.pm_status = 2`);
+      }
+    });
+
+    if (statusFilters.length > 0) {
+      conditions.push(`(${statusFilters.join(" OR ")})`);
     }
 
-    const otWhereClause =
-      otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const otQuery = `
-        SELECT 
-          pr.name AS project_name,
-          t.name AS task_name,
-          DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-          ot.time,
-          ot.comments,
-          ot.status,
-          ot.tl_status,
-          ot.pm_status,
-          ot.id AS ot_id,
-          ot.user_id,
-          u.employee_id,
-          u.role_id,
-          u.first_name AS user_first_name,
-          u.last_name AS user_last_name
-        FROM 
-          ot_details ot
-        LEFT JOIN 
-          tasks t ON t.id = ot.task_id
-        LEFT JOIN 
-          projects pr ON pr.id = ot.project_id
-        LEFT JOIN 
-          users u ON u.id = ot.user_id
-        ${otWhereClause}
-        AND ot.deleted_at IS NULL
-        ORDER BY 
-          ot.id DESC
-      `;
+      SELECT 
+        pr.name AS project_name,
+        t.name AS task_name,
+        DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
+        ot.time,
+        ot.comments,
+        ot.status,
+        ot.tl_status,
+        ot.pm_status,
+        ot.id AS ot_id,
+        ot.user_id,
+        u.employee_id,
+        u.role_id,
+        u.first_name,
+        u.last_name
+      FROM ot_details ot
+      LEFT JOIN tasks t ON t.id = ot.task_id
+      LEFT JOIN projects pr ON pr.id = ot.project_id
+      LEFT JOIN users u ON u.id = ot.user_id
+      ${whereClause}
+      ORDER BY ot.id DESC
+    `;
 
-    const [ots] = await db.query(otQuery, otValues);
+    const [result] = await db.query(otQuery, values);
 
-    // Pagination logic
-    const totalRecords = ots.length;
-    const paginatedData = ots.slice(offset, offset + parseInt(perPage));
-    const pagination = getPagination(page, perPage, totalRecords);
+    const paginated = result.slice(offset, offset + parseInt(perPage));
+    const pagination = getPagination(page, perPage, result.length);
 
-    // Add serial numbers and include id, user_id in the paginated data
-    const data = paginatedData.map((row, index) => ({
-      s_no: offset + index + 1,
+    const data = paginated.map((row, i) => ({
+      s_no: offset + i + 1,
       id: row.ot_id,
       user_id: row.user_id,
       employee_id: row.employee_id,
@@ -452,23 +598,23 @@ exports.getAllOts = async (req, res) => {
       status: row.status,
       tl_status: row.tl_status,
       pm_status: row.pm_status,
-      user_name: `${row.user_first_name} ${row.user_last_name}`,
+      user_name: `${row.first_name} ${row.last_name}`,
     }));
 
-    successResponse(
+    return successResponse(
       res,
       data,
-      data.length === 0
-        ? "No OT details found"
-        : "OT details retrieved successfully",
+      data.length ? "OT details fetched" : "No OT records found",
       200,
       pagination
     );
-  } catch (error) {
-    console.error("Error fetching OT details:", error);
-    return errorResponse(res, error.message, "Server error", 500);
+  } catch (err) {
+    console.error("Error:", err);
+    return errorResponse(res, err.message, "Server Error", 500);
   }
 };
+
+
 // Update OT
 exports.updateOt = async (id, payload, res) => {
   const {

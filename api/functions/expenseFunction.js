@@ -243,6 +243,159 @@ WHERE
   }
 };
 // Show All Expense
+// exports.getAllexpense = async (req, res) => {
+//   try {
+//     const {
+//       user_id,
+//       status,
+//       search,
+//       page = 1,
+//       perPage = 10,
+//       category_id,
+//     } = req.query;
+
+//     if (!user_id) {
+//       return errorResponse(
+//         res,
+//         "user_id is required",
+//         "Error fetching expense details",
+//         400
+//       );
+//     }
+//     if (!status) {
+//       return errorResponse(
+//         res,
+//         "status is required",
+//         "Error fetching expense details",
+//         400
+//       );
+//     }
+
+//     // Validate user existence
+//     const [userCheck] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [user_id]
+//     );
+//     if (userCheck.length === 0) {
+//       return errorResponse(
+//         res,
+//         "User not found or deleted",
+//         "Error fetching expense details",
+//         404
+//       );
+//     }
+
+//     const offset = (page - 1) * perPage;
+
+//     // Query filters
+//     const expenseConditions = [];
+//     const expenseValues = [];
+//     if (category_id) {
+//       const categoryIds = category_id.split(",");
+//       expenseConditions.push(`et.category IN (?)`);
+//       expenseValues.push(categoryIds);
+//     }
+//     if (user_id) {
+//       expenseConditions.push("et.user_id = ?");
+//       expenseValues.push(user_id);
+//     }
+//     if (search) {
+//       const searchTerm = `%${search}%`;
+//       expenseConditions.push(
+//         `(u.first_name LIKE ? OR u.last_name LIKE ? OR et.description LIKE ?)`
+//       );
+//       expenseValues.push(searchTerm, searchTerm, searchTerm);
+//     }
+//     if (status) {
+//       const statusArray = status.split(",");
+//       expenseConditions.push(`et.status IN (?)`);
+//       expenseValues.push(statusArray);
+//     }
+
+//     const expenseWhereClause =
+//       expenseConditions.length > 0
+//         ? `WHERE ${expenseConditions.join(" AND ")}`
+//         : "";
+
+//     // Main query
+//     const expenseQuery = `
+//       SELECT 
+//         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
+//         et.expense_amount,
+//         et.description,
+//         et.category,
+//         et.status,
+//         et.tl_status,
+//         et.pm_status,
+//         et.id AS expense_id,
+//         et.user_id,
+//         et.file,
+//         u.role_id,
+//         u.first_name AS user_first_name,
+//         u.last_name AS user_last_name
+//       FROM 
+//         expense_details et
+//       LEFT JOIN 
+//         users u ON u.id = et.user_id
+//       ${expenseWhereClause}
+//       AND et.deleted_at IS NULL
+//       ORDER BY 
+//         et.updated_at DESC
+//       LIMIT ?, ?
+//     `;
+
+//     expenseValues.push(offset, parseInt(perPage));
+
+//     const [expenses] = await db.query(expenseQuery, expenseValues);
+
+//     // Pagination
+//     const countQuery = `
+//       SELECT COUNT(*) AS total 
+//       FROM expense_details et
+//       LEFT JOIN users u ON u.id = et.user_id
+//       ${expenseWhereClause}
+//       AND et.deleted_at IS NULL
+//     `;
+//     const [totalRecordsResult] = await db.query(
+//       countQuery,
+//       expenseValues.slice(0, -2)
+//     );
+//     const totalRecords = totalRecordsResult[0]?.total || 0;
+
+//     const pagination = getPagination(page, perPage, totalRecords);
+
+//     // Format response data
+//     const data = expenses.map((row, index) => ({
+//       s_no: offset + index + 1,
+//       id: row.expense_id,
+//       user_id: row.user_id,
+//       role_id: row.role_id,
+//       date: row.date,
+//       expense_amount: row.expense_amount,
+//       description: row.description,
+//       category: row.category,
+//       file: row.file,
+//       status: row.status,
+//       tl_status: row.tl_status,
+//       pm_status: row.pm_status,
+//       user_name: `${row.user_first_name} ${row.user_last_name}`,
+//     }));
+
+//     successResponse(
+//       res,
+//       data,
+//       data.length === 0
+//         ? "No expense details found"
+//         : "Expense details retrieved successfully",
+//       200,
+//       pagination
+//     );
+//   } catch (error) {
+//     console.error("Error fetching expense details:", error);
+//     return errorResponse(res, error.message, "Server error", 500);
+//   }
+// };
+
 exports.getAllexpense = async (req, res) => {
   try {
     const {
@@ -254,71 +407,74 @@ exports.getAllexpense = async (req, res) => {
       category_id,
     } = req.query;
 
-    if (!user_id) {
+    if (!user_id || !status) {
       return errorResponse(
         res,
-        "user_id is required",
-        "Error fetching expense details",
-        400
-      );
-    }
-    if (!status) {
-      return errorResponse(
-        res,
-        "status is required",
+        "user_id and status are required",
         "Error fetching expense details",
         400
       );
     }
 
-    // Validate user existence
-    const [userCheck] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+    // Validate user and get role_id
+    const [userRows] = await db.query(
+      "SELECT id, role_id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
-    if (userCheck.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error fetching expense details",
-        404
-      );
+
+    if (userRows.length === 0) {
+      return errorResponse(res, "User not found", "Error fetching data", 404);
     }
 
+    const { role_id } = userRows[0];
     const offset = (page - 1) * perPage;
 
-    // Query filters
-    const expenseConditions = [];
-    const expenseValues = [];
+    const conditions = ["et.deleted_at IS NULL"];
+    const values = [];
+
     if (category_id) {
-      const categoryIds = category_id.split(",");
-      expenseConditions.push(`et.category IN (?)`);
-      expenseValues.push(categoryIds);
+      conditions.push("et.category IN (?)");
+      values.push(category_id.split(","));
     }
-    if (user_id) {
-      expenseConditions.push("et.user_id = ?");
-      expenseValues.push(user_id);
-    }
+
+    conditions.push("et.user_id = ?");
+    values.push(user_id);
+
     if (search) {
-      const searchTerm = `%${search}%`;
-      expenseConditions.push(
-        `(u.first_name LIKE ? OR u.last_name LIKE ? OR et.description LIKE ?)`
-      );
-      expenseValues.push(searchTerm, searchTerm, searchTerm);
-    }
-    if (status) {
-      const statusArray = status.split(",");
-      expenseConditions.push(`et.status IN (?)`);
-      expenseValues.push(statusArray);
+      const keyword = `%${search}%`;
+      conditions.push(`(
+        u.first_name LIKE ? OR 
+        u.last_name LIKE ? OR 
+        et.description LIKE ?
+      )`);
+      values.push(keyword, keyword, keyword);
     }
 
-    const expenseWhereClause =
-      expenseConditions.length > 0
-        ? `WHERE ${expenseConditions.join(" AND ")}`
-        : "";
+    // Role-based status filtering
+    const statusFilters = [];
+    const statusArray = status.split(",");
 
-    // Main query
-    const expenseQuery = `
+    statusArray.forEach((s) => {
+      if (s === "0") {
+        if (role_id == 3) statusFilters.push(`(et.pm_status = 0 AND et.user_id = ${user_id})`);
+        else if (role_id == 4) statusFilters.push(`(et.tl_status = 2 AND et.pm_status = 0)`);
+        else statusFilters.push(`et.status = 2  AND et.tl_status = 2  AND et.pm_status = 0`);
+      } else if (s === "1") {
+        statusFilters.push(`et.status = 1`);
+      } else if (s === "2") {
+        if (role_id == 3) statusFilters.push(`et.pm_status = 2`);
+        else if (role_id == 4) statusFilters.push(`(et.tl_status = 2 AND et.pm_status = 2)`);
+        else statusFilters.push(`et.status = 2  AND et.tl_status = 2  AND et.pm_status = 2`);
+      }
+    });
+
+    if (statusFilters.length) {
+      conditions.push(`(${statusFilters.join(" OR ")})`);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const mainQuery = `
       SELECT 
         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
         et.expense_amount,
@@ -333,40 +489,31 @@ exports.getAllexpense = async (req, res) => {
         u.role_id,
         u.first_name AS user_first_name,
         u.last_name AS user_last_name
-      FROM 
-        expense_details et
-      LEFT JOIN 
-        users u ON u.id = et.user_id
-      ${expenseWhereClause}
-      AND et.deleted_at IS NULL
-      ORDER BY 
-        et.updated_at DESC
+      FROM expense_details et
+      LEFT JOIN users u ON u.id = et.user_id
+      ${whereClause}
+      ORDER BY et.updated_at DESC
       LIMIT ?, ?
     `;
 
-    expenseValues.push(offset, parseInt(perPage));
+    values.push(offset, parseInt(perPage));
 
-    const [expenses] = await db.query(expenseQuery, expenseValues);
+    const [expenses] = await db.query(mainQuery, values);
 
-    // Pagination
+    // Count query
     const countQuery = `
-      SELECT COUNT(*) AS total 
+      SELECT COUNT(*) AS total
       FROM expense_details et
       LEFT JOIN users u ON u.id = et.user_id
-      ${expenseWhereClause}
-      AND et.deleted_at IS NULL
+      ${whereClause}
     `;
-    const [totalRecordsResult] = await db.query(
-      countQuery,
-      expenseValues.slice(0, -2)
-    );
-    const totalRecords = totalRecordsResult[0]?.total || 0;
+    const [countResult] = await db.query(countQuery, values.slice(0, -2));
+    const total = countResult[0]?.total || 0;
 
-    const pagination = getPagination(page, perPage, totalRecords);
+    const pagination = getPagination(page, perPage, total);
 
-    // Format response data
-    const data = expenses.map((row, index) => ({
-      s_no: offset + index + 1,
+    const data = expenses.map((row, i) => ({
+      s_no: offset + i + 1,
       id: row.expense_id,
       user_id: row.user_id,
       role_id: row.role_id,
@@ -381,20 +528,19 @@ exports.getAllexpense = async (req, res) => {
       user_name: `${row.user_first_name} ${row.user_last_name}`,
     }));
 
-    successResponse(
+    return successResponse(
       res,
       data,
-      data.length === 0
-        ? "No expense details found"
-        : "Expense details retrieved successfully",
+      data.length ? "Expense details retrieved successfully" : "No expense details found",
       200,
       pagination
     );
-  } catch (error) {
-    console.error("Error fetching expense details:", error);
-    return errorResponse(res, error.message, "Server error", 500);
+  } catch (err) {
+    console.error("Error fetching expenses:", err);
+    return errorResponse(res, err.message, "Server error", 500);
   }
 };
+
 
 // Update Expense
 exports.updateexpenses = async (id, req, res) => {
