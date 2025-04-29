@@ -725,6 +725,240 @@ exports.deleteOt = async (id, res) => {
 };
 
 // PM Employee OT Details
+// exports.getAllpmemployeeOts = async (req, res) => {
+//   try {
+//     const {
+//       team_id,
+//       start_date,
+//       end_date,
+//       status,
+//       search,
+//       page = 1,
+//       perPage = 10,
+//     } = req.query;
+
+//     if (!status) {
+//       return errorResponse(
+//         res,
+//         "status is required",
+//         "Error fetching OT details",
+//         400
+//       );
+//     }
+
+//     const offset = (page - 1) * perPage;
+
+//     const otConditions = [];
+//     const otValues = [];
+
+//     if (team_id) {
+//       const teamIds = team_id.split(",");
+//       if (teamIds.length > 0) {
+//         otConditions.push("ot.team_id IN (?)");
+//         otValues.push(teamIds);
+//       }
+//     }
+
+//     if (start_date && end_date) {
+//       const startDate = new Date(start_date);
+//       const endDate = new Date(end_date);
+
+//       if (endDate < startDate) {
+//         return errorResponse(
+//           res,
+//           "End date cannot be earlier than start date.",
+//           "Error fetching OT details",
+//           400
+//         );
+//       }
+//       otConditions.push("DATE(ot.date) BETWEEN ? AND ?");
+//       otValues.push(start_date, end_date);
+//     } else if (start_date) {
+//       otConditions.push("DATE(ot.date) >= ?");
+//       otValues.push(start_date);
+//     } else if (end_date) {
+//       otConditions.push("DATE(ot.date) <= ?");
+//       otValues.push(end_date);
+//     }
+
+//     if (search) {
+//       const searchTerm = `%${search}%`;
+//       otConditions.push(
+//         `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
+//       );
+//       otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+//     }
+
+//     if (status) {
+//       if (status.includes(",")) {
+//         return errorResponse(
+//           res,
+//           "Only a single status value is allowed.",
+//           "Error fetching OT details",
+//           400
+//         );
+//       }
+
+//       switch (status) {
+//         case "0":
+//           otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
+//           break;
+
+//         case "1":
+//           otConditions.push("ot.tl_status = 1 OR ot.pm_status = 1");
+//           break;
+
+//         case "2":
+//           otConditions.push("ot.pm_status = 2 OR ot.tl_status = 2");
+//           break;
+
+//         default:
+//           return errorResponse(
+//             res,
+//             "Invalid status value.",
+//             "Error fetching OT details",
+//             400
+//           );
+//       }
+//     }
+
+//     const otWhereClause =
+//       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
+
+//     const otQuery = `
+//       SELECT
+//         pr.name AS project_name,
+//         t.name AS task_name,
+//         DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
+//         ot.time AS employee_time,
+//         ot.comments,
+//         ot.status,
+//         ot.tl_status,
+//         ot.pm_status,
+//         ot.tledited_time AS tl_time,
+//         ot.pmedited_time AS pm_time,
+//         ot.id AS ot_id,
+//         ot.user_id,
+//         u.first_name AS user_first_name,
+//         u.last_name AS user_last_name,
+//         u.employee_id,
+//         u.role_id,
+//         d.name AS designation,
+//         te.name AS team_name
+//       FROM
+//         ot_details ot
+//       LEFT JOIN
+//         tasks t ON t.id = ot.task_id
+//       LEFT JOIN
+//         projects pr ON pr.id = ot.project_id
+//       LEFT JOIN
+//         users u ON u.id = ot.user_id
+//       LEFT JOIN
+//         teams te ON te.id = u.team_id
+//       LEFT JOIN
+//         designations d ON d.id = u.designation_id
+//       ${otWhereClause}
+//       AND ot.deleted_at IS NULL
+//       ORDER BY
+//         ot.created_at DESC
+//     `;
+
+//     const [ots] = await db.query(otQuery, otValues);
+
+//     const totalRecords = ots.length;
+//     const paginatedData = ots.slice(offset, offset + parseInt(perPage));
+//     const pagination = getPagination(page, perPage, totalRecords);
+
+//     const data = Object.values(
+//       paginatedData.reduce((acc, row, index) => {
+//         const userId = row.user_id;
+
+//         if (!acc[userId]) {
+//           acc[userId] = {
+//             employee_name: `${row.user_first_name} ${row.user_last_name}`,
+//             employee_id: row.employee_id,
+//             designation: row.designation,
+//             role_id: row.role_id,
+//             team_name: row.team_name,
+//             total_hours: "00:00:00",
+//             pending_counts: 0,
+//             details: [],
+//           };
+//         }
+
+//         if (row.status === 0) {
+//           acc[userId].pending_counts += 1;
+//         }
+
+//         acc[userId].details.push({
+//           s_no: offset + index + 1,
+//           id: row.ot_id,
+//           user_id: row.user_id,
+//           date: row.date,
+//           employee_time: row.employee_time || "00:00:00",
+//           tl_time: row.tl_time || "00:00:00",
+//           pm_time: row.pm_time || "00:00:00",
+//           project_name: row.project_name,
+//           task_name: row.task_name,
+//           comments: row.comments,
+//           status: row.status,
+//           tlstatus: row.tl_status,
+//           pmstatus: row.pm_status,
+//         });
+
+//         const currentHours = row.employee_time || "00:00:00";
+//         acc[userId].total_hours = addTimes(
+//           acc[userId].total_hours,
+//           currentHours
+//         );
+
+//         return acc;
+//       }, {})
+//     );
+
+//     const totalPendingCounts = data.reduce(
+//       (sum, user) => sum + user.pending_counts,
+//       0
+//     );
+
+//     const formattedData = data.map((group) => ({
+//       employee_name: group.employee_name,
+//       employee_id: group.employee_id,
+//       designation: group.designation,
+//       role_id: group.role_id,
+//       team_name: group.team_name,
+//       total_hours: group.total_hours,
+//       pending_counts: group.pending_counts,
+//       details: group.details,
+//     }));
+
+//     const countZeroQuery = `
+//     SELECT COUNT(*) AS count
+//     FROM ot_details ot
+//     WHERE ot.tl_status = 2
+//       AND ot.pm_status = 0
+//       AND ot.deleted_at IS NULL
+//   `;
+//     const [countResult] = await db.query(countZeroQuery);
+//     const statusZeroCount = countResult[0]?.count || 0;
+//     successResponse(
+//       res,
+//       {
+//         data: formattedData,
+//         pagination,
+//         otpm_status_zero_count: statusZeroCount,
+//       },
+//       formattedData.length === 0
+//         ? "No OT details found"
+//         : "OT details retrieved successfully",
+//       200
+//     );
+//   } catch (error) {
+//     console.error("Error fetching OT details:", error);
+//     return errorResponse(res, error.message, "Server error", 500);
+//   }
+// };
+
 exports.getAllpmemployeeOts = async (req, res) => {
   try {
     const {
@@ -800,16 +1034,20 @@ exports.getAllpmemployeeOts = async (req, res) => {
       }
 
       switch (status) {
-        case "0":
-          otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
+        case "0": // Pending
+          otConditions.push(
+            "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 0"
+          );
           break;
 
-        case "1":
-          otConditions.push("ot.tl_status = 1 OR ot.pm_status = 1");
+        case "1": // Rejected
+          otConditions.push("ot.status = 1");
           break;
 
-        case "2":
-          otConditions.push("ot.pm_status = 2 OR ot.tl_status = 2");
+        case "2": // Approved
+          otConditions.push(
+            "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 2"
+          );
           break;
 
         default:
@@ -865,14 +1103,14 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
     const [ots] = await db.query(otQuery, otValues);
 
-    const totalRecords = ots.length;
-    const paginatedData = ots.slice(offset, offset + parseInt(perPage));
-    const pagination = getPagination(page, perPage, totalRecords);
+    // const totalRecords = ots.length;
+    // const paginatedData = ots.slice(offset, offset + parseInt(perPage));
+    // const pagination = getPagination(page, perPage, totalRecords);
 
-    const data = Object.values(
-      paginatedData.reduce((acc, row, index) => {
+    const groupedData = Object.values(
+      ots.reduce((acc, row) => {
         const userId = row.user_id;
-
+    
         if (!acc[userId]) {
           acc[userId] = {
             employee_name: `${row.user_first_name} ${row.user_last_name}`,
@@ -885,13 +1123,12 @@ exports.getAllpmemployeeOts = async (req, res) => {
             details: [],
           };
         }
-
+    
         if (row.status === 0) {
           acc[userId].pending_counts += 1;
         }
-
+    
         acc[userId].details.push({
-          s_no: offset + index + 1,
           id: row.ot_id,
           user_id: row.user_id,
           date: row.date,
@@ -905,32 +1142,32 @@ exports.getAllpmemployeeOts = async (req, res) => {
           tlstatus: row.tl_status,
           pmstatus: row.pm_status,
         });
-
+    
         const currentHours = row.employee_time || "00:00:00";
-        acc[userId].total_hours = addTimes(
-          acc[userId].total_hours,
-          currentHours
-        );
-
+        acc[userId].total_hours = addTimes(acc[userId].total_hours, currentHours);
+    
         return acc;
       }, {})
     );
+    
+    // const totalPendingCounts = data.reduce(
+    //   (sum, user) => sum + user.pending_counts,
+    //   0
+    // );
 
-    const totalPendingCounts = data.reduce(
-      (sum, user) => sum + user.pending_counts,
-      0
-    );
-
-    const formattedData = data.map((group) => ({
-      employee_name: group.employee_name,
-      employee_id: group.employee_id,
-      designation: group.designation,
-      role_id: group.role_id,
-      team_name: group.team_name,
-      total_hours: group.total_hours,
-      pending_counts: group.pending_counts,
-      details: group.details,
-    }));
+    const totalEmployees = groupedData.length;
+    const paginatedEmployees = groupedData.slice(offset, offset + parseInt(perPage));
+    const pagination = getPagination(page, perPage, totalEmployees);
+    
+    // Assign s_no inside each employee's details
+    const formattedData = paginatedEmployees.map((group) => {
+      group.details = group.details.map((item, index) => ({
+        s_no: index + 1,
+        ...item,
+      }));
+      return group;
+    });
+    
 
     const countZeroQuery = `
     SELECT COUNT(*) AS count
@@ -1611,7 +1848,7 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
       400
     );
   }
-  
+
   if (!role) {
     return errorResponse(
       res,
