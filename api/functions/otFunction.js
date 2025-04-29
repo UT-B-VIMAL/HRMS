@@ -147,7 +147,7 @@ exports.createOt = async (payload, res, req) => {
     let tl_status;
     let statuss;
 
-    if (role_id == 2 || role_id == 3) {
+    if (role_id == 1 || role_id == 2 || role_id == 3) {
       tl_status = 2;
       statuss = 2;
     } else {
