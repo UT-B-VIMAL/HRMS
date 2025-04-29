@@ -413,6 +413,7 @@ exports.getAllOts = async (req, res) => {
           ot.id AS ot_id,
           ot.user_id,
           u.employee_id,
+          u.role_id,
           u.first_name AS user_first_name,
           u.last_name AS user_last_name
         FROM 
@@ -442,6 +443,7 @@ exports.getAllOts = async (req, res) => {
       id: row.ot_id,
       user_id: row.user_id,
       employee_id: row.employee_id,
+      role_id: row.role_id,
       date: row.date,
       time: row.time,
       project_name: row.project_name,
@@ -1042,11 +1044,13 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
         case "1": // Rejected
           otConditions.push("ot.status = 1");
+        case "1":
+          otConditions.push("(ot.tl_status = 1 OR ot.pm_status = 1)");
           break;
 
         case "2": // Approved
           otConditions.push(
-            "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 2"
+            "(ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 2)"
           );
           break;
 

@@ -138,21 +138,29 @@ exports.createexpense = async (req, res) => {
 
         // Notification payload
         const notificationPayload = {
-          title: 'Review Employee Expenses',
-          body: 'New expense requests need your approval.',
+          title: "Review Employee Expenses",
+          body: "New expense requests need your approval.",
         };
 
         const socketIds = userSockets[reportingUserId];
 
         if (Array.isArray(socketIds)) {
           socketIds.forEach((socketId) => {
-            req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
+            req.io
+              .of("/notifications")
+              .to(socketId)
+              .emit("push_notification", notificationPayload);
           });
         }
 
         await db.execute(
-          'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
-          [reportingUserId, notificationPayload.title, notificationPayload.body, 0]
+          "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+          [
+            reportingUserId,
+            notificationPayload.title,
+            notificationPayload.body,
+            0,
+          ]
         );
       }
     }
@@ -322,6 +330,7 @@ exports.getAllexpense = async (req, res) => {
         et.id AS expense_id,
         et.user_id,
         et.file,
+        u.role_id,
         u.first_name AS user_first_name,
         u.last_name AS user_last_name
       FROM 
@@ -331,7 +340,7 @@ exports.getAllexpense = async (req, res) => {
       ${expenseWhereClause}
       AND et.deleted_at IS NULL
       ORDER BY 
-        et.id
+        et.updated_at DESC
       LIMIT ?, ?
     `;
 
@@ -360,6 +369,7 @@ exports.getAllexpense = async (req, res) => {
       s_no: offset + index + 1,
       id: row.expense_id,
       user_id: row.user_id,
+      role_id: row.role_id,
       date: row.date,
       expense_amount: row.expense_amount,
       description: row.description,
@@ -664,14 +674,10 @@ exports.getAllpmemployeexpense = async (req, res) => {
         otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
         break;
       case "1":
-        otConditions.push(
-          "et.tl_status = 1 OR et.pm_status = 1"
-        );
+        otConditions.push("(et.tl_status = 1 OR et.pm_status = 1)");
         break;
       case "2":
-        otConditions.push(
-          "et.pm_status = 2 OR et.tl_status = 2"
-        );
+        otConditions.push("(et.pm_status = 2 OR et.tl_status = 2)");
         break;
       default:
         return errorResponse(
@@ -758,10 +764,8 @@ exports.getAllpmemployeexpense = async (req, res) => {
       AND et.pm_status = 0
       AND et.deleted_at IS NULL
   `;
-  const [countResult] = await db.query(countZeroQuery);
-  const statusZeroCount = countResult[0]?.count || 0;
-
-    
+    const [countResult] = await db.query(countZeroQuery);
+    const statusZeroCount = countResult[0]?.count || 0;
 
     // Send success response
     successResponse(
@@ -776,7 +780,6 @@ exports.getAllpmemployeexpense = async (req, res) => {
         : "Expense details retrieved successfully",
       200
     );
-    
   } catch (error) {
     console.error("Error fetching Expense details:", error);
     return errorResponse(res, error.message, "Server error", 500);
@@ -902,16 +905,17 @@ exports.approve_reject_expense = async (payload, res, req) => {
 
       const notificationPayload = {
         title: status === 2 ? "Expense Approved" : "Expense Rejected",
-        body: `Your expense claim for ${expenseType} has been ${status === 2 ? "approved" : "rejected"
-          }.`,
+        body: `Your expense claim for ${expenseType} has been ${
+          status === 2 ? "approved" : "rejected"
+        }.`,
       };
 
       const socketIds = userSockets[user_id];
       if (Array.isArray(socketIds)) {
         socketIds.forEach((socketId) => {
-        
           req.io
-            .of("/notifications").to(socketId)
+            .of("/notifications")
+            .to(socketId)
             .emit("push_notification", notificationPayload);
         });
       }
@@ -948,16 +952,21 @@ exports.approve_reject_expense = async (payload, res, req) => {
           const pmSocketIds = userSockets[pmUser.id];
           if (Array.isArray(pmSocketIds)) {
             pmSocketIds.forEach((socketId) => {
-              
               req.io
-                .of("/notifications").to(socketId)
+                .of("/notifications")
+                .to(socketId)
                 .emit("push_notification", pmNotificationPayload);
             });
           }
 
           await db.execute(
             "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-            [pmUser.id, pmNotificationPayload.title, pmNotificationPayload.body, 0]
+            [
+              pmUser.id,
+              pmNotificationPayload.title,
+              pmNotificationPayload.body,
+              0,
+            ]
           );
         }
       })();
@@ -1127,7 +1136,6 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         et.updated_at DESC
     `;
     console.log(otQuery);
-    
 
     const [ots] = await db.query(otQuery, otValues);
 
@@ -1231,10 +1239,11 @@ exports.getExpenseReport = async (queryParams, res) => {
          users.deleted_at IS NULL
          AND expenses.pm_status = 2
          AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
-         ${search
-        ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
-        : ""
-      }
+         ${
+           search
+             ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
+             : ""
+         }
          ${category ? "AND expenses.category IN (?)" : ""}
       ORDER BY 
          expenses.date DESC
@@ -1291,10 +1300,11 @@ exports.getExpenseReport = async (queryParams, res) => {
          users.deleted_at IS NULL
          AND expenses.pm_status = 2
          AND (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
-         ${search
-        ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
-        : ""
-      }
+         ${
+           search
+             ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)"
+             : ""
+         }
          ${category ? "AND expenses.category IN (?)" : ""}
     `;
 
