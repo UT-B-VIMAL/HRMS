@@ -1566,7 +1566,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
       switch (status) {
         case "0": // Pending
           if (currentRoleId == 3) {
-            otConditions.push("ot.pm_status = 0");
+            otConditions.push(`ot.pm_status = 0 AND ot.user_id != ${userCheck[0].id}`);
           } else if (currentRoleId == 4) {
             otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
           }
