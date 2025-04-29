@@ -964,6 +964,7 @@ exports.deleteOt = async (id, res) => {
 exports.getAllpmemployeeOts = async (req, res) => {
   try {
     const {
+      user_id,
       team_id,
       start_date,
       end_date,
@@ -973,12 +974,34 @@ exports.getAllpmemployeeOts = async (req, res) => {
       perPage = 10,
     } = req.query;
 
+    if (!user_id) {
+      return errorResponse(
+        res,
+        "user_id is required",
+        "Error fetching OT details",
+        400
+      );
+    }
+
     if (!status) {
       return errorResponse(
         res,
         "status is required",
         "Error fetching OT details",
         400
+      );
+    }
+
+    const [userCheck] = await db.query(
+      "SELECT id,role_id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+    if (userCheck.length === 0) {
+      return errorResponse(
+        res,
+        "User not found or deleted",
+        "Error fetching OT details",
+        404
       );
     }
 
@@ -1035,23 +1058,29 @@ exports.getAllpmemployeeOts = async (req, res) => {
         );
       }
 
+      const currentRoleId = userCheck[0].role_id;
+
       switch (status) {
         case "0": // Pending
-          otConditions.push(
-            "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 0"
-          );
+          if ([1, 2, 3].includes(Number(currentRoleId))) {
+            otConditions.push("ot.pm_status = 0");
+          } else if (Number(currentRoleId) === 4) {
+            otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
+          }
+          otConditions.push("ot.status = 2");
           break;
 
         case "1": // Rejected
           otConditions.push("ot.status = 1");
-        case "1":
-          otConditions.push("(ot.tl_status = 1 OR ot.pm_status = 1)");
           break;
 
         case "2": // Approved
-          otConditions.push(
-            "(ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 2)"
-          );
+          if ([1, 2, 3].includes(Number(currentRoleId))) {
+            otConditions.push("ot.pm_status = 2");
+          } else if (Number(currentRoleId) === 4) {
+            otConditions.push("ot.tl_status = 2 AND ot.pm_status = 2");
+          }
+          otConditions.push("ot.status = 2");
           break;
 
         default:
@@ -1062,6 +1091,32 @@ exports.getAllpmemployeeOts = async (req, res) => {
             400
           );
       }
+
+      // switch (status) {
+      //   case "0": // Pending
+      //     otConditions.push(
+      //       "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 0"
+      //     );
+      //     break;
+
+      //   case "1": // Rejected
+      //     otConditions.push("ot.status = 1");
+      //     break;
+
+      //   case "2": // Approved
+      //     otConditions.push(
+      //       "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 2"
+      //     );
+      //     break;
+
+      //   default:
+      //     return errorResponse(
+      //       res,
+      //       "Invalid status value.",
+      //       "Error fetching OT details",
+      //       400
+      //     );
+      // }
     }
 
     const otWhereClause =
@@ -1114,7 +1169,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
     const groupedData = Object.values(
       ots.reduce((acc, row) => {
         const userId = row.user_id;
-    
+
         if (!acc[userId]) {
           acc[userId] = {
             employee_name: `${row.user_first_name} ${row.user_last_name}`,
@@ -1127,11 +1182,11 @@ exports.getAllpmemployeeOts = async (req, res) => {
             details: [],
           };
         }
-    
+
         if (row.status === 0) {
           acc[userId].pending_counts += 1;
         }
-    
+
         acc[userId].details.push({
           id: row.ot_id,
           user_id: row.user_id,
@@ -1146,23 +1201,29 @@ exports.getAllpmemployeeOts = async (req, res) => {
           tlstatus: row.tl_status,
           pmstatus: row.pm_status,
         });
-    
+
         const currentHours = row.employee_time || "00:00:00";
-        acc[userId].total_hours = addTimes(acc[userId].total_hours, currentHours);
-    
+        acc[userId].total_hours = addTimes(
+          acc[userId].total_hours,
+          currentHours
+        );
+
         return acc;
       }, {})
     );
-    
+
     // const totalPendingCounts = data.reduce(
     //   (sum, user) => sum + user.pending_counts,
     //   0
     // );
 
     const totalEmployees = groupedData.length;
-    const paginatedEmployees = groupedData.slice(offset, offset + parseInt(perPage));
+    const paginatedEmployees = groupedData.slice(
+      offset,
+      offset + parseInt(perPage)
+    );
     const pagination = getPagination(page, perPage, totalEmployees);
-    
+
     // Assign s_no inside each employee's details
     const formattedData = paginatedEmployees.map((group) => {
       group.details = group.details.map((item, index) => ({
@@ -1171,7 +1232,6 @@ exports.getAllpmemployeeOts = async (req, res) => {
       }));
       return group;
     });
-    
 
     const countZeroQuery = `
     SELECT COUNT(*) AS count
