@@ -538,7 +538,7 @@ exports.getAllOts = async (req, res) => {
     statusArray.forEach((s) => {
       if (s === "0") {
         if (role_id == 3) statusFilters.push(`(ot.pm_status = 0 AND ot.user_id = ${user_id})`);
-        else if (role_id == 4) statusFilters.push(`(ot.tl_status = 2 AND ot.pm_status = 0)`);
+        else if (role_id == 4) statusFilters.push(`(ot.tl_status = 0 AND ot.pm_status = 0 AND ot.user_id = ${user_id})`);
         else statusFilters.push(`ot.status = 2  AND ot.tl_status = 2  AND ot.pm_status = 0`);
       } else if (s === "1") {
         statusFilters.push(`ot.status = 1`);
