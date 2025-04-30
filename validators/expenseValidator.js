@@ -2,7 +2,7 @@ const Joi = require("joi");
 
 const validationschema = {
   createExpenseSchema: Joi.object({
-    amount: Joi.number().integer().min(0).max(99999999).required().messages({
+    amount: Joi.number().precision(2).min(0).max(99999999).required().messages({
       "number.base": "amount must be a number",
       "number.integer": "amount must be an integer",
       "number.min": "amount cannot be less than 0",
