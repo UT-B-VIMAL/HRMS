@@ -87,7 +87,8 @@ chatSocket(io.of('/chat'));
 const corsOptions = {
   origin: "*", // Allow all origins
   methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  exposedHeaders: ['Content-Disposition']
+  // allowedHeaders: ["Content-Type", "Authorization"]
 };
 
 app.use(cors(corsOptions));
