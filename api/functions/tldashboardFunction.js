@@ -310,13 +310,36 @@ exports.fetchTLproducts = async (req, res) => {
     }
 
     // Fetch products (filtered by product_id if provided)
-    const productsQuery = productIds.length
-      ? "SELECT * FROM products WHERE id IN (?) AND deleted_at IS NULL"
-      : "SELECT * FROM products WHERE deleted_at IS NULL";
-    const [products] = await db.query(
-      productsQuery,
-      productIds.length ? [productIds] : []
-    );
+    // const productsQuery = productIds.length
+    //   ? "SELECT * FROM products WHERE id IN (?) AND deleted_at IS NULL"
+    //   : "SELECT * FROM products WHERE deleted_at IS NULL";
+    // const [products] = await db.query(
+    //   productsQuery,
+    //   productIds.length ? [productIds] : []
+    // );
+
+    let productFilterQuery = `
+  SELECT DISTINCT p.* 
+  FROM products p
+  LEFT JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
+  LEFT JOIN sub_tasks s ON s.task_id = t.id AND s.deleted_at IS NULL
+  WHERE p.deleted_at IS NULL
+    AND (
+      (t.team_id IN (?) AND t.id IS NOT NULL)
+      OR
+      (s.team_id IN (?) AND s.id IS NOT NULL)
+    )
+`;
+
+const queryValues = [teamIds, teamIds];
+
+if (productIds.length) {
+  productFilterQuery += ` AND p.id IN (?)`;
+  queryValues.push(productIds);
+}
+
+const [products] = await db.query(productFilterQuery, queryValues);
+
 
     if (products.length === 0) {
       return res.status(404).json({ message: "No products found" });
