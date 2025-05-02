@@ -1430,11 +1430,17 @@ exports.getRequestchange = async (id, payload, res, req) => {
   `;
 
   const historyValues = [
-    JSON.stringify(oldData),
-    JSON.stringify(newData),
+    JSON.stringify({
+      ...oldData,
+      status: oldData.status, 
+    }),
+    JSON.stringify({
+      ...newData,
+      status: statusToSet,
+    }),
     type === 'task' ? id : null,
     type === 'subtask' ? id : null,
-    action === 'reopen' ? 'Reopen' : 'Done',
+    action === 'Change the status',
     user_id,
     1 // status_flag
   ];
