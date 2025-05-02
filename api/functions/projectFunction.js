@@ -1552,15 +1552,19 @@ exports.getRequestchange = async (id, payload, res, req) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
     `;
 
+    const taskId = type === 'task' ? id : oldData.task_id;
+    const subtaskId = type === 'subtask' ? id : null;
+    
     const historyValues = [
-      oldStatusLabel,
-      newStatusLabel,
-      type === 'task' ? id : null,
-      type === 'subtask' ? id : null,
-      'Change the status',
-      user_id,
-      1
+      oldStatusLabel,      
+      newStatusLabel,      
+      taskId,              
+      subtaskId,            
+      'Change the status',  
+      user_id,              
+      1                     // status_flag
     ];
+    
 
     await db.query(historyQuery, historyValues);
 
