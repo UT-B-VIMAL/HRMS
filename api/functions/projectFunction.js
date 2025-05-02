@@ -1122,7 +1122,7 @@ exports.projectRequest = async (req, res) => {
         st.name AS name,
         tm.name AS team_name,
         DATE_FORMAT(st.created_at, '%Y-%m-%d') AS date,
-        CONCAT(ua.first_name, ' ', ua.last_name) AS assigned_by_designation,
+        ua.designation_id AS assigned_by_designation,
         'Subtask' AS type,
         t.id AS task_id,
         st.id AS subtask_id,
@@ -1145,7 +1145,7 @@ exports.projectRequest = async (req, res) => {
         t.name AS name,
         tm.name AS team_name,
         DATE_FORMAT(t.created_at, '%Y-%m-%d') AS date,
-        CONCAT(ua.first_name, ' ', ua.last_name) AS assigned_by_designation,
+        ua.designation_id AS assigned_by_designation,
         'Task' AS type,
         t.id AS task_id,
         NULL AS subtask_id,
@@ -1295,6 +1295,139 @@ exports.getRequestupdate = async (req, res) => {
 
 
 
+// exports.getRequestchange = async (id, payload, res, req) => {
+//   const { user_id, type, remark, rating, action } = payload;
+
+//   const requiredFields = [
+//     { key: 'type', message: 'Type is required' },
+//     { key: 'action', message: 'Action is required' },
+//     { key: 'user_id', message: 'User ID is required' },
+//   ];
+
+//   for (const field of requiredFields) {
+//     if (!payload[field.key]) {
+//       return errorResponse(res, null, field.message, 400);
+//     }
+//   }
+
+//   const [userRows] = await db.query(
+//     "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//     [user_id]
+//   );
+
+//   if (userRows.length === 0) {
+//     return errorResponse(res, null, "User Not Found", 400);
+//   }
+
+//   const validType = ['task', 'subtask'];
+//   if (!validType.includes(type)) {
+//     return errorResponse(res, null, 'Invalid type. It should be either task or subtask.', 400);
+//   }
+
+//   const validActions = ['reopen', 'close'];
+//   if (!validActions.includes(action)) {
+//     return errorResponse(res, null, 'Invalid action. It should be either reopen or close.', 400);
+//   }
+
+//   try {
+//     // Validate if the task or subtask exists
+//     const table = type === 'task' ? 'tasks' : 'sub_tasks';
+//     const [idRows] = await db.query(
+//       `SELECT id, user_id FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
+//       [id]
+//     );
+
+//     if (idRows.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
+//         404
+//       );
+//     }
+
+//     const userId = idRows[0].user_id;
+
+//     // Determine status values based on action
+//     let statusToSet, reopenstatusToSet, notificationTitle, notificationBody;
+
+//     if (action === 'reopen') {
+//       statusToSet = 0;
+//       reopenstatusToSet = 1;
+//       notificationTitle = 'Task Reopened';
+//       notificationBody = 'Your task has been reopened for further review. Please check the updates.';
+//     } else if (action === 'close') {
+//       statusToSet = 3;
+//       reopenstatusToSet = 0;
+//       notificationTitle = 'Task Approved';
+//       notificationBody = 'Your submitted task has been successfully approved.';
+//     }
+
+//     // Prepare fields and values for update
+//     const fieldsToUpdate = ['status = ?', 'reopen_status = ?', 'updated_by = ?', 'updated_at = ?'];
+//     const updatedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+//     const values = [statusToSet, reopenstatusToSet, user_id, updatedAt];
+
+//     if (remark !== undefined) {
+//       fieldsToUpdate.push('remark = ?');
+//       values.push(remark);
+//     }
+
+//     if (rating !== undefined) {
+//       fieldsToUpdate.push('rating = ?');
+//       values.push(rating);
+//     }
+
+//     // Construct and execute the update query
+//     const updateQuery = `
+//       UPDATE ${table}
+//       SET ${fieldsToUpdate.join(', ')}
+//       WHERE id = ? AND deleted_at IS NULL
+//     `;
+//     values.push(id);
+
+//     const [updateResult] = await db.query(updateQuery, values);
+
+//     if (updateResult.affectedRows === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
+//         404
+//       );
+//     }
+
+//     // Send notification to the user
+//     const notificationPayload = {
+//       title: notificationTitle,
+//       body: notificationBody,
+//     };
+//     const socketIds = userSockets[userId];
+//     if (Array.isArray(socketIds)) {
+//       socketIds.forEach(socketId => {
+//         req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
+//       });
+//     }
+//     await db.execute(
+//       'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+//       [userId, notificationPayload.title, notificationPayload.body, 0]
+//     );
+
+//     // Return success response
+//     return successResponse(
+//       res,
+//       { id },
+//       `Project request for ${type.charAt(0).toUpperCase() + type.slice(1)} updated successfully`,
+//       200
+//     );
+//   } catch (error) {
+//     console.error('Error updating task or subtask:', error.message);
+//     return errorResponse(res, error.message, 'Error updating task or subtask', 500);
+//   }
+// };
+
+
+
 exports.getRequestchange = async (id, payload, res, req) => {
   const { user_id, type, remark, rating, action } = payload;
 
@@ -1330,26 +1463,12 @@ exports.getRequestchange = async (id, payload, res, req) => {
   }
 
   try {
-    // Validate if the task or subtask exists
     const table = type === 'task' ? 'tasks' : 'sub_tasks';
-    const [idRows] = await db.query(
-      `SELECT id, user_id FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
+
+    const [oldDataRows] = await db.query(
+      `SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
       [id]
     );
-
-    if (idRows.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
-        404
-      );
-    }
-
-    const userId = idRows[0].user_id;
-
-    // Fetch old data before updating
-    const [oldDataRows] = await db.query(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, [id]);
 
     if (oldDataRows.length === 0) {
       return errorResponse(
@@ -1361,8 +1480,9 @@ exports.getRequestchange = async (id, payload, res, req) => {
     }
 
     const oldData = oldDataRows[0];
+    const userId = oldData.user_id;
 
-    // Determine status values based on action
+    // Determine status values
     let statusToSet, reopenstatusToSet, notificationTitle, notificationBody;
 
     if (action === 'reopen') {
@@ -1377,7 +1497,6 @@ exports.getRequestchange = async (id, payload, res, req) => {
       notificationBody = 'Your submitted task has been successfully approved.';
     }
 
-    // Prepare fields and values for update
     const fieldsToUpdate = ['status = ?', 'reopen_status = ?', 'updated_by = ?', 'updated_at = ?'];
     const updatedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const values = [statusToSet, reopenstatusToSet, user_id, updatedAt];
@@ -1392,13 +1511,13 @@ exports.getRequestchange = async (id, payload, res, req) => {
       values.push(rating);
     }
 
-    // Construct and execute the update query
+    values.push(id); // for WHERE clause
+
     const updateQuery = `
       UPDATE ${table}
       SET ${fieldsToUpdate.join(', ')}
       WHERE id = ? AND deleted_at IS NULL
     `;
-    values.push(id);
 
     const [updateResult] = await db.query(updateQuery, values);
 
@@ -1411,72 +1530,68 @@ exports.getRequestchange = async (id, payload, res, req) => {
       );
     }
 
+    // Prepare status labels
+    const getStatusLabel = (status, reopenStatus, activeStatus) => {
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) return "To Do";
+      if (status === 1 && reopenStatus === 0 && activeStatus === 0) return "On Hold";
+      if (status === 2 && reopenStatus === 0) return "Pending Approval";
+      if (reopenStatus === 1 && activeStatus === 0) return "Reopen";
+      if (status === 1 && activeStatus === 1) return "InProgress";
+      if (status === 3) return "Done";
+      return "";
+    };
 
-  // Insert task history
-  const newData = {
-    status: statusToSet,
-    reopen_status: reopenstatusToSet,
-    ...(remark !== undefined && { remark }),
-    ...(rating !== undefined && { rating }),
-    updated_by: user_id,
-    updated_at: updatedAt,
-  };
+    const oldStatusLabel = getStatusLabel(oldData.status, oldData.reopen_status, oldData.active_status);
+    const newStatusLabel = getStatusLabel(statusToSet, reopenstatusToSet, oldData.active_status);
 
-  const historyQuery = `
-    INSERT INTO task_histories (
-      old_data, new_data, task_id, subtask_id, text,
-      updated_by, status_flag, created_at, updated_at, deleted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
-  `;
+    // Insert into task history
+    const historyQuery = `
+      INSERT INTO task_histories (
+        old_data, new_data, task_id, subtask_id, text,
+        updated_by, status_flag, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+    `;
 
-  const historyValues = [
-    JSON.stringify({
-      ...oldData,
-      status: oldData.status, 
-    }),
-    JSON.stringify({
-      ...newData,
-      status: statusToSet,
-    }),
-    type === 'task' ? id : null,
-    type === 'subtask' ? id : null,
-    action === 'Change the status',
-    user_id,
-    1 // status_flag
-  ];
+    const historyValues = [
+      oldStatusLabel,
+      newStatusLabel,
+      type === 'task' ? id : null,
+      type === 'subtask' ? id : null,
+      'Change the status',
+      user_id,
+      1
+    ];
 
-  await db.query(historyQuery, historyValues);
+    await db.query(historyQuery, historyValues);
 
-    // Send notification to the user
+    // Send notification
     const notificationPayload = {
       title: notificationTitle,
       body: notificationBody,
     };
+
     const socketIds = userSockets[userId];
     if (Array.isArray(socketIds)) {
       socketIds.forEach(socketId => {
         req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
       });
     }
+
     await db.execute(
       'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
       [userId, notificationPayload.title, notificationPayload.body, 0]
     );
 
-    // Return success response
     return successResponse(
       res,
       { id },
-      `Project request for ${type.charAt(0).toUpperCase() + type.slice(1)} updated successfully`,
+      `${type.charAt(0).toUpperCase() + type.slice(1)} updated successfully`,
       200
     );
   } catch (error) {
-    console.error('Error updating task or subtask:', error.message);
-    return errorResponse(res, error.message, 'Error updating task or subtask', 500);
+    console.error('Error:', error.message);
+    return errorResponse(res, error.message, 'Server error', 500);
   }
 };
-
-
-
 
 
