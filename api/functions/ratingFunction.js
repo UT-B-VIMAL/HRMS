@@ -66,7 +66,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       [user_id]
     );
     const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
-    query += ' AND users.team_id IN (?) AND users.role_id != 3';
+    query += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
     queryParams.push(teamIds);
   }
  
@@ -112,7 +112,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       [user_id]
     );
     const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
-    countQuery += ' AND users.team_id IN (?) AND users.role_id != 3';
+    countQuery += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
     countQueryParams.push(teamIds);
   }
   if (search && search.trim() !== "") {
@@ -438,7 +438,7 @@ exports.getRatings = async (req, res) => {
         [user_id]
       );
       const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
-      whereClause += ' AND users.team_id IN (?) AND users.role_id != 3';
+      whereClause += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
       values.push(teamIds);
     }
 
