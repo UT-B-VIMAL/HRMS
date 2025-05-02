@@ -1348,6 +1348,20 @@ exports.getRequestchange = async (id, payload, res, req) => {
 
     const userId = idRows[0].user_id;
 
+    // Fetch old data before updating
+    const [oldDataRows] = await db.query(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, [id]);
+
+    if (oldDataRows.length === 0) {
+      return errorResponse(
+        res,
+        null,
+        `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
+        404
+      );
+    }
+
+    const oldData = oldDataRows[0];
+
     // Determine status values based on action
     let statusToSet, reopenstatusToSet, notificationTitle, notificationBody;
 
@@ -1396,6 +1410,36 @@ exports.getRequestchange = async (id, payload, res, req) => {
         404
       );
     }
+
+
+  // Insert task history
+  const newData = {
+    status: statusToSet,
+    reopen_status: reopenstatusToSet,
+    ...(remark !== undefined && { remark }),
+    ...(rating !== undefined && { rating }),
+    updated_by: user_id,
+    updated_at: updatedAt,
+  };
+
+  const historyQuery = `
+    INSERT INTO task_histories (
+      old_data, new_data, task_id, subtask_id, text,
+      updated_by, status_flag, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+  `;
+
+  const historyValues = [
+    JSON.stringify(oldData),
+    JSON.stringify(newData),
+    type === 'task' ? id : null,
+    type === 'subtask' ? id : null,
+    action === 'reopen' ? 'Reopen' : 'Done',
+    user_id,
+    1 // status_flag
+  ];
+
+  await db.query(historyQuery, historyValues);
 
     // Send notification to the user
     const notificationPayload = {
