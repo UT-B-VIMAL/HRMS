@@ -42,7 +42,7 @@ exports.fetchAttendance = async (req, res) => {
 
     // Get total team strength
     const [totalStrengthResult] = await db.query(
-      "SELECT COUNT(*) AS total_strength FROM users WHERE team_id IN (?) AND deleted_at IS NULL",
+      "SELECT COUNT(*) AS total_strength FROM users WHERE team_id IN (?) AND role_id = 4 AND deleted_at IS NULL",
       [teamIds]
     );
     const totalStrength = totalStrengthResult[0]?.total_strength || 0;
@@ -61,7 +61,7 @@ exports.fetchAttendance = async (req, res) => {
           )
           AND u.team_id IN (?)
           AND u.deleted_at IS NULL
-          AND u.role_id = 3
+          AND u.role_id = 4
           AND e.deleted_at IS NULL
           ${employee_id ? "AND u.employee_id = ?" : ""}
       `,
@@ -82,7 +82,7 @@ exports.fetchAttendance = async (req, res) => {
         FROM users
         WHERE team_id IN (?) 
           AND deleted_at IS NULL
-          AND role_id = 3
+          AND role_id = 4
           ${absentEmployeeIdsCondition}
           ${employee_id ? "AND employee_id = ?" : ""}
       `,
@@ -200,7 +200,7 @@ exports.fetchTlrating = async (req, res) => {
     // Fetch team members with concatenated full name
     const [teamMembers] = await db.query(
       `SELECT id, role_id ,designation_id, COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
-       FROM users WHERE team_id IN (?) AND role_id = 3 AND deleted_at IS NULL`,
+       FROM users WHERE team_id IN (?) AND role_id = 4 AND deleted_at IS NULL`,
       [teamIds]
     );
 
