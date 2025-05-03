@@ -1269,53 +1269,53 @@ exports.getAlltlemployeeexpense = async (req, res) => {
 
     const currentRoleId = userCheck[0].role_id;
 
-      switch (status) {
-        case "0": // Pending
-          if (currentRoleId == 3) {
-            otConditions.push(`et.pm_status = 0 AND et.user_id != ${userCheck[0].id}`);
-          } else if (currentRoleId == 4) {
-            otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
-          }
-          break;
+      // switch (status) {
+      //   case "0": // Pending
+      //     if (currentRoleId == 3) {
+      //       otConditions.push(`et.pm_status = 0 AND et.user_id != ${userCheck[0].id}`);
+      //     } else if (currentRoleId == 4) {
+      //       otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
+      //     }
+      //     break;
       
-        case "1": // Rejected
-          otConditions.push("et.status = 1");
-          break;
+      //   case "1": // Rejected
+      //     otConditions.push("et.status = 1");
+      //     break;
       
-        case "2": // Approved
-          if (currentRoleId == 3) {
-            otConditions.push("et.tl_status = 2");
-          } else if (currentRoleId == 4) {
-            otConditions.push("et.tl_status = 2 AND et.pm_status = 2");
-          }
-          break;
+      //   case "2": // Approved
+      //     if (currentRoleId == 3) {
+      //       otConditions.push("et.tl_status = 2");
+      //     } else if (currentRoleId == 4) {
+      //       otConditions.push("et.tl_status = 2 AND et.pm_status = 2");
+      //     }
+      //     break;
       
-        default:
-          return errorResponse(
-            res,
-            "Invalid status value.",
-            "Error fetching expenses",
-            400
-          );
-      }
-    // switch (status) {
-    //   case "0": // All statuses must be 0
-    //     otConditions.push("(et.status = 0 AND et.tl_status = 0)");
-    //     break;
-    //   case "1": // et.status must) be 1, and at least one of tl_status or pm_status must be 1
-    //     otConditions.push("(et.tl_status = 1 OR et.pm_status = 1)");
-    //     break;
-    //   case "2": // All statuses must be 2
-    //     otConditions.push("(et.tl_status = 2 OR et.pm_status = 2)");
-    //     break;
-    //   default:
-    //     return errorResponse(
-    //       res,
-    //       "Invalid status value",
-    //       "Error fetching expenses",
-    //       400
-    //     );
-    // }
+      //   default:
+      //     return errorResponse(
+      //       res,
+      //       "Invalid status value.",
+      //       "Error fetching expenses",
+      //       400
+      //     );
+      // }
+    switch (status) {
+      case "0": // All statuses must be 0
+        otConditions.push(`(et.status = 0 AND et.tl_status = 0 AND user_id != ${userCheck[0].id})`);
+        break;
+      case "1": // et.status must) be 1, and at least one of tl_status or pm_status must be 1
+        otConditions.push(`(et.tl_status = 1 OR et.pm_status = 1) AND user_id != ${userCheck[0].id}`);
+        break;
+      case "2": // All statuses must be 2
+        otConditions.push(`(et.tl_status = 2 OR et.pm_status = 2) AND user_id != ${userCheck[0].id}`);
+        break;
+      default:
+        return errorResponse(
+          res,
+          "Invalid status value",
+          "Error fetching expenses",
+          400
+        );
+    }
 
     // Build the WHERE clause
     const otWhereClause =
