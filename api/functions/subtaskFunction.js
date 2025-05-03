@@ -27,10 +27,10 @@ exports.createSubTask = async (payload, res) => {
       // Insert into `sub_tasks` table
       const insertQuery = `
           INSERT INTO sub_tasks (
-              product_id, project_id, task_id, name, created_by,updated_by ,deleted_at, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?,?, NULL, NOW(), NOW())
+              product_id, project_id, task_id, name, assigned_user_id, created_by,updated_by ,deleted_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?,?,?, NULL, NOW(), NOW())
       `;
-      const values = [product_id, project_id, task_id, name, created_by, created_by];
+      const values = [product_id, project_id, task_id, name,created_by, created_by, created_by];
 
       const [result] = await db.query(insertQuery, values);
 
