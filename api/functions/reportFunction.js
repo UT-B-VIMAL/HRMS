@@ -221,7 +221,7 @@ exports.getTimeListReport = async (req, res) => {
 
         query += `
             GROUP BY u.id, dr.date, el.day_type, el.id, t.name
-            ORDER BY u.id DESC
+            ORDER BY dr.date DESC, u.id DESC
             LIMIT ${limit} OFFSET ${offset};
         `;
 
