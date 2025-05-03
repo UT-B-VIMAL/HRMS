@@ -1135,7 +1135,7 @@ exports.projectRequest = async (req, res) => {
       LEFT JOIN teams tm ON tm.id = u.team_id
       LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
       WHERE st.status = 2 AND st.deleted_at IS NULL ${subtaskWhereClause}
-      ORDER BY st.id
+      ORDER BY st.updated_at DESC
     `;
 
     // Fetch Tasks
@@ -1159,7 +1159,7 @@ exports.projectRequest = async (req, res) => {
       WHERE t.deleted_at IS NULL AND t.status = 2 
         AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
         ${taskWhereClause}
-      ORDER BY t.id
+      ORDER BY t.updated_at DESC
     `;
 
     // Execute queries
