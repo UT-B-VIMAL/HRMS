@@ -441,7 +441,7 @@ exports.getAllexpense = async (req, res) => {
     values.push(user_id);
 
     if (search) {
-      const keyword = `%${search}%`;
+      const keyword = `%${search.toLowerCase()}%`;
     
       const categoryMapping = {
         food: "1",
@@ -449,25 +449,27 @@ exports.getAllexpense = async (req, res) => {
         others: "3",
       };
     
-      const lowerSearch = search.toLowerCase();
-      const matchedCategoryId = categoryMapping[lowerSearch];
+      const matchedCategoryIds = Object.entries(categoryMapping)
+        .filter(([name]) => name.includes(search.toLowerCase()))
+        .map(([, id]) => id);
     
       const searchConditions = [
-        "u.first_name LIKE ?",
-        "u.last_name LIKE ?",
-        "et.description LIKE ?",
+        "LOWER(u.first_name) LIKE ?",
+        "LOWER(u.last_name) LIKE ?",
+        "LOWER(et.description) LIKE ?",
         "et.expense_amount LIKE ?"
       ];
     
       values.push(keyword, keyword, keyword, keyword);
     
-      if (matchedCategoryId) {
-        searchConditions.push("et.category = ?");
-        values.push(matchedCategoryId);
+      if (matchedCategoryIds.length > 0) {
+        searchConditions.push(`et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`);
+        values.push(...matchedCategoryIds);
       }
     
       conditions.push(`(${searchConditions.join(" OR ")})`);
     }
+    
     
 
     // Role-based status filtering
