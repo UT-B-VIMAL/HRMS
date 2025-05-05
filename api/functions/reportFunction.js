@@ -228,8 +228,9 @@ exports.getTimeListReport = async (req, res) => {
         const [results] = await db.query(query);
 
         // Format time values
-        const formattedResults = results.map(row => ({
+        const formattedResults = results.map((row, index) => ({
             ...row,
+            s_no: offset + index + 1,
             logged_hours: convertHoursToTimeFormat(row.logged_hours),
             idle_hours: convertHoursToTimeFormat(row.idle_hours),
             total_work_hours: convertHoursToTimeFormat(row.total_work_hours),
@@ -262,26 +263,43 @@ exports.getTimeListReport = async (req, res) => {
 
         // Count total records for pagination
         let totalRecordsQuery = `
-            SELECT COUNT(*) AS total
-            FROM (
-                SELECT u.id, dr.date
-                FROM users u
-                CROSS JOIN (
-                    SELECT ADDDATE('${from_date}', INTERVAL t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1 DAY) AS date
-                    FROM (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t1,
-                         (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t2,
-                         (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t3,
-                         (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t4
-                    WHERE ADDDATE('${from_date}', INTERVAL t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1 DAY) <= '${to_date}'
-                ) dr
-                WHERE dr.date BETWEEN '${from_date}' AND '${to_date}'
-        `;
+    WITH date_range AS (
+        SELECT ADDDATE('${from_date}', t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1) AS date
+        FROM (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t1,
+             (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t2,
+             (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t3,
+             (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t4
+        WHERE ADDDATE('${from_date}', t4.i * 1000 + t3.i * 100 + t2.i * 10 + t1.i * 1) <= '${to_date}'
+    )
+    SELECT COUNT(*) AS total
+    FROM (
+        SELECT u.id, dr.date
+        FROM date_range dr
+        CROSS JOIN users u
+        LEFT JOIN employee_leave el ON u.id = el.user_id AND el.date = dr.date
+        LEFT JOIN sub_tasks_user_timeline stut ON u.id = stut.user_id AND DATE(stut.start_time) = dr.date
+        LEFT JOIN teams t ON u.team_id = t.id
+        WHERE dr.date BETWEEN '${from_date}' AND '${to_date}'
+        AND u.deleted_at IS NULL
+`;
 
         if (team_id) {
             totalRecordsQuery += ` AND u.team_id = '${team_id}'`;
         }
 
-        totalRecordsQuery += `) AS subquery`;
+        if (search) {
+            totalRecordsQuery += ` AND (
+        CONCAT(u.first_name, ' ', u.last_name) LIKE '%${search}%'
+        OR u.employee_id LIKE '%${search}%'
+        OR t.name LIKE '%${search}%'
+    )`;
+        }
+
+        totalRecordsQuery += `
+        GROUP BY u.id, dr.date
+    ) AS subquery;
+`;
+
 
         const [totalRecordsResult] = await db.query(totalRecordsQuery);
         const totalRecords = totalRecordsResult[0]?.total || 0;
