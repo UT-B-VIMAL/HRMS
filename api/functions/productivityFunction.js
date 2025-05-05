@@ -29,13 +29,13 @@ exports.getTeamwiseProductivity = async (req, res) => {
     const offset = (page - 1) * perPage;
 
     const dateCondition =
-    from_date && to_date
-      ? `AND combined.updated_at BETWEEN ? AND ?`
-      : from_date
-      ? `AND combined.updated_at >= ?`
-      : to_date
-      ? `AND combined.updated_at <= ?`
-      : "";
+      from_date && to_date
+        ? `AND combined.updated_at BETWEEN ? AND ?`
+        : from_date
+          ? `AND combined.updated_at >= ?`
+          : to_date
+            ? `AND combined.updated_at <= ?`
+            : "";
     // Task query
     const taskQuery = `
       SELECT 
@@ -108,7 +108,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
     } else if (to_date) {
       queryParams.push(`${to_date} 23:59:59`);
     }
-    
+
     if (employee_id) queryParams.push(employee_id);
     if (search) {
       queryParams.push(`%${search}%`);
@@ -239,8 +239,17 @@ exports.get_individualStatus = async (req, res) => {
     if (from_date && to_date) {
       const fromDateTime = `${from_date} 00:00:00`;
       const toDateTime = `${to_date} 23:59:59`;
-      whereConditions.push(`tasks.created_at BETWEEN ? AND ?`);
+      whereConditions.push('tasks.created_at BETWEEN ? AND ?');
       queryParams.push(fromDateTime, toDateTime);
+    } else if (from_date) {
+      const fromDateTime = `${from_date} 00:00:00`;
+      whereConditions.push(`tasks.created_at >= ?`);
+      queryParams.push(fromDateTime);
+    } else if (to_date) {
+      const toDateTime = `${to_date} 23:59:59`;
+      whereConditions.push(`tasks.created_at <= ?`);
+      queryParams.push(toDateTime);
+
     }
 
     if (search) {
