@@ -828,12 +828,19 @@ exports.getAllpmemployeexpense = async (req, res) => {
         travel: "2",
         others: "3",
       };
-      const categoryIds = category
-        .split(",")
-        .map((cat) => categoryMapping[cat.toLowerCase()] || cat);
-      otConditions.push("et.category IN (?)");
-      otValues.push(categoryIds);
+    
+      const inputCategories = category.split(",").map((cat) => cat.trim().toLowerCase());
+    
+      const matchedCategoryIds = Object.entries(categoryMapping)
+        .filter(([key]) => inputCategories.some((input) => key.includes(input)))
+        .map(([, id]) => id);
+    
+      if (matchedCategoryIds.length > 0) {
+        otConditions.push(`et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`);
+        otValues.push(...matchedCategoryIds);
+      }
     }
+    
 
     // Filter by date
     if (date) {
@@ -1257,12 +1264,19 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         travel: "2",
         others: "3",
       };
-      const categoryIds = category
-        .split(",")
-        .map((cat) => categoryMapping[cat.toLowerCase()] || cat);
-      otConditions.push("et.category IN (?)");
-      otValues.push(categoryIds);
+    
+      const inputCategories = category.split(",").map((cat) => cat.trim().toLowerCase());
+    
+      const matchedCategoryIds = Object.entries(categoryMapping)
+        .filter(([key]) => inputCategories.some((input) => key.includes(input)))
+        .map(([, id]) => id);
+    
+      if (matchedCategoryIds.length > 0) {
+        otConditions.push(`et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`);
+        otValues.push(...matchedCategoryIds);
+      }
     }
+    
 
     // Filter by date
     if (date) {
