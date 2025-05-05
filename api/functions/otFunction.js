@@ -159,12 +159,13 @@ exports.createOt = async (payload, res, req) => {
     const duplicateCheckQuery = `
 SELECT id 
 FROM ot_details 
-WHERE user_id = ? AND project_id = ? AND date = ? AND deleted_at IS NULL
+WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at IS NULL
 `;
     const [duplicateCheckResult] = await db.query(duplicateCheckQuery, [
       user_id,
       project_id,
       date,
+      task_id,
     ]);
 
     if (duplicateCheckResult.length > 0) {
