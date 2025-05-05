@@ -15,7 +15,6 @@ function convertSecondsToReadableTime(totalSeconds) {
 
   return `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
 }
-
 exports.getTeamwiseProductivity = async (req, res) => {
   try {
     const {
@@ -29,131 +28,137 @@ exports.getTeamwiseProductivity = async (req, res) => {
     } = req.query;
     const offset = (page - 1) * perPage;
 
+    const dateCondition =
+    from_date && to_date
+      ? `AND combined.updated_at BETWEEN ? AND ?`
+      : from_date
+      ? `AND combined.updated_at >= ?`
+      : to_date
+      ? `AND combined.updated_at <= ?`
+      : "";
     // Task query
-    let taskQuery = `
-    SELECT 
-        t.user_id,
-        t.team_id,
-        TIME_TO_SEC(t.estimated_hours) AS estimated_seconds,
-        TIME_TO_SEC(t.total_hours_worked) AS worked_seconds,
-        TIME_TO_SEC(t.extended_hours) AS extended_seconds,
-        t.updated_at
-    FROM 
-        tasks t
-    WHERE 
-        t.deleted_at IS NULL
-        AND NOT EXISTS (
-            SELECT 1 FROM sub_tasks st 
-            WHERE st.task_id = t.id 
-            AND st.deleted_at IS NULL
-        )
-
-        `;
+    const taskQuery = `
+      SELECT 
+          t.user_id,
+          t.team_id,
+          TIME_TO_SEC(t.estimated_hours) AS estimated_seconds,
+          TIME_TO_SEC(t.total_hours_worked) AS worked_seconds,
+          TIME_TO_SEC(t.extended_hours) AS extended_seconds,
+          t.updated_at
+      FROM 
+          tasks t
+      WHERE 
+          t.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM sub_tasks st 
+              WHERE st.task_id = t.id 
+              AND st.deleted_at IS NULL
+          )
+    `;
 
     // Subtask query
-    let subtaskQuery = `
-            SELECT 
-                st.user_id,
-                st.team_id,
-                TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
-                TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
-                TIME_TO_SEC(st.extended_hours) AS extended_seconds,
-                st.updated_at
-            FROM 
-                sub_tasks st
-            WHERE 
-                st.deleted_at IS NULL
-        `;
+    const subtaskQuery = `
+      SELECT 
+          st.user_id,
+          st.team_id,
+          TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
+          TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
+          TIME_TO_SEC(st.extended_hours) AS extended_seconds,
+          st.updated_at
+      FROM 
+          sub_tasks st
+      WHERE 
+          st.deleted_at IS NULL
+    `;
 
     // Main query
     let query = `
-            SELECT 
-                MAX(combined.updated_at) AS updated_at,
-                u.id AS user_id,
-                COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS employee_name,
-                u.employee_id,
-                combined.team_id,
-                COALESCE(SUM(combined.estimated_seconds), 0) AS total_estimated_seconds,
-                COALESCE(SUM(combined.worked_seconds), 0) AS total_worked_seconds,
-                COALESCE(SUM(combined.extended_seconds), 0) AS total_extended_seconds
-            FROM users u
-            LEFT JOIN (
-                (${taskQuery})
-                UNION ALL
-                (${subtaskQuery})
-            ) AS combined
-            ON u.id = combined.user_id
-            WHERE u.deleted_at IS NULL
-            ${team_id ? `AND combined.team_id = ?` : ""}
-            ${
-              from_date && to_date
-                ? `AND combined.updated_at BETWEEN ? AND ?`
-                : ""
-            }
-            ${employee_id ? `AND u.employee_id = ?` : ""}
-            ${
-              search
-                ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
-                : ""
-            }
-            GROUP BY u.id, u.first_name, u.last_name, u.employee_id, combined.team_id
-            ORDER BY updated_at DESC
-            LIMIT ? OFFSET ?
-        `;
+      SELECT 
+          MAX(combined.updated_at) AS updated_at,
+          u.id AS user_id,
+          COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS employee_name,
+          u.employee_id,
+          combined.team_id,
+          COALESCE(SUM(combined.estimated_seconds), 0) AS total_estimated_seconds,
+          COALESCE(SUM(combined.worked_seconds), 0) AS total_worked_seconds,
+          COALESCE(SUM(combined.extended_seconds), 0) AS total_extended_seconds
+      FROM users u
+      LEFT JOIN (
+          (${taskQuery})
+          UNION ALL
+          (${subtaskQuery})
+      ) AS combined ON u.id = combined.user_id
+      WHERE u.deleted_at IS NULL
+      ${team_id ? `AND combined.team_id = ?` : ""}
+      ${dateCondition}
+      ${employee_id ? `AND u.employee_id = ?` : ""}
+      ${search
+        ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+        : ""}
+    `;
 
-    let queryParams = [];
+    const queryParams = [];
+
     if (team_id) queryParams.push(team_id);
     if (from_date && to_date) {
       queryParams.push(`${from_date} 00:00:00`);
       queryParams.push(`${to_date} 23:59:59`);
+    } else if (from_date) {
+      queryParams.push(`${from_date} 00:00:00`);
+    } else if (to_date) {
+      queryParams.push(`${to_date} 23:59:59`);
     }
+    
     if (employee_id) queryParams.push(employee_id);
     if (search) {
       queryParams.push(`%${search}%`);
       queryParams.push(`%${search}%`);
     }
-    queryParams.push(parseInt(perPage));
-    queryParams.push(parseInt(offset));
 
-    // Count query
-    const countQuery = `
-            SELECT COUNT(DISTINCT u.id) AS total_users
-            FROM users u
-            LEFT JOIN (
-                (${taskQuery})
-                UNION ALL
-                (${subtaskQuery})
-            ) AS combined
-            ON u.id = combined.user_id
-            WHERE u.deleted_at IS NULL
-            ${team_id ? `AND combined.team_id = ?` : ""}
-            ${
-              from_date && to_date
-                ? `AND combined.updated_at BETWEEN ? AND ?`
-                : ""
-            }
-            ${employee_id ? `AND u.employee_id = ?` : ""}
-            ${
-              search
-                ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
-                : ""
-            }
-        `;
+    // Append GROUP BY and ORDER BY
+    query += `
+      GROUP BY u.id, u.first_name, u.last_name, u.employee_id, combined.team_id
+      ORDER BY updated_at DESC
+      LIMIT ${parseInt(perPage)} OFFSET ${parseInt(offset)}
+    `;
 
-    let countValues = [];
-    if (team_id) countValues.push(team_id);
+    // Count query (same logic, without LIMIT)
+    let countQuery = `
+      SELECT COUNT(DISTINCT u.id) AS total_users
+      FROM users u
+      LEFT JOIN (
+          (${taskQuery})
+          UNION ALL
+          (${subtaskQuery})
+      ) AS combined ON u.id = combined.user_id
+      WHERE u.deleted_at IS NULL
+      ${team_id ? `AND combined.team_id = ?` : ""}
+      ${dateCondition}
+      ${employee_id ? `AND u.employee_id = ?` : ""}
+      ${search
+        ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+        : ""}
+    `;
+
+    const countParams = [];
+    if (team_id) countParams.push(team_id);
     if (from_date && to_date) {
-      countValues.push(`${from_date} 00:00:00`);
-      countValues.push(`${to_date} 23:59:59`);
+      countParams.push(`${from_date} 00:00:00`);
+      countParams.push(`${to_date} 23:59:59`);
+    } else if (from_date) {
+      countParams.push(`${from_date} 00:00:00`);
+    } else if (to_date) {
+      countParams.push(`${to_date} 23:59:59`);
     }
-    if (employee_id) countValues.push(employee_id);
+    if (employee_id) countParams.push(employee_id);
     if (search) {
-      countValues.push(`%${search}%`);
-      countValues.push(`%${search}%`);
+      countParams.push(`%${search}%`);
+      countParams.push(`%${search}%`);
     }
 
+    // Execute queries
     const [results] = await db.query(query, queryParams);
-    const [countResults] = await db.query(countQuery, countValues);
+    const [countResults] = await db.query(countQuery, countParams);
 
     const totalUsers = countResults[0].total_users;
 
@@ -163,15 +168,9 @@ exports.getTeamwiseProductivity = async (req, res) => {
       employee_name: item.employee_name,
       employee_id: item.employee_id,
       team_id: item.team_id || null,
-      total_estimated_hours: convertSecondsToReadableTime(
-        item.total_estimated_seconds
-      ),
-      total_worked_hours: convertSecondsToReadableTime(
-        item.total_worked_seconds
-      ),
-      total_extended_hours: convertSecondsToReadableTime(
-        item.total_extended_seconds
-      ),
+      total_estimated_hours: convertSecondsToReadableTime(item.total_estimated_seconds),
+      total_worked_hours: convertSecondsToReadableTime(item.total_worked_seconds),
+      total_extended_hours: convertSecondsToReadableTime(item.total_extended_seconds),
     }));
 
     const pagination = getPagination(page, perPage, totalUsers);
@@ -187,15 +186,14 @@ exports.getTeamwiseProductivity = async (req, res) => {
     );
   } catch (error) {
     console.error("Error:", error.message);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "An error occurred",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "An error occurred",
+      error: error.message,
+    });
   }
 };
+
 
 exports.get_individualStatus = async (req, res) => {
   try {
