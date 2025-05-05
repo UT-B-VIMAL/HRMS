@@ -442,13 +442,33 @@ exports.getAllexpense = async (req, res) => {
 
     if (search) {
       const keyword = `%${search}%`;
-      conditions.push(`(
-        u.first_name LIKE ? OR 
-        u.last_name LIKE ? OR 
-        et.description LIKE ?
-      )`);
-      values.push(keyword, keyword, keyword);
+    
+      const categoryMapping = {
+        food: "1",
+        travel: "2",
+        others: "3",
+      };
+    
+      const lowerSearch = search.toLowerCase();
+      const matchedCategoryId = categoryMapping[lowerSearch];
+    
+      const searchConditions = [
+        "u.first_name LIKE ?",
+        "u.last_name LIKE ?",
+        "et.description LIKE ?",
+        "et.expense_amount LIKE ?"
+      ];
+    
+      values.push(keyword, keyword, keyword, keyword);
+    
+      if (matchedCategoryId) {
+        searchConditions.push("et.category = ?");
+        values.push(matchedCategoryId);
+      }
+    
+      conditions.push(`(${searchConditions.join(" OR ")})`);
     }
+    
 
     // Role-based status filtering
     const statusFilters = [];
