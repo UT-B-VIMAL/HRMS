@@ -828,19 +828,12 @@ exports.getAllpmemployeexpense = async (req, res) => {
         travel: "2",
         others: "3",
       };
-    
-      const inputCategories = category.split(",").map((cat) => cat.trim().toLowerCase());
-    
-      const matchedCategoryIds = Object.entries(categoryMapping)
-        .filter(([key]) => inputCategories.some((input) => key.includes(input)))
-        .map(([, id]) => id);
-    
-      if (matchedCategoryIds.length > 0) {
-        otConditions.push(`et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`);
-        otValues.push(...matchedCategoryIds);
-      }
+      const categoryIds = category
+        .split(",")
+        .map((cat) => categoryMapping[cat.toLowerCase()] || cat);
+      otConditions.push("et.category IN (?)");
+      otValues.push(categoryIds);
     }
-    
 
     // Filter by date
     if (date) {
@@ -851,9 +844,23 @@ exports.getAllpmemployeexpense = async (req, res) => {
     // Handle search term
     if (search) {
       const searchTerm = `%${search}%`;
-      otConditions.push(
-        "(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.employee_id LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
-      );
+      otConditions.push(`
+        (
+          tm.name LIKE ? OR 
+          u.first_name LIKE ? OR 
+          u.last_name LIKE ? OR 
+          u.employee_id LIKE ? OR 
+          pr.name LIKE ? OR 
+          et.description LIKE ? OR 
+          et.expense_amount LIKE ? OR 
+          CASE 
+            WHEN et.category = 1 THEN 'food' 
+            WHEN et.category = 2 THEN 'travel' 
+            WHEN et.category = 3 THEN 'others' 
+            ELSE ''
+          END LIKE ?
+        )
+      `);
       otValues.push(
         searchTerm,
         searchTerm,
@@ -865,6 +872,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
         searchTerm
       );
     }
+    
 
     // Handle status conditions
     const currentRoleId = userCheck[0].role_id;
@@ -1264,19 +1272,12 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         travel: "2",
         others: "3",
       };
-    
-      const inputCategories = category.split(",").map((cat) => cat.trim().toLowerCase());
-    
-      const matchedCategoryIds = Object.entries(categoryMapping)
-        .filter(([key]) => inputCategories.some((input) => key.includes(input)))
-        .map(([, id]) => id);
-    
-      if (matchedCategoryIds.length > 0) {
-        otConditions.push(`et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`);
-        otValues.push(...matchedCategoryIds);
-      }
+      const categoryIds = category
+        .split(",")
+        .map((cat) => categoryMapping[cat.toLowerCase()] || cat);
+      otConditions.push("et.category IN (?)");
+      otValues.push(categoryIds);
     }
-    
 
     // Filter by date
     if (date) {
@@ -1287,9 +1288,22 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     // Search term filter
     if (search) {
       const searchTerm = `%${search}%`;
-      otConditions.push(
-        "(u.first_name LIKE ? OR u.last_name LIKE ? OR u.employee_id LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
-      );
+      otConditions.push(`
+        (
+          u.first_name LIKE ? OR 
+          u.last_name LIKE ? OR 
+          u.employee_id LIKE ? OR 
+          pr.name LIKE ? OR 
+          et.description LIKE ? OR 
+          et.expense_amount LIKE ? OR 
+          CASE 
+            WHEN et.category = 1 THEN 'food' 
+            WHEN et.category = 2 THEN 'travel' 
+            WHEN et.category = 3 THEN 'others' 
+            ELSE ''
+          END LIKE ?
+        )
+      `);
       otValues.push(
         searchTerm,
         searchTerm,
@@ -1300,6 +1314,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         searchTerm
       );
     }
+    
 
     // Status-based filtering
 
