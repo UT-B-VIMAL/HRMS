@@ -11,6 +11,8 @@ exports.createTicket = async (req, res) => {
   const io = req.io; 
   try {
     const { user_id, issue_type, issue_date = null, description, created_by } = req.body;
+  const allowedExtensions = ["jpg", "jpeg", "png", "pdf", "doc", "docx"];
+
     const missingFields = [];
     if (!issue_type) missingFields.push("issue_type");
     if (!description) missingFields.push("description");
@@ -31,6 +33,17 @@ exports.createTicket = async (req, res) => {
       const file = req.files.file;
       const fileBuffer = file.data;
       const originalFileName = file.name;
+      const fileExtension = originalFileName.split(".").pop().toLowerCase();
+
+      if (!allowedExtensions.includes(fileExtension)) {
+        return errorResponse(
+          res,
+          `Invalid file type. Allowed types: ${allowedExtensions.join(", ")}`,
+          "Validation Error",
+          400
+        );
+      }
+
       const uniqueFileName = `${Date.now()}_${originalFileName}`;
       fileUrl = await uploadFileToS3(fileBuffer, uniqueFileName);
     }

@@ -441,14 +441,36 @@ exports.getAllexpense = async (req, res) => {
     values.push(user_id);
 
     if (search) {
-      const keyword = `%${search}%`;
-      conditions.push(`(
-        u.first_name LIKE ? OR 
-        u.last_name LIKE ? OR 
-        et.description LIKE ?
-      )`);
-      values.push(keyword, keyword, keyword);
+      const keyword = `%${search.toLowerCase()}%`;
+    
+      const categoryMapping = {
+        food: "1",
+        travel: "2",
+        others: "3",
+      };
+    
+      const matchedCategoryIds = Object.entries(categoryMapping)
+        .filter(([name]) => name.includes(search.toLowerCase()))
+        .map(([, id]) => id);
+    
+      const searchConditions = [
+        "LOWER(u.first_name) LIKE ?",
+        "LOWER(u.last_name) LIKE ?",
+        "LOWER(et.description) LIKE ?",
+        "et.expense_amount LIKE ?"
+      ];
+    
+      values.push(keyword, keyword, keyword, keyword);
+    
+      if (matchedCategoryIds.length > 0) {
+        searchConditions.push(`et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`);
+        values.push(...matchedCategoryIds);
+      }
+    
+      conditions.push(`(${searchConditions.join(" OR ")})`);
     }
+    
+    
 
     // Role-based status filtering
     const statusFilters = [];
@@ -822,9 +844,23 @@ exports.getAllpmemployeexpense = async (req, res) => {
     // Handle search term
     if (search) {
       const searchTerm = `%${search}%`;
-      otConditions.push(
-        "(tm.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.employee_id LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
-      );
+      otConditions.push(`
+        (
+          tm.name LIKE ? OR 
+          u.first_name LIKE ? OR 
+          u.last_name LIKE ? OR 
+          u.employee_id LIKE ? OR 
+          pr.name LIKE ? OR 
+          et.description LIKE ? OR 
+          et.expense_amount LIKE ? OR 
+          CASE 
+            WHEN et.category = 1 THEN 'food' 
+            WHEN et.category = 2 THEN 'travel' 
+            WHEN et.category = 3 THEN 'others' 
+            ELSE ''
+          END LIKE ?
+        )
+      `);
       otValues.push(
         searchTerm,
         searchTerm,
@@ -836,6 +872,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
         searchTerm
       );
     }
+    
 
     // Handle status conditions
     const currentRoleId = userCheck[0].role_id;
@@ -1251,9 +1288,22 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     // Search term filter
     if (search) {
       const searchTerm = `%${search}%`;
-      otConditions.push(
-        "(u.first_name LIKE ? OR u.last_name LIKE ? OR u.employee_id LIKE ? OR pr.name LIKE ? OR et.description LIKE ? OR et.expense_amount LIKE ? OR et.category LIKE ?)"
-      );
+      otConditions.push(`
+        (
+          u.first_name LIKE ? OR 
+          u.last_name LIKE ? OR 
+          u.employee_id LIKE ? OR 
+          pr.name LIKE ? OR 
+          et.description LIKE ? OR 
+          et.expense_amount LIKE ? OR 
+          CASE 
+            WHEN et.category = 1 THEN 'food' 
+            WHEN et.category = 2 THEN 'travel' 
+            WHEN et.category = 3 THEN 'others' 
+            ELSE ''
+          END LIKE ?
+        )
+      `);
       otValues.push(
         searchTerm,
         searchTerm,
@@ -1264,58 +1314,59 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         searchTerm
       );
     }
+    
 
     // Status-based filtering
 
     const currentRoleId = userCheck[0].role_id;
 
-      switch (status) {
-        case "0": // Pending
-          if (currentRoleId == 3) {
-            otConditions.push(`et.pm_status = 0 AND et.user_id != ${userCheck[0].id}`);
-          } else if (currentRoleId == 4) {
-            otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
-          }
-          break;
+      // switch (status) {
+      //   case "0": // Pending
+      //     if (currentRoleId == 3) {
+      //       otConditions.push(`et.pm_status = 0 AND et.user_id != ${userCheck[0].id}`);
+      //     } else if (currentRoleId == 4) {
+      //       otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
+      //     }
+      //     break;
       
-        case "1": // Rejected
-          otConditions.push("et.status = 1");
-          break;
+      //   case "1": // Rejected
+      //     otConditions.push("et.status = 1");
+      //     break;
       
-        case "2": // Approved
-          if (currentRoleId == 3) {
-            otConditions.push("et.tl_status = 2");
-          } else if (currentRoleId == 4) {
-            otConditions.push("et.tl_status = 2 AND et.pm_status = 2");
-          }
-          break;
+      //   case "2": // Approved
+      //     if (currentRoleId == 3) {
+      //       otConditions.push("et.tl_status = 2");
+      //     } else if (currentRoleId == 4) {
+      //       otConditions.push("et.tl_status = 2 AND et.pm_status = 2");
+      //     }
+      //     break;
       
-        default:
-          return errorResponse(
-            res,
-            "Invalid status value.",
-            "Error fetching expenses",
-            400
-          );
-      }
-    // switch (status) {
-    //   case "0": // All statuses must be 0
-    //     otConditions.push("(et.status = 0 AND et.tl_status = 0)");
-    //     break;
-    //   case "1": // et.status must) be 1, and at least one of tl_status or pm_status must be 1
-    //     otConditions.push("(et.tl_status = 1 OR et.pm_status = 1)");
-    //     break;
-    //   case "2": // All statuses must be 2
-    //     otConditions.push("(et.tl_status = 2 OR et.pm_status = 2)");
-    //     break;
-    //   default:
-    //     return errorResponse(
-    //       res,
-    //       "Invalid status value",
-    //       "Error fetching expenses",
-    //       400
-    //     );
-    // }
+      //   default:
+      //     return errorResponse(
+      //       res,
+      //       "Invalid status value.",
+      //       "Error fetching expenses",
+      //       400
+      //     );
+      // }
+    switch (status) {
+      case "0": // All statuses must be 0
+        otConditions.push(`(et.status = 0 AND et.tl_status = 0 AND et.user_id != ${userCheck[0].id})`);
+        break;
+      case "1": // et.status must) be 1, and at least one of tl_status or pm_status must be 1
+        otConditions.push(`(et.tl_status = 1 OR et.pm_status = 1) AND et.user_id != ${userCheck[0].id}`);
+        break;
+      case "2": // All statuses must be 2
+        otConditions.push(`(et.tl_status = 2 OR et.pm_status = 2) AND et.user_id != ${userCheck[0].id}`);
+        break;
+      default:
+        return errorResponse(
+          res,
+          "Invalid status value",
+          "Error fetching expenses",
+          400
+        );
+    }
 
     // Build the WHERE clause
     const otWhereClause =
