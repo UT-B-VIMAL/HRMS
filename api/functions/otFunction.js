@@ -155,6 +155,27 @@ exports.createOt = async (payload, res, req) => {
       statuss = 0;
     }
 
+    // Check for duplicate OT entry for same user, date, and project
+    const duplicateCheckQuery = `
+SELECT id 
+FROM ot_details 
+WHERE user_id = ? AND project_id = ? AND date = ? AND deleted_at IS NULL
+`;
+    const [duplicateCheckResult] = await db.query(duplicateCheckQuery, [
+      user_id,
+      project_id,
+      date,
+    ]);
+
+    if (duplicateCheckResult.length > 0) {
+      return errorResponse(
+        res,
+        "OT already submitted for this project and date",
+        "Duplicate OT entry",
+        409
+      );
+    }
+
     const insertQuery = `
       INSERT INTO ot_details (
         user_id, product_id, project_id, task_id, team_id, comments, status, tl_status, date, time, created_by, updated_by, created_at, updated_at
@@ -401,7 +422,7 @@ WHERE
 //       otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
 
 //     const otQuery = `
-//         SELECT 
+//         SELECT
 //           pr.name AS project_name,
 //           t.name AS task_name,
 //           DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
@@ -416,17 +437,17 @@ WHERE
 //           u.role_id,
 //           u.first_name AS user_first_name,
 //           u.last_name AS user_last_name
-//         FROM 
+//         FROM
 //           ot_details ot
-//         LEFT JOIN 
+//         LEFT JOIN
 //           tasks t ON t.id = ot.task_id
-//         LEFT JOIN 
+//         LEFT JOIN
 //           projects pr ON pr.id = ot.project_id
-//         LEFT JOIN 
+//         LEFT JOIN
 //           users u ON u.id = ot.user_id
 //         ${otWhereClause}
 //         AND ot.deleted_at IS NULL
-//         ORDER BY 
+//         ORDER BY
 //           ot.id DESC
 //       `;
 
@@ -484,7 +505,12 @@ exports.getAllOts = async (req, res) => {
     } = req.query;
 
     if (!user_id || !status) {
-      return errorResponse(res, "user_id and status are required", "Validation error", 400);
+      return errorResponse(
+        res,
+        "user_id and status are required",
+        "Validation error",
+        400
+      );
     }
 
     const [user] = await db.query(
@@ -537,15 +563,26 @@ exports.getAllOts = async (req, res) => {
 
     statusArray.forEach((s) => {
       if (s === "0") {
-        if (role_id == 3) statusFilters.push(`(ot.pm_status = 0 AND ot.user_id = ${user_id})`);
-        else if (role_id == 4) statusFilters.push(`(ot.tl_status = 0 AND ot.pm_status = 0 AND ot.user_id = ${user_id})`);
-        else statusFilters.push(`ot.status = 2  AND ot.tl_status = 2  AND ot.pm_status = 0`);
+        if (role_id == 3)
+          statusFilters.push(`(ot.pm_status = 0 AND ot.user_id = ${user_id})`);
+        else if (role_id == 4)
+          statusFilters.push(
+            `(ot.tl_status = 0 AND ot.pm_status = 0 AND ot.user_id = ${user_id})`
+          );
+        else
+          statusFilters.push(
+            `ot.status = 2  AND ot.tl_status = 2  AND ot.pm_status = 0`
+          );
       } else if (s === "1") {
         statusFilters.push(`ot.status = 1`);
       } else if (s === "2") {
         if (role_id == 3) statusFilters.push(`ot.pm_status = 2`);
-        else if (role_id == 4) statusFilters.push(`(ot.tl_status = 2 AND ot.pm_status = 2)`);
-        else statusFilters.push(`ot.status = 2  AND ot.tl_status = 2  AND ot.pm_status = 2`);
+        else if (role_id == 4)
+          statusFilters.push(`(ot.tl_status = 2 AND ot.pm_status = 2)`);
+        else
+          statusFilters.push(
+            `ot.status = 2  AND ot.tl_status = 2  AND ot.pm_status = 2`
+          );
       }
     });
 
@@ -553,7 +590,9 @@ exports.getAllOts = async (req, res) => {
       conditions.push(`(${statusFilters.join(" OR ")})`);
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
     const otQuery = `
       SELECT 
@@ -613,7 +652,6 @@ exports.getAllOts = async (req, res) => {
     return errorResponse(res, err.message, "Server Error", 500);
   }
 };
-
 
 // Update OT
 exports.updateOt = async (id, payload, res) => {
@@ -1717,11 +1755,11 @@ exports.getAlltlemployeeOts = async (req, res) => {
       //       otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
       //     }
       //     break;
-      
+
       //   case "1": // Rejected
       //     otConditions.push("ot.status = 1");
       //     break;
-      
+
       //   case "2": // Approved
       //     if (currentRoleId == 3) {
       //       otConditions.push("ot.tl_status = 2");
@@ -1729,7 +1767,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
       //       otConditions.push("ot.tl_status = 2 AND ot.pm_status = 2");
       //     }
       //     break;
-      
+
       //   default:
       //     return errorResponse(
       //       res,
@@ -1738,22 +1776,27 @@ exports.getAlltlemployeeOts = async (req, res) => {
       //       400
       //     );
       // }
-      
 
       switch (status) {
         case "0":
           // All statuses must be 0
-            otConditions.push(`ot.pm_status = 0 AND ot.tl_status = 0 AND ot.user_id != ${userCheck[0].id}`);
-            break;
+          otConditions.push(
+            `ot.pm_status = 0 AND ot.tl_status = 0 AND ot.user_id != ${userCheck[0].id}`
+          );
+          break;
 
         case "1":
           // ot.status must be 1, and at least one of tl_status or pm_status must be 1
-          otConditions.push(`(ot.tl_status = 1 OR ot.pm_status = 1) AND ot.user_id != ${userCheck[0].id}`);
+          otConditions.push(
+            `(ot.tl_status = 1 OR ot.pm_status = 1) AND ot.user_id != ${userCheck[0].id}`
+          );
           break;
 
         case "2":
           // All statuses must be 2
-          otConditions.push(`(ot.tl_status = 2 OR ot.pm_status = 2) AND ot.user_id != ${userCheck[0].id}`);
+          otConditions.push(
+            `(ot.tl_status = 2 OR ot.pm_status = 2) AND ot.user_id != ${userCheck[0].id}`
+          );
           break;
 
         default:
