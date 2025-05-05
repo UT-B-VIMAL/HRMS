@@ -1595,3 +1595,186 @@ exports.getExpenseReport = async (queryParams, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+exports.updateOrApproveExpense = async (id, req, res) => {
+  const {
+    date,
+    category,
+    amount,
+    user_id,
+    description,
+    updated_by,
+    approve_reject_flag,
+    role,
+  } = req.body;
+
+  try {
+    // Fetch the existing expense details
+    const [expenseResult] = await db.query(
+      `SELECT * FROM expense_details WHERE deleted_at IS NULL AND id = ?`,
+      [id]
+    );
+
+    if (expenseResult.length === 0) {
+      return errorResponse(res, "Expense not found", "Not Found", 404);
+    }
+
+    const oldExpense = expenseResult[0];
+    let team_id = oldExpense.team_id;
+    let fileUrl = oldExpense.file;
+
+    // Validate updater
+    if (!updated_by) {
+      return errorResponse(res, "updated_by is required", "Validation Error", 400);
+    }
+
+    const [updaterResult] = await db.query(
+      `SELECT id FROM users WHERE id = ? AND deleted_at IS NULL`,
+      [updated_by]
+    );
+
+    if (updaterResult.length === 0) {
+      return errorResponse(res, "Updated_by user not found", "Validation Error", 404);
+    }
+
+    // Validate user_id if updating
+    if (user_id) {
+      const [userResult] = await db.query(
+        `SELECT id, team_id FROM users WHERE deleted_at IS NULL AND id = ?`,
+        [user_id]
+      );
+
+      if (userResult.length === 0) {
+        return errorResponse(res, "User not found", "Validation Error", 404);
+      }
+      team_id = userResult[0].team_id;
+    }
+
+    // Handle file upload
+    if (req.files && req.files.file) {
+      const file = req.files.file;
+      const uniqueFileName = `${Date.now()}_${file.name}`;
+      fileUrl = await uploadexpenseFileToS3(file.data, uniqueFileName);
+    }
+
+    // Build dynamic update query
+    const updateFields = [];
+    const values = [];
+
+    if (user_id) updateFields.push("user_id = ?"), values.push(user_id);
+    if (category) updateFields.push("category = ?"), values.push(category);
+    if (team_id) updateFields.push("team_id = ?"), values.push(team_id);
+    if (description) updateFields.push("description = ?"), values.push(description);
+    if (amount) updateFields.push("expense_amount = ?"), values.push(amount);
+    if (date) updateFields.push("date = ?"), values.push(date);
+    if (fileUrl) updateFields.push("file = ?"), values.push(fileUrl);
+    if (updated_by) updateFields.push("updated_by = ?"), values.push(updated_by);
+
+    // Handle approval flag
+    if (approve_reject_flag && role) {
+      if (role === "tl") {
+        updateFields.push("tl_status = ?");
+      } else if (role === "pm" || role === "admin") {
+        updateFields.push("pm_status = ?");
+      } else {
+        return errorResponse(res, "Invalid role for approval", "Validation Error", 400);
+      }
+      values.push(approve_reject_flag);
+
+      // Also update overall status field if needed
+      updateFields.push("status = ?");
+      values.push(approve_reject_flag);
+    }
+
+    updateFields.push("updated_at = NOW()");
+    values.push(id);
+
+    if (updateFields.length === 1) {
+      return errorResponse(res, "No fields to update", "Validation Error", 400);
+    }
+
+    const updateQuery = `
+      UPDATE expense_details 
+      SET ${updateFields.join(", ")} 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+
+    const [result] = await db.query(updateQuery, values);
+
+    if (result.affectedRows === 0) {
+      return errorResponse(res, "Update failed", "Error", 400);
+    }
+
+    // Notification logic (if approved by PM)
+    if (role === "pm" && approve_reject_flag == 2) {
+      const categoryMap = { 1: "Food", 2: "Travel", 3: "Others" };
+      const type = categoryMap[oldExpense.category] || "Expense";
+
+      const payload = {
+        title: "Expense Approved",
+        body: `Your ${type} expense has been approved.`,
+      };
+
+      const socketIds = userSockets[oldExpense.user_id];
+      if (Array.isArray(socketIds)) {
+        socketIds.forEach((socketId) =>
+          req.io.of("/notifications").to(socketId).emit("push_notification", payload)
+        );
+      }
+
+      await db.execute(
+        `INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, NOW(), NOW())`,
+        [oldExpense.user_id, payload.title, payload.body, 0]
+      );
+    }
+
+    // Notify PMs if TL approves
+    if (role === "tl" && approve_reject_flag == 2) {
+      (async () => {
+        const [pmUsers] = await db.query(
+          `SELECT id FROM users WHERE role_id IN (1,2) AND deleted_at IS NULL`
+        );
+
+        const pmPayload = {
+          title: "Review Employee Expenses",
+          body: "New employee expense requests need your approval.",
+        };
+
+        for (const pm of pmUsers) {
+          const socketIds = userSockets[pm.id];
+          if (Array.isArray(socketIds)) {
+            socketIds.forEach((sid) =>
+              req.io.of("/notifications").to(sid).emit("push_notification", pmPayload)
+            );
+          }
+
+          await db.execute(
+            `INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NOW(), NOW())`,
+            [pm.id, pmPayload.title, pmPayload.body, 0]
+          );
+        }
+      })();
+    }
+
+    return successResponse(
+      res,
+      {
+        id,
+        user_id: user_id || oldExpense.user_id,
+        updated_by,
+      },
+      approve_reject_flag
+        ? approve_reject_flag == 2
+          ? "Expense approved successfully"
+          : "Expense rejected successfully"
+        : "Expense updated successfully",
+      200
+    );
+  } catch (err) {
+    console.error("Update error:", err.message);
+    return errorResponse(res, err.message, "Server Error", 500);
+  }
+};
+

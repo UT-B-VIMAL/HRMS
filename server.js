@@ -239,6 +239,7 @@ apiRouter.get('/getOtReport', RoleController.checkRole(),otdetailController.getO
 apiRouter.post('/expensedetail', RoleController.checkRole(),(req, res) => expensedetailController.createexpensedetail(req, res, req.io));
 apiRouter.get('/expensedetail/:id', RoleController.checkRole(),expensedetailController.getexpensedetail);
 apiRouter.put('/expensedetail/:id',RoleController.checkRole(), expensedetailController.updateexpensedetail);
+apiRouter.put('/approverejectexpensedetail/:id',RoleController.checkRole(), expensedetailController.updateexpensedetailflag);
 apiRouter.delete('/expensedetail/:id',RoleController.checkRole(),expensedetailController.deleteexpensedetail);
 apiRouter.get('/expensedetail',RoleController.checkRole(), expensedetailController.getAllexpensedetails);
 apiRouter.get('/pmemployeeexpensedetail',RoleController.checkRole(), expensedetailController.getAllpmemployeeexpensedetails);
