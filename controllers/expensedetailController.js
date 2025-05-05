@@ -7,7 +7,8 @@ const {
     getAllpmemployeexpense,
     approve_reject_expense,
     getAlltlemployeeexpense,
-    getExpenseReport
+    getExpenseReport,
+    updateOrApproveExpense
   } = require("../api/functions/expenseFunction");
   const { errorResponse } = require("../helpers/responseHelper");
   const Joi = require("joi");
@@ -59,6 +60,15 @@ const {
       // }
   
       await updateexpenses(id, req, res);
+    } catch (error) {
+      return errorResponse(res, error.message, "Error updating expense detail", 500);
+    }
+  };
+  exports.updateexpensedetailflag = async (req, res) => {
+    try {
+      const { id } = req.params;
+  
+      await updateOrApproveExpense(id, req, res);
     } catch (error) {
       return errorResponse(res, error.message, "Error updating expense detail", 500);
     }
