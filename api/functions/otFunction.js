@@ -38,6 +38,21 @@ exports.createOt = async (payload, res, req) => {
     );
   }
 
+  const today = new Date();
+const inputDate = new Date(date);
+today.setHours(0, 0, 0, 0); // Reset to midnight
+inputDate.setHours(0, 0, 0, 0); // Reset to midnight
+
+if (inputDate > today) {
+  return errorResponse(
+    res,
+    "Future dates are not allowed for OT",
+    "Validation Error",
+    400
+  );
+}
+
+
   if (time) {
     const timeMatch = time.match(
       /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
