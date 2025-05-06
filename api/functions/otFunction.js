@@ -1243,9 +1243,9 @@ exports.getAllpmemployeeOts = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       otConditions.push(
-        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
+        `(t.name LIKE ? OR u.employee_id LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
       );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      otValues.push(searchTerm,searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     if (status) {
@@ -1745,9 +1745,9 @@ exports.getAlltlemployeeOts = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       otConditions.push(
-        `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
+        `(t.name LIKE ? OR u.employee_id LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
       );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // Handle status conditions based on the provided status
