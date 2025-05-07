@@ -1569,7 +1569,13 @@ exports.approve_reject_ot = async (payload, res, req) => {
       );
     }
 
+   
+
     updateQuery += ` WHERE user_id = ? AND deleted_at IS NULL`;
+
+    if(status == 2 || status == 1) {
+      updateQuery += ` AND status = 0 OR status = ${status}`;
+    }
 
     const values = [status, updated_by, status, user_id];
 
