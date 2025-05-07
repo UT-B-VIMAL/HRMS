@@ -1040,7 +1040,7 @@ exports.projectRequest = async (req, res) => {
     const { project_id, user_id, employee_id, date, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
-    let effectiveUserIds = []; // Store IDs of users whose tasks should be fetched
+    let effectiveUserIds = []; 
 
     if (user_id) {
       // Step 1: Get the role_id of the provided user_id
@@ -1106,11 +1106,24 @@ exports.projectRequest = async (req, res) => {
     }
     if (search) {
       const searchTerm = `%${search}%`;
-      taskConditions.push("(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)");
-      subtaskConditions.push("(st.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)");
-      taskValues.push(searchTerm, searchTerm, searchTerm);
-      subtaskValues.push(searchTerm, searchTerm, searchTerm);
+      const searchCondition = `(
+        t.name LIKE ? OR
+        pr.name LIKE ? OR
+        tm.name LIKE ? OR
+        ua.first_name LIKE ? OR
+        ua.last_name LIKE ? OR
+        u.first_name LIKE ? OR
+        u.last_name LIKE ?
+      )`;
+    
+      taskConditions.push(searchCondition.replace(/t\./g, 't.').replace(/u\./g, 'u.'));
+      subtaskConditions.push(searchCondition.replace(/t\./g, 'st.').replace(/u\./g, 'u.'));
+    
+      const values = [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
+      taskValues.push(...values);
+      subtaskValues.push(...values);
     }
+    
 
     const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
     const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
