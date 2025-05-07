@@ -107,7 +107,7 @@ apiRouter.post('/profile', profileController.createOrUpdateProfile);
 apiRouter.get('/profile/:id', profileController.getProfile);
 
 // User Routes
-apiRouter.post('/user', userController.createUser);
+apiRouter.post('/user', RoleController.checkRole(),userController.createUser);
 apiRouter.put('/user/:id',RoleController.checkRole(), userController.updateUser);
 apiRouter.delete('/user/:id',RoleController.checkRole(), userController.deleteUser);
 apiRouter.get('/user/:id',RoleController.checkRole(), userController.getUser);
