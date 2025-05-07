@@ -53,7 +53,7 @@ exports.getAllData = async (payload, res) => {
 
                 let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
                 if (productIds.length === 0) {
-                    productIds = [-1]; // Prevent SQL error for empty IN clause
+                    productIds = [-1]; // Prevvent SQL error for empty IN clause
                 }
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
                 queryParams.push(productIds);
