@@ -2810,7 +2810,7 @@ exports.deleteTaskList = async (req, res) => {
     // Search filter
     if (search) {
       const searchTerm = `%${search}%`;
-      const searchQuery = `(t.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR tm.name LIKE ? OR p.name LIKE ?)`;
+      const searchQuery = `(t.name LIKE ? OR  CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR pr.name LIKE ? OR tm.name LIKE ? OR p.name LIKE ? OR t.priority LIKE ?)`;
 
       taskConditions.push(searchQuery);
       subtaskConditions.push(searchQuery);
