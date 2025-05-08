@@ -1410,18 +1410,21 @@ exports.getAllpmemployeeOts = async (req, res) => {
       return group;
     });
 
-    const countZeroQuery = `
-      SELECT COUNT(*) AS count
-      FROM ot_details ot
-      WHERE ot.tl_status = 2
-        AND ot.pm_status = 0
-        AND ot.deleted_at IS NULL
-    `;
+    let countZeroQuery = `
+  SELECT COUNT(*) AS count
+  FROM ot_details ot
+  LEFT JOIN users u ON u.id = ot.user_id
+  WHERE ot.tl_status = 2
+    AND ot.pm_status = 0
+    AND ot.deleted_at IS NULL
+`;
+
     const countZeroParams = [];
 
     if (currentRoleId === 2) {
       countZeroQuery += ` AND u.role_id != 2`;
     }
+
     const [countResult] = await db.query(countZeroQuery, countZeroParams);
     const statusZeroCount = countResult[0]?.count || 0;
 
