@@ -39,19 +39,18 @@ exports.createOt = async (payload, res, req) => {
   }
 
   const today = new Date();
-const inputDate = new Date(date);
-today.setHours(0, 0, 0, 0); // Reset to midnight
-inputDate.setHours(0, 0, 0, 0); // Reset to midnight
+  const inputDate = new Date(date);
+  today.setHours(0, 0, 0, 0); // Reset to midnight
+  inputDate.setHours(0, 0, 0, 0); // Reset to midnight
 
-if (inputDate > today) {
-  return errorResponse(
-    res,
-    "Future dates are not allowed for OT",
-    "Validation Error",
-    400
-  );
-}
-
+  if (inputDate > today) {
+    return errorResponse(
+      res,
+      "Future dates are not allowed for OT",
+      "Validation Error",
+      400
+    );
+  }
 
   if (time) {
     const timeMatch = time.match(
@@ -1193,9 +1192,10 @@ exports.getAllpmemployeeOts = async (req, res) => {
     }
 
     const [userCheck] = await db.query(
-      "SELECT id,role_id FROM users WHERE id = ? AND deleted_at IS NULL",
+      "SELECT id, role_id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
+
     if (userCheck.length === 0) {
       return errorResponse(
         res,
@@ -1205,8 +1205,8 @@ exports.getAllpmemployeeOts = async (req, res) => {
       );
     }
 
+    const currentRoleId = Number(userCheck[0].role_id);
     const offset = (page - 1) * perPage;
-
     const otConditions = [];
     const otValues = [];
 
@@ -1245,7 +1245,14 @@ exports.getAllpmemployeeOts = async (req, res) => {
       otConditions.push(
         `(t.name LIKE ? OR u.employee_id LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
       );
-      otValues.push(searchTerm,searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      otValues.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
     }
 
     if (status) {
@@ -1258,29 +1265,27 @@ exports.getAllpmemployeeOts = async (req, res) => {
         );
       }
 
-      const currentRoleId = userCheck[0].role_id;
-
       switch (status) {
         case "0": // Pending
-          if ([1, 2, 3].includes(Number(currentRoleId))) {
+          if ([1, 2, 3].includes(currentRoleId)) {
             otConditions.push("ot.pm_status = 0");
-          } else if (Number(currentRoleId) === 4) {
+          } else if (currentRoleId === 4) {
             otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
           }
           otConditions.push("ot.status = 2");
           break;
 
         case "1": // Rejected
-          otConditions.push("ot.status = 1");
+          otConditions.push("ot.pm_status = 1");
           break;
 
         case "2": // Approved
-          if ([1, 2, 3].includes(Number(currentRoleId))) {
-            otConditions.push("ot.pm_status = 2");
-          } else if (Number(currentRoleId) === 4) {
+          if ([1, 2, 3].includes(currentRoleId)) {
+            otConditions.push("ot.pm_status = 2 AND ot.tl_status = 2");
+          } else if (currentRoleId === 4) {
             otConditions.push("ot.tl_status = 2 AND ot.pm_status = 2");
           }
-          otConditions.push("ot.status = 2");
+          otConditions.push("ot.status = 2 AND ot.tl_status = 2");
           break;
 
         default:
@@ -1291,32 +1296,6 @@ exports.getAllpmemployeeOts = async (req, res) => {
             400
           );
       }
-
-      // switch (status) {
-      //   case "0": // Pending
-      //     otConditions.push(
-      //       "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 0"
-      //     );
-      //     break;
-
-      //   case "1": // Rejected
-      //     otConditions.push("ot.status = 1");
-      //     break;
-
-      //   case "2": // Approved
-      //     otConditions.push(
-      //       "ot.status = 2 AND ot.tl_status = 2 AND ot.pm_status = 2"
-      //     );
-      //     break;
-
-      //   default:
-      //     return errorResponse(
-      //       res,
-      //       "Invalid status value.",
-      //       "Error fetching OT details",
-      //       400
-      //     );
-      // }
     }
 
     const otWhereClause =
@@ -1354,20 +1333,23 @@ exports.getAllpmemployeeOts = async (req, res) => {
         teams te ON te.id = u.team_id
       LEFT JOIN 
         designations d ON d.id = u.designation_id
-      ${otWhereClause} 
-      AND ot.deleted_at IS NULL 
-      ORDER BY 
-        ot.created_at DESC
+      ${otWhereClause}
+      AND ot.deleted_at IS NULL
+      ORDER BY ot.created_at DESC
     `;
 
     const [ots] = await db.query(otQuery, otValues);
 
-    // const totalRecords = ots.length;
-    // const paginatedData = ots.slice(offset, offset + parseInt(perPage));
-    // const pagination = getPagination(page, perPage, totalRecords);
+    //  Filter out role_id = 2 if current user is role_id = 2
+    const filteredOts = ots.filter((row) => {
+      if (currentRoleId === 2 && row.role_id === 2) {
+        return false;
+      }
+      return true;
+    });
 
     const groupedData = Object.values(
-      ots.reduce((acc, row) => {
+      filteredOts.reduce((acc, row) => {
         const userId = row.user_id;
 
         if (!acc[userId]) {
@@ -1412,11 +1394,6 @@ exports.getAllpmemployeeOts = async (req, res) => {
       }, {})
     );
 
-    // const totalPendingCounts = data.reduce(
-    //   (sum, user) => sum + user.pending_counts,
-    //   0
-    // );
-
     const totalEmployees = groupedData.length;
     const paginatedEmployees = groupedData.slice(
       offset,
@@ -1433,15 +1410,24 @@ exports.getAllpmemployeeOts = async (req, res) => {
       return group;
     });
 
-    const countZeroQuery = `
-    SELECT COUNT(*) AS count
-    FROM ot_details ot
-    WHERE ot.tl_status = 2
-      AND ot.pm_status = 0
-      AND ot.deleted_at IS NULL
-  `;
-    const [countResult] = await db.query(countZeroQuery);
+    let countZeroQuery = `
+  SELECT COUNT(*) AS count
+  FROM ot_details ot
+  LEFT JOIN users u ON u.id = ot.user_id
+  WHERE ot.tl_status = 2
+    AND ot.pm_status = 0
+    AND ot.deleted_at IS NULL
+`;
+
+    const countZeroParams = [];
+
+    if (currentRoleId === 2) {
+      countZeroQuery += ` AND u.role_id != 2`;
+    }
+
+    const [countResult] = await db.query(countZeroQuery, countZeroParams);
     const statusZeroCount = countResult[0]?.count || 0;
+
     successResponse(
       res,
       {
@@ -1569,11 +1555,9 @@ exports.approve_reject_ot = async (payload, res, req) => {
       );
     }
 
-   
-
     updateQuery += ` WHERE user_id = ? AND deleted_at IS NULL`;
 
-    if(status == 2 || status == 1) {
+    if (status == 2 || status == 1) {
       updateQuery += ` AND status = 0 OR status = ${status}`;
     }
 
@@ -1753,7 +1737,14 @@ exports.getAlltlemployeeOts = async (req, res) => {
       otConditions.push(
         `(t.name LIKE ? OR u.employee_id LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR pr.name LIKE ? OR ot.comments LIKE ?)`
       );
-      otValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      otValues.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
     }
 
     // Handle status conditions based on the provided status
