@@ -489,7 +489,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
     }
 
     if (date) {
-      baseQuery += ` AND DATE(t.created_at) = ?`;
+      baseQuery += ` AND DATE(t.start_date) = ?`;
       params.push(date);
     }
 
