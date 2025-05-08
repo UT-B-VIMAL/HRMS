@@ -40,7 +40,7 @@ exports.getAllData = async (payload, res) => {
 
                 let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
                 if (productIds.length === 0) {
-                    productIds = [-1]; // Prevent SQL error
+                    productIds = [-1]; // Prevent SQL error for empty IN clause
                 }
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
                 queryParams.push(productIds);
@@ -51,7 +51,10 @@ exports.getAllData = async (payload, res) => {
                 const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id=?";
                 const [subtaskRows] = await db.query(querySubtasks, [user_id]);
 
-                const productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
+                let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
+                if (productIds.length === 0) {
+                    productIds = [-1]; // Prevvent SQL error for empty IN clause
+                }
                 query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
                 queryParams.push(productIds);
             }else {
@@ -92,11 +95,14 @@ exports.getAllData = async (payload, res) => {
 
                 const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id=?";
                 const [subtaskRows] = await db.query(querySubtasks, [user_id]);
-                const productIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
+                let projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
+                if (projectIds.length === 0) {
+                    projectIds = [-1]; // Prevent SQL error
+                }
                 query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
-                queryParams.push(productIds);
-            }else {
-                    query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
+                queryParams.push(projectIds);
+             }else {
+                query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
             }
 
             // }
@@ -145,9 +151,9 @@ exports.getAllData = async (payload, res) => {
         if (type === "tasks" && id) {
             query += " AND project_id = ?";
             queryParams.push(id);
-            if(task_user_id){
-                query += " AND user_id = ?";
-                queryParams.push(task_user_id);
+            if (task_user_id) {
+                query += " AND (user_id = ? OR id IN (SELECT task_id FROM sub_tasks WHERE user_id = ?))";
+                queryParams.push(task_user_id, task_user_id);
             }
         }
         if (type === "teams" && id) {
@@ -306,4 +312,3 @@ exports.getticketCount = async (req, res) => {
 
 
 
-  

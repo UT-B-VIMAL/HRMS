@@ -43,10 +43,11 @@ exports.changePassword = async (req, res) => {
 
     if (error) {
       const errorMessages = error.details.reduce((acc, err) => {
-        acc[err.path[0]] = err.message;
+        const key = err.path[0] || "general";
+        acc[key] = err.message;
         return acc;
       }, {});
-
+      
       return errorResponse(res, errorMessages, "Validation Error", 403);
     }
 
