@@ -1301,7 +1301,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
     const [ots] = await db.query(otQuery, otValues);
 
-    // ✅ Filter out role_id = 2 if current user is role_id = 2
+    //  Filter out role_id = 2 if current user is role_id = 2
     const filteredOts = ots.filter(row => {
       if (currentRoleId === 2 && row.role_id === 2) {
         return false;
