@@ -71,17 +71,17 @@ exports.getTickets = async (id, res) => {
 
 //   try {
 //     let query = `
-//             SELECT 
+//             SELECT
 //                 (@rownum := @rownum + 1) AS s_no,
 //                 t.id,
 //                 t.user_id,
-//                 COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS name, 
+//                 COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS name,
 //                 t.created_at AS created_at,
 //                 t.description,
 //                 i.issue_name AS issue_type,
 //                 CONVERT_TZ(t.issue_date, '+00:00', '+05:30') AS issue_date,
 //                 t.status,
-//                 CASE 
+//                 CASE
 //                     WHEN t.status = 0 THEN 'Pending'
 //                     WHEN t.status = 1 THEN 'Pending'
 //                     WHEN t.status = 2 THEN 'Approved'
@@ -89,13 +89,13 @@ exports.getTickets = async (id, res) => {
 //                     ELSE 'Unknown'
 //                 END AS status_type,
 //                CONCAT('https://', t.file_name) AS file_name,
-//                 COALESCE((SELECT COUNT(*) 
+//                 COALESCE((SELECT COUNT(*)
 //                           FROM ticket_comments tc
 //                           WHERE tc.ticket_id = t.id
-//                           AND tc.receiver_id = ? 
+//                           AND tc.receiver_id = ?
 //                           AND tc.type = 0), 0) AS unread_counts
 //             FROM tickets t
-//             LEFT JOIN users u ON t.user_id = u.id 
+//             LEFT JOIN users u ON t.user_id = u.id
 //             LEFT JOIN issue_types i ON t.issue_type = i.id,
 //             (SELECT @rownum := ${offset || 0}) AS r
 //             WHERE t.deleted_at IS NULL
@@ -133,21 +133,21 @@ exports.getTickets = async (id, res) => {
 
 //     if (search) {
 //       query += ` AND (
-//               CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
-//               OR t.id LIKE ? 
-//               OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
-//               OR t.description LIKE ? 
-//               OR i.issue_name LIKE ? 
-//               OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+//               CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?
+//               OR t.id LIKE ?
+//               OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ?
+//               OR t.description LIKE ?
+//               OR i.issue_name LIKE ?
+//               OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ?
 //           )`;
 
 //       countQuery += ` AND (
-//               CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
-//               OR t.id LIKE ? 
-//               OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
-//               OR t.description LIKE ? 
-//               OR i.issue_name LIKE ? 
-//               OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+//               CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?
+//               OR t.id LIKE ?
+//               OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ?
+//               OR t.description LIKE ?
+//               OR i.issue_name LIKE ?
+//               OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ?
 //           )`;
 
 //       const searchPattern = `%${search}%`;
@@ -257,7 +257,7 @@ exports.getAlltickets = async (req, res) => {
                 t.status,
                 CASE 
                     WHEN t.status = 0 THEN 'Pending'
-                    WHEN t.status = 1 THEN 'Pending'
+                    WHEN t.status = 1 THEN 'IN Progress'
                     WHEN t.status = 2 THEN 'Approved'
                     WHEN t.status = 3 THEN 'Rejected'
                     ELSE 'Unknown'
@@ -313,6 +313,15 @@ exports.getAlltickets = async (req, res) => {
               OR t.description LIKE ? 
               OR i.issue_name LIKE ? 
               OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+              OR (
+              CASE 
+            WHEN t.status = 0 THEN 'Pending'
+            WHEN t.status = 1 THEN 'IN Progress'
+            WHEN t.status = 2 THEN 'Approved'
+            WHEN t.status = 3 THEN 'Rejected'
+            ELSE 'Unknown'
+            END
+             ) LIKE ?
           )`;
 
       countQuery += ` AND (
@@ -322,6 +331,15 @@ exports.getAlltickets = async (req, res) => {
               OR t.description LIKE ? 
               OR i.issue_name LIKE ? 
               OR DATE_FORMAT(CONVERT_TZ(t.issue_date,  '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
+                OR (
+              CASE 
+              WHEN t.status = 0 THEN 'Pending'
+              WHEN t.status = 1 THEN 'IN Progress'
+              WHEN t.status = 2 THEN 'Approved'
+              WHEN t.status = 3 THEN 'Rejected'
+              ELSE 'Unknown'
+              END
+            ) LIKE ?
           )`;
 
       const searchPattern = `%${search}%`;
@@ -331,7 +349,8 @@ exports.getAlltickets = async (req, res) => {
         searchPattern,
         searchPattern,
         searchPattern,
-        searchPattern
+        searchPattern,
+        searchPattern 
       );
       countValues.push(
         searchPattern,
@@ -339,7 +358,8 @@ exports.getAlltickets = async (req, res) => {
         searchPattern,
         searchPattern,
         searchPattern,
-        searchPattern
+        searchPattern,
+        searchPattern 
       );
     }
 
@@ -375,7 +395,7 @@ exports.getAlltickets = async (req, res) => {
 
     let unreadPendingAdmin = 0;
 
-    if (users.role_id === 1) { 
+    if (users.role_id === 1) {
       const [adminUnreadRes] = await db.query(
         `SELECT COUNT(*) AS unread_pending_admin 
          FROM tickets 
@@ -397,7 +417,7 @@ exports.getAlltickets = async (req, res) => {
       {
         total_records: totalRecords,
         total_pending: statusZeroCount,
-        unread_pending_admin: unreadPendingAdmin 
+        unread_pending_admin: unreadPendingAdmin,
       }
     );
   } catch (error) {
@@ -405,7 +425,6 @@ exports.getAlltickets = async (req, res) => {
     return errorResponse(res, error.message, "Error retrieving tickets", 500);
   }
 };
-
 
 exports.readPendingTickets = async (req, res) => {
   const { user_id } = req.body;
@@ -416,7 +435,12 @@ exports.readPendingTickets = async (req, res) => {
 
   const users = await getAuthUserDetails(user_id, res);
   if (!users || users.role_id !== 1) {
-    return errorResponse(res, "Unauthorized", "Only admin can perform this", 403);
+    return errorResponse(
+      res,
+      "Unauthorized",
+      "Only admin can perform this",
+      403
+    );
   }
 
   try {
@@ -428,14 +452,17 @@ exports.readPendingTickets = async (req, res) => {
        AND deleted_at IS NULL`
     );
 
-    return successResponse(res, [], "All unread pending tickets marked as read by admin", 200);
+    return successResponse(
+      res,
+      [],
+      "All unread pending tickets marked as read by admin",
+      200
+    );
   } catch (err) {
     console.error(err);
     return errorResponse(res, err.message, "Error updating tickets", 500);
   }
 };
-
-
 
 exports.updateTickets = async (id, payload, res) => {
   const { status } = payload;
