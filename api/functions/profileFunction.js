@@ -56,6 +56,15 @@ exports.createOrUpdateProfile = async (user_id, profileData, file = null) => {
       updateValues.push(gender);
     }
     if (mobile_no) {
+      const mobileCheckQuery = `
+    SELECT user_id FROM user_profiles 
+    WHERE mobile_no = ? AND user_id != ?
+  `;
+      const [mobileConflict] = await db.query(mobileCheckQuery, [mobile_no, user_id]);
+
+      if (mobileConflict.length > 0) {
+        throw new Error("Mobile number is already used by another user.");
+      }
       updateFields.push("mobile_no = ?");
       updateValues.push(mobile_no);
     }
