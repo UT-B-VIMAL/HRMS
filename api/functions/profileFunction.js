@@ -47,6 +47,7 @@ exports.createOrUpdateProfile = async (user_id, profileData, file = null) => {
 
     // Dynamically build the update query based on provided data
     if (dob) {
+      validateDOB(dob); // Ensure DOB is valid and age is >= 17
       updateFields.push("dob = ?");
       updateValues.push(dob);
     }
@@ -119,5 +120,33 @@ exports.createOrUpdateProfile = async (user_id, profileData, file = null) => {
     return { user_id, message: "Profile created successfully" };
   }
 };
+
+
+function validateDOB(dob) {
+  const birthDate = new Date(dob);
+  const today = new Date();
+
+  if (isNaN(birthDate.getTime())) {
+    throw new Error("Invalid date format for DOB.");
+  }
+
+  if (birthDate > today) {
+    throw new Error("DOB cannot be in the future.");
+  }
+
+  const age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  const d = today.getDate() - birthDate.getDate();
+  const actualAge = m < 0 || (m === 0 && d < 0) ? age - 1 : age;
+
+  if (actualAge < 17) {
+    throw new Error("User must be at least 17 years old.");
+  }
+
+  if (actualAge > 120) {
+    throw new Error("User age is not valid.");
+  }
+}
+
 
 
