@@ -305,9 +305,12 @@ exports.getAlltickets = async (req, res) => {
       countValues.push(parseInt(status));
     }
 
-    if (search) {
-      query += ` AND (
-              CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+          if (search) {
+                query += ` AND (
+                (
+                CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+                OR (t.user_id = 0 AND 'Anonymous' LIKE ?)
+                )
               OR t.id LIKE ? 
               OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
               OR t.description LIKE ? 
@@ -324,8 +327,11 @@ exports.getAlltickets = async (req, res) => {
              ) LIKE ?
           )`;
 
-      countQuery += ` AND (
-              CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+              countQuery += ` AND (
+               (
+               CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ? 
+               OR (t.user_id = 0 AND ? = 'Anonymous')
+               )
               OR t.id LIKE ? 
               OR DATE_FORMAT(CONVERT_TZ(t.created_at, '+00:00', '+05:30'), '%d-%m-%Y') LIKE ? 
               OR t.description LIKE ? 
@@ -344,14 +350,16 @@ exports.getAlltickets = async (req, res) => {
 
       const searchPattern = `%${search}%`;
       values.push(
+        searchPattern, 
         searchPattern,
+        searchPattern, 
+        searchPattern, 
+        searchPattern, 
         searchPattern,
-        searchPattern,
-        searchPattern,
-        searchPattern,
-        searchPattern,
+        searchPattern, 
         searchPattern 
       );
+
       countValues.push(
         searchPattern,
         searchPattern,
@@ -359,7 +367,8 @@ exports.getAlltickets = async (req, res) => {
         searchPattern,
         searchPattern,
         searchPattern,
-        searchPattern 
+        searchPattern,
+        searchPattern
       );
     }
 
