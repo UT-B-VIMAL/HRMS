@@ -185,7 +185,7 @@ WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at
     if (duplicateCheckResult.length > 0) {
       return errorResponse(
         res,
-        "OT already submitted for this project and date",
+        "OT already submitted for this task and date",
         "Duplicate OT entry",
         409
       );
