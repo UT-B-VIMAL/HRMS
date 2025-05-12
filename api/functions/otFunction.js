@@ -1555,12 +1555,7 @@ exports.approve_reject_ot = async (payload, res, req) => {
       );
     }
 
-    updateQuery += ` WHERE user_id = ? AND deleted_at IS NULL`;
-
-    if (status == 2 || status == 1) {
-      updateQuery += ` AND status = 0 OR status = ${status}`;
-    }
-
+    updateQuery += ` WHERE user_id = ? AND pm_status = 0 AND deleted_at IS NULL`;
     const values = [status, updated_by, status, user_id];
 
     // Execute the query
