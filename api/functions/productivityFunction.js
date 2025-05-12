@@ -28,6 +28,19 @@ exports.getTeamwiseProductivity = async (req, res) => {
     } = req.query;
     const offset = (page - 1) * perPage;
 
+    if (from_date && to_date) {
+      if (!moment(from_date, 'YYYY-MM-DD', true).isValid() || !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
+        return errorResponse(res, "Invalid date format", "Dates must be in YYYY-MM-DD format", 400);
+      }
+      if (moment(to_date).isBefore(moment(from_date))) {
+        return errorResponse(res, "Invalid date range", "End date must be greater than or equal to Start date", 400);
+      }
+    } else if (from_date && !moment(from_date, 'YYYY-MM-DD', true).isValid()) {
+      return errorResponse(res, "Invalid from_date format", "Start date must be in YYYY-MM-DD format", 400);
+    } else if (to_date && !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
+      return errorResponse(res, "Invalid to_date format", "End date must be in YYYY-MM-DD format", 400);
+    }
+
     const dateCondition =
       from_date && to_date
         ? `AND combined.updated_at BETWEEN ? AND ?`
@@ -206,6 +219,19 @@ exports.get_individualStatus = async (req, res) => {
       perPage = 10,
     } = req.query;
     const offset = (page - 1) * perPage;
+
+    if (from_date && to_date) {
+      if (!moment(from_date, 'YYYY-MM-DD', true).isValid() || !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
+        return errorResponse(res, "Invalid date format", "Dates must be in YYYY-MM-DD format", 400);
+      }
+      if (moment(to_date).isBefore(moment(from_date))) {
+        return errorResponse(res, "Invalid date range", "End date must be greater than or equal to Start date", 400);
+      }
+    } else if (from_date && !moment(from_date, 'YYYY-MM-DD', true).isValid()) {
+      return errorResponse(res, "Invalid from_date format", "Start date must be in YYYY-MM-DD format", 400);
+    } else if (to_date && !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
+      return errorResponse(res, "Invalid to_date format", "End date must be in YYYY-MM-DD format", 400);
+    }
 
     let baseQuery = `
             SELECT 
