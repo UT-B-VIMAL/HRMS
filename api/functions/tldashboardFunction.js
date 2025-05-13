@@ -409,33 +409,40 @@ const [products] = await db.query(productFilterQuery, queryValues);
 
         // Fetch employee details for working employees
         let employeeList = [];
-        if (workingEmployees.size > 0) {
-          const employeeDetailsQuery = `
-                      SELECT id, employee_id, 
-                             COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name 
-                      FROM users 
-                      WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
-                  `;
-          const [employees] = await db.query(employeeDetailsQuery, [
-            Array.from(workingEmployees),
-            teamIds,
-          ]);
 
-          employeeList = employees.map((user) => {
-            const fullName = user.full_name || "N/A";
-            const words = fullName.split(" ");
-            const initials =
-              words.length > 1
-                ? words.map((word) => (word[0] || "").toUpperCase()).join("")
-                : fullName.slice(0, 2).toUpperCase();
+if (workingEmployees.size > 0) {
+  const employeeDetailsQuery = `
+    SELECT id, employee_id, first_name, last_name
+    FROM users 
+    WHERE id IN (?) AND team_id IN (?) AND deleted_at IS NULL
+  `;
 
-            return {
-              employee_name: fullName,
-              employee_id: user.employee_id || "N/A",
-              initials: initials,
-            };
-          });
-        }
+  const [employees] = await db.query(employeeDetailsQuery, [
+    Array.from(workingEmployees),
+    teamIds,
+  ]);
+
+  employeeList = employees.map((user) => {
+    const firstName = user.first_name || "";
+    const lastName = user.last_name || "";
+
+    // Extract first letter of first word in first_name
+    const firstInitial = firstName.trim().split(" ")[0]?.[0]?.toUpperCase() || "";
+
+    // Extract first letter of last_name
+    const lastInitial = lastName.trim()[0]?.toUpperCase() || "";
+
+    const fullName = `${firstName} ${lastName}`.trim() || "N/A";
+    const initials = firstInitial + lastInitial;
+
+    return {
+      employee_name: fullName,
+      employee_id: user.employee_id || "N/A",
+      initials: initials || "NA",
+    };
+  });
+}
+
 
         return {
           product_id: product.id,
