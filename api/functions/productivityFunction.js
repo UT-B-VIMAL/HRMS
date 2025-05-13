@@ -74,6 +74,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
           tasks t
       WHERE 
           t.deleted_at IS NULL
+           AND t.estimated_hours != '00:00:00'
           AND NOT EXISTS (
               SELECT 1 FROM sub_tasks st 
               WHERE st.task_id = t.id 
@@ -94,6 +95,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
           sub_tasks st
       WHERE 
           st.deleted_at IS NULL
+            AND st.estimated_hours != '00:00:00'
     `;
 
     // Main query
