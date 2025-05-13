@@ -398,8 +398,8 @@ exports.getEmployeeAttendance = async (req, res) => {
           u.first_name AS employee_name,
           u.employee_id,
           u.id as user_ids,
-          dr.date AS date,
-          u.created_at AS joining_date,
+         DATE_FORMAT(dr.date, '%d-%m-%Y') AS date,
+         DATE_FORMAT(u.created_at, '%d-%m-%Y') AS joining_date,
           t.name AS team_name,
           CASE 
             WHEN el.day_type = 1 THEN 'Absent'
