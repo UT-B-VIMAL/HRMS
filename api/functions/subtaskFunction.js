@@ -22,10 +22,10 @@ exports.createSubTask = async (payload, res) => {
           return errorResponse(res, "Task not found or deleted", "Error creating subtask", 404);
       }
 
-       const { product_id, project_id, status, active_status } = taskResult[0];
+       const { product_id, project_id, status, reopen_status  } = taskResult[0];
 
-    if (status === 1 && active_status === 1) {
-      return errorResponse(res, "Task is already in progress", "Cannot add subtask", 400);
+    if (status !== 0 && reopen_status == 1) {
+      return errorResponse(res, "Task is already active", "Cannot add subtask", 400);
     }
 
       // Insert into `sub_tasks` table
