@@ -1083,16 +1083,17 @@ exports.fetchTlviewproductdata = async (req, res) => {
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
-
     const [rows] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
 
+    // Check if no rows are returned
     if (rows.length === 0) {
       return errorResponse(res, null, "User Not Found", 400);
     }
 
+    // Fetch team IDs for the reporting user
     const [teamResult] = await db.query(
       "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
       [user_id]
@@ -1106,6 +1107,7 @@ exports.fetchTlviewproductdata = async (req, res) => {
 
     const teamIds = teamResult.map((team) => team.id);
 
+    // Validate product existence
     const [rowss] = await db.query(
       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
       [product_id]
@@ -1115,12 +1117,15 @@ exports.fetchTlviewproductdata = async (req, res) => {
       return errorResponse(res, null, "Product Not Found", 400);
     }
 
-    const [productRows] = await db.query(
-      `SELECT id, name FROM products WHERE id = ? AND deleted_at IS NULL`,
-      [product_id]
-    );
+    const productQuery = `
+      SELECT id, name
+      FROM products
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+    const [productRows] = await db.query(productQuery, [product_id]);
     const product = productRows[0] || { name: "N/A", id: "N/A" };
 
+    // Base query for tasks and subtasks
     let baseQuery = `
       SELECT 
         t.id AS task_id,
@@ -1132,9 +1137,6 @@ exports.fetchTlviewproductdata = async (req, res) => {
         t.priority AS task_priority,
         t.estimated_hours AS task_estimation_hours,
         t.description AS task_description,
-        te.name AS team_name,
-        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
-        p.name AS project_name,
         s.id AS subtask_id,
         s.name AS subtask_name,
         s.status AS subtask_status,
@@ -1142,19 +1144,24 @@ exports.fetchTlviewproductdata = async (req, res) => {
         s.reopen_status AS subtask_reopen_status,
         s.estimated_hours AS subtask_estimation_hours,
         s.description AS subtask_description,
-        s.team_id AS subtask_team_id
+        te.name AS team_name,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
+        p.name AS project_name
       FROM tasks t
       LEFT JOIN sub_tasks s 
         ON t.id = s.task_id 
-        AND s.deleted_at IS NULL 
-        AND s.team_id IN (${teamIds.map((id) => db.escape(id)).join(",")})
+        AND s.deleted_at IS NULL
       LEFT JOIN teams te 
-        ON t.team_id = te.id AND te.deleted_at IS NULL
+        ON t.team_id = te.id
+        AND te.deleted_at IS NULL
       LEFT JOIN users u 
-        ON t.user_id = u.id AND u.deleted_at IS NULL
+        ON t.user_id = u.id
+        AND u.deleted_at IS NULL
       LEFT JOIN projects p 
-        ON t.project_id = p.id AND p.deleted_at IS NULL
-      WHERE t.product_id = ? AND t.deleted_at IS NULL
+        ON t.project_id = p.id
+        AND p.deleted_at IS NULL
+      WHERE t.product_id = ? 
+        AND t.deleted_at IS NULL
     `;
 
     const params = [product_id];
@@ -1197,20 +1204,30 @@ exports.fetchTlviewproductdata = async (req, res) => {
       );
     }
 
+    // Execute the query for tasks
     const [taskRows] = await db.query(baseQuery, params);
 
     const isValidSubtask = (item, status) => {
       const isTask = !item.hasOwnProperty("subtask_id");
-      const matchStatus = (item) => {
+
+      if (isTask) {
         switch (status) {
           case "Pending":
-            return item.active_status === 0 && item.status === 0 && item.reopen_status === 0;
+            return (
+              item.active_status === 0 &&
+              item.status === 0 &&
+              item.reopen_status === 0
+            );
           case "In Progress":
             return item.active_status === 1 && item.status === 1;
           case "In Review":
             return item.reopen_status === 0 && item.status === 2;
           case "On Hold":
-            return item.active_status === 0 && item.status === 1 && item.reopen_status === 0;
+            return (
+              item.active_status === 0 &&
+              item.status === 1 &&
+              item.reopen_status === 0
+            );
           case "Done":
             return item.status === 3;
           case "Re Open":
@@ -1218,8 +1235,81 @@ exports.fetchTlviewproductdata = async (req, res) => {
           default:
             return false;
         }
+      } else {
+        switch (status) {
+          case "Pending":
+            return (
+              item.active_status === 0 &&
+              item.status === 0 &&
+              item.reopen_status === 0
+            );
+          case "In Progress":
+            return item.active_status === 1 && item.status === 1;
+          case "In Review":
+            return item.reopen_status === 0 && item.status === 2;
+          case "On Hold":
+            return (
+              item.active_status === 0 &&
+              item.status === 1 &&
+              item.reopen_status === 0
+            );
+          case "Done":
+            return item.status === 3;
+          case "Re Open":
+            return item.reopen_status === 1;
+          default:
+            return false;
+        }
+      }
+    };
+
+    const formatTask = (task, subtasks, status) => {
+      const validSubtasks = [];
+      let totalSubtasks = 0;
+      let completedSubtasks = 0;
+
+      subtasks.forEach((subtask) => {
+        if (isValidSubtask(subtask, status)) {
+          validSubtasks.push({
+            SubtaskId: subtask.id || "N/A",
+            SubtaskName: subtask.name || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskDescription: subtask.description || "N/A",
+            SubtaskActiveStatus: subtask.subtask_active_status || "N/A",
+            SubtaskStatus: subtask.status || "N/A",
+          });
+        }
+        totalSubtasks++;
+        if (subtask.status === 3) {
+          completedSubtasks++;
+        }
+      });
+
+      const completionPercentage =
+        totalSubtasks > 0
+          ? Math.round((completedSubtasks / totalSubtasks) * 100)
+          : task.status === 3
+          ? 100
+          : 0;
+
+      return {
+        Date: task.date
+          ? new Date(task.date).toISOString().split("T")[0]
+          : "N/A",
+        Team: task.team_name || "N/A",
+        EmployeeName: task.employee_name || "N/A",
+        Priority: task.priority || "N/A",
+        ProjectName: task.project_name || "N/A",
+        TaskName: task.name || "N/A",
+        TaskId: task.id || "N/A",
+        TotalSubtaskCount: totalSubtasks,
+        CompletedSubtaskCount: completedSubtasks,
+        EstimationHours: task.estimation_hours || "N/A",
+        Description: task.description || "N/A",
+        Subtasks: validSubtasks,
+        CompletionPercentage: completionPercentage,
+        Status: status,
       };
-      return matchStatus(item);
     };
 
     const groupedTasks = {
@@ -1231,109 +1321,110 @@ exports.fetchTlviewproductdata = async (req, res) => {
       "Re Open": [],
     };
 
-    const taskMap = new Map();
+    const addedTaskIds = {
+      Pending: [],
+      "In Progress": [],
+      "In Review": [],
+      "On Hold": [],
+      Done: [],
+      "Re Open": [],
+    };
 
-    for (const row of taskRows) {
-      const taskId = row.task_id;
+    taskRows.forEach((row) => {
+      const task = {
+        id: row.task_id,
+        name: row.task_name,
+        status: row.task_status,
+        active_status: row.task_active_status,
+        reopen_status: row.task_reopen_status,
+        priority: row.task_priority,
+        date: row.task_date,
+        estimation_hours: row.task_estimation_hours,
+        description: row.task_description,
+        team_name: row.team_name,
+        employee_name: row.employee_name,
+        project_name: row.project_name,
+      };
 
-      if (!taskMap.has(taskId)) {
-        taskMap.set(taskId, {
-          id: taskId,
-          name: row.task_name,
-          status: row.task_status,
-          active_status: row.task_active_status,
-          reopen_status: row.task_reopen_status,
-          priority: row.task_priority,
-          date: row.task_date,
-          estimation_hours: row.task_estimation_hours,
-          description: row.task_description,
-          team_name: row.team_name,
-          employee_name: row.employee_name,
-          project_name: row.project_name,
-          subtasks: [],
-        });
+      const subtask = row.subtask_id
+        ? {
+            id: row.subtask_id,
+            name: row.subtask_name,
+            status: row.subtask_status,
+            active_status: row.subtask_active_status,
+            reopen_status: row.subtask_reopen_status,
+            estimated_hours: row.subtask_estimation_hours,
+            description: row.subtask_description,
+          }
+        : null;
+
+      const category = Object.keys(groupedTasks).find((status) =>
+        isValidSubtask(subtask || task, status)
+      );
+
+      if (category) {
+        const existingTaskIndex = groupedTasks[category].findIndex(
+          (t) => t.TaskId === task.id
+        );
+
+        if (existingTaskIndex === -1) {
+          groupedTasks[category].push(
+            formatTask(task, subtask ? [subtask] : [], category)
+          );
+        } else {
+          const existingTask = groupedTasks[category][existingTaskIndex];
+          existingTask.Subtasks.push({
+            SubtaskId: subtask.id || "N/A",
+            SubtaskName: subtask.name || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskDescription: subtask.description || "N/A",
+            SubtaskActiveStatus: subtask.active_status || "N/A",
+            SubtaskStatus: subtask.status || "N/A",
+          });
+          existingTask.TotalSubtaskCount++;
+          if (subtask.status === 3) {
+            existingTask.CompletedSubtaskCount++;
+          }
+          const completionPercentage =
+            existingTask.TotalSubtaskCount > 0
+              ? Math.round(
+                  (existingTask.CompletedSubtaskCount /
+                    existingTask.TotalSubtaskCount) *
+                    100
+                )
+              : 0;
+          existingTask.CompletionPercentage = completionPercentage;
+        }
       }
+    });
 
-      if (row.subtask_id && teamIds.includes(row.subtask_team_id)) {
-        taskMap.get(taskId).subtasks.push({
-          id: row.subtask_id,
-          name: row.subtask_name,
-          status: row.subtask_status,
-          active_status: row.subtask_active_status,
-          reopen_status: row.subtask_reopen_status,
-          estimated_hours: row.subtask_estimation_hours,
-          description: row.subtask_description,
-          team_id: row.subtask_team_id,
-        });
-      }
-    }
-
+    const taskCount = taskRows.length;
+    // Track totals for tasks and subtasks
     let totalItems = 0;
     let completedItems = 0;
 
-    for (const [_, task] of taskMap.entries()) {
-      const taskStatusCategories = Object.keys(groupedTasks);
-      for (const status of taskStatusCategories) {
-        const validSubtasks = task.subtasks.filter((s) =>
-          isValidSubtask(s, status)
-        );
-        const totalSubtasks = task.subtasks.length;
-        const completedSubtasks = task.subtasks.filter(
-          (s) => s.status === 3
-        ).length;
-
-        let include = false;
-        if (totalSubtasks > 0) {
-          if (validSubtasks.length > 0) include = true;
-        } else if (isValidSubtask(task, status)) {
-          include = true;
-        }
-
-        if (include) {
-          groupedTasks[status].push({
-            Date: task.date
-              ? new Date(task.date).toISOString().split("T")[0]
-              : "N/A",
-            Team: task.team_name || "N/A",
-            EmployeeName: task.employee_name || "N/A",
-            Priority: task.priority || "N/A",
-            ProjectName: task.project_name || "N/A",
-            TaskName: task.name || "N/A",
-            TaskId: task.id || "N/A",
-            TotalSubtaskCount: totalSubtasks,
-            CompletedSubtaskCount: completedSubtasks,
-            EstimationHours: task.estimation_hours || "N/A",
-            Description: task.description || "N/A",
-            Subtasks: validSubtasks.map((s) => ({
-              SubtaskId: s.id,
-              SubtaskName: s.name,
-              SubtaskEstimationHours: s.estimated_hours,
-              SubtaskDescription: s.description,
-              SubtaskActiveStatus: s.active_status,
-              SubtaskStatus: s.status,
-            })),
-            CompletionPercentage:
-              totalSubtasks > 0
-                ? Math.round((completedSubtasks / totalSubtasks) * 100)
-                : task.status === 3
-                ? 100
-                : 0,
-            Status: status,
-          });
-
-          if (totalSubtasks > 0) {
-            totalItems += totalSubtasks;
-            completedItems += completedSubtasks;
-          } else {
+    Object.keys(groupedTasks).forEach((status) => {
+      groupedTasks[status].forEach((task) => {
+        // If the task has subtasks, count the subtasks
+        if (task.Subtasks.length > 0) {
+          task.Subtasks.forEach((subtask) => {
             totalItems++;
-            if (task.status === 3) completedItems++;
+            if (subtask.SubtaskStatus === 3) {
+              // Assuming 3 is the "Done" status
+              completedItems++;
+            }
+          });
+        } else {
+          // Otherwise, count the task itself
+          totalItems++;
+          if (task.CompletionPercentage === 100) {
+            completedItems++;
           }
-
-          break; // Only categorize once
         }
-      }
-    }
+      });
+    });
 
+    // Calculate overall completion based on total task and subtask counts
     const overallCompletionPercentage =
       totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
@@ -1350,7 +1441,7 @@ exports.fetchTlviewproductdata = async (req, res) => {
       OnHoldCount: groupedTasks["On Hold"].length,
       DoneCount: groupedTasks["Done"].length,
       ReOpenCount: groupedTasks["Re Open"].length,
-      TaskCount: taskRows.length,
+      TaskCount: taskCount,
       OverallCompletionPercentage: overallCompletionPercentage,
       productname: product.name,
       productid: product.id,
