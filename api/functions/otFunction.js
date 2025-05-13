@@ -1987,7 +1987,7 @@ exports.getOtReportData = async (queryParams, res) => {
     let baseQuery = `
       SELECT 
           user_id,
-          JSON_ARRAYAGG(DATE(date)) AS date,
+          JSON_ARRAYAGG(DATE_FORMAT(date, '%d-%m-%Y')) AS date,
           users.employee_id AS employee_id,
           users.first_name AS user_name,
           JSON_ARRAYAGG(time) AS time,
@@ -2076,7 +2076,7 @@ exports.getOtReportData = async (queryParams, res) => {
       return {
         s_no: export_status === "1" ? index + 1 : offset + index + 1,
         ...(export_status !== "1" && { user_id: row.user_id }),
-        employee_id: row.employee_id || "N/A",
+        employee_id: row.employee_id || "",
         date: export_status === "1" ? row.date.join(", ") : row.date,
         projects:
           export_status === "1" ? row.projects.join(", ") : row.projects,
@@ -2086,9 +2086,9 @@ exports.getOtReportData = async (queryParams, res) => {
             : formattedTimeArray,
         work_done:
           export_status === "1" ? row.work_done.join(", ") : row.work_done,
-        team_name: row.team_name || "N/A",
+        team_name: row.team_name || "",
         total_hours: formattedTotalTime,
-        user_name: row.user_name || "N/A",
+        user_name: row.user_name || "",
       };
     });
 
