@@ -349,9 +349,14 @@ const [products] = await db.query(productFilterQuery, queryValues);
       products.map(async (product) => {
         // Fetch tasks associated with the product and team
         const tasksQuery = `
-                  SELECT * FROM tasks 
-                  WHERE product_id = ? AND team_id IN (?) AND deleted_at IS NULL
-              `;
+  SELECT t.* 
+  FROM tasks t
+  JOIN users u ON t.user_id = u.id AND u.deleted_at IS NULL
+  WHERE t.product_id = ? 
+    AND u.team_id IN (?) 
+    AND t.deleted_at IS NULL
+`;
+
         const [tasks] = await db.query(tasksQuery, [product.id, teamIds]);
 
         let totalItems = 0;
@@ -361,9 +366,14 @@ const [products] = await db.query(productFilterQuery, queryValues);
         for (const task of tasks) {
           // Fetch subtasks associated with the task
           const subtasksQuery = `
-            SELECT * FROM sub_tasks 
-            WHERE task_id = ? AND team_id IN (?) AND deleted_at IS NULL
-          `;
+  SELECT s.* 
+  FROM sub_tasks s
+  JOIN users u ON s.user_id = u.id AND u.deleted_at IS NULL
+  WHERE s.task_id = ? 
+    AND u.team_id IN (?) 
+    AND s.deleted_at IS NULL
+`;
+
           const [subtasks] = await db.query(subtasksQuery, [task.id, teamIds]);
 
           if (subtasks.length > 0) {
