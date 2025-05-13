@@ -90,8 +90,28 @@ exports.getAttendance = async (req, res) => {
 
     // Search Filter
     if (search) {
-      query += ` AND (u.first_name LIKE ? OR u.employee_id LIKE ?) `;
-      queryParams.push(`%${search}%`, `%${search}%`);
+      query += `
+        AND (
+          u.first_name LIKE ? 
+          OR u.employee_id LIKE ?
+          OR (CASE 
+                WHEN el.day_type = 1 THEN 'Absent'
+                WHEN el.day_type = 2 THEN 'Half Day'
+                ELSE 'Present'
+              END) LIKE ?
+          OR (CASE 
+                WHEN el.day_type = 1 THEN 'Full Day'
+                WHEN el.day_type = 2 THEN 'Half Day'
+                ELSE 'Full Day'
+              END) LIKE ?
+          OR (CASE 
+                WHEN el.half_type = 1 THEN 'First Half'
+                WHEN el.half_type = 2 THEN 'Second Half'
+                ELSE NULL
+              END) LIKE ?
+        )
+      `;
+      queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     // Pagination
