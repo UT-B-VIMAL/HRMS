@@ -6,15 +6,27 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 
+// function convertSecondsToReadableTime(totalSeconds) {
+//   if (!totalSeconds || isNaN(totalSeconds)) return "0h 0m 0s";
+//   const days = Math.floor(totalSeconds / 86400);
+//   const hours = Math.floor((totalSeconds % 86400) / 3600);
+//   const minutes = Math.floor((totalSeconds % 3600) / 60);
+//   const seconds = totalSeconds % 60;
+
+//   return `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
+// }
 function convertSecondsToReadableTime(totalSeconds) {
   if (!totalSeconds || isNaN(totalSeconds)) return "0h 0m 0s";
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
+
+  const secondsInDay = 8 * 3600; // 1 day = 8 hours
+  const days = Math.floor(totalSeconds / secondsInDay);
+  const hours = Math.floor((totalSeconds % secondsInDay) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
   return `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
 }
+
 exports.getTeamwiseProductivity = async (req, res) => {
   try {
     const {
@@ -62,6 +74,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
           tasks t
       WHERE 
           t.deleted_at IS NULL
+           AND t.estimated_hours != '00:00:00'
           AND NOT EXISTS (
               SELECT 1 FROM sub_tasks st 
               WHERE st.task_id = t.id 
@@ -82,6 +95,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
           sub_tasks st
       WHERE 
           st.deleted_at IS NULL
+            AND st.estimated_hours != '00:00:00'
     `;
 
     // Main query
