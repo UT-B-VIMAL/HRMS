@@ -1034,6 +1034,10 @@ exports.projectRequest = async (req, res) => {
     const offset = (page - 1) * perPage;
 
     let effectiveUserIds = [];
+    const taskConditions = [];
+    const subtaskConditions = [];
+    const taskValues = [];
+    const subtaskValues = [];
 
     if (user_id) {
       // Step 1: Get the role_id of the provided user_id
@@ -1064,6 +1068,11 @@ exports.projectRequest = async (req, res) => {
             effectiveUserIds = teamUsers.map((user) => user.id); // Extract all user IDs
           }
         }
+      }else if(role_id === 2){
+      taskConditions.push("t.assigned_user_id = ?");
+      subtaskConditions.push("st.assigned_user_id = ?");
+      taskValues.push(user_id);
+      subtaskValues.push(user_id);
       }
     }
 
@@ -1073,10 +1082,7 @@ exports.projectRequest = async (req, res) => {
       }
     }
 
-    const taskConditions = [];
-    const subtaskConditions = [];
-    const taskValues = [];
-    const subtaskValues = [];
+    
 
     // Apply user filter only if necessary
     if (effectiveUserIds.length > 0) {
@@ -1141,59 +1147,60 @@ exports.projectRequest = async (req, res) => {
         ? `AND ${subtaskConditions.join(" AND ")}`
         : "";
 
-    // Fetch Subtasks
-    const subtasksQuery = `
-      SELECT 
-        pr.name AS project_name,
-        st.name AS name,
-        tm.name AS team_name,
-        DATE_FORMAT(st.created_at, '%Y-%m-%d') AS date,
-        CONCAT(ua.first_name, ' ', ua.last_name) AS assigned_by_designation,
-        'Subtask' AS type,
-        t.id AS task_id,
-        st.id AS subtask_id,
-        st.user_id AS subtask_user_id
-      FROM sub_tasks st
-      LEFT JOIN tasks t ON t.id = st.task_id
-      LEFT JOIN users u ON u.id = st.user_id
-      LEFT JOIN users ua ON ua.id = st.created_by
-      LEFT JOIN projects pr ON pr.id = t.project_id
-      LEFT JOIN teams tm ON tm.id = u.team_id
-      LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
-      WHERE st.status = 2 AND st.deleted_at IS NULL ${subtaskWhereClause}
-      ORDER BY st.updated_at DESC
-    `;
+   // Subtasks Query (Add st.updated_at)
+const subtasksQuery = `
+  SELECT 
+    pr.name AS project_name,
+    st.name AS name,
+    tm.name AS team_name,
+    DATE_FORMAT(st.created_at, '%Y-%m-%d') AS date,
+    CONCAT(ua.first_name, ' ', ua.last_name) AS assigned_by_designation,
+    'Subtask' AS type,
+    t.id AS task_id,
+    st.id AS subtask_id,
+    st.user_id AS subtask_user_id,
+    st.updated_at
+  FROM sub_tasks st
+  LEFT JOIN tasks t ON t.id = st.task_id
+  LEFT JOIN users u ON u.id = st.user_id
+  LEFT JOIN users ua ON ua.id = st.created_by
+  LEFT JOIN projects pr ON pr.id = t.project_id
+  LEFT JOIN teams tm ON tm.id = u.team_id
+  LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
+  WHERE st.status = 2 AND st.deleted_at IS NULL ${subtaskWhereClause}
+`;
 
-    // Fetch Tasks
-    const tasksQuery = `
-      SELECT 
-        pr.name AS project_name,
-        t.name AS name,
-        tm.name AS team_name,
-        DATE_FORMAT(t.created_at, '%Y-%m-%d') AS date,
-        CONCAT(ua.first_name, ' ', ua.last_name) AS assigned_by_designation,
-        'Task' AS type,
-        t.id AS task_id,
-        NULL AS subtask_id,
-        t.user_id AS task_user_id
-      FROM tasks t
-      LEFT JOIN users u ON u.id = t.user_id
-      LEFT JOIN users ua ON ua.id = t.created_by
-      LEFT JOIN projects pr ON pr.id = t.project_id
-      LEFT JOIN teams tm ON tm.id = u.team_id
-      LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
-      WHERE t.deleted_at IS NULL AND t.status = 2 
-        AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
-        ${taskWhereClause}
-      ORDER BY t.updated_at DESC
-    `;
+// Tasks Query (Add t.updated_at)
+const tasksQuery = `
+  SELECT 
+    pr.name AS project_name,
+    t.name AS name,
+    tm.name AS team_name,
+    DATE_FORMAT(t.created_at, '%Y-%m-%d') AS date,
+    CONCAT(ua.first_name, ' ', ua.last_name) AS assigned_by_designation,
+    'Task' AS type,
+    t.id AS task_id,
+    NULL AS subtask_id,
+    t.user_id AS task_user_id,
+    t.updated_at
+  FROM tasks t
+  LEFT JOIN users u ON u.id = t.user_id
+  LEFT JOIN users ua ON ua.id = t.created_by
+  LEFT JOIN projects pr ON pr.id = t.project_id
+  LEFT JOIN teams tm ON tm.id = u.team_id
+  LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
+  WHERE t.deleted_at IS NULL AND t.status = 2 
+    AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
+    ${taskWhereClause}
+`;
 
-    // Execute queries
-    const [subtasks] = await db.query(subtasksQuery, subtaskValues);
-    const [tasks] = await db.query(tasksQuery, taskValues);
+// Execute queries
+const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+const [tasks] = await db.query(tasksQuery, taskValues);
 
-    // Merge and process results
-    const mergedResults = [...subtasks, ...tasks];
+// Merge and sort by updated_at
+const mergedResults = [...subtasks, ...tasks].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
 
     // Fetch assignee names
     const processedData = await Promise.all(
