@@ -269,40 +269,47 @@ exports.projectStatus = async (req, res) => {
     const offset = (page - 1) * perPage;
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
+
     const taskConditions = [];
     const taskValues = [];
     const subtaskConditions = [];
     const subtaskValues = [];
+    
     if (users.role_id === 3) {
       taskConditions.push("tm.reporting_user_id = ?");
       taskValues.push(users.id);
       subtaskConditions.push("tm.reporting_user_id = ?");
       subtaskValues.push(users.id);
     }
+    
     if (product_id) {
       taskConditions.push("t.product_id = ?");
       taskValues.push(product_id);
       subtaskConditions.push("st.product_id = ?");
       subtaskValues.push(product_id);
     }
+    
     if (project_id) {
       taskConditions.push("t.project_id = ?");
       taskValues.push(project_id);
       subtaskConditions.push("st.project_id = ?");
       subtaskValues.push(project_id);
     }
+    
     if (employee_id) {
       taskConditions.push("t.user_id = ?");
       taskValues.push(employee_id);
       subtaskConditions.push("st.user_id = ?");
       subtaskValues.push(employee_id);
     }
+    
     if (date) {
       taskConditions.push("DATE(t.created_at) = ?");
       taskValues.push(date);
       subtaskConditions.push("DATE(st.created_at) = ?");
       subtaskValues.push(date);
     }
+    
     if (status === "0") {
       taskConditions.push("t.status = 0");
       taskConditions.push("t.active_status = 0");
@@ -321,6 +328,7 @@ exports.projectStatus = async (req, res) => {
       taskConditions.push("t.status = 3");
       subtaskConditions.push("st.status = 3");
     }
+
     if (search) {
       const searchTerm = `%${search}%`;
 
@@ -346,20 +354,23 @@ exports.projectStatus = async (req, res) => {
         searchTerm
       );
     }
+
     const taskWhereClause =
       taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
     const subtaskWhereClause =
       subtaskConditions.length > 0
         ? `AND ${subtaskConditions.join(" AND ")}`
         : "";
+    
+    // Updated tasks query to get the latest end_time
     const tasksQuery = `
       SELECT
         t.id AS task_id,
         t.name AS task_name,
         t.estimated_hours AS estimated_time,
         t.total_hours_worked AS task_duration,
-        stut.start_time AS start_time,
-        stut.end_time AS end_time,
+        DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS start_time,
+        DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS end_time,
         t.rating AS rating,
         p.id AS product_id,
         p.name AS product_name,
@@ -373,8 +384,7 @@ exports.projectStatus = async (req, res) => {
         DATE(t.created_at) AS date,
         t.updated_at AS updated_at
       FROM tasks t
-      LEFT JOIN
-        users u ON u.id = t.user_id
+      LEFT JOIN users u ON u.id = t.user_id
       LEFT JOIN products p ON p.id = t.product_id
       LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id
       LEFT JOIN projects pr ON pr.id = t.project_id
@@ -382,10 +392,11 @@ exports.projectStatus = async (req, res) => {
       WHERE t.deleted_at IS NULL
       AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
       ${taskWhereClause}
-      GROUP BY
-        t.id
-        ORDER BY t.created_at DESC
+      GROUP BY t.id
+      ORDER BY t.created_at DESC
     `;
+
+    // Updated subtasks query to get the latest end_time
     const subtasksQuery = `
       SELECT
         p.name AS product_name,
@@ -394,8 +405,8 @@ exports.projectStatus = async (req, res) => {
         st.name AS subtask_name,
         DATE(st.created_at) AS date,
         st.total_hours_worked AS subtask_duration,
-        stut.start_time AS start_time,
-        stut.end_time AS end_time,
+        DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS start_time,
+        DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS end_time,
         st.estimated_hours AS estimated_time,
         st.total_hours_worked AS time_taken,
         st.rating AS subtask_rating,
@@ -407,31 +418,23 @@ exports.projectStatus = async (req, res) => {
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
         st.status AS subtask_status,
         st.updated_at AS updated_at
-      FROM
-        sub_tasks st
-      LEFT JOIN
-        tasks t ON t.id = st.task_id
-      LEFT JOIN
-        users u ON u.id = st.user_id
-      LEFT JOIN
-        products p ON p.id = t.product_id
-      LEFT JOIN
-        projects pr ON pr.id = t.project_id
-      LEFT JOIN
-        sub_tasks_user_timeline stut ON stut.subtask_id = st.id
-      LEFT JOIN
-        teams tm ON tm.id = st.team_id
-      WHERE
-        st.deleted_at IS NULL
-        ${subtaskWhereClause}
-     GROUP BY
-        st.id
-        ORDER BY st.updated_at DESC
+      FROM sub_tasks st
+      LEFT JOIN tasks t ON t.id = st.task_id
+      LEFT JOIN users u ON u.id = st.user_id
+      LEFT JOIN products p ON p.id = t.product_id
+      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN sub_tasks_user_timeline stut ON stut.subtask_id = st.id
+      LEFT JOIN teams tm ON tm.id = st.team_id
+      WHERE st.deleted_at IS NULL
+      ${subtaskWhereClause}
+      GROUP BY st.id
+      ORDER BY st.updated_at DESC
     `;
-    // First fetch tasks
+    
+    // Fetch tasks and subtasks
     const [tasks] = await db.query(tasksQuery, taskValues);
-    // Then fetch subtasks
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+    
     const mapStatus = (statusCode) => {
       switch (statusCode) {
         case 0:
@@ -444,6 +447,7 @@ exports.projectStatus = async (req, res) => {
           return "Unknown";
       }
     };
+
     const Subtasks = subtasks.map((subtask) => ({
       type: "SubTask",
       status: mapStatus(subtask.subtask_status),
@@ -461,17 +465,14 @@ exports.projectStatus = async (req, res) => {
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time: subtask.start_time
-        ? moment(subtask.start_time).format("DD-MM-YYYY HH:mm:ss")
-        : "-",
-      end_time: subtask.end_time
-        ? moment(subtask.end_time).format("DD-MM-YYYY HH:mm:ss")
-        : "-",
+      start_time: subtask.start_time ? subtask.start_time : "-",
+      end_time: subtask.end_time ? subtask.end_time : "-",
       subtask_duration: subtask.subtask_duration,
       task_updated_at: subtask.updated_at
-        ? moment(subtask.updated_at).format("DD-MM-YYYY HH:mm:ss")
+        ? moment(subtask.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
     }));
+
     const Tasks = tasks.map((task) => ({
       type: "Task",
       status: mapStatus(task.task_status),
@@ -488,18 +489,13 @@ exports.projectStatus = async (req, res) => {
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-      start_time: task.start_time
-        ? moment(task.start_time).format("DD-MM-YYYY HH:mm:ss")
-        : "-",
-      end_time: task.end_time
-        ? moment(task.end_time).format("DD-MM-YYYY HH:mm:ss")
-        : "-",
-      task_duration: task.task_duration,
+      start_time: task.start_time ? task.start_time : "-",
+      end_time: task.end_time ? task.end_time : "-",
       task_updated_at: task.updated_at
-        ? moment(task.updated_at).format("DD-MM-YYYY HH:mm:ss")
+        ? moment(task.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
     }));
-    // const groupedTasks = [...Subtasks, ...Tasks];
+
     const groupedTasks = [...Subtasks, ...Tasks].sort((a, b) => {
       const dateA = moment(a.task_updated_at, "DD-MM-YYYY HH:mm:ss").toDate();
       const dateB = moment(b.task_updated_at, "DD-MM-YYYY HH:mm:ss").toDate();
@@ -516,7 +512,7 @@ exports.projectStatus = async (req, res) => {
       s_no: offset + index + 1,
       ...row,
     }));
-    // Now wrap the tasks and pagination inside 'data'
+
     successResponse(
       res,
       data,
@@ -531,6 +527,8 @@ exports.projectStatus = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
 
 // exports.projectStatus_ToDo = async (req, res) => {
 //   try {
