@@ -2674,6 +2674,9 @@ exports.updateTaskTimeLine = async (req, res) => {
     );
     console.log("old_data", taskId, subtaskId, taskOrSubtask.user_id);
     if (action === "start") {
+      if(taskOrSubtask.user_id === null) {
+        return errorResponse(res, "Task is not assigned to any user", 400);
+      }
       await this.startTask(taskOrSubtask, type, id, res);
       const query =
         "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
