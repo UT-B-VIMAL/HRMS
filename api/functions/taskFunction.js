@@ -1924,23 +1924,25 @@ exports.getTaskList = async (queryParams, res) => {
         tasks.active_status,
         tasks.product_id,
         tasks.project_id,
-        tasks.team_id,
+        u.team_id,
         projects.name AS project_name,
+        cu.first_name AS created_by,
         products.name AS product_name,
-        users.first_name AS assignee_name,
+        u.first_name AS assignee_name,
         teams.name AS team_name,
         teams.id AS team_id
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
-      LEFT JOIN users ON tasks.user_id = users.id
-      LEFT JOIN teams ON tasks.team_id = teams.id
+      LEFT JOIN users u ON tasks.user_id = u.id
+      LEFT JOIN users cu ON tasks.created_by = cu.id
+      LEFT JOIN teams ON u.team_id = teams.id
       WHERE tasks.deleted_at IS NULL
     `;
 
     const params = [];
     if (team_id) {
-      baseQuery += ` AND tasks.team_id = ?`;
+      baseQuery += ` AND u.team_id = ?`;
       params.push(team_id);
     } else if (role_id === 3) {
       const queryteam =
@@ -1949,7 +1951,7 @@ exports.getTaskList = async (queryParams, res) => {
       let teamIds = [];
       if (rowteams.length > 0) {
         teamIds = rowteams.map((row) => row.id);
-        baseQuery += ` AND tasks.team_id IN (?)`;
+        baseQuery += ` AND u.team_id IN (?)`;
         params.push(teamIds);
         console.log("teamIds", teamIds);
       } else {
@@ -2070,7 +2072,7 @@ exports.getTaskList = async (queryParams, res) => {
       const taskIds = tasks.map((task) => task.task_id);
       let query = `
         SELECT 
-          id AS subtask_id, 
+          sub_tasks.id AS subtask_id, 
           name AS subtask_name, 
           task_id,
           user_id,
@@ -2078,8 +2080,10 @@ exports.getTaskList = async (queryParams, res) => {
           total_hours_worked, 
           status, 
           reopen_status, 
-          active_status 
+          active_status,
+          users.first_name AS created_by
         FROM sub_tasks
+        LEFT JOIN users ON sub_tasks.created_by = users.id
         WHERE task_id IN (?) 
           AND sub_tasks.deleted_at IS NULL
       `;
@@ -2142,6 +2146,8 @@ exports.getTaskList = async (queryParams, res) => {
         assignee_name: task.assignee_name,
         team_name: task.team_name,
         team_id: task.team_id,
+        created_by: task.created_by,
+
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
@@ -2164,6 +2170,7 @@ exports.getTaskList = async (queryParams, res) => {
               user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
+              created_by: subtask.created_by,
             });
           }
         });
