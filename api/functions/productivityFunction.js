@@ -41,26 +41,49 @@ exports.getTeamwiseProductivity = async (req, res) => {
     const offset = (page - 1) * perPage;
 
     if (from_date && to_date) {
-      if (!moment(from_date, 'YYYY-MM-DD', true).isValid() || !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
-        return errorResponse(res, "Invalid date format", "Dates must be in YYYY-MM-DD format", 400);
+      if (
+        !moment(from_date, "YYYY-MM-DD", true).isValid() ||
+        !moment(to_date, "YYYY-MM-DD", true).isValid()
+      ) {
+        return errorResponse(
+          res,
+          "Invalid date format",
+          "Dates must be in YYYY-MM-DD format",
+          400
+        );
       }
       if (moment(to_date).isBefore(moment(from_date))) {
-        return errorResponse(res, "Invalid date range", "End date must be greater than or equal to Start date", 400);
+        return errorResponse(
+          res,
+          "Invalid date range",
+          "End date must be greater than or equal to Start date",
+          400
+        );
       }
-    } else if (from_date && !moment(from_date, 'YYYY-MM-DD', true).isValid()) {
-      return errorResponse(res, "Invalid from_date format", "Start date must be in YYYY-MM-DD format", 400);
-    } else if (to_date && !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
-      return errorResponse(res, "Invalid to_date format", "End date must be in YYYY-MM-DD format", 400);
+    } else if (from_date && !moment(from_date, "YYYY-MM-DD", true).isValid()) {
+      return errorResponse(
+        res,
+        "Invalid from_date format",
+        "Start date must be in YYYY-MM-DD format",
+        400
+      );
+    } else if (to_date && !moment(to_date, "YYYY-MM-DD", true).isValid()) {
+      return errorResponse(
+        res,
+        "Invalid to_date format",
+        "End date must be in YYYY-MM-DD format",
+        400
+      );
     }
 
     const dateCondition =
       from_date && to_date
         ? `AND combined.updated_at BETWEEN ? AND ?`
         : from_date
-          ? `AND combined.updated_at >= ?`
-          : to_date
-            ? `AND combined.updated_at <= ?`
-            : "";
+        ? `AND combined.updated_at >= ?`
+        : to_date
+        ? `AND combined.updated_at <= ?`
+        : "";
     // Task query
     const taskQuery = `
       SELECT 
@@ -74,7 +97,6 @@ exports.getTeamwiseProductivity = async (req, res) => {
           tasks t
       WHERE 
           t.deleted_at IS NULL
-           AND t.estimated_hours != '00:00:00'
           AND NOT EXISTS (
               SELECT 1 FROM sub_tasks st 
               WHERE st.task_id = t.id 
@@ -84,18 +106,20 @@ exports.getTeamwiseProductivity = async (req, res) => {
 
     // Subtask query
     const subtaskQuery = `
-      SELECT 
-          st.user_id,
-          st.team_id,
-          TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
-          TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
-          TIME_TO_SEC(st.extended_hours) AS extended_seconds,
-          st.updated_at
-      FROM 
-          sub_tasks st
-      WHERE 
-          st.deleted_at IS NULL
-            AND st.estimated_hours != '00:00:00'
+        SELECT 
+            st.user_id,
+            st.team_id,
+            TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
+            TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
+            CASE 
+              WHEN TIME_TO_SEC(st.estimated_hours) > 0 THEN TIME_TO_SEC(st.extended_hours)
+              ELSE 0
+            END AS extended_seconds,
+            st.updated_at
+        FROM 
+            sub_tasks st
+        WHERE 
+            st.deleted_at IS NULL
     `;
 
     // Main query
@@ -119,9 +143,11 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ${team_id ? `AND combined.team_id = ?` : ""}
       ${dateCondition}
       ${employee_id ? `AND u.employee_id = ?` : ""}
-      ${search
-        ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
-        : ""}
+      ${
+        search
+          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+          : ""
+      }
     `;
 
     const queryParams = [];
@@ -162,9 +188,11 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ${team_id ? `AND combined.team_id = ?` : ""}
       ${dateCondition}
       ${employee_id ? `AND u.employee_id = ?` : ""}
-      ${search
-        ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
-        : ""}
+      ${
+        search
+          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+          : ""
+      }
     `;
 
     const countParams = [];
@@ -195,9 +223,15 @@ exports.getTeamwiseProductivity = async (req, res) => {
       employee_name: item.employee_name,
       employee_id: item.employee_id,
       team_id: item.team_id || null,
-      total_estimated_hours: convertSecondsToReadableTime(item.total_estimated_seconds),
-      total_worked_hours: convertSecondsToReadableTime(item.total_worked_seconds),
-      total_extended_hours: convertSecondsToReadableTime(item.total_extended_seconds),
+      total_estimated_hours: convertSecondsToReadableTime(
+        item.total_estimated_seconds
+      ),
+      total_worked_hours: convertSecondsToReadableTime(
+        item.total_worked_seconds
+      ),
+      total_extended_hours: convertSecondsToReadableTime(
+        item.total_extended_seconds
+      ),
     }));
 
     const pagination = getPagination(page, perPage, totalUsers);
@@ -221,7 +255,6 @@ exports.getTeamwiseProductivity = async (req, res) => {
   }
 };
 
-
 exports.get_individualStatus = async (req, res) => {
   try {
     const {
@@ -235,16 +268,39 @@ exports.get_individualStatus = async (req, res) => {
     const offset = (page - 1) * perPage;
 
     if (from_date && to_date) {
-      if (!moment(from_date, 'YYYY-MM-DD', true).isValid() || !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
-        return errorResponse(res, "Invalid date format", "Dates must be in YYYY-MM-DD format", 400);
+      if (
+        !moment(from_date, "YYYY-MM-DD", true).isValid() ||
+        !moment(to_date, "YYYY-MM-DD", true).isValid()
+      ) {
+        return errorResponse(
+          res,
+          "Invalid date format",
+          "Dates must be in YYYY-MM-DD format",
+          400
+        );
       }
       if (moment(to_date).isBefore(moment(from_date))) {
-        return errorResponse(res, "Invalid date range", "End date must be greater than or equal to Start date", 400);
+        return errorResponse(
+          res,
+          "Invalid date range",
+          "End date must be greater than or equal to Start date",
+          400
+        );
       }
-    } else if (from_date && !moment(from_date, 'YYYY-MM-DD', true).isValid()) {
-      return errorResponse(res, "Invalid from_date format", "Start date must be in YYYY-MM-DD format", 400);
-    } else if (to_date && !moment(to_date, 'YYYY-MM-DD', true).isValid()) {
-      return errorResponse(res, "Invalid to_date format", "End date must be in YYYY-MM-DD format", 400);
+    } else if (from_date && !moment(from_date, "YYYY-MM-DD", true).isValid()) {
+      return errorResponse(
+        res,
+        "Invalid from_date format",
+        "Start date must be in YYYY-MM-DD format",
+        400
+      );
+    } else if (to_date && !moment(to_date, "YYYY-MM-DD", true).isValid()) {
+      return errorResponse(
+        res,
+        "Invalid to_date format",
+        "End date must be in YYYY-MM-DD format",
+        400
+      );
     }
 
     let baseQuery = `
@@ -279,7 +335,7 @@ exports.get_individualStatus = async (req, res) => {
     if (from_date && to_date) {
       const fromDateTime = `${from_date} 00:00:00`;
       const toDateTime = `${to_date} 23:59:59`;
-      whereConditions.push('tasks.created_at BETWEEN ? AND ?');
+      whereConditions.push("tasks.created_at BETWEEN ? AND ?");
       queryParams.push(fromDateTime, toDateTime);
     } else if (from_date) {
       const fromDateTime = `${from_date} 00:00:00`;
@@ -289,7 +345,6 @@ exports.get_individualStatus = async (req, res) => {
       const toDateTime = `${to_date} 23:59:59`;
       whereConditions.push(`tasks.created_at <= ?`);
       queryParams.push(toDateTime);
-
     }
 
     if (search) {
