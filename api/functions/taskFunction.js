@@ -2821,9 +2821,11 @@ exports.deleteTaskList = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       const searchQuery = `(t.name LIKE ? OR  CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR pr.name LIKE ? OR tm.name LIKE ? OR p.name LIKE ? OR t.priority LIKE ?)`;
+      const subtask_priority = `st.priority LIKE ?`;
 
       taskConditions.push(searchQuery);
       subtaskConditions.push(searchQuery);
+      subtaskConditions.push(subtask_priority);
 
       taskValues.push(
         searchTerm,
@@ -2831,7 +2833,7 @@ exports.deleteTaskList = async (req, res) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        searchTerm
+        searchTerm,
       );
       subtaskValues.push(
         searchTerm,
@@ -2839,7 +2841,8 @@ exports.deleteTaskList = async (req, res) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        searchTerm
+        searchTerm,
+        searchTerm,
       );
     }
 
