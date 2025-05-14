@@ -587,13 +587,23 @@ exports.getTask = async (queryParams, res) => {
 
     let subtaskParams = [id];
 
-    if (userDetails.role_id === 3) {
-      subtaskQuery += ` AND st.team_id = ?`;
-      subtaskParams.push(userDetails.team_id);
-    } else if (userDetails.role_id === 4) {
-      subtaskQuery += ` AND (st.user_id = ?)`;
-      subtaskParams.push(user_id);
-    }
+if (userDetails.role_id === 3) {
+  subtaskQuery += ` AND (st.team_id = ? OR st.user_id IS NULL)`;
+  subtaskParams.push(userDetails.team_id);
+} else if (userDetails.role_id === 4) {
+    subtaskQuery += ` AND (st.user_id = ?)`;
+    subtaskParams.push(user_id);
+//  subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
+//   subtaskParams.push(user_id, user_id, id);
+}
+
+    // if (userDetails.role_id === 3) {
+    //   subtaskQuery += ` AND st.team_id = ?`;
+    //   subtaskParams.push(userDetails.team_id);
+    // } else if (userDetails.role_id === 4) {
+    //   subtaskQuery += ` AND (st.user_id = ?)`;
+    //   subtaskParams.push(user_id);
+    // }
 
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
