@@ -274,42 +274,42 @@ exports.projectStatus = async (req, res) => {
     const taskValues = [];
     const subtaskConditions = [];
     const subtaskValues = [];
-    
+
     if (users.role_id === 3) {
       taskConditions.push("tm.reporting_user_id = ?");
       taskValues.push(users.id);
       subtaskConditions.push("tm.reporting_user_id = ?");
       subtaskValues.push(users.id);
     }
-    
+
     if (product_id) {
       taskConditions.push("t.product_id = ?");
       taskValues.push(product_id);
       subtaskConditions.push("st.product_id = ?");
       subtaskValues.push(product_id);
     }
-    
+
     if (project_id) {
       taskConditions.push("t.project_id = ?");
       taskValues.push(project_id);
       subtaskConditions.push("st.project_id = ?");
       subtaskValues.push(project_id);
     }
-    
+
     if (employee_id) {
       taskConditions.push("t.user_id = ?");
       taskValues.push(employee_id);
       subtaskConditions.push("st.user_id = ?");
       subtaskValues.push(employee_id);
     }
-    
+
     if (date) {
       taskConditions.push("DATE(t.created_at) = ?");
       taskValues.push(date);
       subtaskConditions.push("DATE(st.created_at) = ?");
       subtaskValues.push(date);
     }
-    
+
     if (status === "0") {
       taskConditions.push("t.status = 0");
       taskConditions.push("t.active_status = 0");
@@ -361,80 +361,82 @@ exports.projectStatus = async (req, res) => {
       subtaskConditions.length > 0
         ? `AND ${subtaskConditions.join(" AND ")}`
         : "";
-    
+
     // Updated tasks query to get the latest end_time
     const tasksQuery = `
-      SELECT
-        t.id AS task_id,
-        t.name AS task_name,
-        t.estimated_hours AS estimated_time,
-        t.total_hours_worked AS task_duration,
-        DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS start_time,
-        DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS end_time,
-        t.rating AS rating,
-        p.id AS product_id,
-        p.name AS product_name,
-        pr.id AS project_id,
-        pr.name AS project_name,
-        tm.id AS team_id,
-        tm.name AS team_name,
-        u.id AS user_id,
-        t.status AS task_status,
-        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-        DATE(t.created_at) AS date,
-        t.updated_at AS updated_at
-      FROM tasks t
-      LEFT JOIN users u ON u.id = t.user_id
-      LEFT JOIN products p ON p.id = t.product_id
-      LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id
-      LEFT JOIN projects pr ON pr.id = t.project_id
-      LEFT JOIN teams tm ON tm.id = t.team_id
-      WHERE t.deleted_at IS NULL
-      AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
-      ${taskWhereClause}
-      GROUP BY t.id
-      ORDER BY t.created_at DESC
+    SELECT
+  t.id AS task_id,
+  t.name AS task_name,
+  t.estimated_hours AS estimated_time,
+  t.total_hours_worked AS task_duration,
+  MIN(DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS start_time,
+  MAX(DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS end_time,
+  t.rating AS rating,
+  p.id AS product_id,
+  p.name AS product_name,
+  pr.id AS project_id,
+  pr.name AS project_name,
+  tm.id AS team_id,
+  tm.name AS team_name,
+  u.id AS user_id,
+  t.status AS task_status,
+  COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+  DATE(t.created_at) AS date,
+  t.updated_at AS updated_at
+FROM tasks t
+LEFT JOIN users u ON u.id = t.user_id
+LEFT JOIN products p ON p.id = t.product_id
+LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id
+LEFT JOIN projects pr ON pr.id = t.project_id
+LEFT JOIN teams tm ON tm.id = t.team_id
+WHERE t.deleted_at IS NULL
+AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
+${taskWhereClause}
+GROUP BY t.id
+ORDER BY t.created_at DESC
+
     `;
 
     // Updated subtasks query to get the latest end_time
     const subtasksQuery = `
-      SELECT
-        p.name AS product_name,
-        pr.name AS project_name,
-        t.name AS task_name,
-        st.name AS subtask_name,
-        DATE(st.created_at) AS date,
-        st.total_hours_worked AS subtask_duration,
-        DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS start_time,
-        DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r') AS end_time,
-        st.estimated_hours AS estimated_time,
-        st.total_hours_worked AS time_taken,
-        st.rating AS subtask_rating,
-        tm.id AS team_id,
-        tm.name AS team_name,
-        t.id AS task_id,
-        st.id AS subtask_id,
-        u.id AS user_id,
-        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-        st.status AS subtask_status,
-        st.updated_at AS updated_at
-      FROM sub_tasks st
-      LEFT JOIN tasks t ON t.id = st.task_id
-      LEFT JOIN users u ON u.id = st.user_id
-      LEFT JOIN products p ON p.id = t.product_id
-      LEFT JOIN projects pr ON pr.id = t.project_id
-      LEFT JOIN sub_tasks_user_timeline stut ON stut.subtask_id = st.id
-      LEFT JOIN teams tm ON tm.id = st.team_id
-      WHERE st.deleted_at IS NULL
-      ${subtaskWhereClause}
-      GROUP BY st.id
-      ORDER BY st.updated_at DESC
+    SELECT
+  p.name AS product_name,
+  pr.name AS project_name,
+  t.name AS task_name,
+  st.name AS subtask_name,
+  DATE(st.created_at) AS date,
+  st.total_hours_worked AS subtask_duration,
+  MIN(DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS start_time,
+  MAX(DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS end_time,
+  st.estimated_hours AS estimated_time,
+  st.total_hours_worked AS time_taken,
+  st.rating AS subtask_rating,
+  tm.id AS team_id,
+  tm.name AS team_name,
+  t.id AS task_id,
+  st.id AS subtask_id,
+  u.id AS user_id,
+  COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+  st.status AS subtask_status,
+  st.updated_at AS updated_at
+FROM sub_tasks st
+LEFT JOIN tasks t ON t.id = st.task_id
+LEFT JOIN users u ON u.id = st.user_id
+LEFT JOIN products p ON p.id = t.product_id
+LEFT JOIN projects pr ON pr.id = t.project_id
+LEFT JOIN sub_tasks_user_timeline stut ON stut.subtask_id = st.id
+LEFT JOIN teams tm ON tm.id = st.team_id
+WHERE st.deleted_at IS NULL
+${subtaskWhereClause}
+GROUP BY st.id
+ORDER BY st.updated_at DESC
+
     `;
-    
+
     // Fetch tasks and subtasks
     const [tasks] = await db.query(tasksQuery, taskValues);
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
-    
+
     const mapStatus = (statusCode) => {
       switch (statusCode) {
         case 0:
@@ -447,6 +449,29 @@ exports.projectStatus = async (req, res) => {
           return "Unknown";
       }
     };
+
+    const Tasks = tasks.map((task) => ({
+      type: "Task",
+      status: mapStatus(task.task_status),
+      date: task.date,
+      product_name: task.product_name,
+      project_name: task.project_name,
+      task_id: task.task_id,
+      task_name: task.task_name,
+      subtask_name: null,
+      user_id: task.user_id,
+      assignee: task.assignee,
+      estimated_time: task.estimated_time,
+      task_duration: task.task_duration,
+      rating: task.rating,
+      team_id: task.team_id,
+      team_name: task.team_name,
+      start_time: task.start_time ? task.start_time : "-", // first start time
+      end_time: task.end_time ? task.end_time : "-", // last end time
+      task_updated_at: task.updated_at
+        ? moment(task.updated_at).format("DD-MM-YYYY hh:mm:ss A")
+        : "-",
+    }));
 
     const Subtasks = subtasks.map((subtask) => ({
       type: "SubTask",
@@ -465,34 +490,11 @@ exports.projectStatus = async (req, res) => {
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time: subtask.start_time ? subtask.start_time : "-",
-      end_time: subtask.end_time ? subtask.end_time : "-",
+      start_time: subtask.start_time ? subtask.start_time : "-", // first start time
+      end_time: subtask.end_time ? subtask.end_time : "-", // last end time
       subtask_duration: subtask.subtask_duration,
       task_updated_at: subtask.updated_at
         ? moment(subtask.updated_at).format("DD-MM-YYYY hh:mm:ss A")
-        : "-",
-    }));
-
-    const Tasks = tasks.map((task) => ({
-      type: "Task",
-      status: mapStatus(task.task_status),
-      date: task.date,
-      product_name: task.product_name,
-      project_name: task.project_name,
-      task_id: task.task_id,
-      task_name: task.task_name,
-      subtask_name: null,
-      user_id: task.user_id,
-      assignee: task.assignee,
-      estimated_time: task.estimated_time,
-      task_duration: task.task_duration,
-      rating: task.rating,
-      team_id: task.team_id,
-      team_name: task.team_name,
-      start_time: task.start_time ? task.start_time : "-",
-      end_time: task.end_time ? task.end_time : "-",
-      task_updated_at: task.updated_at
-        ? moment(task.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
     }));
 
@@ -527,8 +529,6 @@ exports.projectStatus = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
-
 
 // exports.projectStatus_ToDo = async (req, res) => {
 //   try {
