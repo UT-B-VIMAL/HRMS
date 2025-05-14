@@ -247,21 +247,21 @@ exports.createTask = async (payload, res) => {
 
 //     // Base Task Query
 //     let taskQuery = `
-//       SELECT 
-//         t.*, 
-//         te.name AS team_name, 
-//         COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
-//         COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
-//         p.name AS product_name, 
+//       SELECT
+//         t.*,
+//         te.name AS team_name,
+//         COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name,
+//         COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name,
+//         p.name AS product_name,
 //         pj.name AS project_name,
 //         CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
 //         CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
-//       FROM tasks t 
-//       LEFT JOIN teams te ON t.team_id = te.id 
-//       LEFT JOIN users assignee ON t.user_id = assignee.id 
-//       LEFT JOIN users owner ON t.assigned_user_id = owner.id 
-//       LEFT JOIN products p ON t.product_id = p.id 
-//       LEFT JOIN projects pj ON t.project_id = pj.id 
+//       FROM tasks t
+//       LEFT JOIN teams te ON t.team_id = te.id
+//       LEFT JOIN users assignee ON t.user_id = assignee.id
+//       LEFT JOIN users owner ON t.assigned_user_id = owner.id
+//       LEFT JOIN products p ON t.product_id = p.id
+//       LEFT JOIN projects pj ON t.project_id = pj.id
 //       WHERE t.id = ?
 //       AND t.deleted_at IS NULL
 //     `;
@@ -280,11 +280,11 @@ exports.createTask = async (payload, res) => {
 //     }
 //     // Subtasks query
 //     let subtaskQuery = `
-//   SELECT 
-//     st.*, 
-//     COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown Assignee') AS assignee_name 
+//   SELECT
+//     st.*,
+//     COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown Assignee') AS assignee_name
 //   FROM sub_tasks st
-//   LEFT JOIN users u ON st.user_id = u.id 
+//   LEFT JOIN users u ON st.user_id = u.id
 //   WHERE st.task_id = ?
 //     AND st.status = ?
 //     AND st.reopen_status = ?
@@ -305,24 +305,24 @@ exports.createTask = async (payload, res) => {
 //     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
 //     const historiesQuery = `
-//       SELECT h.*, 
+//       SELECT h.*,
 //         COALESCE(
-//           CASE 
-//             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
+//           CASE
+//             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN
 //               UPPER(CONCAT(SUBSTRING(u.first_name, 1, 1), SUBSTRING(u.last_name, 1, 1)))
-//             WHEN u.first_name IS NOT NULL THEN 
+//             WHEN u.first_name IS NOT NULL THEN
 //               UPPER(SUBSTRING(u.first_name, 1, 2))
-//             ELSE 
+//             ELSE
 //               'UNKNOWN'
-//           END, 
+//           END,
 //           ' '
-//         ) AS short_name, 
-//         COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,  
+//         ) AS short_name,
+//         COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,
 //         s.description as status_description
 //       FROM task_histories h
 //       LEFT JOIN users u ON h.updated_by = u.id
 //       LEFT JOIN task_status_flags s ON h.status_flag = s.id
-//       WHERE h.task_id = ? 
+//       WHERE h.task_id = ?
 //       AND h.deleted_at IS NULL
 //       ORDER BY h.id DESC;
 //     `;
@@ -345,40 +345,39 @@ exports.createTask = async (payload, res) => {
 //       reopenStatus = Number(reopenStatus);
 //       activeStatus = Number(activeStatus);
 //     console.log("status", status, "reopenStatus", reopenStatus, "activeStatus", activeStatus);
-    
+
 //       // 1. New subtask, not started
 //       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
 //         return "To Do";
 //       }
-    
+
 //       // 2. On hold (created but not restarted)
 //       if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
 //         return "On Hold";
 //       }
-    
+
 //       // 3. Pending approval
 //       if (status === 2 && reopenStatus === 0) {
 //         return "Pending Approval";
 //       }
-    
+
 //       // 4. Reopened and not active yet
 //       if (reopenStatus === 1 && activeStatus === 0) {
 //         return "Reopen";
 //       }
-    
+
 //       // 5. In progress (active)
 //       if (status === 1 && activeStatus === 1) {
 //         return "InProgress";
 //       }
-    
+
 //       // 6. Done
 //       if (status === 3) {
 //         return "Done";
 //       }
-    
+
 //       return "";
 //     };
-    
 
 //     // Status mapping
 //     const statusMap = {
@@ -525,7 +524,6 @@ exports.createTask = async (payload, res) => {
 //   }
 // };
 
-
 // Get Task by ID
 
 exports.getTask = async (queryParams, res) => {
@@ -533,7 +531,12 @@ exports.getTask = async (queryParams, res) => {
     const { id, user_id } = queryParams;
 
     if (!user_id) {
-      return errorResponse(res, "User ID is required", "Missing user_id in query parameters", 400);
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Missing user_id in query parameters",
+        400
+      );
     }
 
     const userDetails = await getAuthUserDetails(user_id, res);
@@ -568,7 +571,29 @@ exports.getTask = async (queryParams, res) => {
     if (userDetails.role_id === 3) {
       taskQuery += ` AND t.team_id = ?`;
       taskParams.push(userDetails.team_id);
-    } 
+    } if (userDetails.role_id === 4) {
+  taskQuery += `
+    AND (
+      -- 1. Task has no subtasks
+      NOT EXISTS (
+        SELECT 1 FROM sub_tasks st_all
+        WHERE st_all.task_id = t.id
+        AND st_all.deleted_at IS NULL
+      )
+
+      -- 2. OR Task has at least one subtask assigned to the current user
+      OR EXISTS (
+        SELECT 1 FROM sub_tasks st_mine
+        WHERE st_mine.task_id = t.id
+        AND st_mine.user_id = ?
+        AND st_mine.deleted_at IS NULL
+      )
+    )
+  `;
+  taskParams.push(user_id);
+}
+
+
 
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
@@ -587,15 +612,15 @@ exports.getTask = async (queryParams, res) => {
 
     let subtaskParams = [id];
 
-if (userDetails.role_id === 3) {
-  subtaskQuery += ` AND (st.team_id = ? OR st.user_id IS NULL)`;
-  subtaskParams.push(userDetails.team_id);
-} else if (userDetails.role_id === 4) {
-    subtaskQuery += ` AND (st.user_id = ?)`;
-    subtaskParams.push(user_id);
-//  subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
-//   subtaskParams.push(user_id, user_id, id);
-}
+    if (userDetails.role_id === 3) {
+      subtaskQuery += ` AND (st.team_id = ? OR st.user_id IS NULL)`;
+      subtaskParams.push(userDetails.team_id);
+    } else if (userDetails.role_id === 4) {
+      subtaskQuery += ` AND (st.user_id = ?)`;
+      subtaskParams.push(user_id);
+  // subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
+  // subtaskParams.push(user_id, user_id, id);
+    }
 
     // if (userDetails.role_id === 3) {
     //   subtaskQuery += ` AND st.team_id = ?`;
@@ -653,11 +678,14 @@ if (userDetails.role_id === 3) {
 
     // Prepare task data
     const taskData = task.map((task) => {
-      const totalEstimatedHours = task.estimated_hours || "00:00:00";  // Ensure default format as "HH:MM:SS"
-      const timeTaken = task.total_hours_worked || "00:00:00";  // Ensure default format as "HH:MM:SS"
+      const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
+      const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
 
       // Calculate remaining hours and ensure consistent formatting
-      const remainingHours = calculateRemainingHours(totalEstimatedHours, timeTaken);
+      const remainingHours = calculateRemainingHours(
+        totalEstimatedHours,
+        timeTaken
+      );
 
       // Calculate percentage for hours
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
@@ -681,18 +709,26 @@ if (userDetails.role_id === 3) {
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
         estimated_hours: formatTimeDHMS(totalEstimatedHours),
-        estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
+        estimated_hours_percentage: calculatePercentage(
+          estimatedInSeconds,
+          estimatedInSeconds
+        ),
         time_taken: formatTimeDHMS(timeTaken),
-        time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
+        time_taken_percentage: calculatePercentage(
+          timeTakenInSeconds,
+          estimatedInSeconds
+        ),
         remaining_hours: formatTimeDHMS(remainingHours),
-        remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
+        remaining_hours_percentage: calculatePercentage(
+          remainingInSeconds,
+          estimatedInSeconds
+        ),
         start_date: task.start_date,
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
         status_text: statusMap[task.status] || "Unknown",
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
-      
       };
     });
 
@@ -700,19 +736,20 @@ if (userDetails.role_id === 3) {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-          subtask_id: subtask.id,
-          name: subtask.name || "",
-          status: subtask.status,
-          active_status: subtask.active_status,
-          assignee: subtask.user_id,
-          assigneename: subtask.assignee_name || "",
-          reopen_status: subtask.reopen_status,
-          short_name: (subtask.assignee_name || "").substr(0, 2),
-          status_text: statusMap[subtask.status] || "Unknown",
-        }))
+            subtask_id: subtask.id,
+            name: subtask.name || "",
+            status: subtask.status,
+            active_status: subtask.active_status,
+            assignee: subtask.user_id,
+            assigneename: subtask.assignee_name || "",
+            reopen_status: subtask.reopen_status,
+            short_name: (subtask.assignee_name || "").substr(0, 2),
+            status_text: statusMap[subtask.status] || "Unknown",
+          }))
         : [];
 
-        const historiesData = Array.isArray(histories) && histories[0].length > 0
+    const historiesData =
+      Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
             histories[0].map(async (history) => ({
               old_data: history.old_data,
@@ -720,26 +757,30 @@ if (userDetails.role_id === 3) {
               description: history.status_description || "Changed the status",
               updated_by: history.updated_by,
               shortName: history.short_name,
-              time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
-              time_utc: history.updated_at, 
-              time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(), 
+              time_date: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .format("YYYY-MM-DD HH:mm:ss"),
+              time_utc: history.updated_at,
+              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
             }))
           )
         : [];
-      
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-          comment_id: comment.id,
-          comments: comment.comments,
-          updated_by: comment.updated_by || "",
-          shortName: comment.updated_by.substr(0, 2),
-          time_date: moment.utc(comment.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'), 
-          time_utc: comment.updated_at, 
-          time: moment.utc(comment.updated_at).tz('Asia/Kolkata').fromNow(), 
-          
-        }))
+            comment_id: comment.id,
+            comments: comment.comments,
+            updated_by: comment.updated_by || "",
+            shortName: comment.updated_by.substr(0, 2),
+            time_date: moment
+              .utc(comment.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: comment.updated_at,
+            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+          }))
         : [];
 
     // Final response
@@ -1206,7 +1247,7 @@ exports.updateTask = async (id, payload, res) => {
     const updatedData = {
       ...existingTask,
       ...payload,
-      updated_at: new Date()
+      updated_at: new Date(),
     };
 
     // Update query
@@ -1262,7 +1303,7 @@ exports.updateTask = async (id, payload, res) => {
       updatedData.deleted_at,
       updatedData.created_at,
       updatedData.updated_at,
-      id
+      id,
     ];
 
     const [result] = await db.query(query, values);
@@ -1280,7 +1321,6 @@ exports.updateTask = async (id, payload, res) => {
     return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
-
 
 exports.updateTaskData = async (id, payload, res, req) => {
   const {
