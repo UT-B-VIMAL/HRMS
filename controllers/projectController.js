@@ -71,11 +71,14 @@ project_status: async (req, res) => {
   try {
     const { status } = req.query;
     console.log(status);
-    if (status == "0") {
-      await projectStatus_ToDo(req, res);
-    } else {
+  
       await projectStatus(req,res);
-    }
+  
+    // if (status == "0") {
+    //   await projectStatus_ToDo(req, res);
+    // } else {
+    //   await projectStatus(req,res);
+    // }
     
 } catch (error) {
     return errorResponse(res, error.message, 'Error retrieving idle employee', 500);
