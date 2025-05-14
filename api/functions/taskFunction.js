@@ -1985,6 +1985,7 @@ exports.getTaskList = async (queryParams, res) => {
       baseQuery += ` AND u.team_id = ?`;
       params.push(team_id);
     } else if (role_id === 3) {
+   
       const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
       const [rowteams] = await db.query(queryteam, [user_id]);
@@ -2089,7 +2090,23 @@ exports.getTaskList = async (queryParams, res) => {
 
     if (search) {
       const searchTerm = `%${search}%`;
-      baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ? AND sub_tasks.deleted_at IS NULL) OR projects.name LIKE ? OR products.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
+      baseQuery += `
+        AND (
+          tasks.name LIKE ?
+          OR EXISTS (
+            SELECT 1 
+            FROM sub_tasks
+            WHERE sub_tasks.task_id = tasks.id 
+              AND sub_tasks.name LIKE ? 
+              AND sub_tasks.deleted_at IS NULL
+          )
+          OR projects.name LIKE ?
+          OR products.name LIKE ?
+          OR u.first_name LIKE ?
+          OR u.last_name LIKE ?
+          OR teams.name LIKE ?
+          OR tasks.priority LIKE ?
+        )`;
       params.push(
         searchTerm,
         searchTerm,
@@ -2102,6 +2119,7 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
+
     baseQuery += ` ORDER BY tasks.updated_at DESC`;
 
     // Execute the base query for tasks
@@ -2113,17 +2131,20 @@ exports.getTaskList = async (queryParams, res) => {
       let query = `
         SELECT 
           sub_tasks.id AS subtask_id, 
-          name AS subtask_name, 
+          sub_tasks.name AS subtask_name,
+          sub_tasks.user_id As assignee_id, 
+          tasks.user_id AS task_user_id,
           task_id,
-          user_id,
-          estimated_hours, 
-          total_hours_worked, 
-          status, 
-          reopen_status, 
-          active_status,
+          sub_tasks.user_id AS subtask_user_id,
+          sub_tasks.estimated_hours AS estimated_hours, 
+          sub_tasks.total_hours_worked AS total_hours_worked, 
+          sub_tasks.status AS status, 
+          sub_tasks.reopen_status AS reopen_status, 
+          sub_tasks.active_status AS active_status,
           users.first_name AS created_by
         FROM sub_tasks
         LEFT JOIN users ON sub_tasks.created_by = users.id
+        LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
         WHERE task_id IN (?) 
           AND sub_tasks.deleted_at IS NULL
       `;
@@ -2131,8 +2152,8 @@ exports.getTaskList = async (queryParams, res) => {
       // Add user_id filter only if role_id is 4
       const queryParams = [taskIds];
       if (role_id === 4) {
-        query += " AND user_id = ?";
-        queryParams.push(user_id);
+        query += " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
+        queryParams.push(user_id, user_id);
       }
 
       [allSubtasks] = await db.query(query, queryParams);
@@ -2211,6 +2232,7 @@ exports.getTaskList = async (queryParams, res) => {
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
               created_by: subtask.created_by,
+              assignee_id: subtask.assignee_id
             });
           }
         });
