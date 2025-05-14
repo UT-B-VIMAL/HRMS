@@ -3,18 +3,19 @@ const db = require("../../config/db");
 const {
   successResponse,
   errorResponse,
-  getPagination,
+  getPagination
 } = require("../../helpers/responseHelper");
 const { projectSchema } = require("../../validators/projectValidator");
 const { getAuthUserDetails } = require("./commonFunction");
-const { userSockets } = require("../../helpers/notificationHelper");
+const { userSockets } = require('../../helpers/notificationHelper');
+
 
 // Create Project
 exports.createProject = async (payload, res) => {
-  const { name, product, user_id } = payload;
+    const { name, product,user_id } = payload;
 
   const { error } = projectSchema.validate(
-    { name, product, user_id },
+    { name, product,user_id },
     { abortEarly: false }
   );
   if (error) {
@@ -27,8 +28,7 @@ exports.createProject = async (payload, res) => {
   try {
     const user = await getAuthUserDetails(user_id, res);
     if (!user) return;
-    const checkQuery =
-      "SELECT COUNT(*) as count FROM projects WHERE name = ? AND deleted_at IS NULL";
+    const checkQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [name]);
 
     if (checkResult[0].count > 0) {
@@ -43,11 +43,10 @@ exports.createProject = async (payload, res) => {
       "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
-      return errorResponse(res, "Product Not Found", "Product Not Found", 404);
-    }
-
-    const query =
-      "INSERT INTO projects (name, product_id, created_by, updated_by) VALUES (?, ?, ?, ?)";
+        return errorResponse(res, "Product Not Found", "Product Not Found", 404);
+      }
+  
+    const query = "INSERT INTO projects (name, product_id, created_by, updated_by) VALUES (?, ?, ?, ?)";
     const values = [name, product, user_id, user_id];
     const [result] = await db.query(query, values);
 
@@ -65,10 +64,10 @@ exports.createProject = async (payload, res) => {
 
 // Update Project
 exports.updateProject = async (id, payload, res) => {
-  const { name, product, user_id } = payload;
+    const { name, product,user_id } =payload;
 
   const { error } = projectSchema.validate(
-    { name, product, user_id },
+    { name, product ,user_id},
     { abortEarly: false }
   );
   if (error) {
@@ -98,21 +97,14 @@ exports.updateProject = async (id, payload, res) => {
       "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
     if (checkProductResults[0].count == 0) {
-      return errorResponse(res, "Product Not Found", "Product Not Found", 404);
-    }
-    const checkProjectQuery =
-      "SELECT COUNT(*) as count FROM projects WHERE name = ? AND id != ? AND deleted_at IS NULL";
+        return errorResponse(res, "Product Not Found", "Product Not Found", 404);
+      }
+    const checkProjectQuery = "SELECT COUNT(*) as count FROM projects WHERE name = ? AND id != ? AND deleted_at IS NULL";
     const [checkProject] = await db.query(checkProjectQuery, [name, id]);
     if (checkProject[0].count > 0) {
-      return errorResponse(
-        res,
-        "Project with this name already exists",
-        "Duplicate Project Error",
-        400
-      );
+      return errorResponse(res, "Project with this name already exists", "Duplicate Project Error", 400);
     }
-    const query =
-      "UPDATE projects SET name = ?, product_id = ?, updated_by = ? WHERE id = ?";
+    const query = "UPDATE projects SET name = ?, product_id = ?, updated_by = ? WHERE id = ?";
     const values = [name, product, user_id, id];
     await db.query(query, values);
 
@@ -253,6 +245,9 @@ exports.getAllProjects = async (queryParams, res) => {
   }
 };
 
+
+
+
 exports.projectStatus_ToDo = async (req, res) => {
   try {
     const {
@@ -303,21 +298,21 @@ exports.projectStatus_ToDo = async (req, res) => {
       subtaskConditions.push("DATE(st.created_at) = ?");
       subtaskValues.push(date);
     }
-    if (status === "0") {
+    if (status === '0') {
       taskConditions.push("t.status = 0");
       taskConditions.push("t.active_status = 0");
       taskConditions.push("t.reopen_status = 0");
       subtaskConditions.push("st.status = 0");
       subtaskConditions.push("st.active_status = 0");
       subtaskConditions.push("st.reopen_status = 0");
-    } else if (status === "1") {
+    } else if (status === '1') {
       taskConditions.push("t.status = 1");
       taskConditions.push("t.active_status = 1");
       taskConditions.push("t.reopen_status = 0");
       subtaskConditions.push("st.status = 1");
       subtaskConditions.push("st.active_status = 1");
       subtaskConditions.push("st.reopen_status = 0");
-    } else if (status === "3") {
+    } else if (status === '3') {
       taskConditions.push("t.status = 3");
       subtaskConditions.push("st.status = 3");
     }
@@ -326,31 +321,14 @@ exports.projectStatus_ToDo = async (req, res) => {
       taskConditions.push(
         `(t.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR t.created_at LIKE ?)`
       );
-      taskValues.push(
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm
-      );
+      taskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm,);
       subtaskConditions.push(
         `(t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR st.created_at LIKE ?)`
       );
-      subtaskValues.push(
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm
-      );
+      subtaskValues.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
-    const taskWhereClause =
-      taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
-    const subtaskWhereClause =
-      subtaskConditions.length > 0
-        ? `AND ${subtaskConditions.join(" AND ")}`
-        : "";
+    const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
+    const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
     const tasksQuery = `
       SELECT
         t.id AS task_id,
@@ -427,11 +405,10 @@ exports.projectStatus_ToDo = async (req, res) => {
     const [tasks] = await db.query(tasksQuery, taskValues);
     // Then fetch subtasks
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
-    const mapStatus = (status, reopenStatus = 0, activeStatus = 0) => {
+   const mapStatus = (status, reopenStatus = 0, activeStatus = 0) => {
       if (status === 3) return "Done";
       if (status === 1 && activeStatus === 1) return "In Progress";
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0)
-        return "To Do";
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) return "To Do";
       return "Unknown";
     };
     const formatDuration = (start, end) => {
@@ -461,12 +438,8 @@ exports.projectStatus_ToDo = async (req, res) => {
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time: subtask.start_time
-        ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A")
-        : "-",
-      end_time: subtask.end_time
-        ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A")
-        : "-",
+      start_time: subtask.start_time ? moment(subtask.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      end_time: subtask.end_time ? moment(subtask.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
       subtask_duration: formatDuration(subtask.start_time, subtask.end_time),
     }));
     const Tasks = tasks.map((task) => ({
@@ -484,40 +457,32 @@ exports.projectStatus_ToDo = async (req, res) => {
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-      start_time: task.start_time
-        ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A")
-        : "-",
-      end_time: task.end_time
-        ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A")
-        : "-",
+      start_time: task.start_time ? moment(task.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      end_time: task.end_time ? moment(task.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
       task_duration: formatDuration(task.start_time, task.end_time),
     }));
     const groupedTasks = [...Subtasks, ...Tasks];
     const totalRecords = groupedTasks.length;
-    const paginatedData = groupedTasks.slice(
-      offset,
-      offset + parseInt(perPage)
-    );
+    const paginatedData = groupedTasks.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
     const data = paginatedData.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
     }));
     // Now wrap the tasks and pagination inside 'data'
-    successResponse(
-      res,
-      data,
-      data.length === 0
-        ? "No data found"
-        : "Tasks and subtasks retrieved successfully",
-      200,
-      pagination
+      successResponse(
+        res,
+        data,
+        data.length === 0 ? 'No data found' : 'Tasks and subtasks retrieved successfully',
+        200,
+        pagination
     );
   } catch (error) {
     console.error("Error fetching tasks and subtasks:", error);
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
 
 exports.projectStatus = async (req, res) => {
   try {
@@ -562,9 +527,7 @@ exports.projectStatus = async (req, res) => {
     }
     if (search) {
       const searchTerm = `%${search}%`;
-      conditions.push(
-        `(t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ?)`
-      );
+      conditions.push(`(t.name LIKE ? OR st.name LIKE ? OR p.name LIKE ? OR pr.name LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ?)`);
       values.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
@@ -675,58 +638,46 @@ exports.projectStatus = async (req, res) => {
           (stut.subtask_id IS NOT NULL AND st.status = 3 AND stut.end_time IS NOT NULL)
         )`);
       }
-      const whereClause =
-        conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
+      const whereClause = conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
 
       query = `
-       SELECT * FROM (
-  SELECT 
-    COALESCE(st.id, t.id) AS id,
-    COALESCE(st.name, t.name) AS name,
-    COALESCE(st.estimated_hours, t.estimated_hours) AS estimated_time,
-    COALESCE(st.total_hours_worked, t.total_hours_worked) AS duration,
-    CONVERT_TZ(stut.start_time, '+00:00', 'Asia/Kolkata') AS start_time,
-    CONVERT_TZ(stut.end_time, '+00:00', 'Asia/Kolkata') AS end_time,
-    COALESCE(st.rating, t.rating) AS rating,
-    stut.subtask_id,
-    st.name AS subtask_name,
-    p.id AS product_id,
-    p.name AS product_name,
-    pr.id AS project_id,
-    pr.name AS project_name,
-    tm.id AS team_id,
-    tm.name AS team_name,
-    u.id AS user_id,
-    COALESCE(st.status, t.status) AS status,
-    COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-    DATE(stut.start_time) AS date,
-    t.id AS task_id,
-    t.name AS task_name,
-    CASE 
-      WHEN st.id IS NOT NULL THEN 'SubTask'
-      ELSE 'Task'
-    END AS type,
-    stut.updated_at
-  FROM sub_tasks_user_timeline stut
-  LEFT JOIN sub_tasks st ON st.id = stut.subtask_id AND st.deleted_at IS NULL
-  LEFT JOIN tasks t ON t.id = stut.task_id AND stut.subtask_id IS NULL AND t.deleted_at IS NULL
-  LEFT JOIN users u ON u.id = COALESCE(st.user_id, t.user_id)
-  LEFT JOIN products p ON p.id = COALESCE(st.product_id, t.product_id)
-  LEFT JOIN projects pr ON pr.id = COALESCE(st.project_id, t.project_id)
-  LEFT JOIN teams tm ON tm.id = COALESCE(st.team_id, t.team_id)
-  WHERE stut.start_time IS NOT NULL
-    AND (
-      (stut.subtask_id IS NULL AND t.status = 3 AND stut.end_time IS NOT NULL)
-      OR
-      (stut.subtask_id IS NOT NULL AND st.status = 3 AND stut.end_time IS NOT NULL)
-    )
-    ${conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : ""}
-  ORDER BY stut.updated_at DESC
-) AS ranked_data
-GROUP BY user_id
-ORDER BY updated_at DESC
-LIMIT ?, ?
-
+        SELECT 
+          COALESCE(st.id, t.id) AS id,
+          COALESCE(st.name, t.name) AS name,
+          COALESCE(st.estimated_hours, t.estimated_hours) AS estimated_time,
+          COALESCE(st.total_hours_worked, t.total_hours_worked) AS duration,
+          CONVERT_TZ(stut.start_time, '+00:00', 'Asia/Kolkata') AS start_time,
+          CONVERT_TZ(stut.end_time, '+00:00', 'Asia/Kolkata') AS end_time,
+          COALESCE(st.rating, t.rating) AS rating,
+          stut.subtask_id,
+          st.name AS subtask_name,
+          p.id AS product_id,
+          p.name AS product_name,
+          pr.id AS project_id,
+          pr.name AS project_name,
+          tm.id AS team_id,
+          tm.name AS team_name,
+          u.id AS user_id,
+          COALESCE(st.status, t.status) AS status,
+          COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+          DATE(stut.start_time) AS date,
+          t.id AS task_id,
+          t.name AS task_name,
+          CASE 
+            WHEN st.id IS NOT NULL THEN 'SubTask'
+            ELSE 'Task'
+          END AS type
+        FROM sub_tasks_user_timeline stut
+        LEFT JOIN sub_tasks st ON st.id = stut.subtask_id AND st.deleted_at IS NULL
+        LEFT JOIN tasks t ON t.id = stut.task_id AND stut.subtask_id IS NULL AND t.deleted_at IS NULL
+        LEFT JOIN users u ON u.id = COALESCE(st.user_id, t.user_id)
+        LEFT JOIN products p ON p.id = COALESCE(st.product_id, t.product_id)
+        LEFT JOIN projects pr ON pr.id = COALESCE(st.project_id, t.project_id)
+        LEFT JOIN teams tm ON tm.id = COALESCE(st.team_id, t.team_id)
+        WHERE stut.start_time IS NOT NULL 
+        ${whereClause}
+        ORDER BY stut.updated_at DESC
+        LIMIT ?, ?
       `;
 
       countQuery = `
@@ -752,34 +703,23 @@ LIMIT ?, ?
     const formattedResults = results.map((row, index) => ({
       s_no: offset + index + 1,
       type: row.subtask_id ? "SubTask" : "Task",
-      status:
-        row.status === 0 ? "To Do" : row.status === 1 ? "In Progress" : "Done",
+      status: row.status === 0 ? "To Do" : row.status === 1 ? "In Progress" : "Done",
       date: row.date ? moment(row.date).format("YYYY-MM-DD") : "-",
       product_name: row.product_name,
       project_name: row.project_name,
       task_id: row.type === "Task" ? row.id : row.task_id || null,
       task_name: row.type === "Task" ? row.name : row.task_name || null,
       subtask_id: row.type === "SubTask" ? row.id : row.subtask_id || null,
-      subtask_name:
-        row.type === "SubTask" ? row.name : row.subtask_name || null,
+      subtask_name: row.type === "SubTask" ? row.name : row.subtask_name || null,
       user_id: row.user_id,
       assignee: row.assignee,
       estimated_time: row.estimated_time,
       rating: row.rating,
       team_id: row.team_id,
       team_name: row.team_name,
-      start_time: row.start_time
-        ? moment(row.start_time, "DD/MM/YYYY hh:mm:ss A").format("DD/MM/YYYY hh:mm:ss A")
-        : "-",
-      end_time: row.end_time
-        ? moment(row.end_time, "DD/MM/YYYY hh:mm:ss A").format("DD/MM/YYYY hh:mm:ss A")
-        : "-",
-      task_duration:
-        row.start_time && row.end_time
-          ? moment
-              .utc(moment(row.end_time).diff(moment(row.start_time)))
-              .format("HH:mm:ss")
-          : "-",
+      start_time: row.start_time ? moment(row.start_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      end_time: row.end_time ? moment(row.end_time, "HH:mm:ss").format("hh:mm:ss A") : "-",
+      task_duration: row.start_time && row.end_time ? moment.utc(moment(row.end_time).diff(moment(row.start_time))).format("HH:mm:ss") : "-",
     }));
 
     const pagination = getPagination(page, perPage, totalRecords);
@@ -787,9 +727,7 @@ LIMIT ?, ?
     successResponse(
       res,
       formattedResults,
-      formattedResults.length === 0
-        ? "No data found"
-        : "Data retrieved successfully",
+      formattedResults.length === 0 ? "No data found" : "Data retrieved successfully",
       200,
       pagination
     );
@@ -799,20 +737,17 @@ LIMIT ?, ?
   }
 };
 
+
+
+
+
+
 exports.projectRequest = async (req, res) => {
   try {
-    const {
-      project_id,
-      user_id,
-      employee_id,
-      date,
-      search,
-      page = 1,
-      perPage = 10,
-    } = req.query;
+    const { project_id, user_id, employee_id, date, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
 
-    let effectiveUserIds = [];
+    let effectiveUserIds = []; 
 
     if (user_id) {
       // Step 1: Get the role_id of the provided user_id
@@ -829,21 +764,20 @@ exports.projectRequest = async (req, res) => {
         // Get all team IDs where the user is the reporting user
         const teamQuery = `SELECT id FROM teams WHERE reporting_user_id = ?`;
         const [teamResults] = await db.query(teamQuery, [user_id]);
-
+    
         if (teamResults.length > 0) {
-          const teamIds = teamResults.map((team) => team.id); // Extract all team IDs
-
-          // Get all users belonging to these teams
-          const teamUsersQuery = `SELECT id FROM users WHERE team_id IN (${teamIds
-            .map(() => "?")
-            .join(",")})`;
-          const [teamUsers] = await db.query(teamUsersQuery, teamIds);
-
-          if (teamUsers.length > 0) {
-            effectiveUserIds = teamUsers.map((user) => user.id); // Extract all user IDs
-          }
+            const teamIds = teamResults.map(team => team.id); // Extract all team IDs
+    
+            // Get all users belonging to these teams
+            const teamUsersQuery = `SELECT id FROM users WHERE team_id IN (${teamIds.map(() => '?').join(',')})`;
+            const [teamUsers] = await db.query(teamUsersQuery, teamIds);
+    
+            if (teamUsers.length > 0) {
+                effectiveUserIds = teamUsers.map(user => user.id); // Extract all user IDs
+            }
         }
-      }
+    }
+    
     }
 
     if (!user_id || effectiveUserIds.length === 0) {
@@ -859,12 +793,8 @@ exports.projectRequest = async (req, res) => {
 
     // Apply user filter only if necessary
     if (effectiveUserIds.length > 0) {
-      taskConditions.push(
-        `t.user_id IN (${effectiveUserIds.map(() => "?").join(",")})`
-      );
-      subtaskConditions.push(
-        `st.user_id IN (${effectiveUserIds.map(() => "?").join(",")})`
-      );
+      taskConditions.push(`t.user_id IN (${effectiveUserIds.map(() => '?').join(',')})`);
+      subtaskConditions.push(`st.user_id IN (${effectiveUserIds.map(() => '?').join(',')})`);
       taskValues.push(...effectiveUserIds);
       subtaskValues.push(...effectiveUserIds);
     }
@@ -892,33 +822,18 @@ exports.projectRequest = async (req, res) => {
         u.first_name LIKE ? OR
         u.last_name LIKE ?
       )`;
-
-      taskConditions.push(
-        searchCondition.replace(/t\./g, "t.").replace(/u\./g, "u.")
-      );
-      subtaskConditions.push(
-        searchCondition.replace(/t\./g, "st.").replace(/u\./g, "u.")
-      );
-
-      const values = [
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-      ];
+    
+      taskConditions.push(searchCondition.replace(/t\./g, 't.').replace(/u\./g, 'u.'));
+      subtaskConditions.push(searchCondition.replace(/t\./g, 'st.').replace(/u\./g, 'u.'));
+    
+      const values = [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
       taskValues.push(...values);
       subtaskValues.push(...values);
     }
+    
 
-    const taskWhereClause =
-      taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
-    const subtaskWhereClause =
-      subtaskConditions.length > 0
-        ? `AND ${subtaskConditions.join(" AND ")}`
-        : "";
+    const taskWhereClause = taskConditions.length > 0 ? `AND ${taskConditions.join(" AND ")}` : "";
+    const subtaskWhereClause = subtaskConditions.length > 0 ? `AND ${subtaskConditions.join(" AND ")}` : "";
 
     // Fetch Subtasks
     const subtasksQuery = `
@@ -977,9 +892,7 @@ exports.projectRequest = async (req, res) => {
     // Fetch assignee names
     const processedData = await Promise.all(
       mergedResults.map(async (item) => {
-        const assigneeUserId = item.subtask_id
-          ? item.subtask_user_id
-          : item.task_user_id;
+        const assigneeUserId = item.subtask_id ? item.subtask_user_id : item.task_user_id;
         const assigneeNameQuery = `SELECT COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS assignee_name FROM users WHERE id = ?`;
         const [results] = await db.query(assigneeNameQuery, [assigneeUserId]);
         item.assignee_name = results[0] ? results[0].assignee_name : "Unknown";
@@ -990,10 +903,7 @@ exports.projectRequest = async (req, res) => {
 
     // Pagination
     const totalRecords = processedData.length;
-    const paginatedData = processedData.slice(
-      offset,
-      offset + parseInt(perPage)
-    );
+    const paginatedData = processedData.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
     // Add serial numbers
@@ -1005,9 +915,7 @@ exports.projectRequest = async (req, res) => {
     successResponse(
       res,
       data,
-      data.length === 0
-        ? "No tasks or subtasks found"
-        : "Tasks and subtasks retrieved successfully",
+      data.length === 0 ? "No tasks or subtasks found" : "Tasks and subtasks retrieved successfully",
       200,
       pagination
     );
@@ -1016,6 +924,10 @@ exports.projectRequest = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
+
+
 
 exports.getRequestupdate = async (req, res) => {
   try {
@@ -1100,6 +1012,8 @@ exports.getRequestupdate = async (req, res) => {
     return errorResponse(res, null, "Error fetching request update", 500);
   }
 };
+
+
 
 // exports.getRequestchange = async (id, payload, res, req) => {
 //   const { user_id, type, remark, rating, action } = payload;
@@ -1232,13 +1146,15 @@ exports.getRequestupdate = async (req, res) => {
 //   }
 // };
 
+
+
 exports.getRequestchange = async (id, payload, res, req) => {
   const { user_id, type, remark, rating, action } = payload;
 
   const requiredFields = [
-    { key: "type", message: "Type is required" },
-    { key: "action", message: "Action is required" },
-    { key: "user_id", message: "User ID is required" },
+    { key: 'type', message: 'Type is required' },
+    { key: 'action', message: 'Action is required' },
+    { key: 'user_id', message: 'User ID is required' },
   ];
 
   for (const field of requiredFields) {
@@ -1256,28 +1172,18 @@ exports.getRequestchange = async (id, payload, res, req) => {
     return errorResponse(res, null, "User Not Found", 400);
   }
 
-  const validType = ["task", "subtask"];
+  const validType = ['task', 'subtask'];
   if (!validType.includes(type)) {
-    return errorResponse(
-      res,
-      null,
-      "Invalid type. It should be either task or subtask.",
-      400
-    );
+    return errorResponse(res, null, 'Invalid type. It should be either task or subtask.', 400);
   }
 
-  const validActions = ["reopen", "close"];
+  const validActions = ['reopen', 'close'];
   if (!validActions.includes(action)) {
-    return errorResponse(
-      res,
-      null,
-      "Invalid action. It should be either reopen or close.",
-      400
-    );
+    return errorResponse(res, null, 'Invalid action. It should be either reopen or close.', 400);
   }
 
   try {
-    const table = type === "task" ? "tasks" : "sub_tasks";
+    const table = type === 'task' ? 'tasks' : 'sub_tasks';
 
     const [oldDataRows] = await db.query(
       `SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
@@ -1299,35 +1205,29 @@ exports.getRequestchange = async (id, payload, res, req) => {
     // Determine status values
     let statusToSet, reopenstatusToSet, notificationTitle, notificationBody;
 
-    if (action === "reopen") {
+    if (action === 'reopen') {
       statusToSet = 0;
       reopenstatusToSet = 1;
-      notificationTitle = "Task Reopened";
-      notificationBody =
-        "Your task has been reopened for further review. Please check the updates.";
-    } else if (action === "close") {
+      notificationTitle = 'Task Reopened';
+      notificationBody = 'Your task has been reopened for further review. Please check the updates.';
+    } else if (action === 'close') {
       statusToSet = 3;
       reopenstatusToSet = 0;
-      notificationTitle = "Task Approved";
-      notificationBody = "Your submitted task has been successfully approved.";
+      notificationTitle = 'Task Approved';
+      notificationBody = 'Your submitted task has been successfully approved.';
     }
 
-    const fieldsToUpdate = [
-      "status = ?",
-      "reopen_status = ?",
-      "updated_by = ?",
-      "updated_at = ?",
-    ];
-    const updatedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const fieldsToUpdate = ['status = ?', 'reopen_status = ?', 'updated_by = ?', 'updated_at = ?'];
+    const updatedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const values = [statusToSet, reopenstatusToSet, user_id, updatedAt];
 
     if (remark !== undefined) {
-      fieldsToUpdate.push("remark = ?");
+      fieldsToUpdate.push('remark = ?');
       values.push(remark);
     }
 
     if (rating !== undefined) {
-      fieldsToUpdate.push("rating = ?");
+      fieldsToUpdate.push('rating = ?');
       values.push(rating);
     }
 
@@ -1335,7 +1235,7 @@ exports.getRequestchange = async (id, payload, res, req) => {
 
     const updateQuery = `
       UPDATE ${table}
-      SET ${fieldsToUpdate.join(", ")}
+      SET ${fieldsToUpdate.join(', ')}
       WHERE id = ? AND deleted_at IS NULL
     `;
 
@@ -1352,10 +1252,8 @@ exports.getRequestchange = async (id, payload, res, req) => {
 
     // Prepare status labels
     const getStatusLabel = (status, reopenStatus, activeStatus) => {
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0)
-        return "To Do";
-      if (status === 1 && reopenStatus === 0 && activeStatus === 0)
-        return "On Hold";
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) return "To Do";
+      if (status === 1 && reopenStatus === 0 && activeStatus === 0) return "On Hold";
       if (status === 2 && reopenStatus === 0) return "Pending Approval";
       if (reopenStatus === 1 && activeStatus === 0) return "Reopen";
       if (status === 1 && activeStatus === 1) return "InProgress";
@@ -1363,16 +1261,8 @@ exports.getRequestchange = async (id, payload, res, req) => {
       return "";
     };
 
-    const oldStatusLabel = getStatusLabel(
-      oldData.status,
-      oldData.reopen_status,
-      oldData.active_status
-    );
-    const newStatusLabel = getStatusLabel(
-      statusToSet,
-      reopenstatusToSet,
-      oldData.active_status
-    );
+    const oldStatusLabel = getStatusLabel(oldData.status, oldData.reopen_status, oldData.active_status);
+    const newStatusLabel = getStatusLabel(statusToSet, reopenstatusToSet, oldData.active_status);
 
     // Insert into task history
     const historyQuery = `
@@ -1382,18 +1272,19 @@ exports.getRequestchange = async (id, payload, res, req) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
     `;
 
-    const taskId = type === "task" ? id : oldData.task_id;
-    const subtaskId = type === "subtask" ? id : null;
-
+    const taskId = type === 'task' ? id : oldData.task_id;
+    const subtaskId = type === 'subtask' ? id : null;
+    
     const historyValues = [
-      oldStatusLabel,
-      newStatusLabel,
-      taskId,
-      subtaskId,
-      "Change the status",
-      user_id,
-      1, // status_flag
+      oldStatusLabel,      
+      newStatusLabel,      
+      taskId,              
+      subtaskId,            
+      'Change the status',  
+      user_id,              
+      1                     // status_flag
     ];
+    
 
     await db.query(historyQuery, historyValues);
 
@@ -1405,16 +1296,13 @@ exports.getRequestchange = async (id, payload, res, req) => {
 
     const socketIds = userSockets[userId];
     if (Array.isArray(socketIds)) {
-      socketIds.forEach((socketId) => {
-        req.io
-          .of("/notifications")
-          .to(socketId)
-          .emit("push_notification", notificationPayload);
+      socketIds.forEach(socketId => {
+        req.io.of('/notifications').to(socketId).emit('push_notification', notificationPayload);
       });
     }
 
     await db.execute(
-      "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+      'INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
       [userId, notificationPayload.title, notificationPayload.body, 0]
     );
 
@@ -1425,7 +1313,9 @@ exports.getRequestchange = async (id, payload, res, req) => {
       200
     );
   } catch (error) {
-    console.error("Error:", error.message);
-    return errorResponse(res, error.message, "Server error", 500);
+    console.error('Error:', error.message);
+    return errorResponse(res, error.message, 'Server error', 500);
   }
 };
+
+
