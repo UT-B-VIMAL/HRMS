@@ -434,8 +434,8 @@ if (search) {
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time: subtask.start_time ? moment(subtask.start_time).format('YYYY-MM-DD HH:mm:ss') : '-',
-      end_time: subtask.end_time ? moment(subtask.end_time).format('YYYY-MM-DD HH:mm:ss') : '-',
+      start_time: subtask.start_time ? moment(subtask.start_time).format('DD-MM-YYYY HH:mm:ss') : '-',
+      end_time: subtask.end_time ? moment(subtask.end_time).format('DD-MM-YYYY HH:mm:ss') : '-',
 
       subtask_duration: subtask.subtask_duration,
     }));
@@ -455,8 +455,8 @@ if (search) {
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-  start_time: task.start_time ? moment(task.start_time).format('YYYY-MM-DD HH:mm:ss') : '-',
-  end_time: task.end_time ? moment(task.end_time).format('YYYY-MM-DD HH:mm:ss') : '-',
+      start_time: task.start_time ? moment(task.start_time).format('DD-MM-YYYY HH:mm:ss') : '-',
+      end_time: task.end_time ? moment(task.end_time).format('DD-MM-YYYY HH:mm:ss') : '-',
       task_duration: task.task_duration,
     }));
     const groupedTasks = [...Subtasks, ...Tasks];
