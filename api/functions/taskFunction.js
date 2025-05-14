@@ -2089,7 +2089,23 @@ exports.getTaskList = async (queryParams, res) => {
 
     if (search) {
       const searchTerm = `%${search}%`;
-      baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ? AND sub_tasks.deleted_at IS NULL) OR projects.name LIKE ? OR products.name LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
+      baseQuery += `
+        AND (
+          tasks.name LIKE ?
+          OR EXISTS (
+            SELECT 1 
+            FROM sub_tasks
+            WHERE sub_tasks.task_id = tasks.id 
+              AND sub_tasks.name LIKE ? 
+              AND sub_tasks.deleted_at IS NULL
+          )
+          OR projects.name LIKE ?
+          OR products.name LIKE ?
+          OR u.first_name LIKE ?
+          OR u.last_name LIKE ?
+          OR teams.name LIKE ?
+          OR tasks.priority LIKE ?
+        )`;
       params.push(
         searchTerm,
         searchTerm,
@@ -2101,6 +2117,7 @@ exports.getTaskList = async (queryParams, res) => {
         searchTerm
       );
     }
+
 
     baseQuery += ` ORDER BY tasks.updated_at DESC`;
 
