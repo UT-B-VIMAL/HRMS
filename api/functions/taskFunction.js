@@ -1460,14 +1460,34 @@ exports.updateTask = async (id, payload, res) => {
       }
 
       const totalHours = days * 8 + hours;
-      payload.estimated_hours = `${String(totalHours).padStart(
-        2,
-        "0"
-      )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-        2,
-        "0"
-      )}`;
+
+      // Validate against start_date and end_date if both present
+      if (payload.start_date && payload.end_date) {
+        const startDate = new Date(payload.start_date);
+        const endDate = new Date(payload.end_date);
+
+        if (endDate < startDate) {
+          return errorResponse(res, null, "end_date cannot be before start_date", 400);
+        }
+
+        const timeDiff = endDate.getTime() - startDate.getTime();
+        const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+        const maxHoursAllowed = daysDiff * 8;
+
+        if (totalHours > maxHoursAllowed) {
+          return errorResponse(
+            res,
+            null,
+            `estimated_hours (${totalHours}h) exceeds allowed working hours (${maxHoursAllowed}h) for the date range ${payload.start_date} to ${payload.end_date}`,
+            400
+          );
+        }
+      }
+
+      // Format estimated_hours as HH:MM:SS
+      payload.estimated_hours = `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
     }
+
 
     // Merge payload with existing task
     const updatedData = {
