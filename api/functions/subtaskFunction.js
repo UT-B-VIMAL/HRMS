@@ -52,16 +52,24 @@ exports.createSubTask = async (payload, res) => {
             product_id, project_id, task_id, name, assigned_user_id, created_by,updated_by ,deleted_at, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?,?,?, NULL, NOW(), NOW())
     `;
-    const values = [product_id, project_id, task_id, name,created_by, created_by, created_by];
+    const values = [
+      product_id,
+      project_id,
+      task_id,
+      name,
+      created_by,
+      created_by,
+      created_by,
+    ];
 
     const [result] = await db.query(insertQuery, values);
 
     // Return success response
     return successResponse(
-        res,
-        { id: result.insertId, task_id, name, created_by },
-        "SubTask added successfully",
-        201
+      res,
+      { id: result.insertId, task_id, name, created_by },
+      "SubTask added successfully",
+      201
     );
   } catch (error) {
     console.error("Error inserting subtask:", error.message);
@@ -330,7 +338,7 @@ exports.updateSubTask = async (id, payload, res) => {
         return errorResponse(
           res,
           null,
-          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          'Invalid estimated_hours. Use formats like "1d 2h 30m", "2h 15m", or "45m".',
           400
         );
       }
@@ -348,18 +356,23 @@ exports.updateSubTask = async (id, payload, res) => {
         minutes >= 60 ||
         seconds >= 60
       ) {
-        return errorResponse(
-          res,
-          null,
-          "Invalid time values in estimated_hours",
-          400
-        );
+        return errorResponse(res, null, "Invalid time values", 400);
       }
 
-      // Convert days to hours and calculate total hours
       const totalHours = days * 8 + hours;
 
-      // Format as "HH:MM:SS"
+      // Calculate max allowed hours between start and end date
+      if (payload.start_date && payload.end_date) {
+        const start = new Date(payload.start_date);
+        const end = new Date(payload.end_date);
+        const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const maxHoursAllowed = diffDays * 8;
+
+        if (totalHours > maxHoursAllowed) {
+          return errorResponse(res, null, "estimated_hours exceeds limit", 400);
+        }
+      }
+
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
         "0"
@@ -661,6 +674,45 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       )}`;
     }
 
+    if (start_date && due_date && estimate_date) {
+      const startTime = new Date(start_date);
+      const endTime = new Date(due_date);
+
+      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+        return errorResponse(
+          res,
+          null,
+          "Invalid date format for start_date or due_date",
+          400
+        );
+      }
+
+      if (startTime > endTime) {
+        return errorResponse(
+          res,
+          null,
+          "Start Date must be before or equal to Due Date",
+          400
+        );
+      }
+
+      const timeDifferenceInMs = endTime - startTime;
+      const timeDifferenceInHours = timeDifferenceInMs / (1000 * 60 * 60); // convert ms to hours
+
+      const estimateHours = estimate_date * 8;
+
+      if (estimateHours > timeDifferenceInHours) {
+        return errorResponse(
+          res,
+          null,
+          `Estimate exceeds available working hours (${timeDifferenceInHours.toFixed(
+            2
+          )} hrs). Please adjust the estimate or date range.`,
+          400
+        );
+      }
+    }
+
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
       status = Number(status);
       reopenStatus = Number(reopenStatus);
@@ -947,32 +999,41 @@ const convertTasktoSubtask = async (task_id) => {
       task.priority,
       task.created_by,
       task.updated_by,
-      task.created_at
+      task.created_at,
     ];
 
     const [insertResult] = await db.query(insertQuery, values);
     const newSubtaskId = insertResult.insertId;
 
     // Update sub_tasks_user_timeline
-    await db.query(`
+    await db.query(
+      `
       UPDATE sub_tasks_user_timeline
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
-    `, [newSubtaskId, task_id]);
+    `,
+      [newSubtaskId, task_id]
+    );
 
     // Update task_comments
-    await db.query(`
+    await db.query(
+      `
       UPDATE task_comments
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
-    `, [newSubtaskId, task_id]);
+    `,
+      [newSubtaskId, task_id]
+    );
 
     // Update task_histories
-    await db.query(`
+    await db.query(
+      `
       UPDATE task_histories
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
-    `, [newSubtaskId, task_id]);
+    `,
+      [newSubtaskId, task_id]
+    );
     return true;
     }
     
@@ -981,4 +1042,3 @@ const convertTasktoSubtask = async (task_id) => {
     return false;
   }
 };
-
