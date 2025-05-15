@@ -24,6 +24,201 @@ const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
+// exports.createTask = async (payload, res) => {
+//   const {
+//     product_id,
+//     project_id,
+//     user_id,
+//     name,
+//     estimated_hours,
+//     start_date,
+//     end_date,
+//     extended_status = "00:00:00",
+//     extended_hours = "00:00:00",
+//     active_status = 0,
+//     status = 0,
+//     total_hours_worked = "00:00:00",
+//     rating,
+//     command,
+//     assigned_user_id,
+//     remark,
+//     reopen_status = 0,
+//     description,
+//     team_id,
+//     priority,
+//     created_by,
+//     updated_by,
+//     deleted_at,
+//     created_at,
+//     updated_at,
+//   } = payload;
+
+//   try {
+//     const [product] = await db.query(
+//       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+//       [product_id]
+//     );
+//     if (product.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Product not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [project] = await db.query(
+//       "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
+//       [project_id]
+//     );
+//     if (project.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Project not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [assigned_user] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [assigned_user_id]
+//     );
+//     if (assigned_user.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Assigned User not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [user] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [user_id]
+//     );
+//     if (user.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "User not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [team] = await db.query(
+//       "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+//       [team_id]
+//     );
+//     if (team.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Team not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     if (estimated_hours) {
+//       const timeMatch = estimated_hours.match(
+//         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+//       );
+
+//       if (!timeMatch) {
+//         return errorResponse(
+//           res,
+//           null,
+//           'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+//           400
+//         );
+//       }
+
+//       const days = parseInt(timeMatch[2] || "0", 10);
+//       const hours = parseInt(timeMatch[4] || "0", 10);
+//       const minutes = parseInt(timeMatch[6] || "0", 10);
+//       const seconds = parseInt(timeMatch[8] || "0", 10);
+
+//       if (
+//         days < 0 ||
+//         hours < 0 ||
+//         minutes < 0 ||
+//         seconds < 0 ||
+//         minutes >= 60 ||
+//         seconds >= 60
+//       ) {
+//         return errorResponse(
+//           res,
+//           null,
+//           "Invalid time values in estimated_hours",
+//           400
+//         );
+//       }
+
+//       // Convert days to hours and calculate total hours
+//       const totalHours = days * 8 + hours;
+
+//       // Format as "HH:MM:SS"
+//       payload.estimated_hours = `${String(totalHours).padStart(
+//         2,
+//         "0"
+//       )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+//         2,
+//         "0"
+//       )}`;
+//     }
+
+//     const query = `
+//         INSERT INTO tasks (
+//           product_id, project_id, user_id, name, estimated_hours,
+//           start_date, end_date, extended_status, extended_hours,
+//           active_status, status, total_hours_worked, rating, command,
+//           assigned_user_id, remark, reopen_status, description,
+//           team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
+//         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(),NOW())
+//       `;
+
+//     const values = [
+//       product_id,
+//       project_id,
+//       user_id,
+//       name,
+//       payload.estimated_hours,
+//       start_date,
+//       end_date,
+//       extended_status,
+//       extended_hours,
+//       active_status,
+//       status,
+//       total_hours_worked,
+//       rating,
+//       command,
+//       assigned_user_id,
+//       remark,
+//       reopen_status,
+//       description,
+//       team_id,
+//       priority,
+//       created_by,
+//       updated_by,
+//       deleted_at,
+//       created_at,
+//       updated_at,
+//     ];
+
+//     const [result] = await db.query(query, values);
+
+//     return successResponse(
+//       res,
+//       { id: result.insertId, ...payload },
+//       "Task added successfully",
+//       201
+//     );
+//   } catch (error) {
+//     console.error("Error inserting task:", error.message);
+//     return errorResponse(res, error.message, "Error inserting task", 500);
+//   }
+// };
+
 exports.createTask = async (payload, res) => {
   const {
     product_id,
@@ -154,10 +349,11 @@ exports.createTask = async (payload, res) => {
         );
       }
 
-      // Convert days to hours and calculate total hours
-      const totalHours = days * 8 + hours;
+      // Convert everything to total estimated hours (assuming 1 day = 8 hours)
+      const totalEstimatedMinutes = (days * 8 + hours) * 60 + minutes;
 
-      // Format as "HH:MM:SS"
+      // Convert days + hours + minutes to HH:MM:SS format for DB
+      const totalHours = days * 8 + hours;
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
         "0"
@@ -165,17 +361,48 @@ exports.createTask = async (payload, res) => {
         2,
         "0"
       )}`;
+
+      // Date Validation
+      if (start_date && end_date) {
+        const start = moment(start_date, "YYYY-MM-DD");
+        const end = moment(end_date, "YYYY-MM-DD");
+
+        if (!start.isValid() || !end.isValid()) {
+          return errorResponse(
+            res,
+            null,
+            "Invalid start_date or end_date",
+            400
+          );
+        }
+
+        const dayDiff = end.diff(start, "days") + 1; // Inclusive
+        const availableMinutes = dayDiff * 8 * 60; // Each day = 8 hours = 480 mins
+
+        if (totalEstimatedMinutes > availableMinutes) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated time (${
+              payload.estimated_hours
+            }) exceeds the available duration between start and end dates (${dayDiff} day(s) x 8 hours = ${
+              availableMinutes / 60
+            } hrs). Please extend end_date.`,
+            400
+          );
+        }
+      }
     }
 
     const query = `
-        INSERT INTO tasks (
-          product_id, project_id, user_id, name, estimated_hours,
-          start_date, end_date, extended_status, extended_hours,
-          active_status, status, total_hours_worked, rating, command,
-          assigned_user_id, remark, reopen_status, description,
-          team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(),NOW())
-      `;
+      INSERT INTO tasks (
+        product_id, project_id, user_id, name, estimated_hours,
+        start_date, end_date, extended_status, extended_hours,
+        active_status, status, total_hours_worked, rating, command,
+        assigned_user_id, remark, reopen_status, description,
+        team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(), NOW())
+    `;
 
     const values = [
       product_id,
@@ -571,8 +798,9 @@ exports.getTask = async (queryParams, res) => {
     if (userDetails.role_id === 3) {
       taskQuery += ` AND t.team_id = ?`;
       taskParams.push(userDetails.team_id);
-    } if (userDetails.role_id === 4) {
-  taskQuery += `
+    }
+    if (userDetails.role_id === 4) {
+      taskQuery += `
     AND (
       -- 1. Task has no subtasks
       NOT EXISTS (
@@ -590,10 +818,8 @@ exports.getTask = async (queryParams, res) => {
       )
     )
   `;
-  taskParams.push(user_id);
-}
-
-
+      taskParams.push(user_id);
+    }
 
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
@@ -618,8 +844,8 @@ exports.getTask = async (queryParams, res) => {
     } else if (userDetails.role_id === 4) {
       subtaskQuery += ` AND (st.user_id = ?)`;
       subtaskParams.push(user_id);
-  // subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
-  // subtaskParams.push(user_id, user_id, id);
+      // subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
+      // subtaskParams.push(user_id, user_id, id);
     }
 
     // if (userDetails.role_id === 3) {
@@ -1234,14 +1460,34 @@ exports.updateTask = async (id, payload, res) => {
       }
 
       const totalHours = days * 8 + hours;
-      payload.estimated_hours = `${String(totalHours).padStart(
-        2,
-        "0"
-      )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-        2,
-        "0"
-      )}`;
+
+      // Validate against start_date and end_date if both present
+      if (payload.start_date && payload.end_date) {
+        const startDate = new Date(payload.start_date);
+        const endDate = new Date(payload.end_date);
+
+        if (endDate < startDate) {
+          return errorResponse(res, null, "end_date cannot be before start_date", 400);
+        }
+
+        const timeDiff = endDate.getTime() - startDate.getTime();
+        const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+        const maxHoursAllowed = daysDiff * 8;
+
+        if (totalHours > maxHoursAllowed) {
+          return errorResponse(
+            res,
+            null,
+            `estimated_hours (${totalHours}h) exceeds allowed working hours (${maxHoursAllowed}h) for the date range ${payload.start_date} to ${payload.end_date}`,
+            400
+          );
+        }
+      }
+
+      // Format estimated_hours as HH:MM:SS
+      payload.estimated_hours = `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
     }
+
 
     // Merge payload with existing task
     const updatedData = {
@@ -1988,7 +2234,6 @@ exports.getTaskList = async (queryParams, res) => {
       baseQuery += ` AND u.team_id = ?`;
       params.push(team_id);
     } else if (role_id === 3) {
-      
       const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
       const [rowteams] = await db.query(queryteam, [user_id]);
@@ -2187,7 +2432,8 @@ exports.getTaskList = async (queryParams, res) => {
   
       // Add user_id filter only if role_id is 4
       if (role_id === 4) {
-        query += " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
+        query +=
+          " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
         queryParams.push(user_id, user_id);
       }
 
@@ -2244,7 +2490,6 @@ exports.getTaskList = async (queryParams, res) => {
         team_id: task.team_id,
         assigned_by: task.assigned_user,
         created_by: task.created_by,
-
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
@@ -2536,10 +2781,10 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     };
   }
 
-  await db.query("UPDATE ?? SET status = 1, active_status = 1,reopen_status = 0 WHERE id = ?", [
-    type === "subtask" ? "sub_tasks" : "tasks",
-    id,
-  ]);
+  await db.query(
+    "UPDATE ?? SET status = 1, active_status = 1,reopen_status = 0 WHERE id = ?",
+    [type === "subtask" ? "sub_tasks" : "tasks", id]
+  );
   await db.query(
     "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
     [
@@ -2711,7 +2956,7 @@ exports.updateTaskTimeLine = async (req, res) => {
     );
     console.log("old_data", taskId, subtaskId, taskOrSubtask.user_id);
     if (action === "start") {
-      if(taskOrSubtask.user_id === null) {
+      if (taskOrSubtask.user_id === null) {
         return errorResponse(res, "Task is not assigned to any user", 400);
       }
       await this.startTask(taskOrSubtask, type, id, res);
@@ -2942,7 +3187,7 @@ exports.deleteTaskList = async (req, res) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        searchTerm,
+        searchTerm
       );
       subtaskValues.push(
         searchTerm,
@@ -2951,7 +3196,7 @@ exports.deleteTaskList = async (req, res) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        searchTerm,
+        searchTerm
       );
     }
 

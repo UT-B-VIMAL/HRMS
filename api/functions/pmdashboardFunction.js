@@ -404,6 +404,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
       product_id,
       project_id,
       team_id,
+      user_id,
       date,
       search,
     } = req.query;
@@ -414,6 +415,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
       return errorResponse(
         res,
         "Product ID is required",
+        "Missing product_id in query parameters",
+        400
+      );
+    }
+    if (!user_id) {
+      console.log("Missing user_id in query parameters");
+      return errorResponse(
+        res,
+        "user_id is required",
         "Missing product_id in query parameters",
         400
       );
@@ -449,6 +459,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         t.priority AS task_priority,
         t.estimated_hours AS task_estimation_hours,
         t.description AS task_description,
+        t.assigned_user_id AS task_assigned_user_id,
+        t.updated_at AS task_updated_at,
         s.id AS subtask_id,
         s.name AS subtask_name,
         s.status AS subtask_status,
@@ -456,6 +468,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         s.reopen_status AS subtask_reopen_status,
         s.estimated_hours AS subtask_estimation_hours,
         s.description AS subtask_description,
+        s.assigned_user_id AS subtask_assigned_user_id,
+        s.updated_at AS subtask_updated_at,
         te.name AS team_name,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
         p.name AS project_name
@@ -507,6 +521,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
       `;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
+
+    baseQuery += `
+      ORDER BY 
+        (t.assigned_user_id = ?) DESC,
+        t.updated_at DESC,
+        (s.assigned_user_id = ?) DESC,
+        s.updated_at DESC
+    `;
+    params.push(user_id, user_id);
 
     // Execute the query for tasks
     const [taskRows] = await db.query(baseQuery, params);
@@ -587,6 +610,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
             SubtaskDescription: subtask.description || "N/A",
             SubtaskActiveStatus: subtask.subtask_active_status || "N/A",
             SubtaskStatus: subtask.status || "N/A",
+            AssignedUserId: subtask.assigned_user_id || "N/A",
           });
         }
         totalSubtasks++;
@@ -618,6 +642,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         CompletedSubtaskCount: completedSubtasks,
         EstimationHours: task.estimation_hours || "N/A",
         Description: task.description || "N/A",
+        AssignedUserId: task.assigned_user_id || "N/A",
         Subtasks: validSubtasks,
         CompletionPercentage: completionPercentage,
         Status: status,
@@ -659,6 +684,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         team_name: row.team_name,
         employee_name: row.employee_name,
         project_name: row.project_name,
+        assigned_user_id: row.task_assigned_user_id,
       };
 
       // Create subtask if applicable
@@ -671,6 +697,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
             reopen_status: row.subtask_reopen_status,
             estimated_hours: row.subtask_estimation_hours,
             description: row.subtask_description,
+            assigned_user_id: row.subtask_assigned_user_id,
           }
         : null;
 
@@ -702,6 +729,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
             SubtaskDescription: subtask.description || "N/A",
             SubtaskActiveStatus: subtask.active_status || "N/A",
             SubtaskStatus: subtask.status || "N/A",
+            AssignedUserId: subtask.assigned_user_id || "N/A",
           });
 
           // Update the counts for subtasks
