@@ -8,32 +8,32 @@ exports.getAllData = async (payload, res) => {
     let queryParams = [];
 
     // try {
-    // Initialize queries based on type
-    if (type === "teams") {
-        query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
-    } else if (type === "users") {
-        query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
-    }
-    else if (type === "tl") {
-        query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
-    } else if (type === "products") {
-
-        const users = await this.getAuthUserDetails(user_id, res);
-        if (!users) return;
-        if (users.role_id === 3) {
-            const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-            const [rows] = await db.query(query1, [user_id]);
-            let teamIds = [];
-            if (rows.length > 0) {
-                teamIds = rows.map(row => row.id);
-            } else {
-                teamIds.push(users.team_id);
-            }
-            const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
-            const [userRows] = await db.query(userIdList, [teamIds]);
-            const userIds = userRows.map(row => row.id);
-            const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)";
-            const [taskRows] = await db.query(queryTasks, [userIds]);
+        // Initialize queries based on type
+        if (type === "teams") {
+            query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
+        } else if (type === "users") {
+            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
+        }
+        else if (type === "tl") {
+            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
+        } else if (type === "products") {
+            
+            const users = await this.getAuthUserDetails(user_id, res);
+            if (!users) return;
+            if (users.role_id === 3) {
+                const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+                const [rows] = await db.query(query1, [user_id]);
+                let teamIds = []; 
+                if(rows.length > 0){
+                    teamIds = rows.map(row => row.id);
+                }else{
+                   teamIds.push(users.team_id);
+                }
+                const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
+                const [userRows] = await db.query(userIdList, [teamIds]);
+                const userIds = userRows.map(row => row.id);
+                const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [taskRows] = await db.query(queryTasks, [userIds]);
 
             const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)";
             const [subtaskRows] = await db.query(querySubtasks, [userIds]);
