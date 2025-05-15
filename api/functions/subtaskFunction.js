@@ -669,82 +669,65 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       )}`;
     }
 
-    if (start_date && due_date && estimated_hours) {
-      const timeMatch = estimated_hours.match(
-        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
-      );
-
-      if (timeMatch) {
-        const days = parseInt(timeMatch[2] || "0", 10);
-        const hours = parseInt(timeMatch[4] || "0", 10);
-        const minutes = parseInt(timeMatch[6] || "0", 10);
-        const seconds = parseInt(timeMatch[8] || "0", 10);
-
-        const totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
-        const start = new Date(start_date);
-        const end = new Date(due_date);
-
-        const diffMs = end - start;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        if (totalHours > 8 && diffDays < 1) {
-          return errorResponse(
-            res,
-            null,
-            "End date must be at least one day after start date for estimated hours exceeding 8 hours",
-            400
-          );
-        }
-
-        if (totalHours <= 8 && diffDays < 0) {
-          return errorResponse(
-            res,
-            null,
-            "End date cannot be before start date",
-            400
-          );
-        }
-      }
-    }
-
     if (payload.due_date) {
       const startDateToCheck = payload.start_date || currentTask.start_date;
-      const estimatedHoursToCheck =
-        payload.estimated_hours || currentTask.estimated_hours;
+      const dueDateToCheck = payload.due_date || currentTask.due_date;
+      const estimatedHoursToCheck = (
+        payload.estimated_hours ||
+        currentTask.estimated_hours ||
+        ""
+      ).trim();
 
-      if (startDateToCheck && estimatedHoursToCheck) {
-        // parse estimated_hours in format HH:MM:SS
-        const [hoursStr, minutesStr, secondsStr] = estimatedHoursToCheck
-          .split(":")
-          .map((val) => parseInt(val, 10));
-        const totalHours =
-          (hoursStr || 0) + (minutesStr || 0) / 60 + (secondsStr || 0) / 3600;
+      if (startDateToCheck && dueDateToCheck && estimatedHoursToCheck) {
+        let totalHours = 0;
 
-        const start = new Date(startDateToCheck);
-        const end = new Date(payload.due_date);
+        const durationMatch = estimatedHoursToCheck.match(
+          /^((\d+)\s*d\s*)?((\d+)\s*h\s*)?((\d+)\s*m\s*)?((\d+)\s*s\s*)?$/i
+        );
 
-        const diffMs = end - start;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        if (durationMatch) {
+          const days = parseInt(durationMatch[2] || "0", 10);
+          const hours = parseInt(durationMatch[4] || "0", 10);
+          const minutes = parseInt(durationMatch[6] || "0", 10);
+          const seconds = parseInt(durationMatch[8] || "0", 10);
 
-        if (totalHours > 8 && diffDays < 1) {
-          return errorResponse(
-            res,
-            null,
-            "End date must be at least one day after start date for estimated hours exceeding 8 hours",
-            400
-          );
+          totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
+        } else {
+          const [h = "0", m = "0", s = "0"] = estimatedHoursToCheck.split(":");
+          totalHours =
+            parseInt(h, 10) + parseInt(m, 10) / 60 + parseInt(s, 10) / 3600;
         }
 
-        if (totalHours <= 8 && diffDays < 0) {
+        // Normalize both dates (remove time & timezone)
+        const start = new Date(startDateToCheck);
+        const end = new Date(dueDateToCheck);
+        const localStart = new Date(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate()
+        );
+        const localEnd = new Date(
+          end.getFullYear(),
+          end.getMonth(),
+          end.getDate()
+        );
+
+        const diffMs = localEnd - localStart;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1;
+
+        const requiredDays = Math.ceil(totalHours / 8);
+
+        if (diffDays < requiredDays) {
           return errorResponse(
             res,
             null,
-            "End date cannot be before start date",
+            `End date must be at least ${requiredDays} day(s) after start date for estimated hours of ${estimatedHoursToCheck}`,
             400
           );
         }
       }
     }
+
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
       status = Number(status);
       reopenStatus = Number(reopenStatus);
