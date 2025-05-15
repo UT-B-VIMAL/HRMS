@@ -2258,6 +2258,7 @@ exports.getTaskList = async (queryParams, res) => {
       team_id,
       priority,
       search,
+      member_id,
       dropdown_products,
       dropdown_projects,
     } = queryParams;
@@ -2299,6 +2300,7 @@ exports.getTaskList = async (queryParams, res) => {
         u.team_id,
         projects.name AS project_name,
         cu.first_name AS created_by,
+        asu.first_name AS assigned_user,
         products.name AS product_name,
         u.first_name AS assignee_name,
         teams.name AS team_name,
@@ -2308,6 +2310,7 @@ exports.getTaskList = async (queryParams, res) => {
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users u ON tasks.user_id = u.id
       LEFT JOIN users cu ON tasks.created_by = cu.id
+      LEFT JOIN users AS asu ON tasks.assigned_user_id = asu.id
       LEFT JOIN teams ON u.team_id = teams.id
       WHERE tasks.deleted_at IS NULL
     `;
@@ -2334,52 +2337,66 @@ exports.getTaskList = async (queryParams, res) => {
         );
       }
     }
+    
+    if (role_id === 4) {
+      baseQuery += ` AND (
+          -- 1. If the task is assigned to the user but has no subtasks, return it
+          (NOT EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND sub_tasks.deleted_at IS NULL
+          ) 
+          AND tasks.user_id = ?)
+  
+          OR
+  
+          -- 2. If at least one subtask is assigned to the user OR 
+          --    all subtasks are unassigned and the main task is assigned to the user, return it
+          EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND (
+                  sub_tasks.user_id = ? 
+                  OR (tasks.user_id = ? AND NOT EXISTS (
+                      SELECT 1 FROM sub_tasks 
+                      WHERE sub_tasks.task_id = tasks.id 
+                      AND sub_tasks.user_id IS NOT NULL
+                  ))
+              )
+              AND sub_tasks.deleted_at IS NULL
+          )
+  
+          OR
+  
+          -- 3. If all subtasks have NULL user_id but the main task is assigned to the user, return them
+          (
+              tasks.user_id = ?
+              AND EXISTS (
+                  SELECT 1 FROM sub_tasks 
+                  WHERE sub_tasks.task_id = tasks.id 
+                  AND sub_tasks.user_id IS NULL
+                  AND sub_tasks.deleted_at IS NULL
+              )
+          )
+      )`;
 
-    // if (role_id === 4) {
-    //   baseQuery += ` AND (
-    //       -- 1. If the task is assigned to the user but has no subtasks, return it
-    //       (NOT EXISTS (
-    //           SELECT 1 FROM sub_tasks 
-    //           WHERE sub_tasks.task_id = tasks.id 
-    //           AND sub_tasks.deleted_at IS NULL
-    //       ) 
-    //       AND tasks.user_id = ?)
-  
-    //       OR
-  
-    //       -- 2. If at least one subtask is assigned to the user OR 
-    //       --    all subtasks are unassigned and the main task is assigned to the user, return it
-    //       EXISTS (
-    //           SELECT 1 FROM sub_tasks 
-    //           WHERE sub_tasks.task_id = tasks.id 
-    //           AND (
-    //               sub_tasks.user_id = ? 
-    //               OR (tasks.user_id = ? AND NOT EXISTS (
-    //                   SELECT 1 FROM sub_tasks 
-    //                   WHERE sub_tasks.task_id = tasks.id 
-    //                   AND sub_tasks.user_id IS NOT NULL
-    //               ))
-    //           )
-    //           AND sub_tasks.deleted_at IS NULL
-    //       )
-  
-    //       OR
-  
-    //       -- 3. If all subtasks have NULL user_id but the main task is assigned to the user, return them
-    //       (
-    //           tasks.user_id = ?
-    //           AND EXISTS (
-    //               SELECT 1 FROM sub_tasks 
-    //               WHERE sub_tasks.task_id = tasks.id 
-    //               AND sub_tasks.user_id IS NULL
-    //               AND sub_tasks.deleted_at IS NULL
-    //           )
-    //       )
-    //   )`;
-
-    //   params.push(user_id, user_id, user_id, user_id);
-    // }
-
+      params.push(user_id, user_id, user_id, user_id);
+    }
+    if (role_id === 3) {
+      if (member_id) {
+        baseQuery += `
+          AND (
+            tasks.user_id = ?
+            OR EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+                AND sub_tasks.user_id = ?
+                AND sub_tasks.deleted_at IS NULL
+            )
+          )`;
+        params.push(member_id, member_id);
+      }
+    }
     // Additional filters
     if (product_id) {
       baseQuery += ` AND tasks.product_id = ?`;
@@ -2450,7 +2467,16 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
+    if(role_id === 2 ) {
+      baseQuery += ` ORDER BY 
+      CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+      tasks.updated_at DESC`;
+      params.push(user_id);
+    }
+    else{
     baseQuery += ` ORDER BY tasks.updated_at DESC`;
+    }
+  
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
@@ -2463,6 +2489,7 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.id AS subtask_id, 
           sub_tasks.name AS subtask_name,
           sub_tasks.user_id As assignee_id, 
+          sub_tasks.assigned_user_id AS assigned_user_id,
           tasks.user_id AS task_user_id,
           task_id,
           sub_tasks.user_id AS subtask_user_id,
@@ -2471,16 +2498,25 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.status AS status, 
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
-          users.first_name AS created_by
+          users.first_name AS assigned_user
         FROM sub_tasks
-        LEFT JOIN users ON sub_tasks.created_by = users.id
+        LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
         WHERE task_id IN (?) 
           AND sub_tasks.deleted_at IS NULL
       `;
-
-      // Add user_id filter only if role_id is 4
       const queryParams = [taskIds];
+      if(role_id === 2 ) {
+          query += ` ORDER BY 
+          CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+          sub_tasks.updated_at DESC`;
+          queryParams.push(user_id);
+        }
+        else{
+        baseQuery += ` ORDER BY tasks.updated_at DESC`;
+        }
+  
+      // Add user_id filter only if role_id is 4
       if (role_id === 4) {
         query +=
           " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
@@ -2538,6 +2574,7 @@ exports.getTaskList = async (queryParams, res) => {
         assignee_name: task.assignee_name,
         team_name: task.team_name,
         team_id: task.team_id,
+        assigned_by: task.assigned_user,
         created_by: task.created_by,
       };
 
@@ -2561,9 +2598,10 @@ exports.getTaskList = async (queryParams, res) => {
               user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
-              created_by: subtask.created_by,
-              assignee_id: subtask.assignee_id,
+              assigned_by: subtask.assigned_user,
+              assignee_id: subtask.assignee_id
             });
+            
           }
         });
       } else {
