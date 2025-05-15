@@ -424,7 +424,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
       return errorResponse(
         res,
         "user_id is required",
-        "Missing product_id in query parameters",
+        "Missing user_id in query parameters",
         400
       );
     }
