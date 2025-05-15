@@ -2513,7 +2513,7 @@ exports.getTaskList = async (queryParams, res) => {
           queryParams.push(user_id);
         }
         else{
-        baseQuery += ` ORDER BY tasks.updated_at DESC`;
+           baseQuery += ` ORDER BY sub_tasks.updated_at DESC`;
         }
   
       // Add user_id filter only if role_id is 4
