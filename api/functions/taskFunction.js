@@ -17,6 +17,7 @@ const {
   processStatusData,
   formatTimeDHMS,
   getISTTime,
+  checkUpdatePermission
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -24,201 +25,6 @@ const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
-// exports.createTask = async (payload, res) => {
-//   const {
-//     product_id,
-//     project_id,
-//     user_id,
-//     name,
-//     estimated_hours,
-//     start_date,
-//     end_date,
-//     extended_status = "00:00:00",
-//     extended_hours = "00:00:00",
-//     active_status = 0,
-//     status = 0,
-//     total_hours_worked = "00:00:00",
-//     rating,
-//     command,
-//     assigned_user_id,
-//     remark,
-//     reopen_status = 0,
-//     description,
-//     team_id,
-//     priority,
-//     created_by,
-//     updated_by,
-//     deleted_at,
-//     created_at,
-//     updated_at,
-//   } = payload;
-
-//   try {
-//     const [product] = await db.query(
-//       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
-//       [product_id]
-//     );
-//     if (product.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Product not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [project] = await db.query(
-//       "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
-//       [project_id]
-//     );
-//     if (project.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Project not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [assigned_user] = await db.query(
-//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-//       [assigned_user_id]
-//     );
-//     if (assigned_user.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Assigned User not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [user] = await db.query(
-//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-//       [user_id]
-//     );
-//     if (user.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "User not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [team] = await db.query(
-//       "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
-//       [team_id]
-//     );
-//     if (team.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Team not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     if (estimated_hours) {
-//       const timeMatch = estimated_hours.match(
-//         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
-//       );
-
-//       if (!timeMatch) {
-//         return errorResponse(
-//           res,
-//           null,
-//           'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
-//           400
-//         );
-//       }
-
-//       const days = parseInt(timeMatch[2] || "0", 10);
-//       const hours = parseInt(timeMatch[4] || "0", 10);
-//       const minutes = parseInt(timeMatch[6] || "0", 10);
-//       const seconds = parseInt(timeMatch[8] || "0", 10);
-
-//       if (
-//         days < 0 ||
-//         hours < 0 ||
-//         minutes < 0 ||
-//         seconds < 0 ||
-//         minutes >= 60 ||
-//         seconds >= 60
-//       ) {
-//         return errorResponse(
-//           res,
-//           null,
-//           "Invalid time values in estimated_hours",
-//           400
-//         );
-//       }
-
-//       // Convert days to hours and calculate total hours
-//       const totalHours = days * 8 + hours;
-
-//       // Format as "HH:MM:SS"
-//       payload.estimated_hours = `${String(totalHours).padStart(
-//         2,
-//         "0"
-//       )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-//         2,
-//         "0"
-//       )}`;
-//     }
-
-//     const query = `
-//         INSERT INTO tasks (
-//           product_id, project_id, user_id, name, estimated_hours,
-//           start_date, end_date, extended_status, extended_hours,
-//           active_status, status, total_hours_worked, rating, command,
-//           assigned_user_id, remark, reopen_status, description,
-//           team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-//         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(),NOW())
-//       `;
-
-//     const values = [
-//       product_id,
-//       project_id,
-//       user_id,
-//       name,
-//       payload.estimated_hours,
-//       start_date,
-//       end_date,
-//       extended_status,
-//       extended_hours,
-//       active_status,
-//       status,
-//       total_hours_worked,
-//       rating,
-//       command,
-//       assigned_user_id,
-//       remark,
-//       reopen_status,
-//       description,
-//       team_id,
-//       priority,
-//       created_by,
-//       updated_by,
-//       deleted_at,
-//       created_at,
-//       updated_at,
-//     ];
-
-//     const [result] = await db.query(query, values);
-
-//     return successResponse(
-//       res,
-//       { id: result.insertId, ...payload },
-//       "Task added successfully",
-//       201
-//     );
-//   } catch (error) {
-//     console.error("Error inserting task:", error.message);
-//     return errorResponse(res, error.message, "Error inserting task", 500);
-//   }
-// };
-
 exports.createTask = async (payload, res) => {
   const {
     product_id,
@@ -349,11 +155,10 @@ exports.createTask = async (payload, res) => {
         );
       }
 
-      // Convert everything to total estimated hours (assuming 1 day = 8 hours)
-      const totalEstimatedMinutes = (days * 8 + hours) * 60 + minutes;
-
-      // Convert days + hours + minutes to HH:MM:SS format for DB
+      // Convert days to hours and calculate total hours
       const totalHours = days * 8 + hours;
+
+      // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
         "0"
@@ -361,48 +166,17 @@ exports.createTask = async (payload, res) => {
         2,
         "0"
       )}`;
-
-      // Date Validation
-      if (start_date && end_date) {
-        const start = moment(start_date, "YYYY-MM-DD");
-        const end = moment(end_date, "YYYY-MM-DD");
-
-        if (!start.isValid() || !end.isValid()) {
-          return errorResponse(
-            res,
-            null,
-            "Invalid start_date or end_date",
-            400
-          );
-        }
-
-        const dayDiff = end.diff(start, "days") + 1; // Inclusive
-        const availableMinutes = dayDiff * 8 * 60; // Each day = 8 hours = 480 mins
-
-        if (totalEstimatedMinutes > availableMinutes) {
-          return errorResponse(
-            res,
-            null,
-            `Estimated time (${
-              payload.estimated_hours
-            }) exceeds the available duration between start and end dates (${dayDiff} day(s) x 8 hours = ${
-              availableMinutes / 60
-            } hrs). Please extend end_date.`,
-            400
-          );
-        }
-      }
     }
 
     const query = `
-      INSERT INTO tasks (
-        product_id, project_id, user_id, name, estimated_hours,
-        start_date, end_date, extended_status, extended_hours,
-        active_status, status, total_hours_worked, rating, command,
-        assigned_user_id, remark, reopen_status, description,
-        team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(), NOW())
-    `;
+        INSERT INTO tasks (
+          product_id, project_id, user_id, name, estimated_hours,
+          start_date, end_date, extended_status, extended_hours,
+          active_status, status, total_hours_worked, rating, command,
+          assigned_user_id, remark, reopen_status, description,
+          team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(),NOW())
+      `;
 
     const values = [
       product_id,
@@ -446,324 +220,12 @@ exports.createTask = async (payload, res) => {
   }
 };
 
-// exports.getTask = async (queryParams, res) => {
-//   try {
-//     const { id, user_id, status,reopen_status, active_status } = queryParams;
-
-//     if (!user_id) {
-//       return errorResponse(
-//         res,
-//         "User ID is required",
-//         "Missing user_id in query parameters",
-//         400
-//       );
-//     }
-//     if (!status) {
-//       return errorResponse(
-//         res,
-//         "Status is required",
-//         "Missing Status in query parameters",
-//         400
-//       );
-//     }
-
-//     const userDetails = await getAuthUserDetails(user_id, res);
-//     if (!userDetails || userDetails.id === undefined) {
-//       return errorResponse(res, "User not found", "Invalid user ID", 404);
-//     }
-
-//     // Base Task Query
-//     let taskQuery = `
-//       SELECT
-//         t.*,
-//         te.name AS team_name,
-//         COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name,
-//         COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name,
-//         p.name AS product_name,
-//         pj.name AS project_name,
-//         CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
-//         CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
-//       FROM tasks t
-//       LEFT JOIN teams te ON t.team_id = te.id
-//       LEFT JOIN users assignee ON t.user_id = assignee.id
-//       LEFT JOIN users owner ON t.assigned_user_id = owner.id
-//       LEFT JOIN products p ON t.product_id = p.id
-//       LEFT JOIN projects pj ON t.project_id = pj.id
-//       WHERE t.id = ?
-//       AND t.deleted_at IS NULL
-//     `;
-
-//     let taskParams = [id];
-
-//     // Role-based filtering
-//     if (userDetails.role_id === 3) {
-//       taskQuery += ` AND t.team_id = ?`;
-//       taskParams.push(userDetails.team_id);
-//     }
-
-//     const [task] = await db.query(taskQuery, taskParams);
-//     if (!task || task.length === 0) {
-//       return errorResponse(res, "Task not found", "Error retrieving task", 404);
-//     }
-//     // Subtasks query
-//     let subtaskQuery = `
-//   SELECT
-//     st.*,
-//     COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown Assignee') AS assignee_name
-//   FROM sub_tasks st
-//   LEFT JOIN users u ON st.user_id = u.id
-//   WHERE st.task_id = ?
-//     AND st.status = ?
-//     AND st.reopen_status = ?
-//     AND st.active_status = ?
-//     AND st.deleted_at IS NULL
-// `;
-
-//     let subtaskParams = [id, status,reopen_status, active_status];
-
-//     if (userDetails.role_id === 3) {
-//       subtaskQuery += ` AND st.team_id = ?`;
-//       subtaskParams.push(userDetails.team_id);
-//     } else if (userDetails.role_id === 4) {
-//       subtaskQuery += ` AND st.user_id = ?`;
-//       subtaskParams.push(user_id);
-//     }
-
-//     const subtasks = await db.query(subtaskQuery, subtaskParams);
-
-//     const historiesQuery = `
-//       SELECT h.*,
-//         COALESCE(
-//           CASE
-//             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN
-//               UPPER(CONCAT(SUBSTRING(u.first_name, 1, 1), SUBSTRING(u.last_name, 1, 1)))
-//             WHEN u.first_name IS NOT NULL THEN
-//               UPPER(SUBSTRING(u.first_name, 1, 2))
-//             ELSE
-//               'UNKNOWN'
-//           END,
-//           ' '
-//         ) AS short_name,
-//         COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,
-//         s.description as status_description
-//       FROM task_histories h
-//       LEFT JOIN users u ON h.updated_by = u.id
-//       LEFT JOIN task_status_flags s ON h.status_flag = s.id
-//       WHERE h.task_id = ?
-//       AND h.deleted_at IS NULL
-//       ORDER BY h.id DESC;
-//     `;
-//     const histories = await db.query(historiesQuery, [id]);
-
-//     // // Comments query
-//     const commentsQuery = `
-//       SELECT c.*,  COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
-//       FROM task_comments c
-//       LEFT JOIN users u ON c.updated_by = u.id
-//       WHERE c.task_id = ? AND c.subtask_id IS NULL
-//       AND c.deleted_at IS NULL
-//       ORDER BY c.id DESC;
-//     `;
-
-//     const comments = await db.query(commentsQuery, [id]);
-
-//     const getStatusGroup = (status, reopenStatus, activeStatus) => {
-//       status = Number(status);
-//       reopenStatus = Number(reopenStatus);
-//       activeStatus = Number(activeStatus);
-//     console.log("status", status, "reopenStatus", reopenStatus, "activeStatus", activeStatus);
-
-//       // 1. New subtask, not started
-//       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-//         return "To Do";
-//       }
-
-//       // 2. On hold (created but not restarted)
-//       if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
-//         return "On Hold";
-//       }
-
-//       // 3. Pending approval
-//       if (status === 2 && reopenStatus === 0) {
-//         return "Pending Approval";
-//       }
-
-//       // 4. Reopened and not active yet
-//       if (reopenStatus === 1 && activeStatus === 0) {
-//         return "Reopen";
-//       }
-
-//       // 5. In progress (active)
-//       if (status === 1 && activeStatus === 1) {
-//         return "InProgress";
-//       }
-
-//       // 6. Done
-//       if (status === 3) {
-//         return "Done";
-//       }
-
-//       return "";
-//     };
-
-//     // Status mapping
-//     const statusMap = {
-//       0: "To Do",
-//       1: "In Progress",
-//       2: "In Review",
-//       3: "Done",
-//     };
-
-//     // Prepare task data
-//     const taskData = task.map((task) => {
-//       const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
-//       const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
-
-//       // Calculate remaining hours and ensure consistent formatting
-//       const remainingHours = calculateRemainingHours(
-//         totalEstimatedHours,
-//         timeTaken
-//       );
-
-//       // Calculate percentage for hours
-//       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
-//       const timeTakenInSeconds = convertToSeconds(timeTaken);
-//       const remainingInSeconds = convertToSeconds(remainingHours);
-
-//       return {
-//         task_id: task.id || "",
-//         name: task.name || "",
-//         status: task.status,
-//         active_status: task.active_status,
-//         reopen_status: task.reopen_status,
-//         project_id: task.project_id || "",
-//         project: task.project_name || "",
-//         product_id: task.product_id || "",
-//         product: task.product_name || "",
-//         owner_id: task.assigned_user_id || "",
-//         owner: task.owner_name || "",
-//         team_id: task.team_id || "",
-//         team: task.team_name || "",
-//         assignee_id: task.user_id || "",
-//         assignee: task.assignee_name || "",
-//         estimated_hours: formatTimeDHMS(totalEstimatedHours),
-//         estimated_hours_percentage: calculatePercentage(
-//           estimatedInSeconds,
-//           estimatedInSeconds
-//         ),
-//         time_taken: formatTimeDHMS(timeTaken),
-//         time_taken_percentage: calculatePercentage(
-//           timeTakenInSeconds,
-//           estimatedInSeconds
-//         ),
-//         remaining_hours: formatTimeDHMS(remainingHours),
-//         remaining_hours_percentage: calculatePercentage(
-//           remainingInSeconds,
-//           estimatedInSeconds
-//         ),
-//         start_date: task.start_date,
-//         end_date: task.end_date,
-//         priority: task.priority,
-//         description: task.description,
-//         status_text: getStatusGroup(task.status, task.reopen_status, task.active_status) || "Unknown"
-//       };
-//     });
-
-//     // Prepare subtasks data
-//     const subtasksData =
-//       Array.isArray(subtasks) && subtasks[0].length > 0
-//         ? subtasks[0].map((subtask) => ({
-//             subtask_id: subtask.id,
-//             name: subtask.name || "",
-//             status: subtask.status,
-//             active_status: subtask.active_status,
-//             assignee: subtask.user_id,
-//             assigneename: subtask.assignee_name || "",
-//             reopen_status: subtask.reopen_status,
-//             short_name: (subtask.assignee_name || "").substr(0, 2),
-//             status_text: getStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status) || "Unknown"
-//           }))
-//         : [];
-
-//     const historiesData =
-//       Array.isArray(histories) && histories[0].length > 0
-//         ? await Promise.all(
-//             histories[0].map(async (history) => ({
-//               old_data: history.old_data,
-//               new_data: history.new_data,
-//               description: history.status_description || "Changed the status",
-//               updated_by: history.updated_by,
-//               shortName: history.short_name,
-//               time_date: moment
-//                 .utc(history.updated_at)
-//                 .tz("Asia/Kolkata")
-//                 .format("YYYY-MM-DD HH:mm:ss"),
-//               time_utc: history.updated_at,
-//               time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-//             }))
-//           )
-//         : [];
-
-//     const commentsData =
-//       Array.isArray(comments) && comments[0].length > 0
-//         ? comments[0].map((comment) => ({
-//             comment_id: comment.id,
-//             comments: comment.comments,
-//             updated_by: comment.updated_by || "",
-//             shortName: comment.updated_by.substr(0, 2),
-//             time_date: moment
-//               .utc(comment.updated_at)
-//               .tz("Asia/Kolkata")
-//               .format("YYYY-MM-DD HH:mm:ss"),
-//             time_utc: comment.updated_at,
-//             time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
-//           }))
-//         : [];
-
-//     let data = {};
-
-//     if (subtasksData.length > 0) {
-//       data = {
-//          type: "subtask",
-//          task: taskData,
-//         subtasks: subtasksData,
-//         histories: historiesData,
-//         comments: commentsData,
-//       };
-//     } else {
-//       data = {
-//         type: "task",
-//         task: taskData,
-//         histories: historiesData,
-//         comments: commentsData,
-//       };
-//     }
-
-//     return successResponse(
-//       res,
-//       data,
-//       "Task details retrieved successfully",
-//       200
-//     );
-//   } catch (error) {
-//     console.error("Error retrieving task:", error.message);
-//     return errorResponse(res, error.message, "Error retrieving task", 500);
-//   }
-// };
-
-// Get Task by ID
-
 exports.getTask = async (queryParams, res) => {
   try {
     const { id, user_id } = queryParams;
 
     if (!user_id) {
-      return errorResponse(
-        res,
-        "User ID is required",
-        "Missing user_id in query parameters",
-        400
-      );
+      return errorResponse(res, "User ID is required", "Missing user_id in query parameters", 400);
     }
 
     const userDetails = await getAuthUserDetails(user_id, res);
@@ -799,27 +261,6 @@ exports.getTask = async (queryParams, res) => {
       taskQuery += ` AND t.team_id = ?`;
       taskParams.push(userDetails.team_id);
     }
-  //   if (userDetails.role_id === 4) {
-  //     taskQuery += `
-  //   AND (
-  //     -- 1. Task has no subtasks
-  //     NOT EXISTS (
-  //       SELECT 1 FROM sub_tasks st_all
-  //       WHERE st_all.task_id = t.id
-  //       AND st_all.deleted_at IS NULL
-  //     )
-
-  //     -- 2. OR Task has at least one subtask assigned to the current user
-  //     OR EXISTS (
-  //       SELECT 1 FROM sub_tasks st_mine
-  //       WHERE st_mine.task_id = t.id
-  //       AND st_mine.user_id = ?
-  //       AND st_mine.deleted_at IS NULL
-  //     )
-  //   )
-  // `;
-  //     taskParams.push(user_id);
-  //   }
 
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
@@ -839,13 +280,13 @@ exports.getTask = async (queryParams, res) => {
     let subtaskParams = [id];
 
     if (userDetails.role_id === 3) {
-      subtaskQuery += ` AND (st.team_id = ? OR st.user_id IS NULL)`;
+      subtaskQuery += ` AND st.team_id = ?`;
       subtaskParams.push(userDetails.team_id);
     } else if (userDetails.role_id === 4) {
-      subtaskQuery += ` AND (st.user_id = ?)`;
-      subtaskParams.push(user_id);
-      // subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
-      // subtaskParams.push(user_id, user_id, id);
+      // subtaskQuery += ` AND (st.user_id = ?)`;
+      // subtaskParams.push(user_id);
+      subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
+      subtaskParams.push(user_id, user_id, id);
     }
 
     // if (userDetails.role_id === 3) {
@@ -904,14 +345,11 @@ exports.getTask = async (queryParams, res) => {
 
     // Prepare task data
     const taskData = task.map((task) => {
-      const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
-      const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
+      const totalEstimatedHours = task.estimated_hours || "00:00:00";  // Ensure default format as "HH:MM:SS"
+      const timeTaken = task.total_hours_worked || "00:00:00";  // Ensure default format as "HH:MM:SS"
 
       // Calculate remaining hours and ensure consistent formatting
-      const remainingHours = calculateRemainingHours(
-        totalEstimatedHours,
-        timeTaken
-      );
+      const remainingHours = calculateRemainingHours(totalEstimatedHours, timeTaken);
 
       // Calculate percentage for hours
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
@@ -935,26 +373,18 @@ exports.getTask = async (queryParams, res) => {
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
         estimated_hours: formatTimeDHMS(totalEstimatedHours),
-        estimated_hours_percentage: calculatePercentage(
-          estimatedInSeconds,
-          estimatedInSeconds
-        ),
+        estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
         time_taken: formatTimeDHMS(timeTaken),
-        time_taken_percentage: calculatePercentage(
-          timeTakenInSeconds,
-          estimatedInSeconds
-        ),
+        time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
         remaining_hours: formatTimeDHMS(remainingHours),
-        remaining_hours_percentage: calculatePercentage(
-          remainingInSeconds,
-          estimatedInSeconds
-        ),
+        remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
         start_date: task.start_date,
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
         status_text: statusMap[task.status] || "Unknown",
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
+
       };
     });
 
@@ -962,51 +392,46 @@ exports.getTask = async (queryParams, res) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-            subtask_id: subtask.id,
-            name: subtask.name || "",
-            status: subtask.status,
-            active_status: subtask.active_status,
-            assignee: subtask.user_id,
-            assigneename: subtask.assignee_name || "",
-            reopen_status: subtask.reopen_status,
-            short_name: (subtask.assignee_name || "").substr(0, 2),
-            status_text: statusMap[subtask.status] || "Unknown",
-          }))
+          subtask_id: subtask.id,
+          name: subtask.name || "",
+          status: subtask.status,
+          active_status: subtask.active_status,
+          assignee: subtask.user_id,
+          assigneename: subtask.assignee_name || "",
+          reopen_status: subtask.reopen_status,
+          short_name: (subtask.assignee_name || "").substr(0, 2),
+          status_text: statusMap[subtask.status] || "Unknown",
+        }))
         : [];
 
-    const historiesData =
-      Array.isArray(histories) && histories[0].length > 0
-        ? await Promise.all(
-            histories[0].map(async (history) => ({
-              old_data: history.old_data,
-              new_data: history.new_data,
-              description: history.status_description || "Changed the status",
-              updated_by: history.updated_by,
-              shortName: history.short_name,
-              time_date: moment
-                .utc(history.updated_at)
-                .tz("Asia/Kolkata")
-                .format("YYYY-MM-DD HH:mm:ss"),
-              time_utc: history.updated_at,
-              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-            }))
-          )
-        : [];
+    const historiesData = Array.isArray(histories) && histories[0].length > 0
+      ? await Promise.all(
+        histories[0].map(async (history) => ({
+          old_data: history.old_data,
+          new_data: history.new_data,
+          description: history.status_description || "Changed the status",
+          updated_by: history.updated_by,
+          shortName: history.short_name,
+          time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'),
+          time_utc: history.updated_at,
+          time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(),
+        }))
+      )
+      : [];
+
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-            comment_id: comment.id,
-            comments: comment.comments,
-            updated_by: comment.updated_by || "",
-            shortName: comment.updated_by.substr(0, 2),
-            time_date: moment
-              .utc(comment.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: comment.updated_at,
-            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
-          }))
+          comment_id: comment.id,
+          comments: comment.comments,
+          updated_by: comment.updated_by || "",
+          shortName: comment.updated_by.substr(0, 2),
+          time_date: moment.utc(comment.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'),
+          time_utc: comment.updated_at,
+          time: moment.utc(comment.updated_at).tz('Asia/Kolkata').fromNow(),
+
+        }))
         : [];
 
     // Final response
@@ -1045,264 +470,6 @@ exports.getAllTasks = async (res) => {
     return errorResponse(res, error.message, "Error retrieving tasks", 500);
   }
 };
-
-// Update Task
-// exports.updateTask = async (id, payload, res) => {
-//   const {
-//     product_id,
-//     project_id,
-//     user_id,
-//     name,
-//     estimated_hours,
-//     start_date,
-//     end_date,
-//     extended_status,
-//     extended_hours,
-//     active_status,
-//     status,
-//     total_hours_worked,
-//     rating,
-//     command,
-//     assigned_user_id,
-//     remark,
-//     reopen_status,
-//     description,
-//     team_id,
-//     priority,
-//     created_by,
-//     updated_by,
-//     deleted_at,
-//     created_at,
-//     updated_at,
-//   } = payload;
-
-//   try {
-//     const [updatduser] = await db.query(
-//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-//       [updated_by]
-//     );
-//     if (updatduser.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Updated User not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [product] = await db.query(
-//       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
-//       [product_id]
-//     );
-//     if (product.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Product not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [project] = await db.query(
-//       "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
-//       [project_id]
-//     );
-//     if (project.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Project not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [assigned_user] = await db.query(
-//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-//       [assigned_user_id]
-//     );
-//     if (assigned_user.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Assigned User not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [user] = await db.query(
-//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-//       [user_id]
-//     );
-//     if (user.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "User not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [team] = await db.query(
-//       "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
-//       [team_id]
-//     );
-//     if (team.length === 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Team not found or has been deleted",
-//         404
-//       );
-//     }
-
-//     const [currentTask] = await db.query(
-//       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
-//       [id]
-//     );
-
-//     if (currentTask.length === 0) {
-//       return errorResponse(res, null, "Task not found", 200);
-//     }
-
-//     if (estimated_hours) {
-//       const timeMatch = estimated_hours.match(
-//         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
-//       );
-
-//       if (!timeMatch) {
-//         return errorResponse(
-//           res,
-//           null,
-//           'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
-//           400
-//         );
-//       }
-
-//       const days = parseInt(timeMatch[2] || "0", 10);
-//       const hours = parseInt(timeMatch[4] || "0", 10);
-//       const minutes = parseInt(timeMatch[6] || "0", 10);
-//       const seconds = parseInt(timeMatch[8] || "0", 10);
-
-//       if (
-//         days < 0 ||
-//         hours < 0 ||
-//         minutes < 0 ||
-//         seconds < 0 ||
-//         minutes >= 60 ||
-//         seconds >= 60
-//       ) {
-//         return errorResponse(
-//           res,
-//           null,
-//           "Invalid time values in estimated_hours",
-//           400
-//         );
-//       }
-
-//       // Convert days to hours and calculate total hours
-//       const totalHours = days * 8 + hours;
-
-//       // Format as "HH:MM:SS"
-//       payload.estimated_hours = `${String(totalHours).padStart(
-//         2,
-//         "0"
-//       )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-//         2,
-//         "0"
-//       )}`;
-//     }
-//     // Update query
-//     const query = `
-//       UPDATE tasks SET
-//         product_id = IF(? = product_id, product_id, ?),
-//         project_id = IF(? = project_id, project_id, ?),
-//         user_id = IF(? = user_id, user_id, ?),
-//         name = IF(? = name, name, ?),
-//         estimated_hours = IF(? = estimated_hours, estimated_hours, ?),
-//         start_date = IF(? = start_date, start_date, ?),
-//         end_date = IF(? = end_date, end_date, ?),
-//         extended_status = IF(? = extended_status, extended_status, ?),
-//         extended_hours = IF(? = extended_hours, extended_hours, ?),
-//         total_hours_worked = IF(? = total_hours_worked, total_hours_worked, ?),
-//         rating = IF(? = rating, rating, ?),
-//         command = IF(? = command, command, ?),
-//         assigned_user_id = IF(? = assigned_user_id, assigned_user_id, ?),
-//         remark = IF(? = remark, remark, ?),
-//         reopen_status = IF(? = reopen_status, reopen_status, ?),
-//         description = IF(? = description, description, ?),
-//         team_id = IF(? = team_id, team_id, ?),
-//         priority = IF(? = priority, priority, ?),
-//         created_by = IF(? = created_by, created_by, ?),
-//         updated_by = IF(? = updated_by, updated_by, ?),
-//         deleted_at = IF(? = deleted_at, deleted_at, ?),
-//         created_at = IF(? = created_at, created_at, ?),
-//         updated_at = NOW()
-//       WHERE id = ?
-//     `;
-
-//     const values = [
-//       product_id,
-//       product_id,
-//       project_id,
-//       project_id,
-//       user_id,
-//       user_id,
-//       name,
-//       name,
-//       payload.estimated_hours,
-//       payload.estimated_hours,
-//       start_date,
-//       start_date,
-//       end_date,
-//       end_date,
-//       extended_status,
-//       extended_status,
-//       extended_hours,
-//       extended_hours,
-//       total_hours_worked,
-//       total_hours_worked,
-//       rating,
-//       rating,
-//       command,
-//       command,
-//       assigned_user_id,
-//       assigned_user_id,
-//       remark,
-//       remark,
-//       reopen_status,
-//       reopen_status,
-//       description,
-//       description,
-//       team_id,
-//       team_id,
-//       priority,
-//       priority,
-//       created_by,
-//       created_by,
-//       updated_by,
-//       updated_by,
-//       deleted_at,
-//       deleted_at,
-//       created_at,
-//       created_at,
-//       id,
-//     ];
-
-//     const [result] = await db.query(query, values);
-
-//     if (result.affectedRows === 0) {
-//       return errorResponse(res, null, "No changes made to the task", 200);
-//     }
-
-//     return successResponse(
-//       res,
-//       { id, ...payload },
-//       "Task updated successfully"
-//     );
-//   } catch (error) {
-//     return errorResponse(res, error.message, "Error updating task", 500);
-//   }
-// };
 
 exports.updateTask = async (id, payload, res) => {
   try {
@@ -1460,40 +627,20 @@ exports.updateTask = async (id, payload, res) => {
       }
 
       const totalHours = days * 8 + hours;
-
-      // Validate against start_date and end_date if both present
-      if (payload.start_date && payload.end_date) {
-        const startDate = new Date(payload.start_date);
-        const endDate = new Date(payload.end_date);
-
-        if (endDate < startDate) {
-          return errorResponse(res, null, "end_date cannot be before start_date", 400);
-        }
-
-        const timeDiff = endDate.getTime() - startDate.getTime();
-        const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1;
-        const maxHoursAllowed = daysDiff * 8;
-
-        if (totalHours > maxHoursAllowed) {
-          return errorResponse(
-            res,
-            null,
-            `estimated_hours (${totalHours}h) exceeds allowed working hours (${maxHoursAllowed}h) for the date range ${payload.start_date} to ${payload.end_date}`,
-            400
-          );
-        }
-      }
-
-      // Format estimated_hours as HH:MM:SS
-      payload.estimated_hours = `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      payload.estimated_hours = `${String(totalHours).padStart(
+        2,
+        "0"
+      )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+        2,
+        "0"
+      )}`;
     }
-
 
     // Merge payload with existing task
     const updatedData = {
       ...existingTask,
       ...payload,
-      updated_at: new Date(),
+      updated_at: new Date()
     };
 
     // Update query
@@ -1549,7 +696,7 @@ exports.updateTask = async (id, payload, res) => {
       updatedData.deleted_at,
       updatedData.created_at,
       updatedData.updated_at,
-      id,
+      id
     ];
 
     const [result] = await db.query(query, values);
@@ -1567,6 +714,7 @@ exports.updateTask = async (id, payload, res) => {
     return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
+
 
 exports.updateTaskData = async (id, payload, res, req) => {
   const {
@@ -1602,6 +750,22 @@ exports.updateTaskData = async (id, payload, res, req) => {
     due_date: "end_date",
   };
   try {
+    const userDetails = await getAuthUserDetails(updated_by, res);
+    const role_id = userDetails.role_id;
+
+    const result = await checkUpdatePermission({
+      id,
+      type: "task",
+      status,
+      active_status,
+      reopen_status,
+      role_id,
+      res
+    });
+    if (!result.allowed) {
+      return res.status(403).json({ message: result.message });
+    }
+
     if (user_id) {
       const [assigned_user] = await db.query(
         "SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL",
@@ -1685,7 +849,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
     }
     if (sub_task_counts.length === 0) {
       if (active_status == 1 && status == 1) {
-        const userDetails = await getAuthUserDetails(updated_by, res);
 
         if (!userDetails || userDetails.id == undefined) {
           return;
@@ -1696,7 +859,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
           return errorResponse(res, "You are not allowed to start task", 400);
         }
       } else if (active_status == 0 && status == 1) {
-        const userDetails = await getAuthUserDetails(updated_by, res);
 
         const [existingSubtaskSublime] = await db.query(
           "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
@@ -1718,7 +880,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
           }
         }
       } else if (active_status == 0 && status == 2) {
-        const userDetails = await getAuthUserDetails(updated_by, res);
 
         const [existingSubtaskSublime] = await db.query(
           "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
@@ -1743,7 +904,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-  if (estimated_hours) {
+    if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
@@ -1789,92 +950,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
         2,
         "0"
       )}`;
-      // Validate range only if both dates are present
-      const startDateToCheck = payload.start_date || currentTask.start_date;
-      const dueDateToCheck = payload.end_date || currentTask.end_date;
-      if (startDateToCheck && dueDateToCheck) {
-        const start = new Date(startDateToCheck);
-        const end = new Date(dueDateToCheck);
-
-        // Normalize to remove time
-        start.setHours(0, 0, 0, 0);
-        end.setHours(0, 0, 0, 0);
-
-        const diffMs = end - start;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1; // inclusive
-
-        const maxAllowedHours = diffDays * 8;
-
-        if (totalHours > maxAllowedHours) {
-          return errorResponse(
-            res,
-            null,
-            `Estimated hours (${totalHours.toFixed(
-              2
-            )}h) exceed available working hours (${maxAllowedHours}h) between start and due date.`,
-            400
-          );
-        }
-      }
-    }
-
-    if (payload.due_date) {
-      const startDateToCheck = payload.start_date || currentTask.start_date;
-      const dueDateToCheck = payload.due_date || currentTask.due_date;
-      const estimatedHoursToCheck = (
-        payload.estimated_hours ||
-        currentTask.estimated_hours ||
-        ""
-      ).trim();
-
-      if (startDateToCheck && dueDateToCheck && estimatedHoursToCheck) {
-        let totalHours = 0;
-
-        const durationMatch = estimatedHoursToCheck.match(
-          /^((\d+)\s*d\s*)?((\d+)\s*h\s*)?((\d+)\s*m\s*)?((\d+)\s*s\s*)?$/i
-        );
-
-        if (durationMatch) {
-          const days = parseInt(durationMatch[2] || "0", 10);
-          const hours = parseInt(durationMatch[4] || "0", 10);
-          const minutes = parseInt(durationMatch[6] || "0", 10);
-          const seconds = parseInt(durationMatch[8] || "0", 10);
-
-          totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
-        } else {
-          const [h = "0", m = "0", s = "0"] = estimatedHoursToCheck.split(":");
-          totalHours =
-            parseInt(h, 10) + parseInt(m, 10) / 60 + parseInt(s, 10) / 3600;
-        }
-
-        // Normalize both dates (remove time & timezone)
-        const start = new Date(startDateToCheck);
-        const end = new Date(dueDateToCheck);
-        const localStart = new Date(
-          start.getFullYear(),
-          start.getMonth(),
-          start.getDate()
-        );
-        const localEnd = new Date(
-          end.getFullYear(),
-          end.getMonth(),
-          end.getDate()
-        );
-
-        const diffMs = localEnd - localStart;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1;
-
-        const requiredDays = Math.ceil(totalHours / 8);
-
-        if (diffDays < requiredDays) {
-          return errorResponse(
-            res,
-            null,
-            `End date must be at least ${requiredDays} day(s) after start date for estimated hours of ${estimatedHoursToCheck}`,
-            400
-          );
-        }
-      }
     }
 
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
@@ -2048,8 +1123,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-    .join(", ")}
+          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+          .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -2207,8 +1282,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-      ? true
-      : false;
+        ? true
+        : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -2258,7 +1333,6 @@ exports.getTaskList = async (queryParams, res) => {
       team_id,
       priority,
       search,
-      member_id,
       dropdown_products,
       dropdown_projects,
     } = queryParams;
@@ -2297,27 +1371,23 @@ exports.getTaskList = async (queryParams, res) => {
         tasks.active_status,
         tasks.product_id,
         tasks.project_id,
-        u.team_id,
+        tasks.team_id,
         projects.name AS project_name,
-        cu.first_name AS created_by,
-        asu.first_name AS assigned_user,
         products.name AS product_name,
-        u.first_name AS assignee_name,
+        users.first_name AS assignee_name,
         teams.name AS team_name,
         teams.id AS team_id
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
-      LEFT JOIN users u ON tasks.user_id = u.id
-      LEFT JOIN users cu ON tasks.created_by = cu.id
-      LEFT JOIN users AS asu ON tasks.assigned_user_id = asu.id
-      LEFT JOIN teams ON u.team_id = teams.id
+      LEFT JOIN users ON tasks.user_id = users.id
+      LEFT JOIN teams ON users.team_id = teams.id
       WHERE tasks.deleted_at IS NULL
     `;
 
     const params = [];
     if (team_id) {
-      baseQuery += ` AND u.team_id = ?`;
+      baseQuery += ` AND users.team_id = ?`;
       params.push(team_id);
     } else if (role_id === 3) {
       const queryteam =
@@ -2326,7 +1396,7 @@ exports.getTaskList = async (queryParams, res) => {
       let teamIds = [];
       if (rowteams.length > 0) {
         teamIds = rowteams.map((row) => row.id);
-        baseQuery += ` AND u.team_id IN (?)`;
+        baseQuery += ` AND users.team_id IN (?)`;
         params.push(teamIds);
         console.log("teamIds", teamIds);
       } else {
@@ -2337,7 +1407,7 @@ exports.getTaskList = async (queryParams, res) => {
         );
       }
     }
-    
+
     if (role_id === 4) {
       baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
@@ -2382,21 +1452,7 @@ exports.getTaskList = async (queryParams, res) => {
 
       params.push(user_id, user_id, user_id, user_id);
     }
-    if (role_id === 3) {
-      if (member_id) {
-        baseQuery += `
-          AND (
-            tasks.user_id = ?
-            OR EXISTS (
-              SELECT 1 FROM sub_tasks 
-              WHERE sub_tasks.task_id = tasks.id 
-                AND sub_tasks.user_id = ?
-                AND sub_tasks.deleted_at IS NULL
-            )
-          )`;
-        params.push(member_id, member_id);
-      }
-    }
+
     // Additional filters
     if (product_id) {
       baseQuery += ` AND tasks.product_id = ?`;
@@ -2438,23 +1494,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     if (search) {
       const searchTerm = `%${search}%`;
-      baseQuery += `
-        AND (
-          tasks.name LIKE ?
-          OR EXISTS (
-            SELECT 1 
-            FROM sub_tasks
-            WHERE sub_tasks.task_id = tasks.id 
-              AND sub_tasks.name LIKE ? 
-              AND sub_tasks.deleted_at IS NULL
-          )
-          OR projects.name LIKE ?
-          OR products.name LIKE ?
-          OR u.first_name LIKE ?
-          OR u.last_name LIKE ?
-          OR teams.name LIKE ?
-          OR tasks.priority LIKE ?
-        )`;
+      baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ? AND sub_tasks.deleted_at IS NULL) OR projects.name LIKE ? OR products.name LIKE ? OR users.first_name LIKE ? OR users.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
       params.push(
         searchTerm,
         searchTerm,
@@ -2467,16 +1507,7 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
-    if(role_id === 2 ) {
-      baseQuery += ` ORDER BY 
-      CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-      tasks.updated_at DESC`;
-      params.push(user_id);
-    }
-    else{
     baseQuery += ` ORDER BY tasks.updated_at DESC`;
-    }
-  
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
@@ -2486,41 +1517,25 @@ exports.getTaskList = async (queryParams, res) => {
       const taskIds = tasks.map((task) => task.task_id);
       let query = `
         SELECT 
-          sub_tasks.id AS subtask_id, 
-          sub_tasks.name AS subtask_name,
-          sub_tasks.user_id As assignee_id, 
-          sub_tasks.assigned_user_id AS assigned_user_id,
-          tasks.user_id AS task_user_id,
+          id AS subtask_id, 
+          name AS subtask_name, 
           task_id,
-          sub_tasks.user_id AS subtask_user_id,
-          sub_tasks.estimated_hours AS estimated_hours, 
-          sub_tasks.total_hours_worked AS total_hours_worked, 
-          sub_tasks.status AS status, 
-          sub_tasks.reopen_status AS reopen_status, 
-          sub_tasks.active_status AS active_status,
-          users.first_name AS assigned_user
+          user_id,
+          estimated_hours, 
+          total_hours_worked, 
+          status, 
+          reopen_status, 
+          active_status 
         FROM sub_tasks
-        LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
-        LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
         WHERE task_id IN (?) 
           AND sub_tasks.deleted_at IS NULL
       `;
-      const queryParams = [taskIds];
-      if(role_id === 2 ) {
-          query += ` ORDER BY 
-          CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-          sub_tasks.updated_at DESC`;
-          queryParams.push(user_id);
-        }
-        else{
-           baseQuery += ` ORDER BY sub_tasks.updated_at DESC`;
-        }
-  
+
       // Add user_id filter only if role_id is 4
+      const queryParams = [taskIds];
       if (role_id === 4) {
-        query +=
-          " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
-        queryParams.push(user_id, user_id);
+        query += " AND user_id = ?";
+        queryParams.push(user_id);
       }
 
       [allSubtasks] = await db.query(query, queryParams);
@@ -2574,8 +1589,6 @@ exports.getTaskList = async (queryParams, res) => {
         assignee_name: task.assignee_name,
         team_name: task.team_name,
         team_id: task.team_id,
-        assigned_by: task.assigned_user,
-        created_by: task.created_by,
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
@@ -2598,10 +1611,7 @@ exports.getTaskList = async (queryParams, res) => {
               user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
-              assigned_by: subtask.assigned_user,
-              assignee_id: subtask.assignee_id
             });
-            
           }
         });
       } else {
@@ -2867,10 +1877,10 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     };
   }
 
-  await db.query(
-    "UPDATE ?? SET status = 1, active_status = 1,reopen_status = 0 WHERE id = ?",
-    [type === "subtask" ? "sub_tasks" : "tasks", id]
-  );
+  await db.query("UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?", [
+    type === "subtask" ? "sub_tasks" : "tasks",
+    id,
+  ]);
   await db.query(
     "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
     [
@@ -3042,9 +2052,6 @@ exports.updateTaskTimeLine = async (req, res) => {
     );
     console.log("old_data", taskId, subtaskId, taskOrSubtask.user_id);
     if (action === "start") {
-      if (taskOrSubtask.user_id === null) {
-        return errorResponse(res, "Task is not assigned to any user", 400);
-      }
       await this.startTask(taskOrSubtask, type, id, res);
       const query =
         "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
@@ -3261,11 +2268,9 @@ exports.deleteTaskList = async (req, res) => {
     if (search) {
       const searchTerm = `%${search}%`;
       const searchQuery = `(t.name LIKE ? OR  CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR pr.name LIKE ? OR tm.name LIKE ? OR p.name LIKE ? OR t.priority LIKE ?)`;
-      const subtask_priority = `st.priority LIKE ?`;
 
       taskConditions.push(searchQuery);
       subtaskConditions.push(searchQuery);
-      subtaskConditions.push(subtask_priority);
 
       taskValues.push(
         searchTerm,
@@ -3276,7 +2281,6 @@ exports.deleteTaskList = async (req, res) => {
         searchTerm
       );
       subtaskValues.push(
-        searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
@@ -3316,7 +2320,7 @@ exports.deleteTaskList = async (req, res) => {
       LEFT JOIN products p ON p.id = t.product_id
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
-      WHERE st.deleted_at IS NOT NULL AND pr.deleted_at IS  NULL AND p.deleted_at IS  NULL ${subtaskWhereClause}
+      WHERE st.deleted_at IS NOT NULL AND pr.deleted_at IS NOT NULL AND p.deleted_at IS NOT NULL ${subtaskWhereClause}
     `;
 
     // Query to fetch deleted tasks (not linked to subtasks)
@@ -3489,7 +2493,7 @@ exports.getWorkReportData = async (queryParams, res) => {
 
     let baseQuery = `
    SELECT 
- DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
+  DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
   u.employee_id,  -- Fetching employee_id from users table
   CONCAT(u.first_name, ' ', u.last_name) AS name,
   COALESCE(p.name, '') AS project_name,  -- Fetching project_name from projects table
@@ -3648,3 +2652,5 @@ WHERE
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
