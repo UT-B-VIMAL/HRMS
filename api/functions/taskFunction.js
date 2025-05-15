@@ -2335,50 +2335,50 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-    if (role_id === 4) {
-      baseQuery += ` AND (
-          -- 1. If the task is assigned to the user but has no subtasks, return it
-          (NOT EXISTS (
-              SELECT 1 FROM sub_tasks 
-              WHERE sub_tasks.task_id = tasks.id 
-              AND sub_tasks.deleted_at IS NULL
-          ) 
-          AND tasks.user_id = ?)
+    // if (role_id === 4) {
+    //   baseQuery += ` AND (
+    //       -- 1. If the task is assigned to the user but has no subtasks, return it
+    //       (NOT EXISTS (
+    //           SELECT 1 FROM sub_tasks 
+    //           WHERE sub_tasks.task_id = tasks.id 
+    //           AND sub_tasks.deleted_at IS NULL
+    //       ) 
+    //       AND tasks.user_id = ?)
   
-          OR
+    //       OR
   
-          -- 2. If at least one subtask is assigned to the user OR 
-          --    all subtasks are unassigned and the main task is assigned to the user, return it
-          EXISTS (
-              SELECT 1 FROM sub_tasks 
-              WHERE sub_tasks.task_id = tasks.id 
-              AND (
-                  sub_tasks.user_id = ? 
-                  OR (tasks.user_id = ? AND NOT EXISTS (
-                      SELECT 1 FROM sub_tasks 
-                      WHERE sub_tasks.task_id = tasks.id 
-                      AND sub_tasks.user_id IS NOT NULL
-                  ))
-              )
-              AND sub_tasks.deleted_at IS NULL
-          )
+    //       -- 2. If at least one subtask is assigned to the user OR 
+    //       --    all subtasks are unassigned and the main task is assigned to the user, return it
+    //       EXISTS (
+    //           SELECT 1 FROM sub_tasks 
+    //           WHERE sub_tasks.task_id = tasks.id 
+    //           AND (
+    //               sub_tasks.user_id = ? 
+    //               OR (tasks.user_id = ? AND NOT EXISTS (
+    //                   SELECT 1 FROM sub_tasks 
+    //                   WHERE sub_tasks.task_id = tasks.id 
+    //                   AND sub_tasks.user_id IS NOT NULL
+    //               ))
+    //           )
+    //           AND sub_tasks.deleted_at IS NULL
+    //       )
   
-          OR
+    //       OR
   
-          -- 3. If all subtasks have NULL user_id but the main task is assigned to the user, return them
-          (
-              tasks.user_id = ?
-              AND EXISTS (
-                  SELECT 1 FROM sub_tasks 
-                  WHERE sub_tasks.task_id = tasks.id 
-                  AND sub_tasks.user_id IS NULL
-                  AND sub_tasks.deleted_at IS NULL
-              )
-          )
-      )`;
+    //       -- 3. If all subtasks have NULL user_id but the main task is assigned to the user, return them
+    //       (
+    //           tasks.user_id = ?
+    //           AND EXISTS (
+    //               SELECT 1 FROM sub_tasks 
+    //               WHERE sub_tasks.task_id = tasks.id 
+    //               AND sub_tasks.user_id IS NULL
+    //               AND sub_tasks.deleted_at IS NULL
+    //           )
+    //       )
+    //   )`;
 
-      params.push(user_id, user_id, user_id, user_id);
-    }
+    //   params.push(user_id, user_id, user_id, user_id);
+    // }
 
     // Additional filters
     if (product_id) {
