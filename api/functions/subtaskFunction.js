@@ -52,16 +52,24 @@ exports.createSubTask = async (payload, res) => {
             product_id, project_id, task_id, name, assigned_user_id, created_by,updated_by ,deleted_at, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?,?,?, NULL, NOW(), NOW())
     `;
-    const values = [product_id, project_id, task_id, name,created_by, created_by, created_by];
+    const values = [
+      product_id,
+      project_id,
+      task_id,
+      name,
+      created_by,
+      created_by,
+      created_by,
+    ];
 
     const [result] = await db.query(insertQuery, values);
 
     // Return success response
     return successResponse(
-        res,
-        { id: result.insertId, task_id, name, created_by },
-        "SubTask added successfully",
-        201
+      res,
+      { id: result.insertId, task_id, name, created_by },
+      "SubTask added successfully",
+      201
     );
   } catch (error) {
     console.error("Error inserting subtask:", error.message);
@@ -661,7 +669,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       )}`;
     }
 
-  if (start_date && due_date && estimated_hours) {
+    if (start_date && due_date && estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
@@ -673,7 +681,6 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         const seconds = parseInt(timeMatch[8] || "0", 10);
 
         const totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
-
         const start = new Date(start_date);
         const end = new Date(due_date);
 
@@ -700,7 +707,44 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
 
+    if (payload.due_date) {
+      const startDateToCheck = payload.start_date || currentTask.start_date;
+      const estimatedHoursToCheck =
+        payload.estimated_hours || currentTask.estimated_hours;
 
+      if (startDateToCheck && estimatedHoursToCheck) {
+        // parse estimated_hours in format HH:MM:SS
+        const [hoursStr, minutesStr, secondsStr] = estimatedHoursToCheck
+          .split(":")
+          .map((val) => parseInt(val, 10));
+        const totalHours =
+          (hoursStr || 0) + (minutesStr || 0) / 60 + (secondsStr || 0) / 3600;
+
+        const start = new Date(startDateToCheck);
+        const end = new Date(payload.due_date);
+
+        const diffMs = end - start;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        if (totalHours > 8 && diffDays < 1) {
+          return errorResponse(
+            res,
+            null,
+            "End date must be at least one day after start date for estimated hours exceeding 8 hours",
+            400
+          );
+        }
+
+        if (totalHours <= 8 && diffDays < 0) {
+          return errorResponse(
+            res,
+            null,
+            "End date cannot be before start date",
+            400
+          );
+        }
+      }
+    }
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
       status = Number(status);
       reopenStatus = Number(reopenStatus);
@@ -978,36 +1022,44 @@ const convertTasktoSubtask = async (task_id) => {
       task.priority,
       task.created_by,
       task.updated_by,
-      task.created_at
+      task.created_at,
     ];
 
     const [insertResult] = await db.query(insertQuery, values);
     const newSubtaskId = insertResult.insertId;
 
     // Update sub_tasks_user_timeline
-    await db.query(`
+    await db.query(
+      `
       UPDATE sub_tasks_user_timeline
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
-    `, [newSubtaskId, task_id]);
+    `,
+      [newSubtaskId, task_id]
+    );
 
     // Update task_comments
-    await db.query(`
+    await db.query(
+      `
       UPDATE task_comments
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
-    `, [newSubtaskId, task_id]);
+    `,
+      [newSubtaskId, task_id]
+    );
 
     // Update task_histories
-    await db.query(`
+    await db.query(
+      `
       UPDATE task_histories
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
-    `, [newSubtaskId, task_id]);
+    `,
+      [newSubtaskId, task_id]
+    );
     return true;
   } catch (err) {
     console.error("convertTasktoSubtask error:", err.message);
     return false;
   }
 };
-
