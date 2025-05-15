@@ -799,27 +799,27 @@ exports.getTask = async (queryParams, res) => {
       taskQuery += ` AND t.team_id = ?`;
       taskParams.push(userDetails.team_id);
     }
-    if (userDetails.role_id === 4) {
-      taskQuery += `
-    AND (
-      -- 1. Task has no subtasks
-      NOT EXISTS (
-        SELECT 1 FROM sub_tasks st_all
-        WHERE st_all.task_id = t.id
-        AND st_all.deleted_at IS NULL
-      )
+  //   if (userDetails.role_id === 4) {
+  //     taskQuery += `
+  //   AND (
+  //     -- 1. Task has no subtasks
+  //     NOT EXISTS (
+  //       SELECT 1 FROM sub_tasks st_all
+  //       WHERE st_all.task_id = t.id
+  //       AND st_all.deleted_at IS NULL
+  //     )
 
-      -- 2. OR Task has at least one subtask assigned to the current user
-      OR EXISTS (
-        SELECT 1 FROM sub_tasks st_mine
-        WHERE st_mine.task_id = t.id
-        AND st_mine.user_id = ?
-        AND st_mine.deleted_at IS NULL
-      )
-    )
-  `;
-      taskParams.push(user_id);
-    }
+  //     -- 2. OR Task has at least one subtask assigned to the current user
+  //     OR EXISTS (
+  //       SELECT 1 FROM sub_tasks st_mine
+  //       WHERE st_mine.task_id = t.id
+  //       AND st_mine.user_id = ?
+  //       AND st_mine.deleted_at IS NULL
+  //     )
+  //   )
+  // `;
+  //     taskParams.push(user_id);
+  //   }
 
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
