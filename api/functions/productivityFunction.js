@@ -16,7 +16,11 @@ const moment = require("moment");
 //   return `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
 // }
 function convertSecondsToReadableTime(totalSeconds) {
-  if (totalSeconds === null || totalSeconds === undefined || isNaN(totalSeconds)) 
+  if (
+    totalSeconds === null ||
+    totalSeconds === undefined ||
+    isNaN(totalSeconds)
+  )
     return "0h 0m 0s";
 
   const isNegative = totalSeconds < 0;
@@ -28,7 +32,9 @@ function convertSecondsToReadableTime(totalSeconds) {
   const minutes = Math.floor((absSeconds % 3600) / 60);
   const seconds = absSeconds % 60;
 
-  const timeString = `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
+  const timeString = `${
+    days > 0 ? days + "d " : ""
+  }${hours}h ${minutes}m ${seconds}s`;
 
   return isNegative ? `-${timeString}` : timeString;
 }
@@ -46,7 +52,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
     } = req.query;
     const offset = (page - 1) * perPage;
 
-    // Date validation (unchanged)
+    // Date validation
     if (from_date && to_date) {
       if (
         !moment(from_date, "YYYY-MM-DD", true).isValid() ||
@@ -92,14 +98,18 @@ exports.getTeamwiseProductivity = async (req, res) => {
         ? `AND combined.updated_at <= ?`
         : "";
 
-    // Task query (unchanged)
+    // Updated task query
     const taskQuery = `
       SELECT 
           t.user_id,
           t.team_id,
           TIME_TO_SEC(t.estimated_hours) AS estimated_seconds,
           TIME_TO_SEC(t.total_hours_worked) AS worked_seconds,
-          TIME_TO_SEC(t.extended_hours) AS extended_seconds,
+          CASE 
+            WHEN TIME_TO_SEC(t.estimated_hours) > 0 THEN 
+              GREATEST(TIME_TO_SEC(t.total_hours_worked) - TIME_TO_SEC(t.estimated_hours), 0)
+            ELSE 0
+          END AS extended_seconds,
           t.updated_at
       FROM 
           tasks t
@@ -112,27 +122,31 @@ exports.getTeamwiseProductivity = async (req, res) => {
           )
     `;
 
-    // Subtask query (unchanged)
+    // Updated subtask query
     const subtaskQuery = `
-        SELECT 
-            st.user_id,
-            st.team_id,
-            TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
-            TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
-            TIME_TO_SEC(st.extended_hours) AS extended_seconds,
-            st.updated_at
-        FROM 
-            sub_tasks st
-        WHERE 
-            st.deleted_at IS NULL
+      SELECT 
+          st.user_id,
+          st.team_id,
+          TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
+          TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
+          CASE 
+            WHEN TIME_TO_SEC(st.estimated_hours) > 0 THEN 
+              GREATEST(TIME_TO_SEC(st.total_hours_worked) - TIME_TO_SEC(st.estimated_hours), 0)
+            ELSE 0
+          END AS extended_seconds,
+          st.updated_at
+      FROM 
+          sub_tasks st
+      WHERE 
+          st.deleted_at IS NULL
     `;
 
-    // Main query with difference_seconds calculation
+    // Main query
     let query = `
       SELECT 
           MAX(combined.updated_at) AS updated_at,
           u.id AS user_id,
-          COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS employee_name,
+          COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown User') AS employee_name,
           u.employee_id,
           combined.team_id,
           COALESCE(SUM(combined.estimated_seconds), 0) AS total_estimated_seconds,
@@ -151,7 +165,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ${employee_id ? `AND u.employee_id = ?` : ""}
       ${
         search
-          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))) LIKE ?)`
           : ""
       }
     `;
@@ -174,14 +188,13 @@ exports.getTeamwiseProductivity = async (req, res) => {
       queryParams.push(`%${search}%`);
     }
 
-    // Append GROUP BY and ORDER BY
     query += `
       GROUP BY u.id, u.first_name, u.last_name, u.employee_id, combined.team_id
       ORDER BY updated_at DESC
       LIMIT ${parseInt(perPage)} OFFSET ${parseInt(offset)}
     `;
 
-    // Count query (unchanged)
+    // Count query
     let countQuery = `
       SELECT COUNT(DISTINCT u.id) AS total_users
       FROM users u
@@ -196,7 +209,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ${employee_id ? `AND u.employee_id = ?` : ""}
       ${
         search
-          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))) LIKE ?)`
           : ""
       }
     `;
@@ -217,7 +230,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       countParams.push(`%${search}%`);
     }
 
-    // Execute queries
+    // Execute
     const [results] = await db.query(query, queryParams);
     const [countResults] = await db.query(countQuery, countParams);
 
@@ -229,10 +242,16 @@ exports.getTeamwiseProductivity = async (req, res) => {
       employee_name: item.employee_name,
       employee_id: item.employee_id,
       team_id: item.team_id || null,
-      total_estimated_hours: convertSecondsToReadableTime(item.total_estimated_seconds),
-      total_worked_hours: convertSecondsToReadableTime(item.total_worked_seconds),
-      total_extended_hours: convertSecondsToReadableTime(item.total_extended_seconds),
-      difference_hours: convertSecondsToReadableTime(item.difference_seconds), // NEW FIELD: difference displayed, negative if worked > estimated
+      total_estimated_hours: convertSecondsToReadableTime(
+        item.total_estimated_seconds
+      ),
+      total_worked_hours: convertSecondsToReadableTime(
+        item.total_worked_seconds
+      ),
+      total_extended_hours: convertSecondsToReadableTime(
+        item.total_extended_seconds
+      ),
+      difference_hours: convertSecondsToReadableTime(item.difference_seconds),
     }));
 
     const pagination = getPagination(page, perPage, totalUsers);
@@ -255,7 +274,6 @@ exports.getTeamwiseProductivity = async (req, res) => {
     });
   }
 };
-
 
 exports.get_individualStatus = async (req, res) => {
   try {
