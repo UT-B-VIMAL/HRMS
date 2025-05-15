@@ -904,7 +904,16 @@ const convertTasktoSubtask = async (task_id) => {
 
     const task = taskResults[0];
 
-    // Insert as new subtask
+    const subtaskQuery = `
+  SELECT 1 
+  FROM sub_tasks 
+  WHERE subtask_id IS NOT NULL AND deleted_at IS NULL AND task_id = ?
+  LIMIT 1
+`;
+    const [subtaskResult] = await db.query(subtaskQuery, [task_id]);
+
+    if (subtaskResult.length === 0) {
+// Insert as new subtask
     const insertQuery = `
       INSERT INTO sub_tasks (
         product_id, project_id, task_id, user_id, name, estimated_hours, start_date, end_date,
@@ -965,6 +974,8 @@ const convertTasktoSubtask = async (task_id) => {
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
     `, [newSubtaskId, task_id]);
     return true;
+    }
+    
   } catch (err) {
     console.error("convertTasktoSubtask error:", err.message);
     return false;
