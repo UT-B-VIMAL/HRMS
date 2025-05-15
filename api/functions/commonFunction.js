@@ -12,12 +12,10 @@ exports.getAllData = async (payload, res) => {
         if (type === "teams") {
             query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
         } else if (type === "users") {
-            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
+            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
         }
         else if (type === "tl") {
             query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
-        }else if (type === "pm") {
-            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 2 AND deleted_at IS NULL";
         } else if (type === "products") {
             
             const users = await this.getAuthUserDetails(user_id, res);
@@ -115,9 +113,9 @@ exports.getAllData = async (payload, res) => {
         } else if (type === "roles") {
             query = "SELECT id, name FROM roles";
         } else if (type === "owners") {
-            query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id != 4";
+            query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 2";
         } else if (type === "assignee") {
-            query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
+            query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
         } 
         else if (type === "ot_projects") {
             const users = await this.getAuthUserDetails(user_id, res);

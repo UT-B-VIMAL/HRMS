@@ -16,15 +16,27 @@ const moment = require("moment");
 //   return `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
 // }
 function convertSecondsToReadableTime(totalSeconds) {
-  if (!totalSeconds || isNaN(totalSeconds)) return "0h 0m 0s";
+  if (
+    totalSeconds === null ||
+    totalSeconds === undefined ||
+    isNaN(totalSeconds)
+  )
+    return "0h 0m 0s";
+
+  const isNegative = totalSeconds < 0;
+  const absSeconds = Math.abs(totalSeconds);
 
   const secondsInDay = 8 * 3600; // 1 day = 8 hours
-  const days = Math.floor(totalSeconds / secondsInDay);
-  const hours = Math.floor((totalSeconds % secondsInDay) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+  const days = Math.floor(absSeconds / secondsInDay);
+  const hours = Math.floor((absSeconds % secondsInDay) / 3600);
+  const minutes = Math.floor((absSeconds % 3600) / 60);
+  const seconds = absSeconds % 60;
 
-  return `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
+  const timeString = `${
+    days > 0 ? days + "d " : ""
+  }${hours}h ${minutes}m ${seconds}s`;
+
+  return isNegative ? `-${timeString}` : timeString;
 }
 
 exports.getTeamwiseProductivity = async (req, res) => {
@@ -40,6 +52,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
     } = req.query;
     const offset = (page - 1) * perPage;
 
+    // Date validation
     if (from_date && to_date) {
       if (
         !moment(from_date, "YYYY-MM-DD", true).isValid() ||
@@ -84,14 +97,19 @@ exports.getTeamwiseProductivity = async (req, res) => {
         : to_date
         ? `AND combined.updated_at <= ?`
         : "";
-    // Task query
+
+    // Updated task query
     const taskQuery = `
       SELECT 
           t.user_id,
           t.team_id,
           TIME_TO_SEC(t.estimated_hours) AS estimated_seconds,
           TIME_TO_SEC(t.total_hours_worked) AS worked_seconds,
-          TIME_TO_SEC(t.extended_hours) AS extended_seconds,
+          CASE 
+            WHEN TIME_TO_SEC(t.estimated_hours) > 0 THEN 
+              GREATEST(TIME_TO_SEC(t.total_hours_worked) - TIME_TO_SEC(t.estimated_hours), 0)
+            ELSE 0
+          END AS extended_seconds,
           t.updated_at
       FROM 
           tasks t
@@ -104,22 +122,23 @@ exports.getTeamwiseProductivity = async (req, res) => {
           )
     `;
 
-    // Subtask query
+    // Updated subtask query
     const subtaskQuery = `
-        SELECT 
-            st.user_id,
-            st.team_id,
-            TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
-            TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
-            CASE 
-              WHEN TIME_TO_SEC(st.estimated_hours) > 0 THEN TIME_TO_SEC(st.extended_hours)
-              ELSE 0
-            END AS extended_seconds,
-            st.updated_at
-        FROM 
-            sub_tasks st
-        WHERE 
-            st.deleted_at IS NULL
+      SELECT 
+          st.user_id,
+          st.team_id,
+          TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
+          TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
+          CASE 
+            WHEN TIME_TO_SEC(st.estimated_hours) > 0 THEN 
+              GREATEST(TIME_TO_SEC(st.total_hours_worked) - TIME_TO_SEC(st.estimated_hours), 0)
+            ELSE 0
+          END AS extended_seconds,
+          st.updated_at
+      FROM 
+          sub_tasks st
+      WHERE 
+          st.deleted_at IS NULL
     `;
 
     // Main query
@@ -127,12 +146,13 @@ exports.getTeamwiseProductivity = async (req, res) => {
       SELECT 
           MAX(combined.updated_at) AS updated_at,
           u.id AS user_id,
-          COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS employee_name,
+          COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown User') AS employee_name,
           u.employee_id,
           combined.team_id,
           COALESCE(SUM(combined.estimated_seconds), 0) AS total_estimated_seconds,
           COALESCE(SUM(combined.worked_seconds), 0) AS total_worked_seconds,
-          COALESCE(SUM(combined.extended_seconds), 0) AS total_extended_seconds
+          COALESCE(SUM(combined.extended_seconds), 0) AS total_extended_seconds,
+          (COALESCE(SUM(combined.estimated_seconds), 0) - COALESCE(SUM(combined.worked_seconds), 0)) AS difference_seconds
       FROM users u
       LEFT JOIN (
           (${taskQuery})
@@ -145,7 +165,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ${employee_id ? `AND u.employee_id = ?` : ""}
       ${
         search
-          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))) LIKE ?)`
           : ""
       }
     `;
@@ -168,14 +188,13 @@ exports.getTeamwiseProductivity = async (req, res) => {
       queryParams.push(`%${search}%`);
     }
 
-    // Append GROUP BY and ORDER BY
     query += `
       GROUP BY u.id, u.first_name, u.last_name, u.employee_id, combined.team_id
       ORDER BY updated_at DESC
       LIMIT ${parseInt(perPage)} OFFSET ${parseInt(offset)}
     `;
 
-    // Count query (same logic, without LIMIT)
+    // Count query
     let countQuery = `
       SELECT COUNT(DISTINCT u.id) AS total_users
       FROM users u
@@ -190,7 +209,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ${employee_id ? `AND u.employee_id = ?` : ""}
       ${
         search
-          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) LIKE ?)`
+          ? `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))) LIKE ?)`
           : ""
       }
     `;
@@ -211,7 +230,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       countParams.push(`%${search}%`);
     }
 
-    // Execute queries
+    // Execute
     const [results] = await db.query(query, queryParams);
     const [countResults] = await db.query(countQuery, countParams);
 
@@ -232,6 +251,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       total_extended_hours: convertSecondsToReadableTime(
         item.total_extended_seconds
       ),
+      difference_hours: convertSecondsToReadableTime(item.difference_seconds),
     }));
 
     const pagination = getPagination(page, perPage, totalUsers);

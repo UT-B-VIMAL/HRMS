@@ -799,27 +799,27 @@ exports.getTask = async (queryParams, res) => {
       taskQuery += ` AND t.team_id = ?`;
       taskParams.push(userDetails.team_id);
     }
-    if (userDetails.role_id === 4) {
-      taskQuery += `
-    AND (
-      -- 1. Task has no subtasks
-      NOT EXISTS (
-        SELECT 1 FROM sub_tasks st_all
-        WHERE st_all.task_id = t.id
-        AND st_all.deleted_at IS NULL
-      )
+  //   if (userDetails.role_id === 4) {
+  //     taskQuery += `
+  //   AND (
+  //     -- 1. Task has no subtasks
+  //     NOT EXISTS (
+  //       SELECT 1 FROM sub_tasks st_all
+  //       WHERE st_all.task_id = t.id
+  //       AND st_all.deleted_at IS NULL
+  //     )
 
-      -- 2. OR Task has at least one subtask assigned to the current user
-      OR EXISTS (
-        SELECT 1 FROM sub_tasks st_mine
-        WHERE st_mine.task_id = t.id
-        AND st_mine.user_id = ?
-        AND st_mine.deleted_at IS NULL
-      )
-    )
-  `;
-      taskParams.push(user_id);
-    }
+  //     -- 2. OR Task has at least one subtask assigned to the current user
+  //     OR EXISTS (
+  //       SELECT 1 FROM sub_tasks st_mine
+  //       WHERE st_mine.task_id = t.id
+  //       AND st_mine.user_id = ?
+  //       AND st_mine.deleted_at IS NULL
+  //     )
+  //   )
+  // `;
+  //     taskParams.push(user_id);
+  //   }
 
     const [task] = await db.query(taskQuery, taskParams);
     if (!task || task.length === 0) {
@@ -1743,7 +1743,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    if (estimated_hours) {
+  if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
@@ -1789,6 +1789,92 @@ exports.updateTaskData = async (id, payload, res, req) => {
         2,
         "0"
       )}`;
+      // Validate range only if both dates are present
+      const startDateToCheck = payload.start_date || currentTask.start_date;
+      const dueDateToCheck = payload.end_date || currentTask.end_date;
+      if (startDateToCheck && dueDateToCheck) {
+        const start = new Date(startDateToCheck);
+        const end = new Date(dueDateToCheck);
+
+        // Normalize to remove time
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+
+        const diffMs = end - start;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1; // inclusive
+
+        const maxAllowedHours = diffDays * 8;
+
+        if (totalHours > maxAllowedHours) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated hours (${totalHours.toFixed(
+              2
+            )}h) exceed available working hours (${maxAllowedHours}h) between start and due date.`,
+            400
+          );
+        }
+      }
+    }
+
+    if (payload.due_date) {
+      const startDateToCheck = payload.start_date || currentTask.start_date;
+      const dueDateToCheck = payload.due_date || currentTask.due_date;
+      const estimatedHoursToCheck = (
+        payload.estimated_hours ||
+        currentTask.estimated_hours ||
+        ""
+      ).trim();
+
+      if (startDateToCheck && dueDateToCheck && estimatedHoursToCheck) {
+        let totalHours = 0;
+
+        const durationMatch = estimatedHoursToCheck.match(
+          /^((\d+)\s*d\s*)?((\d+)\s*h\s*)?((\d+)\s*m\s*)?((\d+)\s*s\s*)?$/i
+        );
+
+        if (durationMatch) {
+          const days = parseInt(durationMatch[2] || "0", 10);
+          const hours = parseInt(durationMatch[4] || "0", 10);
+          const minutes = parseInt(durationMatch[6] || "0", 10);
+          const seconds = parseInt(durationMatch[8] || "0", 10);
+
+          totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
+        } else {
+          const [h = "0", m = "0", s = "0"] = estimatedHoursToCheck.split(":");
+          totalHours =
+            parseInt(h, 10) + parseInt(m, 10) / 60 + parseInt(s, 10) / 3600;
+        }
+
+        // Normalize both dates (remove time & timezone)
+        const start = new Date(startDateToCheck);
+        const end = new Date(dueDateToCheck);
+        const localStart = new Date(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate()
+        );
+        const localEnd = new Date(
+          end.getFullYear(),
+          end.getMonth(),
+          end.getDate()
+        );
+
+        const diffMs = localEnd - localStart;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1;
+
+        const requiredDays = Math.ceil(totalHours / 8);
+
+        if (diffDays < requiredDays) {
+          return errorResponse(
+            res,
+            null,
+            `End date must be at least ${requiredDays} day(s) after start date for estimated hours of ${estimatedHoursToCheck}`,
+            400
+          );
+        }
+      }
     }
 
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
@@ -2172,6 +2258,7 @@ exports.getTaskList = async (queryParams, res) => {
       team_id,
       priority,
       search,
+      member_id,
       dropdown_products,
       dropdown_projects,
     } = queryParams;
@@ -2213,6 +2300,7 @@ exports.getTaskList = async (queryParams, res) => {
         u.team_id,
         projects.name AS project_name,
         cu.first_name AS created_by,
+        asu.first_name AS assigned_user,
         products.name AS product_name,
         u.first_name AS assignee_name,
         teams.name AS team_name,
@@ -2222,6 +2310,7 @@ exports.getTaskList = async (queryParams, res) => {
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users u ON tasks.user_id = u.id
       LEFT JOIN users cu ON tasks.created_by = cu.id
+      LEFT JOIN users AS asu ON tasks.assigned_user_id = asu.id
       LEFT JOIN teams ON u.team_id = teams.id
       WHERE tasks.deleted_at IS NULL
     `;
@@ -2248,7 +2337,7 @@ exports.getTaskList = async (queryParams, res) => {
         );
       }
     }
-
+    
     if (role_id === 4) {
       baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
@@ -2293,7 +2382,21 @@ exports.getTaskList = async (queryParams, res) => {
 
       params.push(user_id, user_id, user_id, user_id);
     }
-
+    if (role_id === 3) {
+      if (member_id) {
+        baseQuery += `
+          AND (
+            tasks.user_id = ?
+            OR EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+                AND sub_tasks.user_id = ?
+                AND sub_tasks.deleted_at IS NULL
+            )
+          )`;
+        params.push(member_id, member_id);
+      }
+    }
     // Additional filters
     if (product_id) {
       baseQuery += ` AND tasks.product_id = ?`;
@@ -2364,7 +2467,16 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
+    if(role_id === 2 ) {
+      baseQuery += ` ORDER BY 
+      CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+      tasks.updated_at DESC`;
+      params.push(user_id);
+    }
+    else{
     baseQuery += ` ORDER BY tasks.updated_at DESC`;
+    }
+  
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
@@ -2377,6 +2489,7 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.id AS subtask_id, 
           sub_tasks.name AS subtask_name,
           sub_tasks.user_id As assignee_id, 
+          sub_tasks.assigned_user_id AS assigned_user_id,
           tasks.user_id AS task_user_id,
           task_id,
           sub_tasks.user_id AS subtask_user_id,
@@ -2385,16 +2498,25 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.status AS status, 
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
-          users.first_name AS created_by
+          users.first_name AS assigned_user
         FROM sub_tasks
-        LEFT JOIN users ON sub_tasks.created_by = users.id
+        LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
         WHERE task_id IN (?) 
           AND sub_tasks.deleted_at IS NULL
       `;
-
-      // Add user_id filter only if role_id is 4
       const queryParams = [taskIds];
+      if(role_id === 2 ) {
+          query += ` ORDER BY 
+          CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+          sub_tasks.updated_at DESC`;
+          queryParams.push(user_id);
+        }
+        else{
+           baseQuery += ` ORDER BY sub_tasks.updated_at DESC`;
+        }
+  
+      // Add user_id filter only if role_id is 4
       if (role_id === 4) {
         query +=
           " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
@@ -2452,6 +2574,7 @@ exports.getTaskList = async (queryParams, res) => {
         assignee_name: task.assignee_name,
         team_name: task.team_name,
         team_id: task.team_id,
+        assigned_by: task.assigned_user,
         created_by: task.created_by,
       };
 
@@ -2475,9 +2598,10 @@ exports.getTaskList = async (queryParams, res) => {
               user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
-              created_by: subtask.created_by,
-              assignee_id: subtask.assignee_id,
+              assigned_by: subtask.assigned_user,
+              assignee_id: subtask.assignee_id
             });
+            
           }
         });
       } else {
