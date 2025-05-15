@@ -119,7 +119,10 @@ exports.getTeamwiseProductivity = async (req, res) => {
             st.team_id,
             TIME_TO_SEC(st.estimated_hours) AS estimated_seconds,
             TIME_TO_SEC(st.total_hours_worked) AS worked_seconds,
-            TIME_TO_SEC(st.extended_hours) AS extended_seconds,
+            CASE 
+              WHEN TIME_TO_SEC(st.estimated_hours) > 0 THEN TIME_TO_SEC(st.extended_hours)
+              ELSE 0
+            END AS extended_seconds,
             st.updated_at
         FROM 
             sub_tasks st
