@@ -603,13 +603,16 @@ exports.fetchPmviewproductdata = async (req, res) => {
       // Collect and validate subtask details
       subtasks.forEach((subtask) => {
         if (isValidSubtask(subtask, status)) {
+          console.log(subtask);
+          
           validSubtasks.push({
             SubtaskId: subtask.id || "N/A",
             SubtaskName: subtask.name || "N/A",
-            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "-",
             SubtaskDescription: subtask.description || "N/A",
-            SubtaskActiveStatus: subtask.subtask_active_status || "N/A",
-            SubtaskStatus: subtask.status || "N/A",
+            SubtaskActiveStatus: subtask.active_status,
+            SubtaskStatus: subtask.status,
+            SubtaskReopenStatus: subtask.reopen_status,
             AssignedUserId: subtask.assigned_user_id || "N/A",
           });
         }
@@ -640,7 +643,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         TaskId: task.id || "N/A",
         TotalSubtaskCount: totalSubtasks,
         CompletedSubtaskCount: completedSubtasks,
-        EstimationHours: task.estimation_hours || "N/A",
+        EstimationHours: task.estimation_hours || "-",
         Description: task.description || "N/A",
         AssignedUserId: task.assigned_user_id || "N/A",
         Subtasks: validSubtasks,
@@ -725,10 +728,11 @@ exports.fetchPmviewproductdata = async (req, res) => {
           existingTask.Subtasks.push({
             SubtaskId: subtask.id || "N/A",
             SubtaskName: subtask.name || "N/A",
-            SubtaskEstimationHours: subtask.estimated_hours || "N/A",
+            SubtaskEstimationHours: subtask.estimated_hours || "-",
             SubtaskDescription: subtask.description || "N/A",
-            SubtaskActiveStatus: subtask.active_status || "N/A",
-            SubtaskStatus: subtask.status || "N/A",
+            SubtaskActiveStatus: subtask.active_status,
+            SubtaskStatus: subtask.status,
+            SubtaskReopenStatus: subtask.reopen_status,
             AssignedUserId: subtask.assigned_user_id || "N/A",
           });
 
