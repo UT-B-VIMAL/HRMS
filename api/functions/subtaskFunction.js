@@ -10,7 +10,7 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { startTask, pauseTask, endTask } = require("../functions/taskFunction");
-const { getAuthUserDetails, formatTimeDHMS,commonStatusGroup } = require("./commonFunction");
+const { getAuthUserDetails, formatTimeDHMS,commonStatusGroup ,checkUpdatePermission} = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
@@ -146,13 +146,6 @@ ORDER BY h.id DESC;
     `;
     const comments = await db.query(commentsQuery, [id]);
 
-    // // Status mapping
-    const statusMap = {
-      0: "To Do",
-      1: "In Progress",
-      2: "In Review",
-      3: "Done",
-    };
 
     const subtaskData = subtask.map((subtask) => {
       const totalEstimatedHours = subtask.estimated_hours || "00:00:00"; // Default format as "HH:MM:SS"
@@ -173,7 +166,6 @@ ORDER BY h.id DESC;
         subtask_id: subtask.id || "",
         task_id: subtask.task_id || "",
         name: subtask.name || "",
-        status: subtask.status,
         project_id: subtask.project_id || "",
         project: subtask.project_name || "",
         product_id: subtask.product_id || "",
@@ -203,9 +195,10 @@ ORDER BY h.id DESC;
         end_date: subtask.end_date || "",
         priority: subtask.priority || "",
         description: subtask.description || "",
-        status_text: statusMap[subtask.status] || "Unknown",
+        status: subtask.status,
         active_status: subtask.active_status,
         reopen_status: subtask.reopen_status,
+        status_text: commonStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status),
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
       };
     });
@@ -434,10 +427,33 @@ exports.updateSubTask = async (id, payload, res) => {
 // Delete Task
 exports.deleteSubTask = async (id, res) => {
   try {
-    const query = "UPDATE sub_tasks SET deleted_at = NOW() WHERE id = ?";
-    const [result] = await db.query(query, [id]);
+    // Fetch subtask status
+    const statusQuery =
+      "SELECT status, reopen_status, active_status FROM sub_tasks WHERE id = ? AND deleted_at IS NULL";
+    const [statusResult] = await db.query(statusQuery, [id]);
 
-    if (result.affectedRows === 0) {
+    if (statusResult.length === 0) {
+      return errorResponse(res, null, "SubTask not found", 404);
+    }
+
+    const { status, reopen_status, active_status } = statusResult[0];
+
+    // Check if subtask is InProgress
+    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    if (currentGroup === "InProgress") {
+      return errorResponse(
+        res,
+        null,
+        "SubTask is InProgress and cannot be deleted",
+        400
+      );
+    }
+
+    // Soft delete the subtask
+    const deleteQuery = "UPDATE sub_tasks SET deleted_at = NOW() WHERE id = ?";
+    const [deleteResult] = await db.query(deleteQuery, [id]);
+
+    if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "SubTask not found", 204);
     }
 
@@ -446,6 +462,7 @@ exports.deleteSubTask = async (id, res) => {
     return errorResponse(res, error.message, "Error deleting subtask", 500);
   }
 };
+
 
 exports.updatesubTaskData = async (id, payload, res, req) => {
   const {
@@ -490,18 +507,18 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
 
-    const result = await checkUpdatePermission({
-      id,
-      type: "task",
-      status,
-      active_status,
-      reopen_status,
-      role_id,
-      res
-    });
-    if (!result.allowed) {
-      return res.status(403).json({ message: result.message });
-    }
+    // const result = await checkUpdatePermission({
+    //   id,
+    //   type: "subtask",
+    //   status,
+    //   active_status,
+    //   reopen_status,
+    //   role_id,
+    //   res
+    // });
+    // if (!result.allowed) {
+    //   return res.status(403).json({ message: result.message });
+    // }
 
     if (user_id) {
       const [assignee] = await db.query(
@@ -639,24 +656,26 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         }
       }
     }
+    if(payload.status !== "NULL" && payload.status !== undefined) {
 
-const currentStatusGroup = commonStatusGroup(
-  currentTask.status,
-  currentTask.reopen_status,
-  currentTask.active_status
-);
-// Block updates if current status is InProgress, Done, or InReview
-if (
-  ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-  payload.status !== currentTask.status // only block if trying to change status
-) {
-  return errorResponse(
-    res,
-    null,
-    `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-    400
-  );
-}
+    const currentStatusGroup = commonStatusGroup(
+      currentTask.status,
+      currentTask.reopen_status,
+      currentTask.active_status
+    );
+    // Block updates if current status is InProgress, Done, or InReview
+    if (
+      ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+      payload.status !== currentTask.status // only block if trying to change status
+    ) {
+      return errorResponse(
+        res,
+        null,
+        `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+        400
+      );
+    }
+  }
     
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
