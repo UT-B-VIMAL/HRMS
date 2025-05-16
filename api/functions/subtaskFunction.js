@@ -427,10 +427,33 @@ exports.updateSubTask = async (id, payload, res) => {
 // Delete Task
 exports.deleteSubTask = async (id, res) => {
   try {
-    const query = "UPDATE sub_tasks SET deleted_at = NOW() WHERE id = ?";
-    const [result] = await db.query(query, [id]);
+    // Fetch subtask status
+    const statusQuery =
+      "SELECT status, reopen_status, active_status FROM sub_tasks WHERE id = ? AND deleted_at IS NULL";
+    const [statusResult] = await db.query(statusQuery, [id]);
 
-    if (result.affectedRows === 0) {
+    if (statusResult.length === 0) {
+      return errorResponse(res, null, "SubTask not found", 404);
+    }
+
+    const { status, reopen_status, active_status } = statusResult[0];
+
+    // Check if subtask is InProgress
+    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    if (currentGroup === "InProgress") {
+      return errorResponse(
+        res,
+        null,
+        "SubTask is InProgress and cannot be deleted",
+        400
+      );
+    }
+
+    // Soft delete the subtask
+    const deleteQuery = "UPDATE sub_tasks SET deleted_at = NOW() WHERE id = ?";
+    const [deleteResult] = await db.query(deleteQuery, [id]);
+
+    if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "SubTask not found", 204);
     }
 
@@ -439,6 +462,7 @@ exports.deleteSubTask = async (id, res) => {
     return errorResponse(res, error.message, "Error deleting subtask", 500);
   }
 };
+
 
 exports.updatesubTaskData = async (id, payload, res, req) => {
   const {
