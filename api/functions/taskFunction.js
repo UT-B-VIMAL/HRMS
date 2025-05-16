@@ -757,7 +757,7 @@ exports.updateTask = async (id, payload, res) => {
         updated_by = ?,
         deleted_at = ?,
         created_at = ?,
-        updated_at = ?
+        updated_at = NOW(),
       WHERE id = ?
     `;
 
@@ -784,7 +784,6 @@ exports.updateTask = async (id, payload, res) => {
       updatedData.updated_by,
       updatedData.deleted_at,
       updatedData.created_at,
-      updatedData.updated_at,
       id,
     ];
 
@@ -1996,6 +1995,7 @@ exports.getTaskList = async (queryParams, res) => {
       // });
 
       // Sort subtasks within each task group
+      if(role_id === 2) {
       groups[groupKey].forEach((taskGroup) => {
         taskGroup.subtask_details.sort((a, b) => {
           const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
@@ -2009,6 +2009,7 @@ exports.getTaskList = async (queryParams, res) => {
           // return new Date(a.updated_at) - new Date(b.updated_at);
         });
       });
+    }
     });
 
     const lastActiveTaskData = await lastActiveTask(user_id);
