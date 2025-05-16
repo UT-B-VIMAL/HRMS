@@ -2238,7 +2238,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     };
   }
 
-  await db.query("UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?", [
+  await db.query("UPDATE ?? SET status = 1, active_status = 1, updated_at = NOW() WHERE id = ?", [
     type === "subtask" ? "sub_tasks" : "tasks",
     id,
   ]);
@@ -2280,7 +2280,7 @@ exports.pauseTask = async (
   );
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
 
@@ -2330,7 +2330,7 @@ exports.endTask = async (
   }
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, updated_at = NOW(), command = ? WHERE id = ?",
     [
       type === "subtask" ? "sub_tasks" : "tasks",
       newTotalHoursWorked,
