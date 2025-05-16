@@ -66,10 +66,21 @@ if (isProduction) {
 }
 
 // Initialize socket.io
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim())
+  : [];
+
 const io = socketIo(server, {
   cors: {
-    origin: "*",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      }
+    },
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 app.use((req, res, next) => {
