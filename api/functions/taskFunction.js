@@ -1369,8 +1369,38 @@ exports.updateTaskData = async (id, payload, res, req) => {
   }
 };
 
+// exports.deleteTask = async (id, res) => {
+//   try {
+//     const subtaskQuery =
+//       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
+//     const [subtaskResult] = await db.query(subtaskQuery, [id]);
+
+//     if (subtaskResult[0].subtaskCount > 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Task has associated subtasks and cannot be deleted",
+//         400
+//       );
+//     }
+
+//     const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
+//     const [result] = await db.query(query, [id]);
+
+//     if (result.affectedRows === 0) {
+//       return errorResponse(res, null, "Task not found", 404);
+//     }
+
+//     return successResponse(res, null, "Task deleted successfully");
+//   } catch (error) {
+//     return errorResponse(res, error.message, "Error deleting task", 500);
+//   }
+// };
+
+
 exports.deleteTask = async (id, res) => {
   try {
+    // Check if any subtasks exist
     const subtaskQuery =
       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
     const [subtaskResult] = await db.query(subtaskQuery, [id]);
@@ -1384,10 +1414,33 @@ exports.deleteTask = async (id, res) => {
       );
     }
 
-    const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
-    const [result] = await db.query(query, [id]);
+    // Get task status details
+    const statusQuery =
+      "SELECT status, reopen_status, active_status FROM tasks WHERE id = ? AND deleted_at IS NULL";
+    const [taskStatusResult] = await db.query(statusQuery, [id]);
 
-    if (result.affectedRows === 0) {
+    if (taskStatusResult.length === 0) {
+      return errorResponse(res, null, "Task not found", 404);
+    }
+
+    const { status, reopen_status, active_status } = taskStatusResult[0];
+
+    // Prevent deletion if task is "InProgress"
+    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    if (currentGroup === "InProgress") {
+      return errorResponse(
+        res,
+        null,
+        "Task is InProgress and cannot be deleted",
+        400
+      );
+    }
+
+    // Soft delete the task
+    const deleteQuery = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
+    const [deleteResult] = await db.query(deleteQuery, [id]);
+
+    if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "Task not found", 404);
     }
 
