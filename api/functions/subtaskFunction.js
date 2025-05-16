@@ -10,7 +10,7 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { startTask, pauseTask, endTask } = require("../functions/taskFunction");
-const { getAuthUserDetails, formatTimeDHMS } = require("./commonFunction");
+const { getAuthUserDetails, formatTimeDHMS,commonStatusGroup } = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
@@ -479,12 +479,30 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     team_id: 10,
     priority: 11,
   };
+  
 
   const fieldMapping = {
     due_date: "end_date",
   };
 
   try {
+
+    const userDetails = await getAuthUserDetails(updated_by, res);
+    const role_id = userDetails.role_id;
+
+    const result = await checkUpdatePermission({
+      id,
+      type: "task",
+      status,
+      active_status,
+      reopen_status,
+      role_id,
+      res
+    });
+    if (!result.allowed) {
+      return res.status(403).json({ message: result.message });
+    }
+
     if (user_id) {
       const [assignee] = await db.query(
         "SELECT id, team_id FROM users WHERE id = ? AND deleted_at IS NULL",
@@ -621,6 +639,25 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         }
       }
     }
+
+const currentStatusGroup = commonStatusGroup(
+  currentTask.status,
+  currentTask.reopen_status,
+  currentTask.active_status
+);
+// Block updates if current status is InProgress, Done, or InReview
+if (
+  ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+  payload.status !== currentTask.status // only block if trying to change status
+) {
+  return errorResponse(
+    res,
+    null,
+    `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+    400
+  );
+}
+    
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
