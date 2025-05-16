@@ -336,13 +336,13 @@ exports.getTask = async (queryParams, res) => {
 
     const comments = await db.query(commentsQuery, [id]);
 
-    // Status mapping
-    const statusMap = {
-      0: "To Do",
-      1: "In Progress",
-      2: "In Review",
-      3: "Done",
-    };
+    // // Status mapping
+    // const statusMap = {
+    //   0: "To Do",
+    //   1: "In Progress",
+    //   2: "In Review",
+    //   3: "Done",
+    // };
 
     // Prepare task data
     const taskData = task.map((task) => {
@@ -383,7 +383,9 @@ exports.getTask = async (queryParams, res) => {
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
-        status_text: statusMap[task.status] || "Unknown",
+        // status_text: statusMap[task.status] || "Unknown",
+        status_text: commonStatusGroup(task.status, task.reopen_status, task.active_status),
+
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
 
       };
@@ -398,11 +400,13 @@ exports.getTask = async (queryParams, res) => {
           name: subtask.name || "",
           status: subtask.status,
           active_status: subtask.active_status,
+          reopen_status: subtask.reopen_status,
           assignee: subtask.user_id,
           assigneename: subtask.assignee_name || "",
-          reopen_status: subtask.reopen_status,
           short_name: (subtask.assignee_name || "").substr(0, 2),
-          status_text: statusMap[subtask.status] || "Unknown",
+          // status_text: statusMap[subtask.status] || "Unknown",
+          status_text: commonStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status),
+
         }))
         : [];
 
@@ -1353,6 +1357,7 @@ exports.getTaskList = async (queryParams, res) => {
       team_id,
       priority,
       search,
+      member_id,
       dropdown_products,
       dropdown_projects,
     } = queryParams;
@@ -1388,26 +1393,33 @@ exports.getTaskList = async (queryParams, res) => {
         tasks.total_hours_worked,
         tasks.status AS task_status,
         tasks.reopen_status,
+        tasks.assigned_user_id,
+        tasks.updated_at,
+        tasks.created_at,
+        tasks.created_by,
         tasks.active_status,
         tasks.product_id,
         tasks.project_id,
-        tasks.team_id,
+        u.team_id,
         projects.name AS project_name,
+        asu.first_name AS assigned_user,
+
         products.name AS product_name,
-        users.first_name AS assignee_name,
+        u.first_name AS assignee_name,
         teams.name AS team_name,
         teams.id AS team_id
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
-      LEFT JOIN users ON tasks.user_id = users.id
-      LEFT JOIN teams ON users.team_id = teams.id
+      LEFT JOIN users u ON tasks.user_id = u.id
+      LEFT JOIN users AS asu ON tasks.assigned_user_id = asu.id
+      LEFT JOIN teams ON u.team_id = teams.id
       WHERE tasks.deleted_at IS NULL
     `;
 
     const params = [];
     if (team_id) {
-      baseQuery += ` AND users.team_id = ?`;
+      baseQuery += ` AND u.team_id = ?`;
       params.push(team_id);
     } else if (role_id === 3) {
       const queryteam =
@@ -1416,7 +1428,7 @@ exports.getTaskList = async (queryParams, res) => {
       let teamIds = [];
       if (rowteams.length > 0) {
         teamIds = rowteams.map((row) => row.id);
-        baseQuery += ` AND users.team_id IN (?)`;
+        baseQuery += ` AND u.team_id IN (?)`;
         params.push(teamIds);
         console.log("teamIds", teamIds);
       } else {
@@ -1427,7 +1439,7 @@ exports.getTaskList = async (queryParams, res) => {
         );
       }
     }
-
+    
     if (role_id === 4) {
       baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
@@ -1472,7 +1484,21 @@ exports.getTaskList = async (queryParams, res) => {
 
       params.push(user_id, user_id, user_id, user_id);
     }
-
+    if (role_id === 3) {
+      if (member_id) {
+        baseQuery += `
+          AND (
+            tasks.user_id = ?
+            OR EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+                AND sub_tasks.user_id = ?
+                AND sub_tasks.deleted_at IS NULL
+            )
+          )`;
+        params.push(member_id, member_id);
+      }
+    }
     // Additional filters
     if (product_id) {
       baseQuery += ` AND tasks.product_id = ?`;
@@ -1514,7 +1540,23 @@ exports.getTaskList = async (queryParams, res) => {
 
     if (search) {
       const searchTerm = `%${search}%`;
-      baseQuery += `AND (tasks.name LIKE ? OR EXISTS (SELECT 1 FROM sub_tasks WHERE sub_tasks.task_id = tasks.id AND sub_tasks.name LIKE ? AND sub_tasks.deleted_at IS NULL) OR projects.name LIKE ? OR products.name LIKE ? OR users.first_name LIKE ? OR users.last_name LIKE ? OR teams.name LIKE ? OR tasks.priority LIKE ?)`;
+      baseQuery += `
+        AND (
+          tasks.name LIKE ?
+          OR EXISTS (
+            SELECT 1 
+            FROM sub_tasks
+            WHERE sub_tasks.task_id = tasks.id 
+              AND sub_tasks.name LIKE ? 
+              AND sub_tasks.deleted_at IS NULL
+          )
+          OR projects.name LIKE ?
+          OR products.name LIKE ?
+          OR u.first_name LIKE ?
+          OR u.last_name LIKE ?
+          OR teams.name LIKE ?
+          OR tasks.priority LIKE ?
+        )`;
       params.push(
         searchTerm,
         searchTerm,
@@ -1527,35 +1569,63 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
-    baseQuery += ` ORDER BY tasks.updated_at DESC`;
+    if(role_id === 2) {
+  baseQuery += `
+    ORDER BY
+      CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+      tasks.updated_at DESC
+  `;
+  params.push(user_id);
+} else {
+  baseQuery += ` ORDER BY tasks.updated_at DESC`;
+}
+  
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
-
+    console.log("tasks", tasks[0]);
     let allSubtasks = [];
     if (tasks.length > 0) {
       const taskIds = tasks.map((task) => task.task_id);
       let query = `
         SELECT 
-          id AS subtask_id, 
-          name AS subtask_name, 
+          sub_tasks.id AS subtask_id, 
+          sub_tasks.name AS subtask_name,
+          sub_tasks.user_id As assignee_id, 
+          sub_tasks.assigned_user_id AS assigned_user_id,
+          tasks.user_id AS task_user_id,
           task_id,
-          user_id,
-          estimated_hours, 
-          total_hours_worked, 
-          status, 
-          reopen_status, 
-          active_status 
+          sub_tasks.user_id AS subtask_user_id,
+          sub_tasks.estimated_hours AS estimated_hours, 
+          sub_tasks.total_hours_worked AS total_hours_worked, 
+          sub_tasks.status AS status, 
+          sub_tasks.reopen_status AS reopen_status, 
+          sub_tasks.active_status AS active_status,
+          users.first_name AS assigned_user,
+          sub_tasks.updated_at 
         FROM sub_tasks
+        LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
+        LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
         WHERE task_id IN (?) 
           AND sub_tasks.deleted_at IS NULL
       `;
-
-      // Add user_id filter only if role_id is 4
       const queryParams = [taskIds];
-      if (role_id === 4) {
-        query += " AND user_id = ?";
+      if(role_id === 2 ) {
+        query += `
+          ORDER BY
+            CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+            sub_tasks.updated_at ASC
+        `;
         queryParams.push(user_id);
+      } else {
+        query += ` ORDER BY sub_tasks.updated_at ASC`;
+      }
+  
+      // Add user_id filter only if role_id is 4
+      if (role_id === 4) {
+        query +=
+          " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
+        queryParams.push(user_id, user_id);
       }
 
       [allSubtasks] = await db.query(query, queryParams);
@@ -1595,7 +1665,6 @@ exports.getTaskList = async (queryParams, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
-
     // Iterate through tasks and categorize
     tasks.forEach((task) => {
       const taskDetails = {
@@ -1609,6 +1678,11 @@ exports.getTaskList = async (queryParams, res) => {
         assignee_name: task.assignee_name,
         team_name: task.team_name,
         team_id: task.team_id,
+        assigned_by: task.assigned_user,
+        assigned_by_id: task.assigned_user_id,
+        created_by: task.created_by,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
@@ -1631,7 +1705,12 @@ exports.getTaskList = async (queryParams, res) => {
               user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
+              assigned_by: subtask.assigned_user,
+              assigned_by_id: subtask.assigned_user_id,
+              assignee_id: subtask.assignee_id,
+              updated_at: subtask.updated_at
             });
+            
           }
         });
       } else {
@@ -1645,7 +1724,6 @@ exports.getTaskList = async (queryParams, res) => {
           groupedSubtasks[group] = [];
         }
       }
-
       // Add task to respective groups
       Object.keys(groupedSubtasks).forEach((group) => {
         groups[group].push({
@@ -1654,6 +1732,39 @@ exports.getTaskList = async (queryParams, res) => {
         });
       });
     });
+
+// Sort tasks within each group
+Object.keys(groups).forEach((groupKey) => {
+  // groups[groupKey].sort((a, b) => {
+  //   const aAssigned = a.task_details.assigned_by_id === user_id ? 0 : 1;
+  //   const bAssigned = b.task_details.assigned_by_id === user_id ? 0 : 1;
+
+  //   if (aAssigned !== bAssigned) {
+  //     return aAssigned - bAssigned; // Prioritize tasks assigned to the user
+  //   }
+
+  //   // If both have the same assignment status, sort by updated_at descending
+  //   return new Date(b.task_details.updated_at) - new Date(a.task_details.updated_at);
+  // });
+
+  // Sort subtasks within each task group
+    groups[groupKey].forEach((taskGroup) => {
+    taskGroup.subtask_details.sort((a, b) => {
+      const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
+      const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
+
+      if (aAssigned !== bAssigned) {
+        return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
+      }
+
+      // If both have the same assignment status, sort by updated_at descending
+      // return new Date(a.updated_at) - new Date(b.updated_at);
+    });
+  });
+
+});
+
+
 
     const lastActiveTaskData = await lastActiveTask(user_id);
 
@@ -1670,6 +1781,8 @@ exports.getTaskList = async (queryParams, res) => {
     return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
+
+
 
 // Utility function for calculating time left
 function calculateTimeLeft(estimatedHours, totalHoursWorked, timeDifference) {
