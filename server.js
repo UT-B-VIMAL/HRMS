@@ -66,10 +66,13 @@ if (isProduction) {
 }
 
 // Initialize socket.io
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim())
-  : [];
-
+const allowedOrigins = [
+  'http://localhost:80',
+  'http://localhost',
+  'https://main.detwo6merrv1m.amplifyapp.com',
+  'https://main.detwo6merrv1m.amplifyapp.com:80',
+  'https://main.detwo6merrv1m.amplifyapp.com:443',
+];
 const io = socketIo(server, {
   cors: {
     origin: (origin, callback) => {
@@ -108,9 +111,13 @@ chatSocket(io.of("/chat"));
 
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim())
-      : [];
+   const allowedOrigins = [
+  'http://localhost:80',
+  'http://localhost',
+  'https://main.detwo6merrv1m.amplifyapp.com',
+  'https://main.detwo6merrv1m.amplifyapp.com:80',
+  'https://main.detwo6merrv1m.amplifyapp.com:443',
+];
 
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
