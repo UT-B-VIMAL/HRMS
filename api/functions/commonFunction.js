@@ -311,4 +311,25 @@ exports.getticketCount = async (req, res) => {
 };
 
 
+ exports.commonStatusGroup = (status, reopenStatus, activeStatus) => {
+      status = Number(status);
+      reopenStatus = Number(reopenStatus);
+      activeStatus = Number(activeStatus);
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+        return "To Do";
+      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+        return "On Hold";
+      } else if (status === 2 && reopenStatus === 0) {
+        return "Pending Approval";
+      } else if (reopenStatus === 1 && activeStatus === 0) {
+        return "Reopen";
+      } else if (status === 1 && activeStatus === 1) {
+        return "InProgress";
+      } else if (status === 3) {
+        return "Done";
+      }
+      return "";
+    };
+
+
 
