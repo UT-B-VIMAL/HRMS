@@ -10,7 +10,7 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { startTask, pauseTask, endTask } = require("../functions/taskFunction");
-const { getAuthUserDetails, formatTimeDHMS } = require("./commonFunction");
+const { getAuthUserDetails, formatTimeDHMS,commonStatusGroup ,checkUpdatePermission} = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
@@ -146,13 +146,6 @@ ORDER BY h.id DESC;
     `;
     const comments = await db.query(commentsQuery, [id]);
 
-    // // Status mapping
-    const statusMap = {
-      0: "To Do",
-      1: "In Progress",
-      2: "In Review",
-      3: "Done",
-    };
 
     const subtaskData = subtask.map((subtask) => {
       const totalEstimatedHours = subtask.estimated_hours || "00:00:00"; // Default format as "HH:MM:SS"
@@ -173,7 +166,6 @@ ORDER BY h.id DESC;
         subtask_id: subtask.id || "",
         task_id: subtask.task_id || "",
         name: subtask.name || "",
-        status: subtask.status,
         project_id: subtask.project_id || "",
         project: subtask.project_name || "",
         product_id: subtask.product_id || "",
@@ -203,9 +195,10 @@ ORDER BY h.id DESC;
         end_date: subtask.end_date || "",
         priority: subtask.priority || "",
         description: subtask.description || "",
-        status_text: statusMap[subtask.status] || "Unknown",
+        status: subtask.status,
         active_status: subtask.active_status,
         reopen_status: subtask.reopen_status,
+        status_text: commonStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status),
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
       };
     });
@@ -490,18 +483,18 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
 
-    const result = await checkUpdatePermission({
-      id,
-      type: "task",
-      status,
-      active_status,
-      reopen_status,
-      role_id,
-      res
-    });
-    if (!result.allowed) {
-      return res.status(403).json({ message: result.message });
-    }
+    // const result = await checkUpdatePermission({
+    //   id,
+    //   type: "subtask",
+    //   status,
+    //   active_status,
+    //   reopen_status,
+    //   role_id,
+    //   res
+    // });
+    // if (!result.allowed) {
+    //   return res.status(403).json({ message: result.message });
+    // }
 
     if (user_id) {
       const [assignee] = await db.query(
@@ -639,6 +632,27 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         }
       }
     }
+    if(payload.status !== "NULL" && payload.status !== undefined) {
+
+    const currentStatusGroup = commonStatusGroup(
+      currentTask.status,
+      currentTask.reopen_status,
+      currentTask.active_status
+    );
+    // Block updates if current status is InProgress, Done, or InReview
+    if (
+      ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+      payload.status !== currentTask.status // only block if trying to change status
+    ) {
+      return errorResponse(
+        res,
+        null,
+        `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+        400
+      );
+    }
+  }
+    
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
@@ -998,15 +1012,20 @@ const convertTasktoSubtask = async (task_id) => {
     const [usertimelineResult] = await db.query(usertimelineQuery, [task_id]);
 
     const taskQuery = `
-      SELECT * 
-      FROM tasks 
-      WHERE (
-        (status = 1 AND active_status = 0 AND reopen_status = 0) 
-        OR reopen_status = 1
-      ) 
-      AND deleted_at IS NULL 
-      AND id = ?
-    `;
+  SELECT * 
+  FROM tasks 
+  WHERE (
+    reopen_status = 1
+    OR (
+      active_status = 0 AND reopen_status = 0 AND (
+        status = 1 OR status = 2 OR status = 3
+      )
+    )
+  )
+  AND deleted_at IS NULL 
+  AND id = ?
+`;
+
     const [taskResults] = await db.query(taskQuery, [task_id]);
 
     if (taskResults.length === 0 || usertimelineResult.length === 0) {
@@ -1025,8 +1044,8 @@ const convertTasktoSubtask = async (task_id) => {
     const [subtaskResult] = await db.query(subtaskQuery, [task_id]);
 
     if (subtaskResult.length === 0) {
-// Insert as new subtask
-    const insertQuery = `
+      // Insert as new subtask
+      const insertQuery = `
       INSERT INTO sub_tasks (
         product_id, project_id, task_id, user_id, name, estimated_hours, start_date, end_date,
         extended_status, extended_hours, active_status, status, total_hours_worked,
@@ -1036,67 +1055,66 @@ const convertTasktoSubtask = async (task_id) => {
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NOW()
       )
     `;
-    const values = [
-      task.product_id,
-      task.project_id,
-      task.id,
-      task.user_id,
-      task.name,
-      task.estimated_hours,
-      task.start_date,
-      task.end_date,
-      task.extended_status,
-      task.extended_hours,
-      task.active_status,
-      task.status,
-      task.total_hours_worked,
-      task.command,
-      task.assigned_user_id,
-      task.remark,
-      task.reopen_status,
-      task.description,
-      task.team_id,
-      task.priority,
-      task.created_by,
-      task.updated_by,
-      task.created_at,
-    ];
+      const values = [
+        task.product_id,
+        task.project_id,
+        task.id,
+        task.user_id,
+        task.name,
+        task.estimated_hours,
+        task.start_date,
+        task.end_date,
+        task.extended_status,
+        task.extended_hours,
+        task.active_status,
+        task.status,
+        task.total_hours_worked,
+        task.command,
+        task.assigned_user_id,
+        task.remark,
+        task.reopen_status,
+        task.description,
+        task.team_id,
+        task.priority,
+        task.created_by,
+        task.updated_by,
+        task.created_at,
+      ];
 
-    const [insertResult] = await db.query(insertQuery, values);
-    const newSubtaskId = insertResult.insertId;
+      const [insertResult] = await db.query(insertQuery, values);
+      const newSubtaskId = insertResult.insertId;
 
-    // Update sub_tasks_user_timeline
-    await db.query(
-      `
+      // Update sub_tasks_user_timeline
+      await db.query(
+        `
       UPDATE sub_tasks_user_timeline
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
     `,
-      [newSubtaskId, task_id]
-    );
+        [newSubtaskId, task_id]
+      );
 
-    // Update task_comments
-    await db.query(
-      `
+      // Update task_comments
+      await db.query(
+        `
       UPDATE task_comments
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
     `,
-      [newSubtaskId, task_id]
-    );
+        [newSubtaskId, task_id]
+      );
 
-    // Update task_histories
-    await db.query(
-      `
+      // Update task_histories
+      await db.query(
+        `
       UPDATE task_histories
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
     `,
-      [newSubtaskId, task_id]
-    );
-    return true;
+        [newSubtaskId, task_id]
+      );
+      return true;
     }
-    
   } catch (err) {
     console.error("convertTasktoSubtask error:", err.message);
     return false;
