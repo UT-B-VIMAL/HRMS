@@ -18,7 +18,7 @@ const {
   formatTimeDHMS,
   getISTTime,
   checkUpdatePermission,
-  commonStatusGroup
+  commonStatusGroup,
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -130,7 +130,7 @@ exports.createTask = async (payload, res) => {
         return errorResponse(
           res,
           null,
-          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m", "2h 30m", or "45m".',
           400
         );
       }
@@ -156,10 +156,35 @@ exports.createTask = async (payload, res) => {
         );
       }
 
-      // Convert days to hours and calculate total hours
+      // Validate date span for estimated days
+      if (start_date && end_date && days > 0) {
+        const start = moment(start_date, "YYYY-MM-DD");
+        const end = moment(end_date, "YYYY-MM-DD");
+
+        if (!start.isValid() || !end.isValid()) {
+          return errorResponse(
+            res,
+            null,
+            "Invalid start_date or end_date format",
+            400
+          );
+        }
+
+        const diffDays = end.diff(start, "days") + 1;
+
+        if (diffDays < days) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated duration is ${days} day(s), but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
+            400
+          );
+        }
+      }
+
+      // Convert total estimated time to HH:MM:SS
       const totalHours = days * 8 + hours;
 
-      // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
         "0"
@@ -226,7 +251,12 @@ exports.getTask = async (queryParams, res) => {
     const { id, user_id } = queryParams;
 
     if (!user_id) {
-      return errorResponse(res, "User ID is required", "Missing user_id in query parameters", 400);
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Missing user_id in query parameters",
+        400
+      );
     }
 
     const userDetails = await getAuthUserDetails(user_id, res);
@@ -346,11 +376,14 @@ exports.getTask = async (queryParams, res) => {
 
     // Prepare task data
     const taskData = task.map((task) => {
-      const totalEstimatedHours = task.estimated_hours || "00:00:00";  // Ensure default format as "HH:MM:SS"
-      const timeTaken = task.total_hours_worked || "00:00:00";  // Ensure default format as "HH:MM:SS"
+      const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
+      const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
 
       // Calculate remaining hours and ensure consistent formatting
-      const remainingHours = calculateRemainingHours(totalEstimatedHours, timeTaken);
+      const remainingHours = calculateRemainingHours(
+        totalEstimatedHours,
+        timeTaken
+      );
 
       // Calculate percentage for hours
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
@@ -374,20 +407,32 @@ exports.getTask = async (queryParams, res) => {
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
         estimated_hours: formatTimeDHMS(totalEstimatedHours),
-        estimated_hours_percentage: calculatePercentage(estimatedInSeconds, estimatedInSeconds),
+        estimated_hours_percentage: calculatePercentage(
+          estimatedInSeconds,
+          estimatedInSeconds
+        ),
         time_taken: formatTimeDHMS(timeTaken),
-        time_taken_percentage: calculatePercentage(timeTakenInSeconds, estimatedInSeconds),
+        time_taken_percentage: calculatePercentage(
+          timeTakenInSeconds,
+          estimatedInSeconds
+        ),
         remaining_hours: formatTimeDHMS(remainingHours),
-        remaining_hours_percentage: calculatePercentage(remainingInSeconds, estimatedInSeconds),
+        remaining_hours_percentage: calculatePercentage(
+          remainingInSeconds,
+          estimatedInSeconds
+        ),
         start_date: task.start_date,
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
         // status_text: statusMap[task.status] || "Unknown",
-        status_text: commonStatusGroup(task.status, task.reopen_status, task.active_status),
+        status_text: commonStatusGroup(
+          task.status,
+          task.reopen_status,
+          task.active_status
+        ),
 
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
-
       };
     });
 
@@ -395,49 +440,57 @@ exports.getTask = async (queryParams, res) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-          subtask_id: subtask.id,
-          owner_id: subtask.user_id || "",
-          name: subtask.name || "",
-          status: subtask.status,
-          active_status: subtask.active_status,
-          reopen_status: subtask.reopen_status,
-          assignee: subtask.user_id,
-          assigneename: subtask.assignee_name || "",
-          short_name: (subtask.assignee_name || "").substr(0, 2),
-          // status_text: statusMap[subtask.status] || "Unknown",
-          status_text: commonStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status),
-
-        }))
+            subtask_id: subtask.id,
+            owner_id: subtask.user_id || "",
+            name: subtask.name || "",
+            status: subtask.status,
+            active_status: subtask.active_status,
+            reopen_status: subtask.reopen_status,
+            assignee: subtask.user_id,
+            assigneename: subtask.assignee_name || "",
+            short_name: (subtask.assignee_name || "").substr(0, 2),
+            // status_text: statusMap[subtask.status] || "Unknown",
+            status_text: commonStatusGroup(
+              subtask.status,
+              subtask.reopen_status,
+              subtask.active_status
+            ),
+          }))
         : [];
 
-    const historiesData = Array.isArray(histories) && histories[0].length > 0
-      ? await Promise.all(
-        histories[0].map(async (history) => ({
-          old_data: history.old_data,
-          new_data: history.new_data,
-          description: history.status_description || "Changed the status",
-          updated_by: history.updated_by,
-          shortName: history.short_name,
-          time_date: moment.utc(history.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'),
-          time_utc: history.updated_at,
-          time: moment.utc(history.updated_at).tz('Asia/Kolkata').fromNow(),
-        }))
-      )
-      : [];
-
+    const historiesData =
+      Array.isArray(histories) && histories[0].length > 0
+        ? await Promise.all(
+            histories[0].map(async (history) => ({
+              old_data: history.old_data,
+              new_data: history.new_data,
+              description: history.status_description || "Changed the status",
+              updated_by: history.updated_by,
+              shortName: history.short_name,
+              time_date: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .format("YYYY-MM-DD HH:mm:ss"),
+              time_utc: history.updated_at,
+              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+            }))
+          )
+        : [];
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-          comment_id: comment.id,
-          comments: comment.comments,
-          updated_by: comment.updated_by || "",
-          shortName: comment.updated_by.substr(0, 2),
-          time_date: moment.utc(comment.updated_at).tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss'),
-          time_utc: comment.updated_at,
-          time: moment.utc(comment.updated_at).tz('Asia/Kolkata').fromNow(),
-
-        }))
+            comment_id: comment.id,
+            comments: comment.comments,
+            updated_by: comment.updated_by || "",
+            shortName: comment.updated_by.substr(0, 2),
+            time_date: moment
+              .utc(comment.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: comment.updated_at,
+            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+          }))
         : [];
 
     // Final response
@@ -485,6 +538,9 @@ exports.updateTask = async (id, payload, res) => {
       user_id,
       assigned_user_id,
       updated_by,
+      estimated_hours,
+      start_date,
+      end_date,
       team_id,
     } = payload;
 
@@ -597,8 +653,8 @@ exports.updateTask = async (id, payload, res) => {
     const existingTask = currentTask[0];
 
     // If estimated_hours is passed, validate and convert it
-    if (payload.estimated_hours) {
-      const timeMatch = payload.estimated_hours.match(
+    if (estimated_hours) {
+      const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
 
@@ -606,7 +662,7 @@ exports.updateTask = async (id, payload, res) => {
         return errorResponse(
           res,
           null,
-          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m", "2h 30m", or "45m".',
           400
         );
       }
@@ -632,7 +688,35 @@ exports.updateTask = async (id, payload, res) => {
         );
       }
 
+      // Validate date span for estimated days
+      if (start_date && end_date && days > 0) {
+        const start = moment(start_date, "YYYY-MM-DD");
+        const end = moment(end_date, "YYYY-MM-DD");
+
+        if (!start.isValid() || !end.isValid()) {
+          return errorResponse(
+            res,
+            null,
+            "Invalid start_date or end_date format",
+            400
+          );
+        }
+
+        const diffDays = end.diff(start, "days") + 1;
+
+        if (diffDays < days) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated duration is ${days} day(s), but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
+            400
+          );
+        }
+      }
+
+      // Convert total estimated time to HH:MM:SS
       const totalHours = days * 8 + hours;
+
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
         "0"
@@ -641,12 +725,11 @@ exports.updateTask = async (id, payload, res) => {
         "0"
       )}`;
     }
-
     // Merge payload with existing task
     const updatedData = {
       ...existingTask,
       ...payload,
-      updated_at: new Date()
+      updated_at: new Date(),
     };
 
     // Update query
@@ -702,7 +785,7 @@ exports.updateTask = async (id, payload, res) => {
       updatedData.deleted_at,
       updatedData.created_at,
       updatedData.updated_at,
-      id
+      id,
     ];
 
     const [result] = await db.query(query, values);
@@ -720,7 +803,6 @@ exports.updateTask = async (id, payload, res) => {
     return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
-
 
 exports.updateTaskData = async (id, payload, res, req) => {
   const {
@@ -759,18 +841,18 @@ exports.updateTaskData = async (id, payload, res, req) => {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
 
-    const result = await checkUpdatePermission({
-      id,
-      type: "task",
-      status,
-      active_status,
-      reopen_status,
-      role_id,
-      res
-    });
-    if (!result.allowed) {
-      return res.status(403).json({ message: result.message });
-    }
+    // const result = await checkUpdatePermission({
+    //   id,
+    //   type: "task",
+    //   status,
+    //   active_status,
+    //   reopen_status,
+    //   role_id,
+    //   res
+    // });
+    // if (!result.allowed) {
+    //   return res.status(403).json({ message: result.message });
+    // }
 
     if (user_id) {
       const [assigned_user] = await db.query(
@@ -855,7 +937,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
     }
     if (sub_task_counts.length === 0) {
       if (active_status == 1 && status == 1) {
-
         if (!userDetails || userDetails.id == undefined) {
           return;
         }
@@ -865,7 +946,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
           return errorResponse(res, "You are not allowed to start task", 400);
         }
       } else if (active_status == 0 && status == 1) {
-
         const [existingSubtaskSublime] = await db.query(
           "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
           [updated_by]
@@ -886,7 +966,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
           }
         }
       } else if (active_status == 0 && status == 2) {
-
         const [existingSubtaskSublime] = await db.query(
           "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
           [updated_by]
@@ -910,29 +989,31 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-const currentStatusGroup = commonStatusGroup(
-  currentTask.status,
-  currentTask.reopen_status,
-  currentTask.active_status
-);
-// Block updates if current status is InProgress, Done, or InReview
-if (
-  ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-  payload.status !== currentTask.status // only block if trying to change status
-) {
-  return errorResponse(
-    res,
-    null,
-    `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-    400
-  );
-}
-
+    if (payload.status !== "NULL" && payload.status !== undefined) {
+      const currentStatusGroup = commonStatusGroup(
+        currentTask.status,
+        currentTask.reopen_status,
+        currentTask.active_status
+      );
+      // Block updates if current status is InProgress, Done, or InReview
+      if (
+        ["InProgress", "Done", "Pending Approval"].includes(
+          currentStatusGroup
+        ) &&
+        payload.status !== currentTask.status // only block if trying to change status
+      ) {
+        return errorResponse(
+          res,
+          null,
+          `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+          400
+        );
+      }
+    }
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
-
       if (!timeMatch) {
         return errorResponse(
           res,
@@ -941,12 +1022,10 @@ if (
           400
         );
       }
-
       const days = parseInt(timeMatch[2] || "0", 10);
       const hours = parseInt(timeMatch[4] || "0", 10);
       const minutes = parseInt(timeMatch[6] || "0", 10);
       const seconds = parseInt(timeMatch[8] || "0", 10);
-
       if (
         days < 0 ||
         hours < 0 ||
@@ -962,10 +1041,8 @@ if (
           400
         );
       }
-
       // Convert days to hours and calculate total hours
       const totalHours = days * 8 + hours;
-
       // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
@@ -974,6 +1051,93 @@ if (
         2,
         "0"
       )}`;
+      // Validate range only if both dates are present
+      const startDateToCheck = payload.start_date || currentTask.start_date;
+      const dueDateToCheck = payload.end_date || currentTask.end_date;
+
+      if (startDateToCheck && dueDateToCheck) {
+        const start = new Date(startDateToCheck);
+        const end = new Date(dueDateToCheck);
+
+        // Normalize to remove time
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+
+        if (start > end) {
+          return errorResponse(
+            res,
+            null,
+            "Start date cannot be after due date.",
+            400
+          );
+        }
+
+        const diffMs = end - start;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1; // inclusive
+        const maxAllowedHours = diffDays * 8;
+
+        if (totalHours > maxAllowedHours) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated hours (${totalHours.toFixed(
+              2
+            )}h) exceed available working hours (${maxAllowedHours}h) between start and due date.`,
+            400
+          );
+        }
+      }
+    }
+
+    if (payload.due_date) {
+      const startDateToCheck = payload.start_date || currentTask.start_date;
+      const dueDateToCheck = payload.due_date || currentTask.due_date;
+      const estimatedHoursToCheck = (
+        payload.estimated_hours ||
+        currentTask.estimated_hours ||
+        ""
+      ).trim();
+      if (startDateToCheck && dueDateToCheck && estimatedHoursToCheck) {
+        let totalHours = 0;
+        const durationMatch = estimatedHoursToCheck.match(
+          /^((\d+)\s*d\s*)?((\d+)\s*h\s*)?((\d+)\s*m\s*)?((\d+)\s*s\s*)?$/i
+        );
+        if (durationMatch) {
+          const days = parseInt(durationMatch[2] || "0", 10);
+          const hours = parseInt(durationMatch[4] || "0", 10);
+          const minutes = parseInt(durationMatch[6] || "0", 10);
+          const seconds = parseInt(durationMatch[8] || "0", 10);
+          totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
+        } else {
+          const [h = "0", m = "0", s = "0"] = estimatedHoursToCheck.split(":");
+          totalHours =
+            parseInt(h, 10) + parseInt(m, 10) / 60 + parseInt(s, 10) / 3600;
+        }
+        // Normalize both dates (remove time & timezone)
+        const start = new Date(startDateToCheck);
+        const end = new Date(dueDateToCheck);
+        const localStart = new Date(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate()
+        );
+        const localEnd = new Date(
+          end.getFullYear(),
+          end.getMonth(),
+          end.getDate()
+        );
+        const diffMs = localEnd - localStart;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1;
+        const requiredDays = Math.ceil(totalHours / 8);
+        if (diffDays < requiredDays) {
+          return errorResponse(
+            res,
+            null,
+            `End date must be at least ${requiredDays} day(s) after start date for estimated hours of ${estimatedHoursToCheck}`,
+            400
+          );
+        }
+      }
     }
 
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
@@ -1147,8 +1311,8 @@ if (
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-          .join(", ")}
+    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+    .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -1205,8 +1369,38 @@ if (
   }
 };
 
+// exports.deleteTask = async (id, res) => {
+//   try {
+//     const subtaskQuery =
+//       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
+//     const [subtaskResult] = await db.query(subtaskQuery, [id]);
+
+//     if (subtaskResult[0].subtaskCount > 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Task has associated subtasks and cannot be deleted",
+//         400
+//       );
+//     }
+
+//     const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
+//     const [result] = await db.query(query, [id]);
+
+//     if (result.affectedRows === 0) {
+//       return errorResponse(res, null, "Task not found", 404);
+//     }
+
+//     return successResponse(res, null, "Task deleted successfully");
+//   } catch (error) {
+//     return errorResponse(res, error.message, "Error deleting task", 500);
+//   }
+// };
+
+
 exports.deleteTask = async (id, res) => {
   try {
+    // Check if any subtasks exist
     const subtaskQuery =
       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
     const [subtaskResult] = await db.query(subtaskQuery, [id]);
@@ -1220,10 +1414,33 @@ exports.deleteTask = async (id, res) => {
       );
     }
 
-    const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
-    const [result] = await db.query(query, [id]);
+    // Get task status details
+    const statusQuery =
+      "SELECT status, reopen_status, active_status FROM tasks WHERE id = ? AND deleted_at IS NULL";
+    const [taskStatusResult] = await db.query(statusQuery, [id]);
 
-    if (result.affectedRows === 0) {
+    if (taskStatusResult.length === 0) {
+      return errorResponse(res, null, "Task not found", 404);
+    }
+
+    const { status, reopen_status, active_status } = taskStatusResult[0];
+
+    // Prevent deletion if task is "InProgress"
+    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    if (currentGroup === "InProgress") {
+      return errorResponse(
+        res,
+        null,
+        "Task is InProgress and cannot be deleted",
+        400
+      );
+    }
+
+    // Soft delete the task
+    const deleteQuery = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
+    const [deleteResult] = await db.query(deleteQuery, [id]);
+
+    if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "Task not found", 404);
     }
 
@@ -1306,8 +1523,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-        ? true
-        : false;
+      ? true
+      : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -1439,7 +1656,7 @@ exports.getTaskList = async (queryParams, res) => {
         );
       }
     }
-    
+
     if (role_id === 4) {
       baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
@@ -1570,15 +1787,21 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     if(role_id === 2) {
-  baseQuery += `
-    ORDER BY
-      CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-      tasks.updated_at DESC
-  `;
-  params.push(user_id);
-} else {
-  baseQuery += ` ORDER BY tasks.updated_at DESC`;
-}
+        baseQuery += `
+          ORDER BY
+        CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+        CASE tasks.priority
+          WHEN 'High' THEN 1
+          WHEN 'Medium' THEN 2
+          WHEN 'Low' THEN 3
+          ELSE 4
+        END,
+        tasks.updated_at DESC
+        `;
+        params.push(user_id);
+      } else {
+        baseQuery += ` ORDER BY tasks.updated_at DESC`;
+      }
   
 
     // Execute the base query for tasks
@@ -1602,7 +1825,8 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
           users.first_name AS assigned_user,
-          sub_tasks.updated_at 
+          sub_tasks.updated_at,
+          sub_tasks.priority
         FROM sub_tasks
         LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
@@ -1610,17 +1834,23 @@ exports.getTaskList = async (queryParams, res) => {
           AND sub_tasks.deleted_at IS NULL
       `;
       const queryParams = [taskIds];
-      if(role_id === 2 ) {
+      if (role_id === 2) {
         query += `
           ORDER BY
             CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+            CASE sub_tasks.priority
+            WHEN 'High' THEN 1
+            WHEN 'Medium' THEN 2
+            WHEN 'Low' THEN 3
+            ELSE 4
+        END,
             sub_tasks.updated_at DESC
         `;
         queryParams.push(user_id);
       } else {
         baseQuery += ` ORDER BY tasks.updated_at DESC`;
       }
-  
+
       // Add user_id filter only if role_id is 4
       if (role_id === 4) {
         query +=
@@ -1710,10 +1940,10 @@ exports.getTaskList = async (queryParams, res) => {
               assignee_id: subtask.assignee_id,
               updated_at: subtask.updated_at,
               status: subtask.status,
+              priority: subtask.priority,
               reopen_status: subtask.reopen_status,
-              active_status: subtask.active_status
+              active_status: subtask.active_status,
             });
-            
           }
         });
       } else {
@@ -1736,38 +1966,35 @@ exports.getTaskList = async (queryParams, res) => {
       });
     });
 
-// Sort tasks within each group
-Object.keys(groups).forEach((groupKey) => {
-  // groups[groupKey].sort((a, b) => {
-  //   const aAssigned = a.task_details.assigned_by_id === user_id ? 0 : 1;
-  //   const bAssigned = b.task_details.assigned_by_id === user_id ? 0 : 1;
+    // Sort tasks within each group
+    Object.keys(groups).forEach((groupKey) => {
+      // groups[groupKey].sort((a, b) => {
+      //   const aAssigned = a.task_details.assigned_by_id === user_id ? 0 : 1;
+      //   const bAssigned = b.task_details.assigned_by_id === user_id ? 0 : 1;
 
-  //   if (aAssigned !== bAssigned) {
-  //     return aAssigned - bAssigned; // Prioritize tasks assigned to the user
-  //   }
+      //   if (aAssigned !== bAssigned) {
+      //     return aAssigned - bAssigned; // Prioritize tasks assigned to the user
+      //   }
 
-  //   // If both have the same assignment status, sort by updated_at descending
-  //   return new Date(b.task_details.updated_at) - new Date(a.task_details.updated_at);
-  // });
+      //   // If both have the same assignment status, sort by updated_at descending
+      //   return new Date(b.task_details.updated_at) - new Date(a.task_details.updated_at);
+      // });
 
-  // Sort subtasks within each task group
-    groups[groupKey].forEach((taskGroup) => {
-    taskGroup.subtask_details.sort((a, b) => {
-      const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
-      const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
+      // Sort subtasks within each task group
+      groups[groupKey].forEach((taskGroup) => {
+        taskGroup.subtask_details.sort((a, b) => {
+          const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
+          const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
 
-      if (aAssigned !== bAssigned) {
-        return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
-      }
+          if (aAssigned !== bAssigned) {
+            return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
+          }
 
-      // If both have the same assignment status, sort by updated_at descending
-      // return new Date(a.updated_at) - new Date(b.updated_at);
+          // If both have the same assignment status, sort by updated_at descending
+          // return new Date(a.updated_at) - new Date(b.updated_at);
+        });
+      });
     });
-  });
-
-});
-
-
 
     const lastActiveTaskData = await lastActiveTask(user_id);
 
@@ -1784,8 +2011,6 @@ Object.keys(groups).forEach((groupKey) => {
     return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
-
-
 
 // Utility function for calculating time left
 function calculateTimeLeft(estimatedHours, totalHoursWorked, timeDifference) {
@@ -2013,7 +2238,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     };
   }
 
-  await db.query("UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?", [
+  await db.query("UPDATE ?? SET status = 1, active_status = 1, updated_at = NOW() WHERE id = ?", [
     type === "subtask" ? "sub_tasks" : "tasks",
     id,
   ]);
@@ -2055,7 +2280,7 @@ exports.pauseTask = async (
   );
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
 
@@ -2105,7 +2330,7 @@ exports.endTask = async (
   }
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, updated_at = NOW(), command = ? WHERE id = ?",
     [
       type === "subtask" ? "sub_tasks" : "tasks",
       newTotalHoursWorked,
@@ -2788,5 +3013,3 @@ WHERE
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
-
