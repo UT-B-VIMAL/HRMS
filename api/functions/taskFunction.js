@@ -2294,13 +2294,17 @@ exports.getTaskList = async (queryParams, res) => {
         tasks.total_hours_worked,
         tasks.status AS task_status,
         tasks.reopen_status,
+        tasks.assigned_user_id,
+        tasks.updated_at,
+        tasks.created_at,
+        tasks.created_by,
         tasks.active_status,
         tasks.product_id,
         tasks.project_id,
         u.team_id,
         projects.name AS project_name,
-        cu.first_name AS created_by,
         asu.first_name AS assigned_user,
+
         products.name AS product_name,
         u.first_name AS assignee_name,
         teams.name AS team_name,
@@ -2309,7 +2313,6 @@ exports.getTaskList = async (queryParams, res) => {
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users u ON tasks.user_id = u.id
-      LEFT JOIN users cu ON tasks.created_by = cu.id
       LEFT JOIN users AS asu ON tasks.assigned_user_id = asu.id
       LEFT JOIN teams ON u.team_id = teams.id
       WHERE tasks.deleted_at IS NULL
@@ -2467,20 +2470,21 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
-    if(role_id === 2 ) {
-      baseQuery += ` ORDER BY 
+    if(role_id === 2) {
+  baseQuery += `
+    ORDER BY
       CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-      tasks.updated_at DESC`;
-      params.push(user_id);
-    }
-    else{
-    baseQuery += ` ORDER BY tasks.updated_at DESC`;
-    }
+      tasks.updated_at DESC
+  `;
+  params.push(user_id);
+} else {
+  baseQuery += ` ORDER BY tasks.updated_at DESC`;
+}
   
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
-
+    console.log("tasks", tasks[0]);
     let allSubtasks = [];
     if (tasks.length > 0) {
       const taskIds = tasks.map((task) => task.task_id);
@@ -2498,7 +2502,8 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.status AS status, 
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
-          users.first_name AS assigned_user
+          users.first_name AS assigned_user,
+          sub_tasks.updated_at 
         FROM sub_tasks
         LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
@@ -2507,14 +2512,15 @@ exports.getTaskList = async (queryParams, res) => {
       `;
       const queryParams = [taskIds];
       if(role_id === 2 ) {
-          query += ` ORDER BY 
-          CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-          sub_tasks.updated_at DESC`;
-          queryParams.push(user_id);
-        }
-        else{
-           baseQuery += ` ORDER BY sub_tasks.updated_at DESC`;
-        }
+        query += `
+          ORDER BY
+            CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+            sub_tasks.updated_at ASC
+        `;
+        queryParams.push(user_id);
+      } else {
+        query += ` ORDER BY sub_tasks.updated_at ASC`;
+      }
   
       // Add user_id filter only if role_id is 4
       if (role_id === 4) {
@@ -2560,7 +2566,6 @@ exports.getTaskList = async (queryParams, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
-
     // Iterate through tasks and categorize
     tasks.forEach((task) => {
       const taskDetails = {
@@ -2575,7 +2580,10 @@ exports.getTaskList = async (queryParams, res) => {
         team_name: task.team_name,
         team_id: task.team_id,
         assigned_by: task.assigned_user,
+        assigned_by_id: task.assigned_user_id,
         created_by: task.created_by,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
       };
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
@@ -2599,7 +2607,9 @@ exports.getTaskList = async (queryParams, res) => {
               subtask_name: subtask.subtask_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
               assigned_by: subtask.assigned_user,
-              assignee_id: subtask.assignee_id
+              assigned_by_id: subtask.assigned_user_id,
+              assignee_id: subtask.assignee_id,
+              updated_at: subtask.updated_at
             });
             
           }
@@ -2615,7 +2625,6 @@ exports.getTaskList = async (queryParams, res) => {
           groupedSubtasks[group] = [];
         }
       }
-
       // Add task to respective groups
       Object.keys(groupedSubtasks).forEach((group) => {
         groups[group].push({
@@ -2624,6 +2633,39 @@ exports.getTaskList = async (queryParams, res) => {
         });
       });
     });
+
+// Sort tasks within each group
+Object.keys(groups).forEach((groupKey) => {
+  // groups[groupKey].sort((a, b) => {
+  //   const aAssigned = a.task_details.assigned_by_id === user_id ? 0 : 1;
+  //   const bAssigned = b.task_details.assigned_by_id === user_id ? 0 : 1;
+
+  //   if (aAssigned !== bAssigned) {
+  //     return aAssigned - bAssigned; // Prioritize tasks assigned to the user
+  //   }
+
+  //   // If both have the same assignment status, sort by updated_at descending
+  //   return new Date(b.task_details.updated_at) - new Date(a.task_details.updated_at);
+  // });
+
+  // Sort subtasks within each task group
+    groups[groupKey].forEach((taskGroup) => {
+    taskGroup.subtask_details.sort((a, b) => {
+      const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
+      const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
+
+      if (aAssigned !== bAssigned) {
+        return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
+      }
+
+      // If both have the same assignment status, sort by updated_at descending
+      // return new Date(a.updated_at) - new Date(b.updated_at);
+    });
+  });
+
+});
+
+
 
     const lastActiveTaskData = await lastActiveTask(user_id);
 
@@ -2640,6 +2682,7 @@ exports.getTaskList = async (queryParams, res) => {
     return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
+
 
 // Utility function for calculating time left
 function calculateTimeLeft(estimatedHours, totalHoursWorked, timeDifference) {
