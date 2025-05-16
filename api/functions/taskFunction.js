@@ -122,15 +122,13 @@ exports.createTask = async (payload, res) => {
     }
 
     if (estimated_hours) {
-      const timeMatch = estimated_hours.match(
-        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
-      );
+      const timeMatch = estimated_hours.match(/^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
 
       if (!timeMatch) {
         return errorResponse(
           res,
           null,
-          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m", "2h 30m", or "45m".',
           400
         );
       }
@@ -156,17 +154,31 @@ exports.createTask = async (payload, res) => {
         );
       }
 
-      // Convert days to hours and calculate total hours
+      // Validate date span for estimated days
+      if (start_date && end_date && days > 0) {
+        const start = moment(start_date, "YYYY-MM-DD");
+        const end = moment(end_date, "YYYY-MM-DD");
+
+        if (!start.isValid() || !end.isValid()) {
+          return errorResponse(res, null, "Invalid start_date or end_date format", 400);
+        }
+
+        const diffDays = end.diff(start, "days") + 1;
+
+        if (diffDays < days) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated duration is ${days} day(s), but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
+            400
+          );
+        }
+      }
+
+      // Convert total estimated time to HH:MM:SS
       const totalHours = days * 8 + hours;
 
-      // Format as "HH:MM:SS"
-      payload.estimated_hours = `${String(totalHours).padStart(
-        2,
-        "0"
-      )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-        2,
-        "0"
-      )}`;
+      payload.estimated_hours = `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
     }
 
     const query = `
@@ -597,16 +609,14 @@ exports.updateTask = async (id, payload, res) => {
     const existingTask = currentTask[0];
 
     // If estimated_hours is passed, validate and convert it
-    if (payload.estimated_hours) {
-      const timeMatch = payload.estimated_hours.match(
-        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
-      );
+      if (estimated_hours) {
+      const timeMatch = estimated_hours.match(/^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
 
       if (!timeMatch) {
         return errorResponse(
           res,
           null,
-          'Invalid format for estimated_hours. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
+          'Invalid format for estimated_hours. Use formats like "1d 2h 30m", "2h 30m", or "45m".',
           400
         );
       }
@@ -632,16 +642,32 @@ exports.updateTask = async (id, payload, res) => {
         );
       }
 
-      const totalHours = days * 8 + hours;
-      payload.estimated_hours = `${String(totalHours).padStart(
-        2,
-        "0"
-      )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-        2,
-        "0"
-      )}`;
-    }
+      // Validate date span for estimated days
+      if (start_date && end_date && days > 0) {
+        const start = moment(start_date, "YYYY-MM-DD");
+        const end = moment(end_date, "YYYY-MM-DD");
 
+        if (!start.isValid() || !end.isValid()) {
+          return errorResponse(res, null, "Invalid start_date or end_date format", 400);
+        }
+
+        const diffDays = end.diff(start, "days") + 1;
+
+        if (diffDays < days) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated duration is ${days} day(s), but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
+            400
+          );
+        }
+      }
+
+      // Convert total estimated time to HH:MM:SS
+      const totalHours = days * 8 + hours;
+
+      payload.estimated_hours = `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
     // Merge payload with existing task
     const updatedData = {
       ...existingTask,
@@ -910,29 +936,29 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-const currentStatusGroup = commonStatusGroup(
-  currentTask.status,
-  currentTask.reopen_status,
-  currentTask.active_status
-);
-// Block updates if current status is InProgress, Done, or InReview
-if (
-  ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-  payload.status !== currentTask.status // only block if trying to change status
-) {
-  return errorResponse(
-    res,
-    null,
-    `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-    400
-  );
-}
+    
+    const currentStatusGroup = commonStatusGroup(
+      currentTask.status,
+      currentTask.reopen_status,
+      currentTask.active_status
+    );
+    // Block updates if current status is InProgress, Done, or InReview
+    if (
+      ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+      payload.status !== currentTask.status // only block if trying to change status
+    ) {
+      return errorResponse(
+        res,
+        null,
+        `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+        400
+      );
+    }
 
-    if (estimated_hours) {
+   if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
-
       if (!timeMatch) {
         return errorResponse(
           res,
@@ -941,12 +967,10 @@ if (
           400
         );
       }
-
       const days = parseInt(timeMatch[2] || "0", 10);
       const hours = parseInt(timeMatch[4] || "0", 10);
       const minutes = parseInt(timeMatch[6] || "0", 10);
       const seconds = parseInt(timeMatch[8] || "0", 10);
-
       if (
         days < 0 ||
         hours < 0 ||
@@ -962,10 +986,8 @@ if (
           400
         );
       }
-
       // Convert days to hours and calculate total hours
       const totalHours = days * 8 + hours;
-
       // Format as "HH:MM:SS"
       payload.estimated_hours = `${String(totalHours).padStart(
         2,
@@ -974,7 +996,85 @@ if (
         2,
         "0"
       )}`;
+      // Validate range only if both dates are present
+      const startDateToCheck = payload.start_date || currentTask.start_date;
+      const dueDateToCheck = payload.due_date || currentTask.due_date;
+      console.log("startDateToCheck:", startDateToCheck);
+      console.log("dueDateToCheck:", dueDateToCheck);
+      
+      if (startDateToCheck && dueDateToCheck) {
+        const start = new Date(startDateToCheck);
+        const end = new Date(dueDateToCheck);
+        // Normalize to remove time
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+        const diffMs = end - start;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1; // inclusive
+        const maxAllowedHours = diffDays * 8;
+        if (totalHours > maxAllowedHours) {
+          return errorResponse(
+            res,
+            null,
+            `Estimated hours (${totalHours.toFixed(
+              2
+            )}h) exceed available working hours (${maxAllowedHours}h) between start and due date.`,
+            400
+          );
+        }
+      }
     }
+
+    if (payload.due_date) {
+      const startDateToCheck = payload.start_date || currentTask.start_date;
+      const dueDateToCheck = payload.due_date || currentTask.due_date;
+      const estimatedHoursToCheck = (
+        payload.estimated_hours ||
+        currentTask.estimated_hours ||
+        ""
+      ).trim();
+      if (startDateToCheck && dueDateToCheck && estimatedHoursToCheck) {
+        let totalHours = 0;
+        const durationMatch = estimatedHoursToCheck.match(
+          /^((\d+)\s*d\s*)?((\d+)\s*h\s*)?((\d+)\s*m\s*)?((\d+)\s*s\s*)?$/i
+        );
+        if (durationMatch) {
+          const days = parseInt(durationMatch[2] || "0", 10);
+          const hours = parseInt(durationMatch[4] || "0", 10);
+          const minutes = parseInt(durationMatch[6] || "0", 10);
+          const seconds = parseInt(durationMatch[8] || "0", 10);
+          totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
+        } else {
+          const [h = "0", m = "0", s = "0"] = estimatedHoursToCheck.split(":");
+          totalHours =
+            parseInt(h, 10) + parseInt(m, 10) / 60 + parseInt(s, 10) / 3600;
+        }
+        // Normalize both dates (remove time & timezone)
+        const start = new Date(startDateToCheck);
+        const end = new Date(dueDateToCheck);
+        const localStart = new Date(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate()
+        );
+        const localEnd = new Date(
+          end.getFullYear(),
+          end.getMonth(),
+          end.getDate()
+        );
+        const diffMs = localEnd - localStart;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1;
+        const requiredDays = Math.ceil(totalHours / 8);
+        if (diffDays < requiredDays) {
+          return errorResponse(
+            res,
+            null,
+            `End date must be at least ${requiredDays} day(s) after start date for estimated hours of ${estimatedHoursToCheck}`,
+            400
+          );
+        }
+      }
+    }
+
 
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
       status = Number(status);

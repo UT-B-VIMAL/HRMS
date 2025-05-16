@@ -633,23 +633,23 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
 
-const currentStatusGroup = commonStatusGroup(
-  currentTask.status,
-  currentTask.reopen_status,
-  currentTask.active_status
-);
-// Block updates if current status is InProgress, Done, or InReview
-if (
-  ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-  payload.status !== currentTask.status // only block if trying to change status
-) {
-  return errorResponse(
-    res,
-    null,
-    `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-    400
-  );
-}
+    const currentStatusGroup = commonStatusGroup(
+      currentTask.status,
+      currentTask.reopen_status,
+      currentTask.active_status
+    );
+    // Block updates if current status is InProgress, Done, or InReview
+    if (
+      ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+      payload.status !== currentTask.status // only block if trying to change status
+    ) {
+      return errorResponse(
+        res,
+        null,
+        `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+        400
+      );
+    }
     
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
