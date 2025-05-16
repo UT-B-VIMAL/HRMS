@@ -375,7 +375,7 @@ exports.updateSubTask = async (id, payload, res) => {
                 start_date = ?, end_date = ?, extended_status = ?, extended_hours = ?,
                 active_status = ?, status = ?, total_hours_worked = ?, rating = ?, command = ?,
                 assigned_user_id = ?, remark = ?, reopen_status = ?, description = ?,
-                team_id = ?, priority = ?, created_by = ?, updated_by = ?, deleted_at = ?, created_at = ?, updated_at = ?
+                team_id = ?, priority = ?, created_by = ?, updated_by = ?, deleted_at = ?, created_at = ?, updated_at = NOW()
             WHERE id = ?
         `;
 
@@ -479,7 +479,6 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     due_date,
     priority,
     updated_by,
-    updated_at,
   } = payload;
 
   // Define the mapping of fields to status_flag values
@@ -973,6 +972,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         updateValues.push(payload[key]);
       }
     }
+    updateFields.push("updated_at = NOW()");
 
     if (updateFields.length === 0) {
       return errorResponse(res, null, "No fields to update", 400);
