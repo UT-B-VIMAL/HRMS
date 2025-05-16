@@ -34,26 +34,35 @@ exports.getAllData = async (payload, res) => {
                 const userIds = userRows.map(row => row.id);
                 const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)";
                 const [taskRows] = await db.query(queryTasks, [userIds]);
+<<<<<<< HEAD
+=======
 
-            const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)";
-            const [subtaskRows] = await db.query(querySubtasks, [userIds]);
+                const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [subtaskRows] = await db.query(querySubtasks, [userIds]);
+>>>>>>> 9ddfdd7a7433878f0f8234bf5f19e82802a75c98
 
-            let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
-            if (productIds.length === 0) {
-                productIds = [-1]; // Prevent SQL error for empty IN clause
-            }
-            query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
-            queryParams.push(productIds);
-        } else if (users.role_id === 4) {
-            const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id=?";
-            const [taskRows] = await db.query(queryTasks, [user_id]);
+                let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
+                if (productIds.length === 0) {
+                    productIds = [-1]; // Prevent SQL error for empty IN clause
+                }
+                query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
+                queryParams.push(productIds);
+            }else if(users.role_id === 4){
+                const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id=?";
+                const [taskRows] = await db.query(queryTasks, [user_id]);
 
-            const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id=?";
-            const [subtaskRows] = await db.query(querySubtasks, [user_id]);
+                const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id=?";
+                const [subtaskRows] = await db.query(querySubtasks, [user_id]);
 
-            let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
-            if (productIds.length === 0) {
-                productIds = [-1]; // Prevvent SQL error for empty IN clause
+                let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
+                if (productIds.length === 0) {
+                    productIds = [-1]; // Prevvent SQL error for empty IN clause
+                }
+                query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
+                queryParams.push(productIds);
+            }else {
+                query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
+            
             }
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(productIds);
