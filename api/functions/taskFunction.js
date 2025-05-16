@@ -17,7 +17,8 @@ const {
   processStatusData,
   formatTimeDHMS,
   getISTTime,
-  checkUpdatePermission
+  checkUpdatePermission,
+  commonStatusGroup
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -393,6 +394,7 @@ exports.getTask = async (queryParams, res) => {
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
           subtask_id: subtask.id,
+          owner_id: subtask.user_id || "",
           name: subtask.name || "",
           status: subtask.status,
           active_status: subtask.active_status,
@@ -903,6 +905,24 @@ exports.updateTaskData = async (id, payload, res, req) => {
         }
       }
     }
+
+const currentStatusGroup = commonStatusGroup(
+  currentTask.status,
+  currentTask.reopen_status,
+  currentTask.active_status
+);
+// Block updates if current status is InProgress, Done, or InReview
+if (
+  ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+  payload.status !== currentTask.status // only block if trying to change status
+) {
+  return errorResponse(
+    res,
+    null,
+    `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+    400
+  );
+}
 
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
