@@ -485,7 +485,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
 
     // const result = await checkUpdatePermission({
     //   id,
-    //   type: "task",
+    //   type: "subtask",
     //   status,
     //   active_status,
     //   reopen_status,
