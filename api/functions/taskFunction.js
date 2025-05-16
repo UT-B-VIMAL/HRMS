@@ -394,6 +394,7 @@ exports.getTask = async (queryParams, res) => {
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
           subtask_id: subtask.id,
+          owner_id: subtask.user_id || "",
           name: subtask.name || "",
           status: subtask.status,
           active_status: subtask.active_status,
