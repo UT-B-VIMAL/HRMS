@@ -498,6 +498,8 @@ exports.updateTask = async (id, payload, res) => {
       assigned_user_id,
       updated_by,
       estimated_hours,
+      start_date,
+      end_date,
       team_id,
     } = payload;
 
