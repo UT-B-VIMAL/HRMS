@@ -1786,16 +1786,23 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
-    if (role_id === 2) {
-      baseQuery += `
-    ORDER BY
-      CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-      tasks.updated_at DESC
-  `;
-      params.push(user_id);
-    } else {
-      baseQuery += ` ORDER BY tasks.updated_at DESC`;
-    }
+    if(role_id === 2) {
+        baseQuery += `
+          ORDER BY
+        CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+        CASE tasks.priority
+          WHEN 'High' THEN 1
+          WHEN 'Medium' THEN 2
+          WHEN 'Low' THEN 3
+          ELSE 4
+        END,
+        tasks.updated_at DESC
+        `;
+        params.push(user_id);
+      } else {
+        baseQuery += ` ORDER BY tasks.updated_at DESC`;
+      }
+  
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
@@ -1818,7 +1825,8 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
           users.first_name AS assigned_user,
-          sub_tasks.updated_at 
+          sub_tasks.updated_at,
+          sub_tasks.priority
         FROM sub_tasks
         LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
@@ -1830,6 +1838,12 @@ exports.getTaskList = async (queryParams, res) => {
         query += `
           ORDER BY
             CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+            CASE sub_tasks.priority
+            WHEN 'High' THEN 1
+            WHEN 'Medium' THEN 2
+            WHEN 'Low' THEN 3
+            ELSE 4
+        END,
             sub_tasks.updated_at DESC
         `;
         queryParams.push(user_id);
@@ -1926,6 +1940,7 @@ exports.getTaskList = async (queryParams, res) => {
               assignee_id: subtask.assignee_id,
               updated_at: subtask.updated_at,
               status: subtask.status,
+              priority: subtask.priority,
               reopen_status: subtask.reopen_status,
               active_status: subtask.active_status,
             });
@@ -2223,7 +2238,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     };
   }
 
-  await db.query("UPDATE ?? SET status = 1, active_status = 1 WHERE id = ?", [
+  await db.query("UPDATE ?? SET status = 1, active_status = 1, updated_at = NOW() WHERE id = ?", [
     type === "subtask" ? "sub_tasks" : "tasks",
     id,
   ]);
@@ -2265,7 +2280,7 @@ exports.pauseTask = async (
   );
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0 WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
 
@@ -2315,7 +2330,7 @@ exports.endTask = async (
   }
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, command = ? WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, extended_hours = ?, status = 2, active_status = 0, reopen_status = 0, updated_at = NOW(), command = ? WHERE id = ?",
     [
       type === "subtask" ? "sub_tasks" : "tasks",
       newTotalHoursWorked,
