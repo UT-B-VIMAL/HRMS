@@ -34,12 +34,9 @@ exports.getAllData = async (payload, res) => {
                 const userIds = userRows.map(row => row.id);
                 const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)";
                 const [taskRows] = await db.query(queryTasks, [userIds]);
-<<<<<<< HEAD
-=======
 
                 const querySubtasks = "SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)";
                 const [subtaskRows] = await db.query(querySubtasks, [userIds]);
->>>>>>> 9ddfdd7a7433878f0f8234bf5f19e82802a75c98
 
                 let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
                 if (productIds.length === 0) {
@@ -313,7 +310,7 @@ exports.getticketCount = async (req, res) => {
     }
 };
 
-async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id }) {
+async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id, res }) {
     let selectQuery;
     // Fetch data based on type
     if (type === 'task') {
