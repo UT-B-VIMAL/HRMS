@@ -1017,15 +1017,20 @@ const convertTasktoSubtask = async (task_id) => {
     const [usertimelineResult] = await db.query(usertimelineQuery, [task_id]);
 
     const taskQuery = `
-      SELECT * 
-      FROM tasks 
-      WHERE (
-        (status = 1 AND active_status = 0 AND reopen_status = 0) 
-        OR reopen_status = 1
-      ) 
-      AND deleted_at IS NULL 
-      AND id = ?
-    `;
+  SELECT * 
+  FROM tasks 
+  WHERE (
+    reopen_status = 1
+    OR (
+      active_status = 0 AND reopen_status = 0 AND (
+        status = 1 OR status = 2 OR status = 3
+      )
+    )
+  )
+  AND deleted_at IS NULL 
+  AND id = ?
+`;
+
     const [taskResults] = await db.query(taskQuery, [task_id]);
 
     if (taskResults.length === 0 || usertimelineResult.length === 0) {
@@ -1044,8 +1049,8 @@ const convertTasktoSubtask = async (task_id) => {
     const [subtaskResult] = await db.query(subtaskQuery, [task_id]);
 
     if (subtaskResult.length === 0) {
-// Insert as new subtask
-    const insertQuery = `
+      // Insert as new subtask
+      const insertQuery = `
       INSERT INTO sub_tasks (
         product_id, project_id, task_id, user_id, name, estimated_hours, start_date, end_date,
         extended_status, extended_hours, active_status, status, total_hours_worked,
@@ -1055,67 +1060,66 @@ const convertTasktoSubtask = async (task_id) => {
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NOW()
       )
     `;
-    const values = [
-      task.product_id,
-      task.project_id,
-      task.id,
-      task.user_id,
-      task.name,
-      task.estimated_hours,
-      task.start_date,
-      task.end_date,
-      task.extended_status,
-      task.extended_hours,
-      task.active_status,
-      task.status,
-      task.total_hours_worked,
-      task.command,
-      task.assigned_user_id,
-      task.remark,
-      task.reopen_status,
-      task.description,
-      task.team_id,
-      task.priority,
-      task.created_by,
-      task.updated_by,
-      task.created_at,
-    ];
+      const values = [
+        task.product_id,
+        task.project_id,
+        task.id,
+        task.user_id,
+        task.name,
+        task.estimated_hours,
+        task.start_date,
+        task.end_date,
+        task.extended_status,
+        task.extended_hours,
+        task.active_status,
+        task.status,
+        task.total_hours_worked,
+        task.command,
+        task.assigned_user_id,
+        task.remark,
+        task.reopen_status,
+        task.description,
+        task.team_id,
+        task.priority,
+        task.created_by,
+        task.updated_by,
+        task.created_at,
+      ];
 
-    const [insertResult] = await db.query(insertQuery, values);
-    const newSubtaskId = insertResult.insertId;
+      const [insertResult] = await db.query(insertQuery, values);
+      const newSubtaskId = insertResult.insertId;
 
-    // Update sub_tasks_user_timeline
-    await db.query(
-      `
+      // Update sub_tasks_user_timeline
+      await db.query(
+        `
       UPDATE sub_tasks_user_timeline
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
     `,
-      [newSubtaskId, task_id]
-    );
+        [newSubtaskId, task_id]
+      );
 
-    // Update task_comments
-    await db.query(
-      `
+      // Update task_comments
+      await db.query(
+        `
       UPDATE task_comments
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
     `,
-      [newSubtaskId, task_id]
-    );
+        [newSubtaskId, task_id]
+      );
 
-    // Update task_histories
-    await db.query(
-      `
+      // Update task_histories
+      await db.query(
+        `
       UPDATE task_histories
       SET subtask_id = ?
       WHERE task_id = ? AND subtask_id IS NULL AND deleted_at IS NULL
     `,
-      [newSubtaskId, task_id]
-    );
-    return true;
+        [newSubtaskId, task_id]
+      );
+      return true;
     }
-    
   } catch (err) {
     console.error("convertTasktoSubtask error:", err.message);
     return false;
