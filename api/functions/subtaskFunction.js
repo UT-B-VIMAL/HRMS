@@ -10,7 +10,7 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { startTask, pauseTask, endTask } = require("../functions/taskFunction");
-const { getAuthUserDetails, formatTimeDHMS,commonStatusGroup ,checkUpdatePermission} = require("./commonFunction");
+const { getAuthUserDetails, formatTimeDHMS, commonStatusGroup, checkUpdatePermission } = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
@@ -211,20 +211,20 @@ ORDER BY h.id DESC;
     const historiesData =
       validHistories.length > 0
         ? await Promise.all(
-            validHistories.map(async (history) => ({
-              old_data: history.old_data,
-              new_data: history.new_data,
-              description: history.status_description || "",
-              updated_by: history.updated_by || "Unknown User",
-              shortName: history.short_name,
-              time_date: moment
-                .utc(history.updated_at)
-                .tz("Asia/Kolkata")
-                .format("YYYY-MM-DD HH:mm:ss"),
-              time_utc: history.updated_at,
-              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-            }))
-          )
+          validHistories.map(async (history) => ({
+            old_data: history.old_data,
+            new_data: history.new_data,
+            description: history.status_description || "",
+            updated_by: history.updated_by || "Unknown User",
+            shortName: history.short_name,
+            time_date: moment
+              .utc(history.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: history.updated_at,
+            time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+          }))
+        )
         : [];
     // Prepare comments data
     const validComments =
@@ -496,7 +496,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     team_id: 10,
     priority: 11,
   };
-  
+
 
   const fieldMapping = {
     due_date: "end_date",
@@ -507,18 +507,21 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
 
-    // const result = await checkUpdatePermission({
-    //   id,
-    //   type: "subtask",
-    //   status,
-    //   active_status,
-    //   reopen_status,
-    //   role_id,
-    //   res
-    // });
-    // if (!result.allowed) {
-    //   return res.status(403).json({ message: result.message });
-    // }
+    if (status && active_status && reopen_status) {
+
+      const result = await checkUpdatePermission({
+        id,
+        type: "subtask",
+        status,
+        active_status,
+        reopen_status,
+        role_id,
+        res
+      });
+      if (!result.allowed) {
+        return res.status(403).json({ message: result.message });
+      }
+    }
 
     if (user_id) {
       const [assignee] = await db.query(
@@ -656,27 +659,27 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         }
       }
     }
-    if(payload.status !== "NULL" && payload.status !== undefined) {
+    //   if(payload.status !== "NULL" && payload.status !== undefined) {
 
-    const currentStatusGroup = commonStatusGroup(
-      currentTask.status,
-      currentTask.reopen_status,
-      currentTask.active_status
-    );
-    // Block updates if current status is InProgress, Done, or InReview
-    if (
-      ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-      payload.status !== currentTask.status // only block if trying to change status
-    ) {
-      return errorResponse(
-        res,
-        null,
-        `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-        400
-      );
-    }
-  }
-    
+    //   const currentStatusGroup = commonStatusGroup(
+    //     currentTask.status,
+    //     currentTask.reopen_status,
+    //     currentTask.active_status
+    //   );
+    //   // Block updates if current status is InProgress, Done, or InReview
+    //   if (
+    //     ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+    //     payload.status !== currentTask.status // only block if trying to change status
+    //   ) {
+    //     return errorResponse(
+    //       res,
+    //       null,
+    //       `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+    //       400
+    //     );
+    //   }
+    // }
+
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/

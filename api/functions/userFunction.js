@@ -3,6 +3,9 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const getPagination = require('../../helpers/pagination');
 const { createUserInKeycloak, deleteUserInKeycloak, editUserInKeycloak } = require("../functions/keycloakFunction");
+const {
+  getAuthUserDetails
+} = require("../../api/functions/commonFunction");
 
 // Create User
 exports.createUser = async (payload, res) => {
@@ -295,11 +298,7 @@ if (existingemail.length > 0) {
 };
 
 
-
-
-
-
-// Delete User
+// Delete User 
 exports.deleteUser = async (id, res) => {
   try {
     const selectQuery = `SELECT keycloak_id FROM users WHERE id = ?`;
@@ -307,6 +306,39 @@ exports.deleteUser = async (id, res) => {
 
     if (rows.length === 0 || !rows[0].keycloak_id) {
       return errorResponse(res, null, 'User not found or Keycloak ID missing', 404);
+    }
+    const userDetails = await getAuthUserDetails(id, res);
+    const role_id = userDetails.role_id;
+
+    if (role_id === 3) {
+      const [reportingTeams] = await db.query(
+        `SELECT COUNT(*) AS team_lead_count FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL`,
+        [id]
+      );
+
+      if (reportingTeams[0].team_lead_count > 0) {
+        return errorResponse(res, null, 'This user is a Team Lead for one or more teams', 400);
+      }
+    }
+
+    // Role 2: Manager check
+    if (role_id === 2) {
+      const [assignedTasks] = await db.query(
+        `SELECT COUNT(*) AS task_mgr_count FROM tasks WHERE assigned_user_id = ? AND deleted_at IS NULL`,
+        [id]
+      );
+
+      const [assignedSubTasks] = await db.query(
+        `SELECT COUNT(*) AS subtask_mgr_count FROM sub_tasks WHERE assigned_user_id = ? AND deleted_at IS NULL`,
+        [id]
+      );
+
+      if (
+        assignedTasks[0].task_mgr_count > 0 ||
+        assignedSubTasks[0].subtask_mgr_count > 0
+      ) {
+        return errorResponse(res, null, 'This user is a Manager for tasks or sub-tasks', 400);
+      }
     }
 
     const keycloakId = rows[0].keycloak_id;
