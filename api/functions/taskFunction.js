@@ -2496,7 +2496,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         "SELECT id FROM users WHERE role_id IN (1, 2)"
       );
       const adminAndManagerIds = adminsAndManagers.map((user) => user.id);
-
+console.log("adminAndManagerIds", adminAndManagerIds);
       const notificationPayload = {
         title: "Review Employee Tasks",
         body: "Please review employee pending tasks.",
@@ -2512,6 +2512,7 @@ exports.updateTaskTimeLine = async (req, res) => {
               .emit("push_notification", notificationPayload);
           });
         }
+        console.log("userId", userId);
         await db.execute(
           "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
           [userId, notificationPayload.title, notificationPayload.body, 0]
