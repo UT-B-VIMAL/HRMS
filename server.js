@@ -72,18 +72,24 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [];
 
 
+// const io = socketIo(server, {
+//   cors: {
+//     origin: (origin, callback) => {
+//       if (!origin || allowedOrigins.includes(origin)) {
+//         callback(null, true);
+//       } else {
+//         callback(new Error(`Origin ${origin} is not allowed by CORS`));
+//       }
+//     },
+//     methods: ["GET", "POST"],
+//     credentials: true,
+//   },
+// });
 const io = socketIo(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Origin ${origin} is not allowed by CORS`));
-      }
-    },
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
 app.use((req, res, next) => {
   req.io = io;
