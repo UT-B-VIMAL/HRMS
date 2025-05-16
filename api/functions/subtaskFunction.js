@@ -660,7 +660,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
 
-        if (
+     if (
       currentTask.status == 1 &&
       currentTask.active_status == 1 &&
       currentTask.reopen_status == 0 &&
@@ -673,7 +673,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         400
       );
     }
-    
+
     //   if(payload.status !== "NULL" && payload.status !== undefined) {
 
     //   const currentStatusGroup = commonStatusGroup(

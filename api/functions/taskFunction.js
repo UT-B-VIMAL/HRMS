@@ -157,7 +157,7 @@ exports.createTask = async (payload, res) => {
       }
 
       // Validate date span for estimated days
-      if (start_date && end_date && days > 0) {
+      if (start_date && end_date) {
         const start = moment(start_date, "YYYY-MM-DD");
         const end = moment(end_date, "YYYY-MM-DD");
 
@@ -172,11 +172,15 @@ exports.createTask = async (payload, res) => {
 
         const diffDays = end.diff(start, "days") + 1;
 
-        if (diffDays < days) {
+        const totalEstimatedHours =
+          days * 8 + hours + minutes / 60 + seconds / 3600;
+        const effectiveDays = Math.ceil(totalEstimatedHours / 8);
+
+        if (diffDays < effectiveDays) {
           return errorResponse(
             res,
             null,
-            `Estimated duration is ${days} day(s), but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
+            `Estimated duration is ${effectiveDays} day(s) based on total estimated time, but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
             400
           );
         }
@@ -689,7 +693,7 @@ exports.updateTask = async (id, payload, res) => {
       }
 
       // Validate date span for estimated days
-      if (start_date && end_date && days > 0) {
+      if (start_date && end_date) {
         const start = moment(start_date, "YYYY-MM-DD");
         const end = moment(end_date, "YYYY-MM-DD");
 
@@ -704,11 +708,15 @@ exports.updateTask = async (id, payload, res) => {
 
         const diffDays = end.diff(start, "days") + 1;
 
-        if (diffDays < days) {
+        const totalEstimatedHours =
+          days * 8 + hours + minutes / 60 + seconds / 3600;
+        const effectiveDays = Math.ceil(totalEstimatedHours / 8);
+
+        if (diffDays < effectiveDays) {
           return errorResponse(
             res,
             null,
-            `Estimated duration is ${days} day(s), but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
+            `Estimated duration is ${effectiveDays} day(s) based on total estimated time, but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
             400
           );
         }
@@ -839,21 +847,21 @@ exports.updateTaskData = async (id, payload, res, req) => {
   try {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
-  if (status && active_status && reopen_status) {
-    const result = await checkUpdatePermission({
-      id,
-      type: "task",
-      status,
-      active_status,
-      reopen_status,
-      role_id,
-      res
-    });
-    
-    if (!result.allowed) {
-      return res.status(403).json({ message: result.message });
+    if (status && active_status && reopen_status) {
+      const result = await checkUpdatePermission({
+        id,
+        type: "task",
+        status,
+        active_status,
+        reopen_status,
+        role_id,
+        res,
+      });
+
+      if (!result.allowed) {
+        return res.status(403).json({ message: result.message });
+      }
     }
-  }
 
     if (user_id) {
       const [assigned_user] = await db.query(
@@ -994,7 +1002,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
       currentTask.status == 1 &&
       currentTask.active_status == 1 &&
       currentTask.reopen_status == 0 &&
-      user_id && user_id != currentTask.user_id
+      user_id &&
+      user_id != currentTask.user_id
     ) {
       return errorResponse(
         res,
@@ -1003,28 +1012,28 @@ exports.updateTaskData = async (id, payload, res, req) => {
         400
       );
     }
-    
-  //   if(payload.status !== "NULL" && payload.status !== undefined) {
 
-  //  const currentStatusGroup = commonStatusGroup(
-  //     currentTask.status,
-  //     currentTask.reopen_status,
-  //     currentTask.active_status
-  //   );
-  //   // Block updates if current status is InProgress, Done, or InReview
-  //   if (
-  //     ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-  //     payload.status !== currentTask.status // only block if trying to change status
-  //   ) {
-  //     return errorResponse(
-  //       res,
-  //       null,
-  //       `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-  //       400
-  //     );
-  //   }
-  // }
-   if (estimated_hours) {
+    //   if(payload.status !== "NULL" && payload.status !== undefined) {
+
+    //  const currentStatusGroup = commonStatusGroup(
+    //     currentTask.status,
+    //     currentTask.reopen_status,
+    //     currentTask.active_status
+    //   );
+    //   // Block updates if current status is InProgress, Done, or InReview
+    //   if (
+    //     ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
+    //     payload.status !== currentTask.status // only block if trying to change status
+    //   ) {
+    //     return errorResponse(
+    //       res,
+    //       null,
+    //       `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
+    //       400
+    //     );
+    //   }
+    // }
+    if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
       );
@@ -1411,7 +1420,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
 //   }
 // };
 
-
 exports.deleteTask = async (id, res) => {
   try {
     // Check if any subtasks exist
@@ -1440,7 +1448,11 @@ exports.deleteTask = async (id, res) => {
     const { status, reopen_status, active_status } = taskStatusResult[0];
 
     // Prevent deletion if task is "InProgress"
-    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    const currentGroup = commonStatusGroup(
+      status,
+      reopen_status,
+      active_status
+    );
     if (currentGroup === "InProgress") {
       return errorResponse(
         res,
@@ -1800,8 +1812,8 @@ exports.getTaskList = async (queryParams, res) => {
       );
     }
 
-    if(role_id === 2) {
-        baseQuery += `
+    if (role_id === 2) {
+      baseQuery += `
           ORDER BY
         CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
         CASE tasks.priority
@@ -1812,11 +1824,10 @@ exports.getTaskList = async (queryParams, res) => {
         END,
         tasks.updated_at DESC
         `;
-        params.push(user_id);
-      } else {
-        baseQuery += ` ORDER BY tasks.updated_at DESC`;
-      }
-  
+      params.push(user_id);
+    } else {
+      baseQuery += ` ORDER BY tasks.updated_at DESC`;
+    }
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
@@ -2254,10 +2265,10 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     };
   }
 
-  await db.query("UPDATE ?? SET status = 1, active_status = 1, updated_at = NOW() WHERE id = ?", [
-    type === "subtask" ? "sub_tasks" : "tasks",
-    id,
-  ]);
+  await db.query(
+    "UPDATE ?? SET status = 1, active_status = 1, updated_at = NOW() WHERE id = ?",
+    [type === "subtask" ? "sub_tasks" : "tasks", id]
+  );
   await db.query(
     "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
     [
