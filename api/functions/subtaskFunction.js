@@ -146,13 +146,6 @@ ORDER BY h.id DESC;
     `;
     const comments = await db.query(commentsQuery, [id]);
 
-    // // Status mapping
-    const statusMap = {
-      0: "To Do",
-      1: "In Progress",
-      2: "In Review",
-      3: "Done",
-    };
 
     const subtaskData = subtask.map((subtask) => {
       const totalEstimatedHours = subtask.estimated_hours || "00:00:00"; // Default format as "HH:MM:SS"
@@ -173,7 +166,6 @@ ORDER BY h.id DESC;
         subtask_id: subtask.id || "",
         task_id: subtask.task_id || "",
         name: subtask.name || "",
-        status: subtask.status,
         project_id: subtask.project_id || "",
         project: subtask.project_name || "",
         product_id: subtask.product_id || "",
@@ -203,9 +195,10 @@ ORDER BY h.id DESC;
         end_date: subtask.end_date || "",
         priority: subtask.priority || "",
         description: subtask.description || "",
-        status_text: statusMap[subtask.status] || "Unknown",
+        status: subtask.status,
         active_status: subtask.active_status,
         reopen_status: subtask.reopen_status,
+        status_text: commonStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status),
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
       };
     });

@@ -336,13 +336,13 @@ exports.getTask = async (queryParams, res) => {
 
     const comments = await db.query(commentsQuery, [id]);
 
-    // Status mapping
-    const statusMap = {
-      0: "To Do",
-      1: "In Progress",
-      2: "In Review",
-      3: "Done",
-    };
+    // // Status mapping
+    // const statusMap = {
+    //   0: "To Do",
+    //   1: "In Progress",
+    //   2: "In Review",
+    //   3: "Done",
+    // };
 
     // Prepare task data
     const taskData = task.map((task) => {
@@ -383,7 +383,9 @@ exports.getTask = async (queryParams, res) => {
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
-        status_text: statusMap[task.status] || "Unknown",
+        // status_text: statusMap[task.status] || "Unknown",
+        status_text: commonStatusGroup(task.status, task.reopen_status, task.active_status),
+
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
 
       };
@@ -398,11 +400,13 @@ exports.getTask = async (queryParams, res) => {
           name: subtask.name || "",
           status: subtask.status,
           active_status: subtask.active_status,
+          reopen_status: subtask.reopen_status,
           assignee: subtask.user_id,
           assigneename: subtask.assignee_name || "",
-          reopen_status: subtask.reopen_status,
           short_name: (subtask.assignee_name || "").substr(0, 2),
-          status_text: statusMap[subtask.status] || "Unknown",
+          // status_text: statusMap[subtask.status] || "Unknown",
+          status_text: commonStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status),
+
         }))
         : [];
 
