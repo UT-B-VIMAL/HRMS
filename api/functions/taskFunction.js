@@ -2528,23 +2528,26 @@ console.log("adminAndManagerIds", adminAndManagerIds);
       if (team.length > 0) {
         const reportingUserId = team[0].reporting_user_id;
         const reportingUserSocketIds = userSockets[reportingUserId];
-        if (Array.isArray(reportingUserSocketIds)) {
-          reportingUserSocketIds.forEach((socketId) => {
-            req.io
-              .of("/notifications")
-              .to(socketId)
-              .emit("push_notification", notificationPayload);
-          });
+        if(reportingUserId){
+          if (Array.isArray(reportingUserSocketIds)) {
+                    reportingUserSocketIds.forEach((socketId) => {
+                req.io
+                  .of("/notifications")
+                  .to(socketId)
+                  .emit("push_notification", notificationPayload);
+              });
+            }
+            await db.execute(
+              "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+              [
+                reportingUserId,
+                notificationPayload.title,
+                notificationPayload.body,
+                0,
+              ]
+            );
         }
-        await db.execute(
-          "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-          [
-            reportingUserId,
-            notificationPayload.title,
-            notificationPayload.body,
-            0,
-          ]
-        );
+        
       }
     } else {
       return errorResponse(res, "Invalid Type", 400);
