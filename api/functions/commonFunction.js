@@ -310,7 +310,7 @@ exports.getticketCount = async (req, res) => {
     }
 };
 
-async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id }) {
+async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id, res }) {
     let selectQuery;
     // Fetch data based on type
     if (type === 'task') {
