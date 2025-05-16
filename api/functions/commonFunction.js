@@ -12,7 +12,7 @@ exports.getAllData = async (payload, res) => {
         if (type === "teams") {
             query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
         } else if (type === "users") {
-            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
+            query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
         }
         else if (type === "tl") {
             query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
@@ -115,7 +115,7 @@ exports.getAllData = async (payload, res) => {
         } else if (type === "owners") {
             query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 2";
         } else if (type === "assignee") {
-            query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
+            query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL";
         } 
         else if (type === "ot_projects") {
             const users = await this.getAuthUserDetails(user_id, res);
@@ -309,6 +309,104 @@ exports.getticketCount = async (req, res) => {
         return errorResponse(res, error.message, "Error fetching Ticket Count", 500);
     }
 };
+
+async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id }) {
+    let selectQuery;
+    // Fetch data based on type
+    if (type === 'task') {
+        selectQuery = `
+            SELECT status, active_status, reopen_status
+            FROM tasks
+            WHERE deleted_at IS NULL AND id = ?
+        `;
+    } else if (type === 'sub_task') {
+        selectQuery = `
+            SELECT status, active_status, reopen_status
+            FROM sub_tasks
+            WHERE deleted_at IS NULL AND id = ?
+        `;
+    } else {
+        return { allowed: true };
+    }
+
+    const [rows] = await db.query(selectQuery, [id]);
+
+    if (!rows.length) {
+        return { allowed: false, message: 'Item not found.' };
+    }
+
+    const { status: prevStatus, active_status: prevActive, reopen_status: prevReopen } = rows[0];
+
+    // Rule 1: Check TO-DO status
+    if (prevStatus === 0 && prevActive === 0 && prevReopen === 0) {
+        if (status === 1 && active_status === 1 && reopen_status === 0 && role_id === 4) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    // Rule 2: Check IN-PROGRESS status
+     if (prevStatus === 1 && prevActive === 1 && prevReopen === 0) {
+        return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+    }
+
+    // Rule 3: Check ON-HOLD status
+     if (prevStatus === 1 && prevActive === 0 && prevReopen === 0) {
+        if (status === 1 && active_status === 1 && reopen_status === 0 && role_id === 4) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    // Rule 4: Check IN-REVIEW status
+    if (prevStatus === 2 && prevActive === 0 && prevReopen === 0) {
+        if (status === 3 || reopen_status === 1) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    // Rule 5: Check COMPLETED status
+    if (prevStatus === 3 && prevActive === 0 && prevReopen === 0) {
+        if (reopen_status === 1) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    return { allowed: true };
+
+
+}
+exports.checkUpdatePermission = checkUpdatePermission;
+
+
+ exports.commonStatusGroup = (status, reopenStatus, activeStatus) => {
+      status = Number(status);
+      reopenStatus = Number(reopenStatus);
+      activeStatus = Number(activeStatus);
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+        return "To Do";
+      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+        return "On Hold";
+      } else if (status === 2 && reopenStatus === 0) {
+        return "Pending Approval";
+      } else if (reopenStatus === 1 && activeStatus === 0) {
+        return "Reopen";
+      } else if (status === 1 && activeStatus === 1) {
+        return "InProgress";
+      } else if (status === 3) {
+        return "Done";
+      }
+      return "";
+    };
+
+
+
 
 
 
