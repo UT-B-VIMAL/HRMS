@@ -2507,7 +2507,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         "SELECT id FROM users WHERE role_id IN (1, 2)"
       );
       const adminAndManagerIds = adminsAndManagers.map((user) => user.id);
-
+console.log("adminAndManagerIds", adminAndManagerIds);
       const notificationPayload = {
         title: "Review Employee Tasks",
         body: "Please review employee pending tasks.",
@@ -2523,6 +2523,7 @@ exports.updateTaskTimeLine = async (req, res) => {
               .emit("push_notification", notificationPayload);
           });
         }
+        console.log("userId", userId);
         await db.execute(
           "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
           [userId, notificationPayload.title, notificationPayload.body, 0]
@@ -2538,23 +2539,26 @@ exports.updateTaskTimeLine = async (req, res) => {
       if (team.length > 0) {
         const reportingUserId = team[0].reporting_user_id;
         const reportingUserSocketIds = userSockets[reportingUserId];
-        if (Array.isArray(reportingUserSocketIds)) {
-          reportingUserSocketIds.forEach((socketId) => {
-            req.io
-              .of("/notifications")
-              .to(socketId)
-              .emit("push_notification", notificationPayload);
-          });
+        if(reportingUserId){
+          if (Array.isArray(reportingUserSocketIds)) {
+                    reportingUserSocketIds.forEach((socketId) => {
+                req.io
+                  .of("/notifications")
+                  .to(socketId)
+                  .emit("push_notification", notificationPayload);
+              });
+            }
+            await db.execute(
+              "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+              [
+                reportingUserId,
+                notificationPayload.title,
+                notificationPayload.body,
+                0,
+              ]
+            );
         }
-        await db.execute(
-          "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-          [
-            reportingUserId,
-            notificationPayload.title,
-            notificationPayload.body,
-            0,
-          ]
-        );
+        
       }
     } else {
       return errorResponse(res, "Invalid Type", 400);
