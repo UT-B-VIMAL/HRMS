@@ -10,7 +10,7 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { startTask, pauseTask, endTask } = require("../functions/taskFunction");
-const { getAuthUserDetails, formatTimeDHMS,commonStatusGroup } = require("./commonFunction");
+const { getAuthUserDetails, formatTimeDHMS,commonStatusGroup ,checkUpdatePermission} = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
