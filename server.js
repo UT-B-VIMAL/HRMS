@@ -66,13 +66,12 @@ if (isProduction) {
 }
 
 // Initialize socket.io
-const allowedOrigins = [
-  'http://localhost:80',
-  'http://localhost',
-  'https://main.detwo6merrv1m.amplifyapp.com',
-  'https://main.detwo6merrv1m.amplifyapp.com:80',
-  'https://main.detwo6merrv1m.amplifyapp.com:443',
-];
+// Load allowed origins from env
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim())
+  : [];
+
+
 const io = socketIo(server, {
   cors: {
     origin: (origin, callback) => {
@@ -109,16 +108,11 @@ chatSocket(io.of("/chat"));
 //   // allowedHeaders: ["Content-Type", "Authorization"]
 // };
 
+// Load allowed origins from env
 const corsOptions = {
   origin: (origin, callback) => {
-   const allowedOrigins = [
-  'http://localhost:80',
-  'http://localhost',
-  'https://main.detwo6merrv1m.amplifyapp.com',
-  'https://main.detwo6merrv1m.amplifyapp.com:80',
-  'https://main.detwo6merrv1m.amplifyapp.com:443',
-];
-
+    console.log(allowedOrigins);
+    
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -128,6 +122,7 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
+
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
