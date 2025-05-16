@@ -1566,15 +1566,21 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     if(role_id === 2) {
-  baseQuery += `
-    ORDER BY
-      CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-      tasks.updated_at DESC
-  `;
-  params.push(user_id);
-} else {
-  baseQuery += ` ORDER BY tasks.updated_at DESC`;
-}
+        baseQuery += `
+          ORDER BY
+        CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+        CASE tasks.priority
+          WHEN 'High' THEN 1
+          WHEN 'Medium' THEN 2
+          WHEN 'Low' THEN 3
+          ELSE 4
+        END,
+        tasks.updated_at DESC
+        `;
+        params.push(user_id);
+      } else {
+        baseQuery += ` ORDER BY tasks.updated_at DESC`;
+      }
   
 
     // Execute the base query for tasks
@@ -1598,7 +1604,8 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
           users.first_name AS assigned_user,
-          sub_tasks.updated_at 
+          sub_tasks.updated_at,
+          sub_tasks.priority
         FROM sub_tasks
         LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
@@ -1610,6 +1617,12 @@ exports.getTaskList = async (queryParams, res) => {
         query += `
           ORDER BY
             CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
+            CASE sub_tasks.priority
+            WHEN 'High' THEN 1
+            WHEN 'Medium' THEN 2
+            WHEN 'Low' THEN 3
+            ELSE 4
+        END,
             sub_tasks.updated_at DESC
         `;
         queryParams.push(user_id);
@@ -1706,6 +1719,7 @@ exports.getTaskList = async (queryParams, res) => {
               assignee_id: subtask.assignee_id,
               updated_at: subtask.updated_at,
               status: subtask.status,
+              priority: subtask.priority,
               reopen_status: subtask.reopen_status,
               active_status: subtask.active_status
             });
