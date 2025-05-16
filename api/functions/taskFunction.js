@@ -938,9 +938,10 @@ exports.updateTaskData = async (id, payload, res, req) => {
         }
       }
     }
-
     
-    const currentStatusGroup = commonStatusGroup(
+    if(payload.status !== "NULL" && payload.status !== undefined) {
+
+   const currentStatusGroup = commonStatusGroup(
       currentTask.status,
       currentTask.reopen_status,
       currentTask.active_status
@@ -957,7 +958,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         400
       );
     }
-
+  }
    if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/

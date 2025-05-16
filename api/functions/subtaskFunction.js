@@ -632,6 +632,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         }
       }
     }
+    if(payload.status !== "NULL" && payload.status !== undefined) {
 
     const currentStatusGroup = commonStatusGroup(
       currentTask.status,
@@ -650,6 +651,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         400
       );
     }
+  }
     
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
