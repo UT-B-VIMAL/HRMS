@@ -310,6 +310,80 @@ exports.getticketCount = async (req, res) => {
     }
 };
 
+async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id }) {
+    let selectQuery;
+    // Fetch data based on type
+    if (type === 'task') {
+        selectQuery = `
+            SELECT status, active_status, reopen_status
+            FROM tasks
+            WHERE deleted_at IS NULL AND id = ?
+        `;
+    } else if (type === 'sub_task') {
+        selectQuery = `
+            SELECT status, active_status, reopen_status
+            FROM sub_tasks
+            WHERE deleted_at IS NULL AND id = ?
+        `;
+    } else {
+        return { allowed: true };
+    }
+
+    const [rows] = await db.query(selectQuery, [id]);
+
+    if (!rows.length) {
+        return { allowed: false, message: 'Item not found.' };
+    }
+
+    const { status: prevStatus, active_status: prevActive, reopen_status: prevReopen } = rows[0];
+
+    // Rule 1: Check TO-DO status
+    if (prevStatus === 0 && prevActive === 0 && prevReopen === 0) {
+        if (status === 1 && active_status === 1 && reopen_status === 0 && role_id === 4) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    // Rule 2: Check IN-PROGRESS status
+     if (prevStatus === 1 && prevActive === 1 && prevReopen === 0) {
+        return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+    }
+
+    // Rule 3: Check ON-HOLD status
+     if (prevStatus === 1 && prevActive === 0 && prevReopen === 0) {
+        if (status === 1 && active_status === 1 && reopen_status === 0 && role_id === 4) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    // Rule 4: Check IN-REVIEW status
+    if (prevStatus === 2 && prevActive === 0 && prevReopen === 0) {
+        if (status === 3 || reopen_status === 1) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    // Rule 5: Check COMPLETED status
+    if (prevStatus === 3 && prevActive === 0 && prevReopen === 0) {
+        if (reopen_status === 1) {
+            return { allowed: true };
+        } else {
+            return errorResponse(res, null,  'Update not allowed based on previous state.', 403);
+        }
+    }
+
+    return { allowed: true };
+
+
+}
+exports.checkUpdatePermission = checkUpdatePermission;
+
 
  exports.commonStatusGroup = (status, reopenStatus, activeStatus) => {
       status = Number(status);
@@ -330,6 +404,9 @@ exports.getticketCount = async (req, res) => {
       }
       return "";
     };
+
+
+
 
 
 
