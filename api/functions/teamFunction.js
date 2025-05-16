@@ -42,11 +42,11 @@ const getPagination = (page, perPage, totalRecords) => {
     user_id: Joi.number().integer().required().messages({
       'number.base': 'User Id must be a valid user ID',
       'any.required': 'User Id field is required'
-    }),
-    reporting_user_id: Joi.number().integer().required().messages({
-      'number.base': 'Reporting User Id must be a valid user ID',
-      'any.required': 'Reporting User Id field is required'
     })
+    // reporting_user_id: Joi.number().integer().required().messages({
+    //   'number.base': 'Reporting User Id must be a valid user ID',
+    //   'any.required': 'Reporting User Id field is required'
+    // })
   });
 
 // Create Team
@@ -87,7 +87,7 @@ exports.createTeam = async (payload, res) => {
 exports.updateTeam = async (id, payload, res) => {
     const { name ,user_id,reporting_user_id} = payload;
     const { error } = teamUpdateSchema.validate(
-      { name, user_id ,reporting_user_id},
+      { name, user_id },
       { abortEarly: false }
     );
     if (error) {
