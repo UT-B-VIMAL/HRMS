@@ -483,18 +483,18 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
 
-    const result = await checkUpdatePermission({
-      id,
-      type: "task",
-      status,
-      active_status,
-      reopen_status,
-      role_id,
-      res
-    });
-    if (!result.allowed) {
-      return res.status(403).json({ message: result.message });
-    }
+    // const result = await checkUpdatePermission({
+    //   id,
+    //   type: "task",
+    //   status,
+    //   active_status,
+    //   reopen_status,
+    //   role_id,
+    //   res
+    // });
+    // if (!result.allowed) {
+    //   return res.status(403).json({ message: result.message });
+    // }
 
     if (user_id) {
       const [assignee] = await db.query(
