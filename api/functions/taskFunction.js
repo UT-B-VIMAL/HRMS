@@ -990,6 +990,20 @@ exports.updateTaskData = async (id, payload, res, req) => {
         }
       }
     }
+
+    if (
+      currentTask.status == 1 &&
+      currentTask.active_status == 1 &&
+      currentTask.reopen_status == 0 &&
+      user_id && user_id != currentTask.user_id
+    ) {
+      return errorResponse(
+        res,
+        null,
+        "Assigned user cannot be changed while task is active and in progress.",
+        400
+      );
+    }
     
   //   if(payload.status !== "NULL" && payload.status !== undefined) {
 
