@@ -1610,11 +1610,11 @@ exports.getTaskList = async (queryParams, res) => {
         query += `
           ORDER BY
             CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
-            sub_tasks.updated_at ASC
+            sub_tasks.updated_at DESC
         `;
         queryParams.push(user_id);
       } else {
-        query += ` ORDER BY sub_tasks.updated_at ASC`;
+        baseQuery += ` ORDER BY tasks.updated_at DESC`;
       }
   
       // Add user_id filter only if role_id is 4
@@ -1704,7 +1704,10 @@ exports.getTaskList = async (queryParams, res) => {
               assigned_by: subtask.assigned_user,
               assigned_by_id: subtask.assigned_user_id,
               assignee_id: subtask.assignee_id,
-              updated_at: subtask.updated_at
+              updated_at: subtask.updated_at,
+              status: subtask.status,
+              reopen_status: subtask.reopen_status,
+              active_status: subtask.active_status
             });
             
           }
