@@ -112,12 +112,14 @@ exports.updateTeam = async (id, payload, res) => {
     if (checkTeam[0].count > 0) {
       return errorResponse(res, "Team with this name already exists", "Duplicate Team Error", 400);
     }
-    const query = "UPDATE teams SET name = ?, updated_by = ? WHERE id = ?";
-    const values = [name, user_id, id];
+    let query = "UPDATE teams SET name = ?, updated_by = ?";
+    const values = [name, user_id];
     if (reporting_user_id) {
       query += ", reporting_user_id = ?";
       values.push(reporting_user_id);
     }
+    query += " WHERE id = ?";
+    values.push(id);
     await db.query(query, values);
     return successResponse(res, { id, name,reporting_user_id }, 'Teams updated successfully', 200);
   } catch (error) {
