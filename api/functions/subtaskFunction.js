@@ -537,9 +537,11 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         return res.status(403).json({ message: result.message });
       }
     }
-  }else{
-    return errorResponse(res, null, "Status cannot be changed without an assigned user.", 400);
   }
+  
+  // else{
+  //   return errorResponse(res, null, "Status cannot be changed without an assigned user.", 400);
+  // }
 
     if (user_id) {
       const [assignee] = await db.query(
