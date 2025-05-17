@@ -10,7 +10,12 @@ const {
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { startTask, pauseTask, endTask } = require("../functions/taskFunction");
-const { getAuthUserDetails, formatTimeDHMS, commonStatusGroup, checkUpdatePermission } = require("./commonFunction");
+const {
+  getAuthUserDetails,
+  formatTimeDHMS,
+  commonStatusGroup,
+  checkUpdatePermission,
+} = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
@@ -146,7 +151,6 @@ ORDER BY h.id DESC;
     `;
     const comments = await db.query(commentsQuery, [id]);
 
-
     const subtaskData = subtask.map((subtask) => {
       const totalEstimatedHours = subtask.estimated_hours || "00:00:00"; // Default format as "HH:MM:SS"
       const timeTaken = subtask.total_hours_worked || "00:00:00"; // Default format as "HH:MM:SS"
@@ -198,7 +202,11 @@ ORDER BY h.id DESC;
         status: subtask.status,
         active_status: subtask.active_status,
         reopen_status: subtask.reopen_status,
-        status_text: commonStatusGroup(subtask.status, subtask.reopen_status, subtask.active_status),
+        status_text: commonStatusGroup(
+          subtask.status,
+          subtask.reopen_status,
+          subtask.active_status
+        ),
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
       };
     });
@@ -211,20 +219,20 @@ ORDER BY h.id DESC;
     const historiesData =
       validHistories.length > 0
         ? await Promise.all(
-          validHistories.map(async (history) => ({
-            old_data: history.old_data,
-            new_data: history.new_data,
-            description: history.status_description || "",
-            updated_by: history.updated_by || "Unknown User",
-            shortName: history.short_name,
-            time_date: moment
-              .utc(history.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: history.updated_at,
-            time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-          }))
-        )
+            validHistories.map(async (history) => ({
+              old_data: history.old_data,
+              new_data: history.new_data,
+              description: history.status_description || "",
+              updated_by: history.updated_by || "Unknown User",
+              shortName: history.short_name,
+              time_date: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .format("YYYY-MM-DD HH:mm:ss"),
+              time_utc: history.updated_at,
+              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+            }))
+          )
         : [];
     // Prepare comments data
     const validComments =
@@ -439,7 +447,11 @@ exports.deleteSubTask = async (id, res) => {
     const { status, reopen_status, active_status } = statusResult[0];
 
     // Check if subtask is InProgress
-    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    const currentGroup = commonStatusGroup(
+      status,
+      reopen_status,
+      active_status
+    );
     if (currentGroup === "InProgress") {
       return errorResponse(
         res,
@@ -462,7 +474,6 @@ exports.deleteSubTask = async (id, res) => {
     return errorResponse(res, error.message, "Error deleting subtask", 500);
   }
 };
-
 
 exports.updatesubTaskData = async (id, payload, res, req) => {
   const {
@@ -496,18 +507,23 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     priority: 11,
   };
 
-
   const fieldMapping = {
     due_date: "end_date",
   };
 
   try {
-
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
+    const [tasks] = await db.query(
+      "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
+    const currentTask = tasks[0];
+    const assigneeId = currentTask.user_id;
+
+    if (assigneeId){
 
     if (status && active_status && reopen_status) {
-
       const result = await checkUpdatePermission({
         id,
         type: "subtask",
@@ -515,12 +531,15 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         active_status,
         reopen_status,
         role_id,
-        res
+        res,
       });
       if (!result.allowed) {
         return res.status(403).json({ message: result.message });
       }
     }
+  }else{
+    return errorResponse(res, null, "Status cannot be changed without an assigned user.", 400);
+  }
 
     if (user_id) {
       const [assignee] = await db.query(
@@ -585,12 +604,6 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         );
       }
     }
-
-    const [tasks] = await db.query(
-      "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL",
-      [id]
-    );
-    const currentTask = tasks[0];
 
     if (!currentTask) {
       return errorResponse(
@@ -659,11 +672,12 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
 
-     if (
+    if (
       currentTask.status == 1 &&
       currentTask.active_status == 1 &&
       currentTask.reopen_status == 0 &&
-      user_id && user_id != currentTask.user_id
+      user_id &&
+      user_id != currentTask.user_id
     ) {
       return errorResponse(
         res,
