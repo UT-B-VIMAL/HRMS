@@ -462,12 +462,13 @@ ORDER BY st.updated_at DESC
       user_id: task.user_id,
       assignee: task.assignee,
       estimated_time: task.estimated_time,
-      task_duration: task.task_duration,
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-      start_time: task.start_time ? task.start_time : "-", // first start time
-      end_time: task.end_time ? task.end_time : "-", // last end time
+      start_time:task.task_status === 3 && task.start_time ? task.start_time : "-",
+      end_time: task.task_status === 3 && task.end_time ? task.end_time : "-",
+      task_duration: task.task_status === 3 ? task.task_duration : "-",
+
       task_updated_at: task.updated_at
         ? moment(task.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
@@ -486,13 +487,21 @@ ORDER BY st.updated_at DESC
       user_id: subtask.user_id,
       assignee: subtask.assignee,
       estimated_time: subtask.estimated_time,
-      time_taken: subtask.time_taken,
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time: subtask.start_time ? subtask.start_time : "-", // first start time
-      end_time: subtask.end_time ? subtask.end_time : "-", // last end time
-      subtask_duration: subtask.subtask_duration,
+      start_time:
+        subtask.subtask_status === 3 && subtask.start_time
+          ? subtask.start_time
+          : "-",
+      end_time:
+        subtask.subtask_status === 3 && subtask.end_time
+          ? subtask.end_time
+          : "-",
+      time_taken: subtask.subtask_status === 3 ? subtask.time_taken : "-",
+      subtask_duration:
+        subtask.subtask_status === 3 ? subtask.subtask_duration : "-",
+
       task_updated_at: subtask.updated_at
         ? moment(subtask.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
@@ -1066,11 +1075,11 @@ exports.projectRequest = async (req, res) => {
             effectiveUserIds = teamUsers.map((user) => user.id); // Extract all user IDs
           }
         }
-      }else if(role_id === 2){
-      taskConditions.push("t.assigned_user_id = ?");
-      subtaskConditions.push("st.assigned_user_id = ?");
-      taskValues.push(user_id);
-      subtaskValues.push(user_id);
+      } else if (role_id === 2) {
+        taskConditions.push("t.assigned_user_id = ?");
+        subtaskConditions.push("st.assigned_user_id = ?");
+        taskValues.push(user_id);
+        subtaskValues.push(user_id);
       }
     }
 
@@ -1079,8 +1088,6 @@ exports.projectRequest = async (req, res) => {
         effectiveUserIds.push(employee_id);
       }
     }
-
-    
 
     // Apply user filter only if necessary
     if (effectiveUserIds.length > 0) {
@@ -1145,8 +1152,8 @@ exports.projectRequest = async (req, res) => {
         ? `AND ${subtaskConditions.join(" AND ")}`
         : "";
 
-   // Subtasks Query (Add st.updated_at)
-const subtasksQuery = `
+    // Subtasks Query (Add st.updated_at)
+    const subtasksQuery = `
   SELECT 
     pr.name AS project_name,
     st.name AS name,
@@ -1168,8 +1175,8 @@ const subtasksQuery = `
   WHERE st.status = 2 AND st.deleted_at IS NULL ${subtaskWhereClause}
 `;
 
-// Tasks Query (Add t.updated_at)
-const tasksQuery = `
+    // Tasks Query (Add t.updated_at)
+    const tasksQuery = `
   SELECT 
     pr.name AS project_name,
     t.name AS name,
@@ -1192,13 +1199,14 @@ const tasksQuery = `
     ${taskWhereClause}
 `;
 
-// Execute queries
-const [subtasks] = await db.query(subtasksQuery, subtaskValues);
-const [tasks] = await db.query(tasksQuery, taskValues);
+    // Execute queries
+    const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+    const [tasks] = await db.query(tasksQuery, taskValues);
 
-// Merge and sort by updated_at
-const mergedResults = [...subtasks, ...tasks].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-
+    // Merge and sort by updated_at
+    const mergedResults = [...subtasks, ...tasks].sort(
+      (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
+    );
 
     // Fetch assignee names
     const processedData = await Promise.all(
