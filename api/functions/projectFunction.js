@@ -266,6 +266,7 @@ exports.projectStatus = async (req, res) => {
       page = 1,
       perPage = 10,
     } = req.query;
+
     const offset = (page - 1) * perPage;
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
@@ -362,122 +363,106 @@ exports.projectStatus = async (req, res) => {
         ? `AND ${subtaskConditions.join(" AND ")}`
         : "";
 
-    // Updated tasks query to get the latest end_time
     const tasksQuery = `
-    SELECT
-  t.id AS task_id,
-  t.name AS task_name,
-  t.estimated_hours AS estimated_time,
-  t.total_hours_worked AS task_duration,
-  -- Subquery to get start_time of earliest updated timeline
-  (
-    SELECT DATE_FORMAT(CONVERT_TZ(stut2.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
-    FROM sub_tasks_user_timeline stut2
-    WHERE stut2.task_id = t.id
-    ORDER BY stut2.updated_at ASC
-    LIMIT 1
-  ) AS start_time,
-
-  -- Subquery to get end_time of latest updated timeline
-  (
-    SELECT DATE_FORMAT(CONVERT_TZ(stut3.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
-    FROM sub_tasks_user_timeline stut3
-    WHERE stut3.task_id = t.id
-    ORDER BY stut3.updated_at DESC
-    LIMIT 1
-  ) AS end_time,
-  t.rating AS rating,
-  p.id AS product_id,
-  p.name AS product_name,
-  pr.id AS project_id,
-  pr.name AS project_name,
-  tm.id AS team_id,
-  tm.name AS team_name,
-  u.id AS user_id,
-  t.status AS task_status,
-  COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-  DATE(t.created_at) AS date,
-  t.updated_at AS updated_at
-FROM tasks t
-LEFT JOIN users u ON u.id = t.user_id
-LEFT JOIN products p ON p.id = t.product_id
-LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id
-LEFT JOIN projects pr ON pr.id = t.project_id
-LEFT JOIN teams tm ON tm.id = t.team_id
-WHERE t.deleted_at IS NULL
-AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
-${taskWhereClause}
-GROUP BY t.id
-ORDER BY t.created_at DESC
-
+      SELECT
+        t.id AS task_id,
+        t.name AS task_name,
+        t.estimated_hours AS estimated_time,
+        t.total_hours_worked AS task_duration,
+        (
+          SELECT DATE_FORMAT(CONVERT_TZ(stut2.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+          FROM sub_tasks_user_timeline stut2
+          WHERE stut2.task_id = t.id
+          ORDER BY stut2.updated_at ASC
+          LIMIT 1
+        ) AS start_time,
+        (
+          SELECT DATE_FORMAT(CONVERT_TZ(stut3.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+          FROM sub_tasks_user_timeline stut3
+          WHERE stut3.task_id = t.id
+          ORDER BY stut3.updated_at DESC
+          LIMIT 1
+        ) AS end_time,
+        t.rating AS rating,
+        p.id AS product_id,
+        p.name AS product_name,
+        pr.id AS project_id,
+        pr.name AS project_name,
+        tm.id AS team_id,
+        tm.name AS team_name,
+        u.id AS user_id,
+        t.status AS task_status,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+        DATE(t.created_at) AS date,
+        t.updated_at AS updated_at
+      FROM tasks t
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN products p ON p.id = t.product_id
+      LEFT JOIN sub_tasks_user_timeline stut ON stut.task_id = t.id
+      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN teams tm ON tm.id = t.team_id
+      WHERE t.deleted_at IS NULL
+        AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)
+        ${taskWhereClause}
+      GROUP BY t.id
+      ORDER BY t.created_at DESC
     `;
 
-    // Updated subtasks query to get the latest end_time
     const subtasksQuery = `
-    SELECT
-  p.name AS product_name,
-  pr.name AS project_name,
-  t.name AS task_name,
-  st.name AS subtask_name,
-  DATE(st.created_at) AS date,
-  st.total_hours_worked AS subtask_duration,
-  -- Subquery to get start_time of earliest updated timeline
-  (
-    SELECT DATE_FORMAT(CONVERT_TZ(stut2.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
-    FROM sub_tasks_user_timeline stut2
-    WHERE stut2.task_id = t.id
-    ORDER BY stut2.updated_at ASC
-    LIMIT 1
-  ) AS start_time,
-
-  -- Subquery to get end_time of latest updated timeline
-  (
-    SELECT DATE_FORMAT(CONVERT_TZ(stut3.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
-    FROM sub_tasks_user_timeline stut3
-    WHERE stut3.task_id = t.id
-    ORDER BY stut3.updated_at DESC
-    LIMIT 1
-  ) AS end_time,
-
-  st.estimated_hours AS estimated_time,
-  st.total_hours_worked AS time_taken,
-  st.rating AS subtask_rating,
-  tm.id AS team_id,
-  tm.name AS team_name,
-  t.id AS task_id,
-  st.id AS subtask_id,
-  u.id AS user_id,
-  COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-  st.status AS subtask_status,
-  st.updated_at AS updated_at
-FROM sub_tasks st
-LEFT JOIN tasks t ON t.id = st.task_id
-LEFT JOIN users u ON u.id = st.user_id
-LEFT JOIN products p ON p.id = t.product_id
-LEFT JOIN projects pr ON pr.id = t.project_id
-LEFT JOIN sub_tasks_user_timeline stut ON stut.subtask_id = st.id
-LEFT JOIN teams tm ON tm.id = st.team_id
-WHERE st.deleted_at IS NULL
-${subtaskWhereClause}
-GROUP BY st.id
-ORDER BY st.updated_at DESC
-
+      SELECT
+        p.name AS product_name,
+        pr.name AS project_name,
+        t.name AS task_name,
+        st.name AS subtask_name,
+        DATE(st.created_at) AS date,
+        st.total_hours_worked AS subtask_duration,
+        (
+          SELECT DATE_FORMAT(CONVERT_TZ(stut2.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+          FROM sub_tasks_user_timeline stut2
+          WHERE stut2.task_id = t.id
+          ORDER BY stut2.updated_at ASC
+          LIMIT 1
+        ) AS start_time,
+        (
+          SELECT DATE_FORMAT(CONVERT_TZ(stut3.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+          FROM sub_tasks_user_timeline stut3
+          WHERE stut3.task_id = t.id
+          ORDER BY stut3.updated_at DESC
+          LIMIT 1
+        ) AS end_time,
+        st.estimated_hours AS estimated_time,
+        st.total_hours_worked AS time_taken,
+        st.rating AS subtask_rating,
+        tm.id AS team_id,
+        tm.name AS team_name,
+        t.id AS task_id,
+        st.id AS subtask_id,
+        u.id AS user_id,
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
+        st.status AS subtask_status,
+        st.updated_at AS updated_at
+      FROM sub_tasks st
+      LEFT JOIN tasks t ON t.id = st.task_id
+      LEFT JOIN users u ON u.id = st.user_id
+      LEFT JOIN products p ON p.id = t.product_id
+      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN sub_tasks_user_timeline stut ON stut.subtask_id = st.id
+      LEFT JOIN teams tm ON tm.id = st.team_id
+      WHERE st.deleted_at IS NULL
+        ${subtaskWhereClause}
+      GROUP BY st.id
+      ORDER BY st.updated_at DESC
     `;
 
-    // Fetch tasks and subtasks
     const [tasks] = await db.query(tasksQuery, taskValues);
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
 
     const mapStatus = (statusCode) => {
       switch (statusCode) {
-        case 0:
-          return "To Do";
-        case 1:
-          return "In Progress";
-        case 3:
-          return "Done";
-        default:
-          return "Unknown";
+        case 0: return "To Do";
+        case 1: return "In Progress";
+        case 3: return "Done";
+        default: return "Unknown";
       }
     };
 
@@ -496,10 +481,9 @@ ORDER BY st.updated_at DESC
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-      start_time: task.task.start_time,
+      start_time: task.start_time ? task.start_time : "-",
       end_time: task.task_status === 3 && task.end_time ? task.end_time : "-",
       task_duration: task.task_status === 3 ? task.task_duration : "-",
-
       task_updated_at: task.updated_at
         ? moment(task.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
@@ -521,51 +505,41 @@ ORDER BY st.updated_at DESC
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time: subtask.start_time,
-      end_time:
-        subtask.subtask_status === 3 && subtask.end_time
-          ? subtask.end_time
-          : "-",
+      start_time: subtask.start_time ? subtask.start_time : "-",
+      end_time: subtask.subtask_status === 3 && subtask.end_time ? subtask.end_time : "-",
       time_taken: subtask.subtask_status === 3 ? subtask.time_taken : "-",
-      subtask_duration:
-        subtask.subtask_status === 3 ? subtask.subtask_duration : "-",
-
+      subtask_duration: subtask.subtask_status === 3 ? subtask.subtask_duration : "-",
       task_updated_at: subtask.updated_at
         ? moment(subtask.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
     }));
 
-    const groupedTasks = [...Subtasks, ...Tasks].sort((a, b) => {
-      const dateA = moment(a.task_updated_at, "DD-MM-YYYY HH:mm:ss").toDate();
-      const dateB = moment(b.task_updated_at, "DD-MM-YYYY HH:mm:ss").toDate();
-      return dateB - dateA;
+    // Combine and sort both task types by updated_at
+    const combined = [...Subtasks, ...Tasks].sort((a, b) =>
+      new Date(b.task_updated_at) - new Date(a.task_updated_at)
+    );
+
+    const paginated = combined.slice(offset, offset + parseInt(perPage));
+
+    return res.status(200).json({
+      success: true,
+      message: "Project status fetched successfully",
+      data: paginated,
+      total: combined.length,
+      currentPage: parseInt(page),
+      perPage: parseInt(perPage),
+      totalPages: Math.ceil(combined.length / perPage),
     });
-
-    const totalRecords = groupedTasks.length;
-    const paginatedData = groupedTasks.slice(
-      offset,
-      offset + parseInt(perPage)
-    );
-    const pagination = getPagination(page, perPage, totalRecords);
-    const data = paginatedData.map((row, index) => ({
-      s_no: offset + index + 1,
-      ...row,
-    }));
-
-    successResponse(
-      res,
-      data,
-      data.length === 0
-        ? "No data found"
-        : "Tasks and subtasks retrieved successfully",
-      200,
-      pagination
-    );
   } catch (error) {
-    console.error("Error fetching tasks and subtasks:", error);
-    return errorResponse(res, error.message, "Server error", 500);
+    console.error("Error in projectStatus:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong.",
+      error: error.message,
+    });
   }
 };
+
 
 // exports.projectStatus_ToDo = async (req, res) => {
 //   try {
