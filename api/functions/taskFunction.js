@@ -2257,8 +2257,8 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
       throw {
         status: 500,
         success: false,
-        message: "You cannot start task ,because task has subtask",
-        error: "You cannot start task ,because task has subtask",
+        message: "This task cannot be started as it contains subtasks.",
+        error: "This task cannot be started as it contains subtasks.",
       };
     }
   }
