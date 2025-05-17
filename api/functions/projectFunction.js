@@ -467,8 +467,6 @@ ORDER BY st.updated_at DESC
     // Fetch tasks and subtasks
     const [tasks] = await db.query(tasksQuery, taskValues);
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
-console.log("Tasks:", tasks); 
-console.log("Subtasks:", subtasks);
 
     const mapStatus = (statusCode) => {
       switch (statusCode) {
@@ -498,7 +496,7 @@ console.log("Subtasks:", subtasks);
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-      start_time:task.task.start_time ,
+      start_time: task.task.start_time,
       end_time: task.task_status === 3 && task.end_time ? task.end_time : "-",
       task_duration: task.task_status === 3 ? task.task_duration : "-",
 
