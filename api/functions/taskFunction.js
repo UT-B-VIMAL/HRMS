@@ -1592,17 +1592,7 @@ const formatTime = (seconds) => {
 
 exports.getTaskList = async (queryParams, res) => {
   try {
-    const {
-      user_id,
-      product_id,
-      project_id,
-      team_id,
-      priority,
-      search,
-      member_id,
-      dropdown_products,
-      dropdown_projects,
-    } = queryParams;
+    const { user_id,product_id, project_id, team_id, priority,  search, member_id, dropdown_products,dropdown_projects } = queryParams;
 
     // Validate if user_id exists
     if (!user_id) {
@@ -1661,8 +1651,16 @@ exports.getTaskList = async (queryParams, res) => {
 
     const params = [];
     if (team_id) {
-      baseQuery += ` AND u.team_id = ?`;
-      params.push(team_id);
+        baseQuery += ` AND (
+        u.team_id = ? OR EXISTS (
+          SELECT 1 FROM sub_tasks 
+          LEFT JOIN users su ON sub_tasks.user_id = su.id
+          WHERE sub_tasks.task_id = tasks.id 
+          AND su.team_id = ?
+          AND sub_tasks.deleted_at IS NULL
+        )
+      )`;
+      params.push(team_id, team_id);
     } else if (role_id === 3) {
       const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
@@ -1753,8 +1751,15 @@ exports.getTaskList = async (queryParams, res) => {
     }
 
     if (priority) {
-      baseQuery += ` AND tasks.priority = ?`;
-      params.push(priority);
+      baseQuery += ` AND (
+        tasks.priority = ? OR EXISTS (
+          SELECT 1 FROM sub_tasks 
+          WHERE sub_tasks.task_id = tasks.id 
+          AND sub_tasks.priority = ?
+          AND sub_tasks.deleted_at IS NULL
+        )
+      )`;
+      params.push(priority, priority);
     }
 
     if (dropdown_products) {
