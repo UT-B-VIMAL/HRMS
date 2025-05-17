@@ -553,6 +553,7 @@ exports.get_individualStatus = async (req, res) => {
           FROM tasks t
           WHERE t.user_id = users.id
             AND t.deleted_at IS NULL
+            AND t.status = 0 AND t.reopen_status = 0 AND t.active_status = 0
             AND NOT EXISTS (
               SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL
             )
