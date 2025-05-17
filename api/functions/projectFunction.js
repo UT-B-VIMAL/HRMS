@@ -369,8 +369,23 @@ exports.projectStatus = async (req, res) => {
   t.name AS task_name,
   t.estimated_hours AS estimated_time,
   t.total_hours_worked AS task_duration,
-  MIN(DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS start_time,
-  MAX(DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS end_time,
+  -- Subquery to get start_time of earliest updated timeline
+  (
+    SELECT DATE_FORMAT(CONVERT_TZ(stut2.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+    FROM sub_tasks_user_timeline stut2
+    WHERE stut2.task_id = t.id
+    ORDER BY stut2.updated_at ASC
+    LIMIT 1
+  ) AS start_time,
+
+  -- Subquery to get end_time of latest updated timeline
+  (
+    SELECT DATE_FORMAT(CONVERT_TZ(stut3.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+    FROM sub_tasks_user_timeline stut3
+    WHERE stut3.task_id = t.id
+    ORDER BY stut3.updated_at DESC
+    LIMIT 1
+  ) AS end_time,
   t.rating AS rating,
   p.id AS product_id,
   p.name AS product_name,
@@ -406,8 +421,24 @@ ORDER BY t.created_at DESC
   st.name AS subtask_name,
   DATE(st.created_at) AS date,
   st.total_hours_worked AS subtask_duration,
-  MIN(DATE_FORMAT(CONVERT_TZ(stut.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS start_time,
-  MAX(DATE_FORMAT(CONVERT_TZ(stut.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')) AS end_time,
+  -- Subquery to get start_time of earliest updated timeline
+  (
+    SELECT DATE_FORMAT(CONVERT_TZ(stut2.start_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+    FROM sub_tasks_user_timeline stut2
+    WHERE stut2.task_id = t.id
+    ORDER BY stut2.updated_at ASC
+    LIMIT 1
+  ) AS start_time,
+
+  -- Subquery to get end_time of latest updated timeline
+  (
+    SELECT DATE_FORMAT(CONVERT_TZ(stut3.end_time, '+00:00', '+05:30'), '%d-%m-%Y %r')
+    FROM sub_tasks_user_timeline stut3
+    WHERE stut3.task_id = t.id
+    ORDER BY stut3.updated_at DESC
+    LIMIT 1
+  ) AS end_time,
+
   st.estimated_hours AS estimated_time,
   st.total_hours_worked AS time_taken,
   st.rating AS subtask_rating,
@@ -436,6 +467,8 @@ ORDER BY st.updated_at DESC
     // Fetch tasks and subtasks
     const [tasks] = await db.query(tasksQuery, taskValues);
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+console.log("Tasks:", tasks); 
+console.log("Subtasks:", subtasks);
 
     const mapStatus = (statusCode) => {
       switch (statusCode) {
@@ -465,7 +498,7 @@ ORDER BY st.updated_at DESC
       rating: task.rating,
       team_id: task.team_id,
       team_name: task.team_name,
-      start_time:task.task_status === 3 && task.start_time ? task.start_time : "-",
+      start_time:task.task.start_time ,
       end_time: task.task_status === 3 && task.end_time ? task.end_time : "-",
       task_duration: task.task_status === 3 ? task.task_duration : "-",
 
@@ -490,10 +523,7 @@ ORDER BY st.updated_at DESC
       rating: subtask.subtask_rating,
       team_id: subtask.team_id,
       team_name: subtask.team_name,
-      start_time:
-        subtask.subtask_status === 3 && subtask.start_time
-          ? subtask.start_time
-          : "-",
+      start_time: subtask.start_time,
       end_time:
         subtask.subtask_status === 3 && subtask.end_time
           ? subtask.end_time
