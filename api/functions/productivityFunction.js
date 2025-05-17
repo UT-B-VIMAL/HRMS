@@ -275,18 +275,157 @@ exports.getTeamwiseProductivity = async (req, res) => {
   }
 };
 
+// exports.get_individualStatus = async (req, res) => {
+//   try {
+//     const {
+//       team_id,
+//       from_date,
+//       to_date,
+//       search,
+//       page = 1,
+//       perPage = 10,
+//     } = req.query;
+//     const offset = (page - 1) * perPage;
+
+//     if (from_date && to_date) {
+//       if (
+//         !moment(from_date, "YYYY-MM-DD", true).isValid() ||
+//         !moment(to_date, "YYYY-MM-DD", true).isValid()
+//       ) {
+//         return errorResponse(
+//           res,
+//           "Invalid date format",
+//           "Dates must be in YYYY-MM-DD format",
+//           400
+//         );
+//       }
+//       if (moment(to_date).isBefore(moment(from_date))) {
+//         return errorResponse(
+//           res,
+//           "Invalid date range",
+//           "End date must be greater than or equal to Start date",
+//           400
+//         );
+//       }
+//     } else if (from_date && !moment(from_date, "YYYY-MM-DD", true).isValid()) {
+//       return errorResponse(
+//         res,
+//         "Invalid from_date format",
+//         "Start date must be in YYYY-MM-DD format",
+//         400
+//       );
+//     } else if (to_date && !moment(to_date, "YYYY-MM-DD", true).isValid()) {
+//       return errorResponse(
+//         res,
+//         "Invalid to_date format",
+//         "End date must be in YYYY-MM-DD format",
+//         400
+//       );
+//     }
+
+//     let baseQuery = `
+//             SELECT
+//                 users.id,
+//                 COALESCE(CONCAT(COALESCE(users.first_name, ''), ' ', COALESCE(NULLIF(users.last_name, ''), '')), 'Unknown User') AS employee_name,
+//                 users.employee_id,
+//                 COUNT(tasks.id) AS assigned_tasks,
+//                 SUM(CASE WHEN tasks.status = 1 THEN 1 ELSE 0 END) AS ongoing_tasks,
+//                 SUM(CASE WHEN tasks.status = 3 THEN 1 ELSE 0 END) AS completed_tasks,
+//                 MIN(tasks.created_at) AS task_created_at
+//             FROM users
+//             LEFT JOIN tasks ON tasks.user_id = users.id AND tasks.deleted_at IS NULL
+//             WHERE users.deleted_at IS NULL
+//         `;
+
+//     let countQuery = `
+//             SELECT COUNT(DISTINCT users.id) AS total
+//             FROM users
+//             LEFT JOIN tasks ON tasks.user_id = users.id AND tasks.deleted_at IS NULL
+//             WHERE users.deleted_at IS NULL
+//         `;
+
+//     let whereConditions = [];
+//     const queryParams = [];
+
+//     if (team_id) {
+//       whereConditions.push(`users.team_id = ?`);
+//       queryParams.push(team_id);
+//     }
+
+//     if (from_date && to_date) {
+//       const fromDateTime = `${from_date} 00:00:00`;
+//       const toDateTime = `${to_date} 23:59:59`;
+//       whereConditions.push("tasks.created_at BETWEEN ? AND ?");
+//       queryParams.push(fromDateTime, toDateTime);
+//     } else if (from_date) {
+//       const fromDateTime = `${from_date} 00:00:00`;
+//       whereConditions.push(`tasks.created_at >= ?`);
+//       queryParams.push(fromDateTime);
+//     } else if (to_date) {
+//       const toDateTime = `${to_date} 23:59:59`;
+//       whereConditions.push(`tasks.created_at <= ?`);
+//       queryParams.push(toDateTime);
+//     }
+
+//     if (search) {
+//       whereConditions.push(
+//         `(users.first_name LIKE ? OR users.employee_id LIKE ?)`
+//       );
+//       queryParams.push(`%${search}%`, `%${search}%`);
+//     }
+
+//     if (whereConditions.length > 0) {
+//       const whereClause = ` AND ${whereConditions.join(" AND ")}`;
+//       baseQuery += whereClause;
+//       countQuery += whereClause;
+//     }
+
+//     baseQuery += ` GROUP BY users.id LIMIT ? OFFSET ?`;
+//     queryParams.push(perPage, offset);
+
+//     const [results] = await db.query(baseQuery, queryParams);
+//     const [countResult] = await db.query(countQuery, queryParams.slice(0, -2));
+//     const totalRecords = countResult[0]?.total || 0;
+//     const pagination = getPagination(page, perPage, totalRecords);
+
+//     const data = results.map((user) => ({
+//       employee_name: user.employee_name,
+//       employee_id: user.employee_id,
+//       assigned_tasks: user.assigned_tasks || 0,
+//       ongoing_tasks: user.ongoing_tasks || 0,
+//       completed_tasks: user.completed_tasks || 0,
+//       task_created_at: user.task_created_at || null,
+//     }));
+
+//     successResponse(
+//       res,
+//       data,
+//       data.length === 0
+//         ? "No Individual status found"
+//         : "Individual status retrieved successfully",
+//       200,
+//       pagination
+//     );
+//   } catch (error) {
+//     console.error("Error fetching individual status:", error);
+//     return errorResponse(res, error.message, "Server error", 500);
+//   }
+// };
+
 exports.get_individualStatus = async (req, res) => {
   try {
     const {
       team_id,
+      search,
       from_date,
       to_date,
-      search,
       page = 1,
       perPage = 10,
     } = req.query;
+
     const offset = (page - 1) * perPage;
 
+    // Validate date formats if provided
     if (from_date && to_date) {
       if (
         !moment(from_date, "YYYY-MM-DD", true).isValid() ||
@@ -323,81 +462,211 @@ exports.get_individualStatus = async (req, res) => {
       );
     }
 
-    let baseQuery = `
-            SELECT 
-                users.id,
-                COALESCE(CONCAT(COALESCE(users.first_name, ''), ' ', COALESCE(NULLIF(users.last_name, ''), '')), 'Unknown User') AS employee_name, 
-                users.employee_id,
-                COUNT(tasks.id) AS assigned_tasks,
-                SUM(CASE WHEN tasks.status = 1 THEN 1 ELSE 0 END) AS ongoing_tasks,
-                SUM(CASE WHEN tasks.status = 3 THEN 1 ELSE 0 END) AS completed_tasks,
-                MIN(tasks.created_at) AS task_created_at
-            FROM users
-            LEFT JOIN tasks ON tasks.user_id = users.id AND tasks.deleted_at IS NULL
-            WHERE users.deleted_at IS NULL
-        `;
-
-    let countQuery = `
-            SELECT COUNT(DISTINCT users.id) AS total
-            FROM users
-            LEFT JOIN tasks ON tasks.user_id = users.id AND tasks.deleted_at IS NULL
-            WHERE users.deleted_at IS NULL
-        `;
-
-    let whereConditions = [];
-    const queryParams = [];
+    // Prepare user filtering conditions
+    let queryParams = [];
+    let whereUserConditions = [`users.deleted_at IS NULL`];
 
     if (team_id) {
-      whereConditions.push(`users.team_id = ?`);
+      whereUserConditions.push(`users.team_id = ?`);
       queryParams.push(team_id);
     }
+
+    if (search) {
+      whereUserConditions.push(`(users.first_name LIKE ? OR users.employee_id LIKE ?)`);
+      queryParams.push(`%${search}%`, `%${search}%`);
+    }
+
+
+    const whereUserClause = whereUserConditions.length
+      ? `WHERE ${whereUserConditions.join(" AND ")}`
+      : "";
+
+    // Prepare date filters for tasks and subtasks separately
+    let whereTaskDateCondition = [];
+    let taskDateParams = [];
+
+    let whereSubtaskDateCondition = [];
+    let subtaskDateParams = [];
 
     if (from_date && to_date) {
       const fromDateTime = `${from_date} 00:00:00`;
       const toDateTime = `${to_date} 23:59:59`;
-      whereConditions.push("tasks.created_at BETWEEN ? AND ?");
-      queryParams.push(fromDateTime, toDateTime);
+      whereTaskDateCondition.push(`t.created_at BETWEEN ? AND ?`);
+      taskDateParams.push(fromDateTime, toDateTime);
+
+      whereSubtaskDateCondition.push(`st.created_at BETWEEN ? AND ?`);
+      subtaskDateParams.push(fromDateTime, toDateTime);
     } else if (from_date) {
-      const fromDateTime = `${from_date} 00:00:00`;
-      whereConditions.push(`tasks.created_at >= ?`);
-      queryParams.push(fromDateTime);
+        const fromDateTime = `${from_date} 00:00:00`;
+        const toDateTime = `${from_date} 23:59:59`;
+
+        whereTaskDateCondition.push(`t.created_at BETWEEN ? AND ?`);
+        taskDateParams.push(fromDateTime, toDateTime);
+
+        whereSubtaskDateCondition.push(`st.created_at BETWEEN ? AND ?`);
+        subtaskDateParams.push(fromDateTime, toDateTime);
     } else if (to_date) {
       const toDateTime = `${to_date} 23:59:59`;
-      whereConditions.push(`tasks.created_at <= ?`);
-      queryParams.push(toDateTime);
+      whereTaskDateCondition.push(`t.created_at <= ?`);
+      taskDateParams.push(toDateTime);
+
+      whereSubtaskDateCondition.push(`st.created_at <= ?`);
+      subtaskDateParams.push(toDateTime);
     }
 
-    if (search) {
-      whereConditions.push(
-        `(users.first_name LIKE ? OR users.employee_id LIKE ?)`
-      );
-      queryParams.push(`%${search}%`, `%${search}%`);
-    }
+    // Helper to repeat params for multiple occurrences of the same condition
+    const repeatParams = (params, times) => {
+      let arr = [];
+      for (let i = 0; i < times; i++) {
+        arr = arr.concat(params);
+      }
+      return arr;
+    };
 
-    if (whereConditions.length > 0) {
-      const whereClause = ` AND ${whereConditions.join(" AND ")}`;
-      baseQuery += whereClause;
-      countQuery += whereClause;
-    }
+    // Count how many times date filters appear in the query for subtasks and tasks:
+    // Each subtasks date filter used 3 times in your query (assigned, ongoing, completed, earliest)
+    const subtaskDateFilterCount = whereSubtaskDateCondition.length ? 4 : 0;
+    // Each tasks date filter used 3 times similarly
+    const taskDateFilterCount = whereTaskDateCondition.length ? 4 : 0;
 
-    baseQuery += ` GROUP BY users.id LIMIT ? OFFSET ?`;
-    queryParams.push(perPage, offset);
+    // Compose the full query with separate date filters on tasks and subtasks
+    const baseQuery = `
+      SELECT
+        users.id,
+        COALESCE(CONCAT(COALESCE(users.first_name, ''), ' ', COALESCE(NULLIF(users.last_name, ''), '')), 'Unknown User') AS employee_name,
+        users.employee_id,
 
-    const [results] = await db.query(baseQuery, queryParams);
-    const [countResult] = await db.query(countQuery, queryParams.slice(0, -2));
+        -- Assigned tasks count:
+        (
+          SELECT COUNT(*)
+          FROM sub_tasks st
+          JOIN tasks t ON st.task_id = t.id
+          WHERE st.user_id = users.id
+            AND st.deleted_at IS NULL
+            AND t.deleted_at IS NULL
+            AND st.status = 0 AND st.reopen_status = 0 AND st.active_status = 0
+            ${whereSubtaskDateCondition.length ? `AND ${whereSubtaskDateCondition.join(" AND ")}` : ""}
+        )
+        +
+        (
+          SELECT COUNT(*)
+          FROM tasks t
+          WHERE t.user_id = users.id
+            AND t.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL
+            )
+            ${whereTaskDateCondition.length ? `AND ${whereTaskDateCondition.join(" AND ")}` : ""}
+        ) AS assigned_tasks,
+
+        -- Ongoing tasks count:
+        (
+          SELECT COUNT(*)
+          FROM sub_tasks st
+          JOIN tasks t ON st.task_id = t.id
+          WHERE st.user_id = users.id
+            AND st.deleted_at IS NULL
+            AND t.deleted_at IS NULL
+            AND st.status = 1 AND st.reopen_status = 0 AND st.active_status = 1
+            ${whereSubtaskDateCondition.length ? `AND ${whereSubtaskDateCondition.join(" AND ")}` : ""}
+        )
+        +
+        (
+          SELECT COUNT(*)
+          FROM tasks t
+          WHERE t.user_id = users.id
+            AND t.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL
+            )
+            AND t.status = 1 AND t.reopen_status = 0 AND t.active_status = 1
+            ${whereTaskDateCondition.length ? `AND ${whereTaskDateCondition.join(" AND ")}` : ""}
+        ) AS ongoing_tasks,
+
+        -- Completed tasks count:
+        (
+          SELECT COUNT(*)
+          FROM sub_tasks st
+          JOIN tasks t ON st.task_id = t.id
+          WHERE st.user_id = users.id
+            AND st.deleted_at IS NULL
+            AND t.deleted_at IS NULL
+            AND st.status = 3
+            ${whereSubtaskDateCondition.length ? `AND ${whereSubtaskDateCondition.join(" AND ")}` : ""}
+        )
+        +
+        (
+          SELECT COUNT(*)
+          FROM tasks t
+          WHERE t.user_id = users.id
+            AND t.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL
+            )
+            AND t.status = 3
+            ${whereTaskDateCondition.length ? `AND ${whereTaskDateCondition.join(" AND ")}` : ""}
+        ) AS completed_tasks,
+
+        -- Earliest created_at for subtasks (if any)
+        (
+          SELECT MIN(st.created_at)
+          FROM sub_tasks st
+          JOIN tasks t ON st.task_id = t.id
+          WHERE st.user_id = users.id
+            AND st.deleted_at IS NULL
+            AND t.deleted_at IS NULL
+            ${whereSubtaskDateCondition.length ? `AND ${whereSubtaskDateCondition.join(" AND ")}` : ""}
+        ) AS subtask_created_at,
+
+        -- Earliest created_at for tasks without subtasks
+        (
+          SELECT MIN(t.created_at)
+          FROM tasks t
+          WHERE t.user_id = users.id
+            AND t.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL
+            )
+            ${whereTaskDateCondition.length ? `AND ${whereTaskDateCondition.join(" AND ")}` : ""}
+        ) AS task_created_at
+
+      FROM users
+      ${whereUserClause}
+      ORDER BY users.first_name ASC
+      LIMIT ? OFFSET ?;
+    `;
+
+const queryParamsFinal = [
+  ...repeatParams(subtaskDateParams, subtaskDateFilterCount),
+  ...repeatParams(taskDateParams, taskDateFilterCount),
+  ...queryParams,
+   perPage,
+  offset,
+];
+  // Total count query (for pagination)
+    const countQuery = `
+      SELECT COUNT(*) AS total FROM users
+      ${whereUserClause};
+    `;
+
+    // Execute queries
+    const [results] = await db.query(baseQuery, queryParamsFinal);
+    const [countResult] = await db.query(countQuery, queryParams);
+
     const totalRecords = countResult[0]?.total || 0;
     const pagination = getPagination(page, perPage, totalRecords);
 
+    // Map response data
     const data = results.map((user) => ({
       employee_name: user.employee_name,
       employee_id: user.employee_id,
-      assigned_tasks: user.assigned_tasks || 0,
-      ongoing_tasks: user.ongoing_tasks || 0,
-      completed_tasks: user.completed_tasks || 0,
-      task_created_at: user.task_created_at || null,
+      assigned_tasks: Number(user.assigned_tasks) || 0,
+      ongoing_tasks: Number(user.ongoing_tasks) || 0,
+      completed_tasks: Number(user.completed_tasks) || 0,
+      task_created_at: user.subtask_created_at || user.task_created_at || null,
     }));
 
-    successResponse(
+    return successResponse(
       res,
       data,
       data.length === 0
@@ -411,3 +680,5 @@ exports.get_individualStatus = async (req, res) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
+
