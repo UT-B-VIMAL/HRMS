@@ -2281,7 +2281,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
   }
 
   await db.query(
-    "UPDATE ?? SET status = 1, active_status = 1, updated_at = NOW() WHERE id = ?",
+    "UPDATE ?? SET status = 1, active_status = 1, reopen_status = 0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", id]
   );
   await db.query(
