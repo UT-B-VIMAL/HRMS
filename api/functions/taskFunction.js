@@ -2251,6 +2251,17 @@ exports.doneTaskList = async (req, res) => {
 
 // Helper functions for task actions
 exports.startTask = async (taskOrSubtask, type, id, res) => {
+    if(type==="task"){
+    const[subtasksexist]=await db.query("SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",[id]);
+    if(subtasksexist.length>0){
+      throw {
+        status: 500,
+        success: false,
+        message: "You cannot start task ,because task has subtask",
+        error: "You cannot start task ,because task has subtask",
+      };
+    }
+  }
   const [existingSubtaskSublime] = await db.query(
     "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
     [taskOrSubtask.user_id]
