@@ -136,6 +136,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
   // Add pagination to the main query
   query += ` 
     GROUP BY users.id, users.first_name, users.employee_id, teams.name
+    ORDER BY  ratings.updated_at DESC
     LIMIT ? OFFSET ?
   `;
   queryParams.push(parseInt(perPage, 10), offset);
