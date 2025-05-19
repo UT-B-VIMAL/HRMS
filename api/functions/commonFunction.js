@@ -341,6 +341,13 @@ exports.reportingUser = async (req, res) => {
         "You are not currently assigned a reporting TL for your team.",
         404
       );
+    }else{
+         return successResponse(
+          res,
+          null,
+          "You have a team",
+          200
+        );
     }
     } catch (error) {
         console.error("Error fetching reporting TL:", error);
