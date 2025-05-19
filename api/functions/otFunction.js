@@ -16,8 +16,28 @@ exports.createOt = async (payload, res, req) => {
   const missingFields = [];
   if (!date) missingFields.push("date");
   if (!project_id) missingFields.push("project_id");
-  if (!task_id) missingFields.push("task_id");
   if (!user_id) missingFields.push("user_id");
+
+  const userQuery = `
+        SELECT id,team_id,role_id 
+        FROM users 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+  const [userResult] = await db.query(userQuery, [user_id]);
+
+  if (userResult.length === 0) {
+    return errorResponse(
+      res,
+      "User not found or deleted",
+      "Error creating OT",
+      404
+    );
+  }
+  const { team_id, role_id } = userResult[0];
+
+  if (role_id == 4) {
+    if (!task_id) missingFields.push("task_id");
+  }
 
   // If any field is missing, return an error response
   if (missingFields.length > 0) {
@@ -125,38 +145,23 @@ exports.createOt = async (payload, res, req) => {
       );
     }
 
-    const taskQuery = `
+    if (role_id == 4) {
+      const taskQuery = `
         SELECT id 
         FROM tasks 
         WHERE deleted_at IS NULL AND id = ? AND project_id = ?
       `;
-    const [taskResult] = await db.query(taskQuery, [task_id, project_id]);
+      const [taskResult] = await db.query(taskQuery, [task_id, project_id]);
 
-    if (taskResult.length === 0) {
-      return errorResponse(
-        res,
-        "Task not found or does not belong to the specified project",
-        "Error creating OT",
-        404
-      );
+      if (taskResult.length === 0) {
+        return errorResponse(
+          res,
+          "Task not found or does not belong to the specified project",
+          "Error creating OT",
+          404
+        );
+      }
     }
-
-    const userQuery = `
-        SELECT id,team_id,role_id 
-        FROM users 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
-    const [userResult] = await db.query(userQuery, [user_id]);
-
-    if (userResult.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error creating OT",
-        404
-      );
-    }
-    const { team_id, role_id } = userResult[0];
 
     let tl_status;
     let statuss;
@@ -168,19 +173,23 @@ exports.createOt = async (payload, res, req) => {
       tl_status = 0;
       statuss = 0;
     }
-
     // Check for duplicate OT entry for same user, date, and project
-    const duplicateCheckQuery = `
+    let duplicateCheckQuery = `
 SELECT id 
 FROM ot_details 
-WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at IS NULL
+WHERE user_id = ? AND project_id = ? AND date = ? AND deleted_at IS NULL
 `;
-    const [duplicateCheckResult] = await db.query(duplicateCheckQuery, [
-      user_id,
-      project_id,
-      date,
-      task_id,
-    ]);
+    let queryParams = [user_id, project_id, date];
+    if (role_id == 4) {
+      duplicateCheckQuery += " AND task_id = ?";
+      queryParams.push(task_id);
+    } else {
+      duplicateCheckQuery += " AND task_id IS NULL";
+    }
+    const [duplicateCheckResult] = await db.query(
+      duplicateCheckQuery,
+      queryParams
+    );
 
     if (duplicateCheckResult.length > 0) {
       return errorResponse(
@@ -189,6 +198,13 @@ WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at
         "Duplicate OT entry",
         409
       );
+    }
+
+    console.log("task", task_id);
+
+    let taskValue = null;
+    if (role_id == 4) {
+      taskValue = task_id;
     }
 
     const insertQuery = `
@@ -200,7 +216,7 @@ WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at
       user_id,
       product_id,
       project_id,
-      task_id,
+      taskValue,
       team_id,
       comments,
       statuss,
@@ -1191,6 +1207,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       );
     }
 
+    // Check user existence and role
     const [userCheck] = await db.query(
       "SELECT id, role_id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
@@ -1219,10 +1236,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
     }
 
     if (start_date && end_date) {
-      const startDate = new Date(start_date);
-      const endDate = new Date(end_date);
-
-      if (endDate < startDate) {
+      if (new Date(end_date) < new Date(start_date)) {
         return errorResponse(
           res,
           "End date cannot be earlier than start date.",
@@ -1298,8 +1312,11 @@ exports.getAllpmemployeeOts = async (req, res) => {
       }
     }
 
+    // Add deleted_at filter with AND or WHERE correctly
     const otWhereClause =
-      otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
+      otConditions.length > 0
+        ? `WHERE ${otConditions.join(" AND ")} AND ot.deleted_at IS NULL`
+        : `WHERE ot.deleted_at IS NULL`;
 
     const otQuery = `
       SELECT 
@@ -1334,19 +1351,36 @@ exports.getAllpmemployeeOts = async (req, res) => {
       LEFT JOIN 
         designations d ON d.id = u.designation_id
       ${otWhereClause}
-      AND ot.deleted_at IS NULL
       ORDER BY ot.created_at DESC
     `;
 
     const [ots] = await db.query(otQuery, otValues);
 
-    //  Filter out role_id = 2 if current user is role_id = 2
+    // Filter out role_id=2 if current user is role_id=2
     const filteredOts = ots.filter((row) => {
       if (currentRoleId === 2 && row.role_id === 2) {
         return false;
       }
       return true;
     });
+
+    function timeToSeconds(timeStr) {
+      const [h, m, s] = timeStr.split(":").map(Number);
+      return h * 3600 + m * 60 + s;
+    }
+
+    function secondsToHHMMSS(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600)
+        .toString()
+        .padStart(2, "0");
+      const m = Math.floor((totalSeconds % 3600) / 60)
+        .toString()
+        .padStart(2, "0");
+      const s = Math.floor(totalSeconds % 60)
+        .toString()
+        .padStart(2, "0");
+      return `${h}:${m}:${s}`;
+    }
 
     const groupedData = Object.values(
       filteredOts.reduce((acc, row) => {
@@ -1361,6 +1395,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
             team_name: row.team_name,
             total_hours: "00:00:00",
             pending_counts: 0,
+            totalSeconds: 0,
             details: [],
           };
         }
@@ -1369,6 +1404,16 @@ exports.getAllpmemployeeOts = async (req, res) => {
           acc[userId].pending_counts += 1;
         }
 
+        // Calculate time to add (pm_time > tl_time > employee_time)
+        const calculatedTime =
+          row.pm_time && row.pm_time !== "00:00:00"
+            ? row.pm_time
+            : row.tl_time && row.tl_time !== "00:00:00"
+            ? row.tl_time
+            : row.employee_time || "00:00:00";
+
+        acc[userId].totalSeconds += timeToSeconds(calculatedTime);
+
         acc[userId].details.push({
           id: row.ot_id,
           user_id: row.user_id,
@@ -1376,6 +1421,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
           employee_time: row.employee_time || "00:00:00",
           tl_time: row.tl_time || "00:00:00",
           pm_time: row.pm_time || "00:00:00",
+          calculated_time: calculatedTime,
           project_name: row.project_name,
           task_name: row.task_name,
           comments: row.comments,
@@ -1384,48 +1430,47 @@ exports.getAllpmemployeeOts = async (req, res) => {
           pmstatus: row.pm_status,
         });
 
-        const currentHours = row.employee_time || "00:00:00";
-        acc[userId].total_hours = addTimes(
-          acc[userId].total_hours,
-          currentHours
-        );
-
         return acc;
       }, {})
     );
 
+    // Convert total seconds to HH:mm:ss per employee
+    groupedData.forEach((emp) => {
+      emp.total_hours = secondsToHHMMSS(emp.totalSeconds);
+      delete emp.totalSeconds; // clean up
+    });
+
     const totalEmployees = groupedData.length;
     const paginatedEmployees = groupedData.slice(
       offset,
-      offset + parseInt(perPage)
+      offset + Number(perPage)
     );
     const pagination = getPagination(page, perPage, totalEmployees);
 
-    // Assign s_no inside each employee's details
-    const formattedData = paginatedEmployees.map((group) => {
-      group.details = group.details.map((item, index) => ({
+    // Add s_no to each detail
+    const formattedData = paginatedEmployees.map((empGroup) => {
+      empGroup.details = empGroup.details.map((item, index) => ({
         s_no: index + 1,
         ...item,
       }));
-      return group;
+      return empGroup;
     });
 
+    // Count OT with tl_status=2 and pm_status=0 for notification
     let countZeroQuery = `
-  SELECT COUNT(*) AS count
-  FROM ot_details ot
-  LEFT JOIN users u ON u.id = ot.user_id
-  WHERE ot.tl_status = 2
-    AND ot.pm_status = 0
-    AND ot.deleted_at IS NULL
-`;
-
-    const countZeroParams = [];
+      SELECT COUNT(*) AS count
+      FROM ot_details ot
+      LEFT JOIN users u ON u.id = ot.user_id
+      WHERE ot.tl_status = 2
+        AND ot.pm_status = 0
+        AND ot.deleted_at IS NULL
+    `;
 
     if (currentRoleId === 2) {
       countZeroQuery += ` AND u.role_id != 2`;
     }
 
-    const [countResult] = await db.query(countZeroQuery, countZeroParams);
+    const [countResult] = await db.query(countZeroQuery);
     const statusZeroCount = countResult[0]?.count || 0;
 
     successResponse(
@@ -1676,7 +1721,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-       return errorResponse(
+      return errorResponse(
         res,
         null,
         "You are not currently assigned a reporting TL for your team.",
@@ -1758,36 +1803,6 @@ exports.getAlltlemployeeOts = async (req, res) => {
 
       const currentRoleId = userCheck[0].role_id;
 
-      // switch (status) {
-      //   case "0": // Pending
-      //     if (currentRoleId == 3) {
-      //       otConditions.push(`ot.pm_status = 0 AND ot.tl_status = 0 AND ot.user_id != ${userCheck[0].id}`);
-      //     } else if (currentRoleId == 4) {
-      //       otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
-      //     }
-      //     break;
-
-      //   case "1": // Rejected
-      //     otConditions.push("ot.status = 1");
-      //     break;
-
-      //   case "2": // Approved
-      //     if (currentRoleId == 3) {
-      //       otConditions.push("ot.tl_status = 2");
-      //     } else if (currentRoleId == 4) {
-      //       otConditions.push("ot.tl_status = 2 AND ot.pm_status = 2");
-      //     }
-      //     break;
-
-      //   default:
-      //     return errorResponse(
-      //       res,
-      //       "Invalid status value.",
-      //       "Error fetching OT details",
-      //       400
-      //     );
-      // }
-
       switch (status) {
         case "0":
           // All statuses must be 0
@@ -1830,12 +1845,13 @@ exports.getAlltlemployeeOts = async (req, res) => {
           pr.name AS project_name,
           t.name AS task_name,
           DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-          ot.time AS employee_time,
           ot.comments,
           ot.status,
           ot.tl_status,
           ot.pm_status,
+          ot.time AS employee_time,
           ot.tledited_time AS tl_time,
+          ot.pmedited_time AS pm_time,
           ot.id AS ot_id,
           ot.user_id,
           u.first_name AS user_first_name,
@@ -1867,6 +1883,25 @@ exports.getAlltlemployeeOts = async (req, res) => {
     const paginatedData = ots.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
+    // Helper functions to convert time strings to seconds and back
+    function timeToSeconds(timeStr) {
+      const [h, m, s] = timeStr.split(":").map(Number);
+      return h * 3600 + m * 60 + s;
+    }
+
+    function secondsToHHMMSS(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600)
+        .toString()
+        .padStart(2, "0");
+      const m = Math.floor((totalSeconds % 3600) / 60)
+        .toString()
+        .padStart(2, "0");
+      const s = Math.floor(totalSeconds % 60)
+        .toString()
+        .padStart(2, "0");
+      return `${h}:${m}:${s}`;
+    }
+
     // Group the data by user_id and calculate pending counts for status 0
     const data = Object.values(
       paginatedData.reduce((acc, row, index) => {
@@ -1881,6 +1916,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               designation: row.designation,
               role_id: row.role_id,
               pending_counts: 0,
+              totalSeconds: 0,
               details: [],
             };
           } else {
@@ -1889,6 +1925,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               employee_id: row.employee_id,
               designation: row.designation,
               role_id: row.role_id,
+              totalSeconds: 0,
               details: [],
             };
           }
@@ -1899,6 +1936,16 @@ exports.getAlltlemployeeOts = async (req, res) => {
           acc[userId].pending_counts += 1;
         }
 
+        // Calculate the time to use
+        const calculatedTime =
+          row.pm_time && row.pm_time !== "00:00:00"
+            ? row.pm_time
+            : row.tl_time && row.tl_time !== "00:00:00"
+            ? row.tl_time
+            : row.employee_time || "00:00:00";
+
+        // Add to total seconds
+        acc[userId].totalSeconds += timeToSeconds(calculatedTime);
         // Add individual OT details
         acc[userId].details.push({
           s_no: offset + index + 1,
@@ -1907,6 +1954,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
           date: row.date,
           employee_time: row.employee_time || "00:00:00",
           tl_time: row.tl_time || "00:00:00",
+          pm_time: row.pm_time || "00:00:00",
           project_name: row.project_name,
           task_name: row.task_name,
           comments: row.comments,
@@ -1930,6 +1978,8 @@ exports.getAlltlemployeeOts = async (req, res) => {
       designation: group.designation,
       role_id: group.role_id,
       pending_counts: group.pending_counts,
+      total_hours: secondsToHHMMSS(group.totalSeconds || 0),
+
       details: group.details,
     }));
 

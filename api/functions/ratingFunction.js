@@ -53,7 +53,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ?  AND ratings.status = 1
     WHERE 
-      users.role_id NOT IN (1)
+      users.role_id NOT IN (1,2)
       AND users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
@@ -66,7 +66,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       [user_id]
     );
     if(teamRows.length == 0){
-      return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+      return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
     }
     const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
     query += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
@@ -102,7 +102,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ? 
     WHERE 
-      users.role_id NOT IN (1)
+      users.role_id NOT IN (1,2)
       AND users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
@@ -136,6 +136,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
   // Add pagination to the main query
   query += ` 
     GROUP BY users.id, users.first_name, users.employee_id, teams.name
+    ORDER BY  ratings.updated_at DESC
     LIMIT ? OFFSET ?
   `;
   queryParams.push(parseInt(perPage, 10), offset);
@@ -202,21 +203,32 @@ exports.ratingUpdation = async (payload, res, req) => {
   const ratings = [quality, timelines, agility, attitude, responsibility].map(Number);
   const validRatings = ratings.filter(r => !isNaN(r));
   const average = validRatings.length > 0 ? validRatings.reduce((a, b) => a + b, 0) / validRatings.length : 0;
-
+  let pm_status = 0;
+  if(user.role_id == 2 && status == 1){
+    if(average > 0){
+      pm_status = 1;
+    }
+  }
   if (checkResult[0].count > 0) {
     const updateQuery = `
         UPDATE ratings
-        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?, remarks = ?, status = ?
+        SET quality = ?, timelines = ?, agility = ?, attitude = ?, responsibility = ?, average = ?, updated_by = ?, remarks = ?, status = ? , pm_status = ?
         WHERE user_id = ? AND month = ? AND rater = ?`;
-    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by, remarks, status, user_id, month, rater];
+    const values = [quality, timelines, agility, attitude, responsibility, average, updated_by, remarks, status,pm_status, user_id, month, rater];
     await db.query(updateQuery, values);
   } else {
     const insertQuery = `
         INSERT INTO ratings 
-        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status];
+        (user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status,pm_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status,pm_status];
     await db.query(insertQuery, values);
+  }
+  if(user.role_id == 2 && status == 1){
+    const updateQuery = `
+      UPDATE ratings SET pm_status = 1 where user_id = ? AND month = ? AND rater = "TL"`;
+    const values = [user_id, month];
+    await db.query(updateQuery, values);
   }
   const responsePayload = {
     user_id,
@@ -424,7 +436,7 @@ exports.getRatings = async (req, res) => {
     if (!users) return;
 
     const values = [];
-    let whereClause = " WHERE users.role_id != 1 AND users.deleted_at IS NULL";
+    let whereClause = "WHERE users.role_id NOT IN (1,2) AND users.deleted_at IS NULL";
     
     // if (users.role_id === 2) {
     //   whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
@@ -442,7 +454,7 @@ exports.getRatings = async (req, res) => {
       );
 
         if (teamRows.length == 0) {
-          return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+          return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
         }
       const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
       whereClause += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
