@@ -309,6 +309,43 @@ exports.getticketCount = async (req, res) => {
         return errorResponse(res, error.message, "Error fetching Ticket Count", 500);
     }
 };
+exports.reportingUser = async (req, res) => {
+    try {
+         const { id } = req.params;
+        const user_id = id;
+
+    if (!user_id) {
+      return errorResponse(res, null, "User ID is required", 400);
+    }
+
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
+    }
+
+    // Fetch team IDs
+    const [teamResult] = await db.query(
+      "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    if (teamResult.length === 0) {
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
+    }
+    } catch (error) {
+        console.error("Error fetching reporting TL:", error);
+        return errorResponse(res, error.message, "Error fetching reporting TL", 500);
+    }
+};
 
 async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id, res }) {
     let selectQuery;

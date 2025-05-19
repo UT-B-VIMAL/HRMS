@@ -1,6 +1,7 @@
 const { 
     getAllData,
-    getticketCount
+    getticketCount,
+    reportingUser
   } = require('../api/functions/commonFunction');
   const {errorResponse}  = require('../helpers/responseHelper');
 
@@ -18,6 +19,14 @@ const {
     try {
 
       await getticketCount(req, res);
+    } catch (error) {
+      return errorResponse(res, error.message, 'Error  fetching Data', 500);
+    }
+  },
+  getreportinguser: async (req, res) => {
+    try {
+
+      await reportingUser(req, res);
     } catch (error) {
       return errorResponse(res, error.message, 'Error  fetching Data', 500);
     }
