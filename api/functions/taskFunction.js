@@ -315,8 +315,8 @@ exports.getTask = async (queryParams, res) => {
 
     let subtaskParams = [id];
 
-  if (userDetails.role_id === 3) {
-  subtaskQuery += ` AND (
+    if (userDetails.role_id === 3) {
+      subtaskQuery += ` AND (
     st.team_id = ? OR (
       st.user_id IS NULL AND EXISTS (
         SELECT 1 FROM tasks t
@@ -495,7 +495,7 @@ exports.getTask = async (queryParams, res) => {
             comment_id: comment.id,
             comments: comment.comments,
             user_id: comment.user_id,
-            is_edited:comment.is_edited,
+            is_edited: comment.is_edited,
             updated_by: comment.updated_by || "",
             shortName: comment.updated_by.substr(0, 2),
             time_date: moment
@@ -857,7 +857,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
   try {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
-   
 
     const [tasks] = await db.query(
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
@@ -870,14 +869,14 @@ exports.updateTaskData = async (id, payload, res, req) => {
     const currentTask = tasks[0];
     const assignee_id = currentTask.user_id;
 
-     if (status && active_status && reopen_status) {
+    if (status && active_status && reopen_status) {
       if (!assignee_id && sub_task_counts.length === 0) {
         return errorResponse(
           res,
           null,
           "Task is not assigned to any user",
           400
-          );
+        );
       }
       const result = await checkUpdatePermission({
         id,
@@ -957,7 +956,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
       }
     }
-    
 
     if (!currentTask) {
       return errorResponse(
@@ -1132,6 +1130,33 @@ exports.updateTaskData = async (id, payload, res, req) => {
             400
           );
         }
+      }
+    }
+
+    if (payload.start_date) {
+      const dueDateToCheck = payload.due_date || currentTask.end_date;
+      const newStart = new Date(payload.start_date);
+      const existingDue = new Date(dueDateToCheck);
+
+      // Normalize both dates (remove time & timezone)
+      const localNewStart = new Date(
+        newStart.getFullYear(),
+        newStart.getMonth(),
+        newStart.getDate()
+      );
+      const localDue = new Date(
+        existingDue.getFullYear(),
+        existingDue.getMonth(),
+        existingDue.getDate()
+      );
+
+      if (localNewStart > localDue) {
+        return errorResponse(
+          res,
+          null,
+          "Start date cannot be after the due date.",
+          400
+        );
       }
     }
 
@@ -1445,11 +1470,11 @@ exports.updateTaskData = async (id, payload, res, req) => {
 exports.deleteTask = async (req, res) => {
   try {
     const id = req.params.id;
-    
+
     const updated_by = req.body.updated_by;
     // Check if any subtasks exist
-    console.log(id,updated_by);
-    
+    console.log(id, updated_by);
+
     const subtaskQuery =
       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
     const [subtaskResult] = await db.query(subtaskQuery, [id]);
@@ -1507,18 +1532,10 @@ exports.deleteTask = async (req, res) => {
   ORDER BY created_at DESC 
   LIMIT 1
 `;
-const [flagResult] = await db.query(flagQuery, [id]); // Pass task_id here
-const old_data = flagResult[0]?.new_data || null;
+    const [flagResult] = await db.query(flagQuery, [id]); // Pass task_id here
+    const old_data = flagResult[0]?.new_data || null;
 
-
-    await addHistorydata(
-      old_data,
-      "Deleted",
-      id,
-      null,
-      updated_by || null,
-      14
-    );
+    await addHistorydata(old_data, "Deleted", id, null, updated_by || null, 14);
 
     return successResponse(res, null, "Task deleted successfully");
   } catch (error) {
@@ -1721,7 +1738,7 @@ exports.getTaskList = async (queryParams, res) => {
         )
       )`;
       params.push(team_id, team_id);
-    } 
+    }
     if (role_id === 3) {
       const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
@@ -1951,10 +1968,10 @@ exports.getTaskList = async (queryParams, res) => {
       }
 
       [allSubtasks] = await db.query(query, queryParams);
-    }else if (role_id === 3) {
- " AND subtask_user.team_id = ? OR (sub_tasks.user_id IS NULL AND task_user.team_id = ? AND sub_tasks.deleted_at IS NULL)";
-  queryParams.push(team_id, team_id);
-      }
+    } else if (role_id === 3) {
+      (" AND subtask_user.team_id = ? OR (sub_tasks.user_id IS NULL AND task_user.team_id = ? AND sub_tasks.deleted_at IS NULL)");
+      queryParams.push(team_id, team_id);
+    }
 
     // Group subtasks by task_id
     const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
@@ -2841,7 +2858,9 @@ exports.deleteTaskList = async (req, res) => {
 
     // Combine the results
     const mergedResults = [...subtasks, ...tasks];
-    mergedResults.sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+    mergedResults.sort(
+      (a, b) => new Date(b.deleted_at) - new Date(a.deleted_at)
+    );
 
     console.log("mergedResults", mergedResults);
     // Fetch assignee names and remove user_id
@@ -2959,20 +2978,18 @@ exports.restoreTasks = async (req, res) => {
         old_data, new_data, task_id, subtask_id, text,
         updated_by, status_flag, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
-        const historyValues = [
-          null,
-          null,
-         task_id,
-          subtask_id,
-          isSubtask
-            ? "Subtask restored":
-            "Task restored",
-          user_id,
-          isSubtask ? 17 : 16,
-          moment().format("YYYY-MM-DD HH:mm:ss"),
-          moment().format("YYYY-MM-DD HH:mm:ss"), 
-        ];
-        await db.query(historyQuery, historyValues);
+    const historyValues = [
+      "Deleted",
+      "Restored",
+      task_id,
+      subtask_id,
+      isSubtask ? "Subtask restored" : "Task restored",
+      user_id,
+      isSubtask ? 17 : 16,
+      moment().format("YYYY-MM-DD HH:mm:ss"),
+      moment().format("YYYY-MM-DD HH:mm:ss"),
+    ];
+    await db.query(historyQuery, historyValues);
 
     return successResponse(res, "Record restored successfully", "Success", 200);
   } catch (error) {
