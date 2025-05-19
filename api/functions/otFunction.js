@@ -1774,36 +1774,6 @@ exports.getAlltlemployeeOts = async (req, res) => {
 
       const currentRoleId = userCheck[0].role_id;
 
-      // switch (status) {
-      //   case "0": // Pending
-      //     if (currentRoleId == 3) {
-      //       otConditions.push(`ot.pm_status = 0 AND ot.tl_status = 0 AND ot.user_id != ${userCheck[0].id}`);
-      //     } else if (currentRoleId == 4) {
-      //       otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
-      //     }
-      //     break;
-
-      //   case "1": // Rejected
-      //     otConditions.push("ot.status = 1");
-      //     break;
-
-      //   case "2": // Approved
-      //     if (currentRoleId == 3) {
-      //       otConditions.push("ot.tl_status = 2");
-      //     } else if (currentRoleId == 4) {
-      //       otConditions.push("ot.tl_status = 2 AND ot.pm_status = 2");
-      //     }
-      //     break;
-
-      //   default:
-      //     return errorResponse(
-      //       res,
-      //       "Invalid status value.",
-      //       "Error fetching OT details",
-      //       400
-      //     );
-      // }
-
       switch (status) {
         case "0":
           // All statuses must be 0
@@ -1846,12 +1816,13 @@ exports.getAlltlemployeeOts = async (req, res) => {
           pr.name AS project_name,
           t.name AS task_name,
           DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-          ot.time AS employee_time,
           ot.comments,
           ot.status,
           ot.tl_status,
           ot.pm_status,
+          ot.time AS employee_time,
           ot.tledited_time AS tl_time,
+          ot.pmedited_time AS pm_time,
           ot.id AS ot_id,
           ot.user_id,
           u.first_name AS user_first_name,
@@ -1883,6 +1854,25 @@ exports.getAlltlemployeeOts = async (req, res) => {
     const paginatedData = ots.slice(offset, offset + parseInt(perPage));
     const pagination = getPagination(page, perPage, totalRecords);
 
+    // Helper functions to convert time strings to seconds and back
+    function timeToSeconds(timeStr) {
+      const [h, m, s] = timeStr.split(":").map(Number);
+      return h * 3600 + m * 60 + s;
+    }
+
+    function secondsToHHMMSS(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600)
+        .toString()
+        .padStart(2, "0");
+      const m = Math.floor((totalSeconds % 3600) / 60)
+        .toString()
+        .padStart(2, "0");
+      const s = Math.floor(totalSeconds % 60)
+        .toString()
+        .padStart(2, "0");
+      return `${h}:${m}:${s}`;
+    }
+
     // Group the data by user_id and calculate pending counts for status 0
     const data = Object.values(
       paginatedData.reduce((acc, row, index) => {
@@ -1897,6 +1887,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               designation: row.designation,
               role_id: row.role_id,
               pending_counts: 0,
+              totalSeconds: 0,
               details: [],
             };
           } else {
@@ -1905,6 +1896,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
               employee_id: row.employee_id,
               designation: row.designation,
               role_id: row.role_id,
+              totalSeconds: 0,
               details: [],
             };
           }
@@ -1915,6 +1907,16 @@ exports.getAlltlemployeeOts = async (req, res) => {
           acc[userId].pending_counts += 1;
         }
 
+        // Calculate the time to use
+        const calculatedTime =
+          row.pm_time && row.pm_time !== "00:00:00"
+            ? row.pm_time
+            : row.tl_time && row.tl_time !== "00:00:00"
+            ? row.tl_time
+            : row.employee_time || "00:00:00";
+
+        // Add to total seconds
+        acc[userId].totalSeconds += timeToSeconds(calculatedTime);
         // Add individual OT details
         acc[userId].details.push({
           s_no: offset + index + 1,
@@ -1923,6 +1925,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
           date: row.date,
           employee_time: row.employee_time || "00:00:00",
           tl_time: row.tl_time || "00:00:00",
+          pm_time: row.pm_time || "00:00:00",
           project_name: row.project_name,
           task_name: row.task_name,
           comments: row.comments,
@@ -1946,6 +1949,8 @@ exports.getAlltlemployeeOts = async (req, res) => {
       designation: group.designation,
       role_id: group.role_id,
       pending_counts: group.pending_counts,
+      final_time: secondsToHHMMSS(group.totalSeconds || 0),
+
       details: group.details,
     }));
 
