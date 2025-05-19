@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const moment = require('moment-timezone');
 const connectedUsers = {};
 
 module.exports = (io) => {
@@ -98,10 +99,10 @@ module.exports = (io) => {
         console.log('Received data:', data);
 
         socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
-        const createdAt = new Date();
+        const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, createdAt, createdAt, NULL)`,
+          VALUES (?, ?, ?, ?, istTime, istTime, NULL)`,
           [ticket_id, sender_id, receiver_id, comments]
         );
 
