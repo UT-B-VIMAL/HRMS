@@ -65,6 +65,9 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
       [user_id]
     );
+    if(teamRows.length == 0){
+      return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+    }
     const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
     query += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
     queryParams.push(teamIds);
@@ -437,6 +440,10 @@ exports.getRatings = async (req, res) => {
         `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
         [user_id]
       );
+
+        if (teamRows.length == 0) {
+          return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+        }
       const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
       whereClause += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
       values.push(teamIds);

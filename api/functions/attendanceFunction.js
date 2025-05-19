@@ -37,7 +37,7 @@ exports.getAttendance = async (req, res) => {
       );
 
       if (!teamResult.length || teamResult[0].reporting_user_id === null) {
-        return errorResponse(res, null, "No teams found for the given user_id", 400);
+        return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
       }
     }
     // Base Query

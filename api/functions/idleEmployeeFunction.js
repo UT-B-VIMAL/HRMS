@@ -32,6 +32,9 @@ exports.get_idleEmployee = async (req, res) => {
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
         [user_id]
       );
+      if(rows.length == 0) {
+          return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+      }
       teamIds = rows.length > 0 ? rows.map((row) => row.id) : [user.team_id];
     }
 
