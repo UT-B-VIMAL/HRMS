@@ -1238,9 +1238,12 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       [user_id]
     );
     if (teamResult.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No teams found for the given user_id" });
+       return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
     }
     const teamIds = teamResult.map((team) => team.id);
 
