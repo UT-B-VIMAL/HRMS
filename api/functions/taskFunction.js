@@ -314,9 +314,16 @@ exports.getTask = async (queryParams, res) => {
 
     let subtaskParams = [id];
 
-    if (userDetails.role_id === 3) {
-      subtaskQuery += ` AND st.team_id = ?`;
-      subtaskParams.push(userDetails.team_id);
+  if (userDetails.role_id === 3) {
+  subtaskQuery += ` AND (
+    st.team_id = ? OR (
+      st.user_id IS NULL AND EXISTS (
+        SELECT 1 FROM tasks t
+        WHERE t.id = st.task_id AND t.team_id = ?
+      )
+    )
+  )`;
+      subtaskParams.push(userDetails.team_id, userDetails.team_id);
     } else if (userDetails.role_id === 4) {
       // subtaskQuery += ` AND (st.user_id = ?)`;
       // subtaskParams.push(user_id);
