@@ -32,12 +32,12 @@ exports.getAttendance = async (req, res) => {
     const dynamicDate = date || today;
     if (user.role_id == 3) {
       const [teamResult] = await db.query(
-        `SELECT reporting_user_id FROM teams WHERE id = ?`,
-        [user.team_id]
+        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
+        [user_id]
       );
 
       if (!teamResult.length || teamResult[0].reporting_user_id === null) {
-        return errorResponse(res, null, "No teams found for the given user_id", 400);
+        return errorResponse(res, null, "You are not currently assigned a reporting TL for your team", 400);
       }
     }
     // Base Query

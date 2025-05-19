@@ -241,7 +241,8 @@ ORDER BY h.id DESC;
     const commentsData = validComments.map((comment) => ({
       comments_id: comment.id || "",
       comments: comment.comments || "",
-      comments:comment.is_edited,
+      user_id:comment.user_id || "",
+      is_edited:comment.is_edited,
       updated_by: comment.updated_by || "",
       shortName: comment.updated_by.substr(0, 2),
       time_date: moment
@@ -550,9 +551,18 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     const currentTask = tasks[0];
     const assigneeId = currentTask.user_id;
 
-    if (assigneeId){
+  
 
     if (status && active_status && reopen_status) {
+        if (!assigneeId){
+           return errorResponse(
+          res,
+          null,
+          "SubTask is not assigned to any user",
+          400
+          );
+
+          }
       const result = await checkUpdatePermission({
         id,
         type: "subtask",
@@ -565,7 +575,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       if (!result.allowed) {
         return res.status(403).json({ message: result.message });
       }
-    }
+    
   }
   
   // else{
