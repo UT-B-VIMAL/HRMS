@@ -699,7 +699,7 @@ exports.fetchRatings = async (req, res) => {
     const ratingQuery = `
       SELECT SUM(average) AS total_average
       FROM ratings 
-      WHERE user_id = ? AND month = ?
+      WHERE status = 1 AND user_id = ? AND month = ? 
     `;
 
     const [ratingRecords] = await db.query(ratingQuery, [userId, monthToUse]);
@@ -709,7 +709,7 @@ exports.fetchRatings = async (req, res) => {
     const yearAvgQuery = `
       SELECT SUM(average) AS total_average, COUNT(*) AS record_count
       FROM ratings 
-      WHERE user_id = ? AND month LIKE ?
+      WHERE status = 1 AND user_id = ? AND month LIKE ?
     `;
 
     const [yearlyAvgRecord] = await db.query(yearAvgQuery, [
