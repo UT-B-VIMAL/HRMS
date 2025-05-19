@@ -223,6 +223,12 @@ exports.ratingUpdation = async (payload, res, req) => {
     const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status,pm_status];
     await db.query(insertQuery, values);
   }
+  if(user.role_id == 2 && status == 1){
+    const updateQuery = `
+      UPDATE ratings SET pm_status = 1 where user_id = ? AND month = ? AND rater = "TL"`;
+    const values = [user_id, month];
+    await db.query(updateQuery, values);
+  }
   const responsePayload = {
     user_id,
     month,
