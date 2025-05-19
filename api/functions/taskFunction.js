@@ -2977,6 +2977,7 @@ const formatDate = (date) => {
   return `${year}-${month}-${day}`; // Convert to YYYY-MM-DD
 };
 
+
 exports.getWorkReportData = async (queryParams, res) => {
   try {
     const {
@@ -2993,6 +2994,7 @@ exports.getWorkReportData = async (queryParams, res) => {
     let baseQuery = `
    SELECT 
   DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
+  su.id AS timeline_id,
   u.employee_id,  -- Fetching employee_id from users table
   CONCAT(u.first_name, ' ', u.last_name) AS name,
   COALESCE(p.name, '') AS project_name,  -- Fetching project_name from projects table
@@ -3041,8 +3043,26 @@ LEFT JOIN
   users u ON su.user_id = u.id  -- Join users table to get employee_id and first_name
 WHERE 
   su.deleted_at IS NULL
-
-
+  AND (
+    (
+      su.subtask_id IS NULL 
+      AND t.deleted_at IS NULL 
+      AND (
+        (t.status = 1 AND t.active_status = 1) 
+        OR t.status = 3
+      )
+    )
+    OR (
+      su.subtask_id IS NOT NULL 
+      AND st.deleted_at IS NULL 
+      AND (
+        (st.status = 1 AND st.active_status = 1) 
+        OR st.status = 3
+      )
+    )
+  )
+  AND p.deleted_at IS NULL
+  AND u.deleted_at IS NULL
 `;
 
     const params = [];
@@ -3098,29 +3118,72 @@ WHERE
           404
         );
       }
+      if (export_status == 1) {
+        const { Parser } = require("json2csv");
 
-      // Define fields explicitly
-      const fields = [
-        { label: "S.No", value: "s_no" },
-        { label: "Date", value: "date" },
-        { label: "Employee ID", value: "employee_id" },
-        { label: "Name", value: "name" },
-        { label: "Project Name", value: "project_name" },
-        { label: "In Progress", value: "in_progress" },
-        { label: "Completed", value: "completed" },
-        { label: "Total Hours Worked", value: "total_hours_worked" },
-      ];
+      const groupedData = {};
 
-      const result = results.map((task, index) => ({
-        s_no: index + 1,
-        ...task,
-        total_hours_worked: task.total_hours_worked, // Format if needed
+      results.forEach(row => {
+        const userId = row.employee_id;
+
+        if (!groupedData[userId]) {
+          groupedData[userId] = {
+            s_no: 0,
+            employee_id: row.employee_id,
+            name: row.name,
+            date: [],
+            project_name: [],
+            in_progress: [],
+            completed: [],
+            total_seconds: 0, // store seconds for summing
+          };
+        }
+
+        groupedData[userId].date.push(row.date);
+        groupedData[userId].project_name.push(row.project_name);
+        groupedData[userId].completed.push(row.completed);
+        groupedData[userId].in_progress.push(row.in_progress);
+
+        // Convert time string to seconds
+        const [hours, minutes, seconds] = row.total_hours_worked.split(':').map(Number);
+        const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+        groupedData[userId].total_seconds += totalSeconds;
+      });
+
+      // Helper to convert seconds back to HH:MM:SS
+      function formatSecondsToHHMMSS(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+      }
+
+      // Prepare export array
+      const exportData = Object.values(groupedData).map((user, index) => ({
+        "S.No": index + 1,
+        "Employee ID": user.employee_id,
+        "Employee Name": user.name,
+        "Date": user.date.join(', '),
+        "Project Name": user.project_name.join(', '),
+        "In Progress": user.in_progress.join(', '),
+        "Completed": user.completed.join(', '),
+        "Total Hours Worked": formatSecondsToHHMMSS(user.total_seconds),
       }));
+
+
+        const json2csvParser = new Parser({ });
+        const csv = json2csvParser.parse(exportData);
+
+        res.header('Content-Type', 'text/csv');
+        res.attachment('attendance_data.csv');
+        return res.send(csv);
+      }
+
+     
 
       // Convert data to CSV
       const { Parser } = require("json2csv");
-      const json2csvParser = new Parser({ fields });
-      const csv = json2csvParser.parse(result);
+      const csv = json2csvParser.parse(results);
 
       res.header("Content-Type", "text/csv");
       res.attachment("work_report_data.csv");
@@ -3151,3 +3214,4 @@ WHERE
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+
