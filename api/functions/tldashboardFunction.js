@@ -33,9 +33,12 @@ exports.fetchAttendance = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No teams found for the given user_id" });
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -190,9 +193,12 @@ exports.fetchTlrating = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No teams found for the given user_id" });
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -295,9 +301,12 @@ exports.fetchTLproducts = async (req, res) => {
       [user_id]
     );
     if (teamResult.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No teams found for the given user_id" });
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
     }
     const teamIds = teamResult.map((team) => team.id);
 
@@ -472,9 +481,12 @@ exports.fetchTLresourceallotment = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No teams found for the given user_id" });
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -649,9 +661,12 @@ exports.fetchTLdatas = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No teams found for the given user_id" });
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
     }
 
     const teamIds = teamResult.map((team) => team.id);
@@ -1081,9 +1096,12 @@ exports.fetchTlviewproductdata = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No teams found for the given user_id" });
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
     }
 
     const teamIds = teamResult.map((team) => team.id);
