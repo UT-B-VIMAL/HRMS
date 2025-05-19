@@ -48,8 +48,8 @@ exports.updateSubTask = async (req, res) => {
 
 exports.deleteSubTask = async (req, res) => {
     try {
-        const { id } = req.params;
-        await deleteSubTask(id, res);
+        // const { id } = req.params;
+        await deleteSubTask(req, res);
     } catch (error) {
         return errorResponse(res, error.message, 'Error deleting task', 500);
     }
