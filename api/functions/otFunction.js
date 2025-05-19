@@ -1207,6 +1207,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       );
     }
 
+    // Check user existence and role
     const [userCheck] = await db.query(
       "SELECT id, role_id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
@@ -1235,10 +1236,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
     }
 
     if (start_date && end_date) {
-      const startDate = new Date(start_date);
-      const endDate = new Date(end_date);
-
-      if (endDate < startDate) {
+      if (new Date(end_date) < new Date(start_date)) {
         return errorResponse(
           res,
           "End date cannot be earlier than start date.",
@@ -1314,8 +1312,11 @@ exports.getAllpmemployeeOts = async (req, res) => {
       }
     }
 
+    // Add deleted_at filter with AND or WHERE correctly
     const otWhereClause =
-      otConditions.length > 0 ? `WHERE ${otConditions.join(" AND ")}` : "";
+      otConditions.length > 0
+        ? `WHERE ${otConditions.join(" AND ")} AND ot.deleted_at IS NULL`
+        : `WHERE ot.deleted_at IS NULL`;
 
     const otQuery = `
       SELECT 
@@ -1350,19 +1351,36 @@ exports.getAllpmemployeeOts = async (req, res) => {
       LEFT JOIN 
         designations d ON d.id = u.designation_id
       ${otWhereClause}
-      AND ot.deleted_at IS NULL
       ORDER BY ot.created_at DESC
     `;
 
     const [ots] = await db.query(otQuery, otValues);
 
-    //  Filter out role_id = 2 if current user is role_id = 2
+    // Filter out role_id=2 if current user is role_id=2
     const filteredOts = ots.filter((row) => {
       if (currentRoleId === 2 && row.role_id === 2) {
         return false;
       }
       return true;
     });
+
+    function timeToSeconds(timeStr) {
+      const [h, m, s] = timeStr.split(":").map(Number);
+      return h * 3600 + m * 60 + s;
+    }
+
+    function secondsToHHMMSS(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600)
+        .toString()
+        .padStart(2, "0");
+      const m = Math.floor((totalSeconds % 3600) / 60)
+        .toString()
+        .padStart(2, "0");
+      const s = Math.floor(totalSeconds % 60)
+        .toString()
+        .padStart(2, "0");
+      return `${h}:${m}:${s}`;
+    }
 
     const groupedData = Object.values(
       filteredOts.reduce((acc, row) => {
@@ -1377,6 +1395,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
             team_name: row.team_name,
             total_hours: "00:00:00",
             pending_counts: 0,
+            totalSeconds: 0,
             details: [],
           };
         }
@@ -1385,6 +1404,16 @@ exports.getAllpmemployeeOts = async (req, res) => {
           acc[userId].pending_counts += 1;
         }
 
+        // Calculate time to add (pm_time > tl_time > employee_time)
+        const calculatedTime =
+          row.pm_time && row.pm_time !== "00:00:00"
+            ? row.pm_time
+            : row.tl_time && row.tl_time !== "00:00:00"
+            ? row.tl_time
+            : row.employee_time || "00:00:00";
+
+        acc[userId].totalSeconds += timeToSeconds(calculatedTime);
+
         acc[userId].details.push({
           id: row.ot_id,
           user_id: row.user_id,
@@ -1392,6 +1421,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
           employee_time: row.employee_time || "00:00:00",
           tl_time: row.tl_time || "00:00:00",
           pm_time: row.pm_time || "00:00:00",
+          calculated_time: calculatedTime,
           project_name: row.project_name,
           task_name: row.task_name,
           comments: row.comments,
@@ -1400,48 +1430,47 @@ exports.getAllpmemployeeOts = async (req, res) => {
           pmstatus: row.pm_status,
         });
 
-        const currentHours = row.employee_time || "00:00:00";
-        acc[userId].total_hours = addTimes(
-          acc[userId].total_hours,
-          currentHours
-        );
-
         return acc;
       }, {})
     );
 
+    // Convert total seconds to HH:mm:ss per employee
+    groupedData.forEach((emp) => {
+      emp.total_hours = secondsToHHMMSS(emp.totalSeconds);
+      delete emp.totalSeconds; // clean up
+    });
+
     const totalEmployees = groupedData.length;
     const paginatedEmployees = groupedData.slice(
       offset,
-      offset + parseInt(perPage)
+      offset + Number(perPage)
     );
     const pagination = getPagination(page, perPage, totalEmployees);
 
-    // Assign s_no inside each employee's details
-    const formattedData = paginatedEmployees.map((group) => {
-      group.details = group.details.map((item, index) => ({
+    // Add s_no to each detail
+    const formattedData = paginatedEmployees.map((empGroup) => {
+      empGroup.details = empGroup.details.map((item, index) => ({
         s_no: index + 1,
         ...item,
       }));
-      return group;
+      return empGroup;
     });
 
+    // Count OT with tl_status=2 and pm_status=0 for notification
     let countZeroQuery = `
-  SELECT COUNT(*) AS count
-  FROM ot_details ot
-  LEFT JOIN users u ON u.id = ot.user_id
-  WHERE ot.tl_status = 2
-    AND ot.pm_status = 0
-    AND ot.deleted_at IS NULL
-`;
-
-    const countZeroParams = [];
+      SELECT COUNT(*) AS count
+      FROM ot_details ot
+      LEFT JOIN users u ON u.id = ot.user_id
+      WHERE ot.tl_status = 2
+        AND ot.pm_status = 0
+        AND ot.deleted_at IS NULL
+    `;
 
     if (currentRoleId === 2) {
       countZeroQuery += ` AND u.role_id != 2`;
     }
 
-    const [countResult] = await db.query(countZeroQuery, countZeroParams);
+    const [countResult] = await db.query(countZeroQuery);
     const statusZeroCount = countResult[0]?.count || 0;
 
     successResponse(
@@ -1949,7 +1978,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
       designation: group.designation,
       role_id: group.role_id,
       pending_counts: group.pending_counts,
-      final_time: secondsToHHMMSS(group.totalSeconds || 0),
+      total_hours: secondsToHHMMSS(group.totalSeconds || 0),
 
       details: group.details,
     }));
