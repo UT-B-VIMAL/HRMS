@@ -15,6 +15,7 @@ const {
   formatTimeDHMS,
   commonStatusGroup,
   checkUpdatePermission,
+  addHistorydata
 } = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
@@ -434,18 +435,21 @@ exports.updateSubTask = async (id, payload, res) => {
 };
 
 // Delete Task
-exports.deleteSubTask = async (id, res) => {
+exports.deleteSubTask = async (req, res) => {
+   const id = req.params.id;
+    
+    const updated_by = req.body.updated_by;
   try {
     // Fetch subtask status
     const statusQuery =
-      "SELECT status, reopen_status, active_status FROM sub_tasks WHERE id = ? AND deleted_at IS NULL";
+      "SELECT status, reopen_status, active_status, task_id FROM sub_tasks WHERE id = ? AND deleted_at IS NULL";
     const [statusResult] = await db.query(statusQuery, [id]);
 
     if (statusResult.length === 0) {
       return errorResponse(res, null, "SubTask not found", 404);
     }
 
-    const { status, reopen_status, active_status } = statusResult[0];
+    const { status, reopen_status, active_status, task_id } = statusResult[0];
 
     // Check if subtask is InProgress
     const currentGroup = commonStatusGroup(
@@ -469,6 +473,30 @@ exports.deleteSubTask = async (id, res) => {
     if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "SubTask not found", 204);
     }
+
+     // Get status_flag for "Task Deleted"
+    const flagQuery = `
+  SELECT new_data 
+  FROM task_histories 
+  WHERE status_flag = 15 
+    AND task_id = ? 
+    AND subtask_id = ? 
+  ORDER BY created_at DESC 
+  LIMIT 1
+`;
+const [flagResult] = await db.query(flagQuery, [task_id, id]);
+const old_data = flagResult[0]?.new_data || null;
+
+
+
+    await addHistorydata(
+      old_data,
+      "Deleted",
+      task_id,
+      id,
+      updated_by || null,
+      15
+    );
 
     return successResponse(res, null, "SubTask deleted successfully");
   } catch (error) {

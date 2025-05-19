@@ -19,6 +19,7 @@ const {
   getISTTime,
   checkUpdatePermission,
   commonStatusGroup,
+  addHistorydata,
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -486,7 +487,7 @@ exports.getTask = async (queryParams, res) => {
         ? comments[0].map((comment) => ({
             comment_id: comment.id,
             comments: comment.comments,
-            comments:comment.is_edited,
+            comments: comment.is_edited,
             updated_by: comment.updated_by || "",
             shortName: comment.updated_by.substr(0, 2),
             time_date: moment
@@ -1420,9 +1421,14 @@ exports.updateTaskData = async (id, payload, res, req) => {
 //   }
 // };
 
-exports.deleteTask = async (id, res) => {
+exports.deleteTask = async (req, res) => {
   try {
+    const id = req.params.id;
+    
+    const updated_by = req.body.updated_by;
     // Check if any subtasks exist
+    console.log(id,updated_by);
+    
     const subtaskQuery =
       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
     const [subtaskResult] = await db.query(subtaskQuery, [id]);
@@ -1469,6 +1475,29 @@ exports.deleteTask = async (id, res) => {
     if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "Task not found", 404);
     }
+
+    // Get status_flag for "Task Deleted"
+    const flagQuery = `
+  SELECT new_data 
+  FROM task_histories 
+  WHERE status_flag = 14 
+    AND task_id = ? 
+    AND subtask_id IS NULL 
+  ORDER BY created_at DESC 
+  LIMIT 1
+`;
+const [flagResult] = await db.query(flagQuery, [id]); // Pass task_id here
+const old_data = flagResult[0]?.new_data || null;
+
+
+    await addHistorydata(
+      old_data,
+      "Deleted",
+      id,
+      null,
+      updated_by || null,
+      14
+    );
 
     return successResponse(res, null, "Task deleted successfully");
   } catch (error) {
@@ -1593,7 +1622,17 @@ const formatTime = (seconds) => {
 
 exports.getTaskList = async (queryParams, res) => {
   try {
-    const { user_id,product_id, project_id, team_id, priority,  search, member_id, dropdown_products,dropdown_projects } = queryParams;
+    const {
+      user_id,
+      product_id,
+      project_id,
+      team_id,
+      priority,
+      search,
+      member_id,
+      dropdown_products,
+      dropdown_projects,
+    } = queryParams;
 
     // Validate if user_id exists
     if (!user_id) {
@@ -1652,7 +1691,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     const params = [];
     if (team_id) {
-        baseQuery += ` AND (
+      baseQuery += ` AND (
         u.team_id = ? OR EXISTS (
           SELECT 1 FROM sub_tasks 
           LEFT JOIN users su ON sub_tasks.user_id = su.id
@@ -2011,21 +2050,21 @@ exports.getTaskList = async (queryParams, res) => {
       // });
 
       // Sort subtasks within each task group
-      if(role_id === 2) {
-      groups[groupKey].forEach((taskGroup) => {
-        taskGroup.subtask_details.sort((a, b) => {
-          const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
-          const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
+      if (role_id === 2) {
+        groups[groupKey].forEach((taskGroup) => {
+          taskGroup.subtask_details.sort((a, b) => {
+            const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
+            const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
 
-          if (aAssigned !== bAssigned) {
-            return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
-          }
+            if (aAssigned !== bAssigned) {
+              return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
+            }
 
-          // If both have the same assignment status, sort by updated_at descending
-          // return new Date(a.updated_at) - new Date(b.updated_at);
+            // If both have the same assignment status, sort by updated_at descending
+            // return new Date(a.updated_at) - new Date(b.updated_at);
+          });
         });
-      });
-    }
+      }
     });
 
     const lastActiveTaskData = await lastActiveTask(user_id);
@@ -2257,9 +2296,12 @@ exports.doneTaskList = async (req, res) => {
 
 // Helper functions for task actions
 exports.startTask = async (taskOrSubtask, type, id, res) => {
-    if(type==="task"){
-    const[subtasksexist]=await db.query("SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",[id]);
-    if(subtasksexist.length>0){
+  if (type === "task") {
+    const [subtasksexist] = await db.query(
+      "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",
+      [id]
+    );
+    if (subtasksexist.length > 0) {
       throw {
         status: 500,
         success: false,
@@ -2342,8 +2384,8 @@ exports.endTask = async (
   comment,
   res
 ) => {
-    if(!comment){
-     throw {
+  if (!comment) {
+    throw {
       status: 400,
       success: false,
       message: "Comment is required",
@@ -2532,7 +2574,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         "SELECT id FROM users WHERE role_id IN (1, 2)"
       );
       const adminAndManagerIds = adminsAndManagers.map((user) => user.id);
-console.log("adminAndManagerIds", adminAndManagerIds);
+      console.log("adminAndManagerIds", adminAndManagerIds);
       const notificationPayload = {
         title: "Review Employee Tasks",
         body: "Please review employee pending tasks.",
@@ -2564,26 +2606,25 @@ console.log("adminAndManagerIds", adminAndManagerIds);
       if (team.length > 0) {
         const reportingUserId = team[0].reporting_user_id;
         const reportingUserSocketIds = userSockets[reportingUserId];
-        if(reportingUserId){
+        if (reportingUserId) {
           if (Array.isArray(reportingUserSocketIds)) {
-                    reportingUserSocketIds.forEach((socketId) => {
-                req.io
-                  .of("/notifications")
-                  .to(socketId)
-                  .emit("push_notification", notificationPayload);
-              });
-            }
-            await db.execute(
-              "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-              [
-                reportingUserId,
-                notificationPayload.title,
-                notificationPayload.body,
-                0,
-              ]
-            );
+            reportingUserSocketIds.forEach((socketId) => {
+              req.io
+                .of("/notifications")
+                .to(socketId)
+                .emit("push_notification", notificationPayload);
+            });
+          }
+          await db.execute(
+            "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+            [
+              reportingUserId,
+              notificationPayload.title,
+              notificationPayload.body,
+              0,
+            ]
+          );
         }
-        
       }
     } else {
       return errorResponse(res, "Invalid Type", 400);
