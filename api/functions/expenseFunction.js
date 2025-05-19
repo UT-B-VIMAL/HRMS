@@ -1523,18 +1523,18 @@ exports.getExpenseReport = async (queryParams, res) => {
     // Base query with filters
     const baseQuery = `
       SELECT 
+         users.employee_id AS employee_id,
+         users.first_name,
          DATE_FORMAT(expenses.date, '%d-%m-%Y') AS expense_date,
-         expenses.expense_amount,
          expenses.description AS reason,
+         expenses.expense_amount,
          expenses.file AS proof,
          CASE 
             WHEN expenses.category = 1 THEN 'Food'
             WHEN expenses.category = 2 THEN 'Travel'
             WHEN expenses.category = 3 THEN 'Others'
             ELSE 'Unknown'
-         END AS category,
-         users.first_name,
-         users.employee_id AS employee_id
+         END AS category
       FROM 
          expense_details AS expenses
       LEFT JOIN users ON users.id = expenses.user_id
@@ -1585,13 +1585,56 @@ exports.getExpenseReport = async (queryParams, res) => {
     }));
     // Handle export case
     if (export_status === "1") {
-      const { Parser } = require("json2csv");
-      const json2csvParser = new Parser();
-      const csv = json2csvParser.parse(rowsWithSerialNo);
+      const exportQuery = `
+      SELECT 
+        users.employee_id,
+        users.first_name,
+        GROUP_CONCAT(DATE_FORMAT(expenses.date, '%d-%m-%Y') ORDER BY expenses.date) AS dates,
+        GROUP_CONCAT(expenses.expense_amount ORDER BY expenses.date) AS amounts,
+        SUM(expenses.expense_amount) AS total
+      FROM 
+        expense_details AS expenses
+      LEFT JOIN users ON users.id = expenses.user_id
+      WHERE 
+        expenses.deleted_at IS NULL AND
+        users.deleted_at IS NULL AND
+        expenses.pm_status = 2 AND
+        (STR_TO_DATE(expenses.date, '%Y-%m-%d') BETWEEN ? AND ?)
+        ${search ? "AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR expenses.date LIKE ?)" : ""}
+        ${category ? "AND expenses.category IN (?)" : ""}
+      GROUP BY 
+        users.id, users.employee_id, users.first_name
+      ORDER BY 
+        users.first_name ASC;
+    `;
 
-      res.header("Content-Type", "text/csv");
-      res.attachment("expense_report.csv");
-      return res.send(csv);
+    const exportParams = [fromDate, toDate];
+    if (search) exportParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    if (category) {
+      const categoryArray = Array.isArray(category) ? category : category.split(",");
+      exportParams.push(categoryArray);
+    }
+
+    const [exportResults] = await db.query(exportQuery, exportParams);
+
+    // Optional: Transform comma strings to arrays (optional for CSV, but useful for JSON export)
+    const formattedResults = exportResults.map((row, index) => ({
+      "S.No": index + 1,
+      "Emp.ID": row.employee_id,
+      Name: row.first_name,
+      Date: row.dates,      // ❌ causes ["...","..."]
+      "Amount(Rs)": row.amounts,  // ❌ causes ["...","..."]
+      "Total Travel/Food Expenses": row.total,
+    }));
+
+    const { Parser } = require("json2csv");
+    const json2csvParser = new Parser();
+    const csv = json2csvParser.parse(formattedResults);
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("expense_report_summary.csv");
+    return res.send(csv);
+
     }
 
     // Standard paginated response for normal requests
