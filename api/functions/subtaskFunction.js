@@ -479,14 +479,13 @@ exports.deleteSubTask = async (req, res) => {
     const flagQuery = `
   SELECT new_data 
   FROM task_histories 
-  WHERE status_flag = 15 
-    AND task_id = ? 
+  WHERE  task_id = ? 
     AND subtask_id = ? 
   ORDER BY created_at DESC 
   LIMIT 1
 `;
     const [flagResult] = await db.query(flagQuery, [task_id, id]);
-    const old_data = flagResult[0]?.new_data || null;
+    const old_data = flagResult.length > 0 ? flagResult[0].new_data : null;
 
     await addHistorydata(
       old_data,
