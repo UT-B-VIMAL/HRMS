@@ -33,7 +33,7 @@ exports.get_idleEmployee = async (req, res) => {
         [user_id]
       );
       if(rows.length == 0) {
-          return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+          return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
       }
       teamIds = rows.length > 0 ? rows.map((row) => row.id) : [user.team_id];
     }
