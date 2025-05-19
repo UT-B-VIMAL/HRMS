@@ -77,7 +77,7 @@ exports.createexpense = async (req, res) => {
     let tl_status;
     let statuss;
 
-    if (role_id == 1 ||role_id == 2 || role_id == 3) {
+    if (role_id == 1 || role_id == 2 || role_id == 3) {
       tl_status = 2;
       statuss = 2;
     } else {
@@ -319,7 +319,7 @@ WHERE
 
 //     // Main query
 //     const expenseQuery = `
-//       SELECT 
+//       SELECT
 //         DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
 //         et.expense_amount,
 //         et.description,
@@ -333,13 +333,13 @@ WHERE
 //         u.role_id,
 //         u.first_name AS user_first_name,
 //         u.last_name AS user_last_name
-//       FROM 
+//       FROM
 //         expense_details et
-//       LEFT JOIN 
+//       LEFT JOIN
 //         users u ON u.id = et.user_id
 //       ${expenseWhereClause}
 //       AND et.deleted_at IS NULL
-//       ORDER BY 
+//       ORDER BY
 //         et.updated_at DESC
 //       LIMIT ?, ?
 //     `;
@@ -350,7 +350,7 @@ WHERE
 
 //     // Pagination
 //     const countQuery = `
-//       SELECT COUNT(*) AS total 
+//       SELECT COUNT(*) AS total
 //       FROM expense_details et
 //       LEFT JOIN users u ON u.id = et.user_id
 //       ${expenseWhereClause}
@@ -442,35 +442,35 @@ exports.getAllexpense = async (req, res) => {
 
     if (search) {
       const keyword = `%${search.toLowerCase()}%`;
-    
+
       const categoryMapping = {
         food: "1",
         travel: "2",
         others: "3",
       };
-    
+
       const matchedCategoryIds = Object.entries(categoryMapping)
         .filter(([name]) => name.includes(search.toLowerCase()))
         .map(([, id]) => id);
-    
+
       const searchConditions = [
         "LOWER(u.first_name) LIKE ?",
         "LOWER(u.last_name) LIKE ?",
         "LOWER(et.description) LIKE ?",
-        "et.expense_amount LIKE ?"
+        "et.expense_amount LIKE ?",
       ];
-    
+
       values.push(keyword, keyword, keyword, keyword);
-    
+
       if (matchedCategoryIds.length > 0) {
-        searchConditions.push(`et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`);
+        searchConditions.push(
+          `et.category IN (${matchedCategoryIds.map(() => "?").join(", ")})`
+        );
         values.push(...matchedCategoryIds);
       }
-    
+
       conditions.push(`(${searchConditions.join(" OR ")})`);
     }
-    
-    
 
     // Role-based status filtering
     const statusFilters = [];
@@ -478,15 +478,24 @@ exports.getAllexpense = async (req, res) => {
 
     statusArray.forEach((s) => {
       if (s === "0") {
-        if (role_id == 3) statusFilters.push(`(et.pm_status = 0 AND et.user_id = ${user_id})`);
-        else if (role_id == 4) statusFilters.push(`(et.tl_status = 0 AND et.pm_status = 0)`);
-        else statusFilters.push(`et.status = 2  AND et.tl_status = 2  AND et.pm_status = 0`);
+        if (role_id == 3)
+          statusFilters.push(`(et.pm_status = 0 AND et.user_id = ${user_id})`);
+        else if (role_id == 4)
+          statusFilters.push(`(et.tl_status = 0 AND et.pm_status = 0)`);
+        else
+          statusFilters.push(
+            `et.status = 2  AND et.tl_status = 2  AND et.pm_status = 0`
+          );
       } else if (s === "1") {
         statusFilters.push(`et.status = 1`);
       } else if (s === "2") {
         if (role_id == 3) statusFilters.push(`et.pm_status = 2`);
-        else if (role_id == 4) statusFilters.push(`(et.tl_status = 2 AND et.pm_status = 2)`);
-        else statusFilters.push(`et.status = 2  AND et.tl_status = 2  AND et.pm_status = 2`);
+        else if (role_id == 4)
+          statusFilters.push(`(et.tl_status = 2 AND et.pm_status = 2)`);
+        else
+          statusFilters.push(
+            `et.status = 2  AND et.tl_status = 2  AND et.pm_status = 2`
+          );
       }
     });
 
@@ -494,28 +503,36 @@ exports.getAllexpense = async (req, res) => {
       conditions.push(`(${statusFilters.join(" OR ")})`);
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
     const mainQuery = `
       SELECT 
-        DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
-        et.expense_amount,
-        et.description,
-        et.category,
-        et.status,
-        et.tl_status,
-        et.pm_status,
-        et.id AS expense_id,
-        et.user_id,
-        et.file,
-        u.role_id,
-        u.first_name AS user_first_name,
-        u.last_name AS user_last_name
-      FROM expense_details et
-      LEFT JOIN users u ON u.id = et.user_id
-      ${whereClause}
-      ORDER BY et.updated_at DESC
-      LIMIT ?, ?
+  DATE_FORMAT(et.date, '%Y-%m-%d') AS date,
+  et.expense_amount,
+  et.description,
+  et.category,
+  CASE 
+    WHEN et.category = 1 THEN 'Food'
+    WHEN et.category = 2 THEN 'Travel'
+    WHEN et.category = 3 THEN 'Others'
+    ELSE 'Unknown'
+  END AS category_name,
+  et.status,
+  et.tl_status,
+  et.pm_status,
+  et.id AS expense_id,
+  et.user_id,
+  et.file,
+  u.role_id,
+  u.first_name AS user_first_name,
+  u.last_name AS user_last_name
+FROM expense_details et
+LEFT JOIN users u ON u.id = et.user_id
+${whereClause}
+ORDER BY et.updated_at DESC
+LIMIT ?, ?
     `;
 
     values.push(offset, parseInt(perPage));
@@ -543,6 +560,7 @@ exports.getAllexpense = async (req, res) => {
       expense_amount: row.expense_amount,
       description: row.description,
       category: row.category,
+      category_name: row.category_name,
       file: row.file,
       status: row.status,
       tl_status: row.tl_status,
@@ -553,7 +571,9 @@ exports.getAllexpense = async (req, res) => {
     return successResponse(
       res,
       data,
-      data.length ? "Expense details retrieved successfully" : "No expense details found",
+      data.length
+        ? "Expense details retrieved successfully"
+        : "No expense details found",
       200,
       pagination
     );
@@ -562,7 +582,6 @@ exports.getAllexpense = async (req, res) => {
     return errorResponse(res, err.message, "Server error", 500);
   }
 };
-
 
 // Update Expense
 exports.updateexpenses = async (id, req, res) => {
@@ -786,7 +805,6 @@ exports.getAllpmemployeexpense = async (req, res) => {
       );
     }
 
-
     // Ensure status is provided
     if (!status) {
       return errorResponse(
@@ -872,7 +890,6 @@ exports.getAllpmemployeexpense = async (req, res) => {
         searchTerm
       );
     }
-    
 
     // Handle status conditions
     const currentRoleId = userCheck[0].role_id;
@@ -921,6 +938,12 @@ exports.getAllpmemployeexpense = async (req, res) => {
         et.expense_amount AS amount,
         et.status,
         et.category,
+        CASE 
+          WHEN et.category = 1 THEN 'Food'
+          WHEN et.category = 2 THEN 'Travel'
+          WHEN et.category = 3 THEN 'Others'
+          ELSE 'Unknown'
+        END AS category_name,
         et.tl_status,
         et.pm_status,
         et.file,
@@ -967,6 +990,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
       role_id: row.role_id,
       date: row.date,
       category: row.category,
+      category_name: row.category_name,
       project_name: row.project_name,
       team_name: row.team_name,
       task_name: row.task_name,
@@ -1238,7 +1262,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       [user_id]
     );
     if (teamResult.length === 0) {
-       return errorResponse(
+      return errorResponse(
         res,
         null,
         "You are not currently assigned a reporting TL for your team.",
@@ -1317,50 +1341,55 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         searchTerm
       );
     }
-    
 
     // Status-based filtering
 
     const currentRoleId = userCheck[0].role_id;
 
-      // switch (status) {
-      //   case "0": // Pending
-      //     if (currentRoleId == 3) {
-      //       otConditions.push(`et.pm_status = 0 AND et.user_id != ${userCheck[0].id}`);
-      //     } else if (currentRoleId == 4) {
-      //       otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
-      //     }
-      //     break;
-      
-      //   case "1": // Rejected
-      //     otConditions.push("et.status = 1");
-      //     break;
-      
-      //   case "2": // Approved
-      //     if (currentRoleId == 3) {
-      //       otConditions.push("et.tl_status = 2");
-      //     } else if (currentRoleId == 4) {
-      //       otConditions.push("et.tl_status = 2 AND et.pm_status = 2");
-      //     }
-      //     break;
-      
-      //   default:
-      //     return errorResponse(
-      //       res,
-      //       "Invalid status value.",
-      //       "Error fetching expenses",
-      //       400
-      //     );
-      // }
+    // switch (status) {
+    //   case "0": // Pending
+    //     if (currentRoleId == 3) {
+    //       otConditions.push(`et.pm_status = 0 AND et.user_id != ${userCheck[0].id}`);
+    //     } else if (currentRoleId == 4) {
+    //       otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
+    //     }
+    //     break;
+
+    //   case "1": // Rejected
+    //     otConditions.push("et.status = 1");
+    //     break;
+
+    //   case "2": // Approved
+    //     if (currentRoleId == 3) {
+    //       otConditions.push("et.tl_status = 2");
+    //     } else if (currentRoleId == 4) {
+    //       otConditions.push("et.tl_status = 2 AND et.pm_status = 2");
+    //     }
+    //     break;
+
+    //   default:
+    //     return errorResponse(
+    //       res,
+    //       "Invalid status value.",
+    //       "Error fetching expenses",
+    //       400
+    //     );
+    // }
     switch (status) {
       case "0": // All statuses must be 0
-        otConditions.push(`(et.status = 0 AND et.tl_status = 0 AND et.user_id != ${userCheck[0].id})`);
+        otConditions.push(
+          `(et.status = 0 AND et.tl_status = 0 AND et.user_id != ${userCheck[0].id})`
+        );
         break;
       case "1": // et.status must) be 1, and at least one of tl_status or pm_status must be 1
-        otConditions.push(`(et.tl_status = 1 OR et.pm_status = 1) AND et.user_id != ${userCheck[0].id}`);
+        otConditions.push(
+          `(et.tl_status = 1 OR et.pm_status = 1) AND et.user_id != ${userCheck[0].id}`
+        );
         break;
       case "2": // All statuses must be 2
-        otConditions.push(`(et.tl_status = 2 OR et.pm_status = 2) AND et.user_id != ${userCheck[0].id}`);
+        otConditions.push(
+          `(et.tl_status = 2 OR et.pm_status = 2) AND et.user_id != ${userCheck[0].id}`
+        );
         break;
       default:
         return errorResponse(
@@ -1390,6 +1419,12 @@ exports.getAlltlemployeeexpense = async (req, res) => {
         u.role_id,
         d.name AS designation,
         et.category,
+        CASE 
+          WHEN et.category = 1 THEN 'Food'
+          WHEN et.category = 2 THEN 'Travel'
+          WHEN et.category = 3 THEN 'Others'
+          ELSE 'Unknown'
+        END AS category_name,
         et.description,
         et.expense_amount AS amount,
         et.file
@@ -1404,7 +1439,6 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       ORDER BY 
         et.updated_at DESC
     `;
-    console.log(otQuery);
 
     const [ots] = await db.query(otQuery, otValues);
 
@@ -1424,6 +1458,7 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       role_id: row.role_id,
       date: row.date,
       category: row.category,
+      category_name: row.category_name,
       description: row.description,
       amount: row.amount,
       file: row.file,
@@ -1628,7 +1663,12 @@ exports.updateOrApproveExpense = async (id, req, res) => {
 
     // Validate updater
     if (!updated_by) {
-      return errorResponse(res, "updated_by is required", "Validation Error", 400);
+      return errorResponse(
+        res,
+        "updated_by is required",
+        "Validation Error",
+        400
+      );
     }
 
     const [updaterResult] = await db.query(
@@ -1637,7 +1677,12 @@ exports.updateOrApproveExpense = async (id, req, res) => {
     );
 
     if (updaterResult.length === 0) {
-      return errorResponse(res, "Updated_by user not found", "Validation Error", 404);
+      return errorResponse(
+        res,
+        "Updated_by user not found",
+        "Validation Error",
+        404
+      );
     }
 
     // Validate user_id if updating
@@ -1667,11 +1712,13 @@ exports.updateOrApproveExpense = async (id, req, res) => {
     if (user_id) updateFields.push("user_id = ?"), values.push(user_id);
     if (category) updateFields.push("category = ?"), values.push(category);
     if (team_id) updateFields.push("team_id = ?"), values.push(team_id);
-    if (description) updateFields.push("description = ?"), values.push(description);
+    if (description)
+      updateFields.push("description = ?"), values.push(description);
     if (amount) updateFields.push("expense_amount = ?"), values.push(amount);
     if (date) updateFields.push("date = ?"), values.push(date);
     if (fileUrl) updateFields.push("file = ?"), values.push(fileUrl);
-    if (updated_by) updateFields.push("updated_by = ?"), values.push(updated_by);
+    if (updated_by)
+      updateFields.push("updated_by = ?"), values.push(updated_by);
 
     // Handle approval flag
     if (approve_reject_flag && role) {
@@ -1680,7 +1727,12 @@ exports.updateOrApproveExpense = async (id, req, res) => {
       } else if (role === "pm" || role === "admin") {
         updateFields.push("pm_status = ?");
       } else {
-        return errorResponse(res, "Invalid role for approval", "Validation Error", 400);
+        return errorResponse(
+          res,
+          "Invalid role for approval",
+          "Validation Error",
+          400
+        );
       }
       values.push(approve_reject_flag);
 
@@ -1721,7 +1773,10 @@ exports.updateOrApproveExpense = async (id, req, res) => {
       const socketIds = userSockets[oldExpense.user_id];
       if (Array.isArray(socketIds)) {
         socketIds.forEach((socketId) =>
-          req.io.of("/notifications").to(socketId).emit("push_notification", payload)
+          req.io
+            .of("/notifications")
+            .to(socketId)
+            .emit("push_notification", payload)
         );
       }
 
@@ -1748,7 +1803,10 @@ exports.updateOrApproveExpense = async (id, req, res) => {
           const socketIds = userSockets[pm.id];
           if (Array.isArray(socketIds)) {
             socketIds.forEach((sid) =>
-              req.io.of("/notifications").to(sid).emit("push_notification", pmPayload)
+              req.io
+                .of("/notifications")
+                .to(sid)
+                .emit("push_notification", pmPayload)
             );
           }
 
@@ -1780,4 +1838,3 @@ exports.updateOrApproveExpense = async (id, req, res) => {
     return errorResponse(res, err.message, "Server Error", 500);
   }
 };
-

@@ -117,7 +117,6 @@ chatSocket(io.of("/chat"));
 // Load allowed origins from env
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log(allowedOrigins);
     
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -661,6 +660,12 @@ apiRouter.get(
   "/ticketcount/:id",
   RoleController.checkRole(),
   commonController.getTicketCount
+);
+// reportingusercheck
+apiRouter.get(
+  "/reportinguser/:id",
+  RoleController.checkRole(),
+  commonController.getreportinguser
 );
 
 // Use `/api` as a common prefix
