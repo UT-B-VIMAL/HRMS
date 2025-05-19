@@ -314,8 +314,8 @@ exports.getTask = async (queryParams, res) => {
 
     let subtaskParams = [id];
 
-  if (userDetails.role_id === 3) {
-  subtaskQuery += ` AND (
+    if (userDetails.role_id === 3) {
+      subtaskQuery += ` AND (
     st.team_id = ? OR (
       st.user_id IS NULL AND EXISTS (
         SELECT 1 FROM tasks t
@@ -451,59 +451,59 @@ exports.getTask = async (queryParams, res) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-            subtask_id: subtask.id,
-            owner_id: subtask.user_id || "",
-            name: subtask.name || "",
-            status: subtask.status,
-            active_status: subtask.active_status,
-            reopen_status: subtask.reopen_status,
-            assignee: subtask.user_id,
-            assigneename: subtask.assignee_name || "",
-            short_name: (subtask.assignee_name || "").substr(0, 2),
-            // status_text: statusMap[subtask.status] || "Unknown",
-            status_text: commonStatusGroup(
-              subtask.status,
-              subtask.reopen_status,
-              subtask.active_status
-            ),
-          }))
+          subtask_id: subtask.id,
+          owner_id: subtask.user_id || "",
+          name: subtask.name || "",
+          status: subtask.status,
+          active_status: subtask.active_status,
+          reopen_status: subtask.reopen_status,
+          assignee: subtask.user_id,
+          assigneename: subtask.assignee_name || "",
+          short_name: (subtask.assignee_name || "").substr(0, 2),
+          // status_text: statusMap[subtask.status] || "Unknown",
+          status_text: commonStatusGroup(
+            subtask.status,
+            subtask.reopen_status,
+            subtask.active_status
+          ),
+        }))
         : [];
 
     const historiesData =
       Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
-            histories[0].map(async (history) => ({
-              old_data: history.old_data,
-              new_data: history.new_data,
-              description: history.status_description || "Changed the status",
-              updated_by: history.updated_by,
-              shortName: history.short_name,
-              time_date: moment
-                .utc(history.updated_at)
-                .tz("Asia/Kolkata")
-                .format("YYYY-MM-DD HH:mm:ss"),
-              time_utc: history.updated_at,
-              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-            }))
-          )
+          histories[0].map(async (history) => ({
+            old_data: history.old_data,
+            new_data: history.new_data,
+            description: history.status_description || "Changed the status",
+            updated_by: history.updated_by,
+            shortName: history.short_name,
+            time_date: moment
+              .utc(history.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: history.updated_at,
+            time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+          }))
+        )
         : [];
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-            comment_id: comment.id,
-            comments: comment.comments,
-            user_id: comment.user_id,
-            is_edited:comment.is_edited,
-            updated_by: comment.updated_by || "",
-            shortName: comment.updated_by.substr(0, 2),
-            time_date: moment
-              .utc(comment.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: comment.updated_at,
-            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
-          }))
+          comment_id: comment.id,
+          comments: comment.comments,
+          user_id: comment.user_id,
+          is_edited: comment.is_edited,
+          updated_by: comment.updated_by || "",
+          shortName: comment.updated_by.substr(0, 2),
+          time_date: moment
+            .utc(comment.updated_at)
+            .tz("Asia/Kolkata")
+            .format("YYYY-MM-DD HH:mm:ss"),
+          time_utc: comment.updated_at,
+          time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+        }))
         : [];
 
     // Final response
@@ -856,7 +856,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
   try {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
-   
+
 
     const [tasks] = await db.query(
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
@@ -869,14 +869,14 @@ exports.updateTaskData = async (id, payload, res, req) => {
     const currentTask = tasks[0];
     const assignee_id = currentTask.user_id;
 
-     if (status && active_status && reopen_status) {
+    if (status && active_status && reopen_status) {
       if (!assignee_id && sub_task_counts.length === 0) {
         return errorResponse(
           res,
           null,
           "Task is not assigned to any user",
           400
-          );
+        );
       }
       const result = await checkUpdatePermission({
         id,
@@ -956,7 +956,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
       }
     }
-    
+
 
     if (!currentTask) {
       return errorResponse(
@@ -1355,8 +1355,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-    .join(", ")}
+          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+          .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -1570,8 +1570,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-      ? true
-      : false;
+        ? true
+        : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -1614,7 +1614,7 @@ const formatTime = (seconds) => {
 
 exports.getTaskList = async (queryParams, res) => {
   try {
-    const { user_id,product_id, project_id, team_id, priority,  search, member_id, dropdown_products,dropdown_projects } = queryParams;
+    const { user_id, product_id, project_id, team_id, priority, search, member_id, dropdown_products, dropdown_projects } = queryParams;
 
     // Validate if user_id exists
     if (!user_id) {
@@ -1633,9 +1633,7 @@ exports.getTaskList = async (queryParams, res) => {
     if (!userDetails || userDetails.id == undefined) {
       return;
     }
-
     const { role_id, team_id: userTeamId } = userDetails;
-
     // Base query for tasks
     let baseQuery = `
       SELECT 
@@ -1671,8 +1669,9 @@ exports.getTaskList = async (queryParams, res) => {
     `;
 
     const params = [];
+    if(role_id !== 3) {
     if (team_id) {
-        baseQuery += ` AND (
+      baseQuery += ` AND (
         u.team_id = ? OR EXISTS (
           SELECT 1 FROM sub_tasks 
           LEFT JOIN users su ON sub_tasks.user_id = su.id
@@ -1682,7 +1681,8 @@ exports.getTaskList = async (queryParams, res) => {
         )
       )`;
       params.push(team_id, team_id);
-    } 
+    }
+  }
     if (role_id === 3) {
       const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
@@ -1692,6 +1692,46 @@ exports.getTaskList = async (queryParams, res) => {
         teamIds = rowteams.map((row) => row.id);
         baseQuery += ` AND u.team_id IN (?)`;
         params.push(teamIds);
+        baseQuery += ` AND (
+          -- 1. If the task is assigned to the user but has no subtasks, return it
+          (NOT EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND sub_tasks.deleted_at IS NULL
+          ) 
+          AND tasks.team_id IN (?))
+           OR
+  
+          -- 2. If at least one subtask is assigned to the user OR 
+          --    all subtasks are unassigned and the main task is assigned to the user, return it
+          EXISTS (
+              SELECT 1 FROM sub_tasks 
+              WHERE sub_tasks.task_id = tasks.id 
+              AND (
+                  sub_tasks.team_id IN (?) 
+                  OR (tasks.team_id IN (?) AND NOT EXISTS (
+                      SELECT 1 FROM sub_tasks 
+                      WHERE sub_tasks.task_id = tasks.id 
+                      AND sub_tasks.user_id IS NOT NULL
+                  ))
+              )
+              AND sub_tasks.deleted_at IS NULL
+          )
+  
+          OR
+  
+          -- 3. If all subtasks have NULL user_id but the main task is assigned to the user, return them
+          (
+              tasks.team_id IN (?)
+              AND EXISTS (
+                  SELECT 1 FROM sub_tasks 
+                  WHERE sub_tasks.task_id = tasks.id 
+                  AND sub_tasks.user_id IS NULL
+                  AND sub_tasks.deleted_at IS NULL
+              )
+          )
+      )`;
+        params.push(teamIds, teamIds, teamIds, teamIds);
         console.log("teamIds", teamIds);
       } else {
         return errorResponse(
@@ -1857,10 +1897,10 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Execute the base query for tasks
     const [tasks] = await db.query(baseQuery, params);
-    console.log("tasks", tasks[0]);
     let allSubtasks = [];
     if (tasks.length > 0) {
       const taskIds = tasks.map((task) => task.task_id);
+      console.log("taskIds", taskIds);
       let query = `
         SELECT 
           sub_tasks.id AS subtask_id, 
@@ -1869,6 +1909,7 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.assigned_user_id AS assigned_user_id,
           tasks.user_id AS task_user_id,
           task_id,
+          subtask_assignee_team.name AS subtask_user_team_name,
           sub_tasks.user_id AS subtask_user_id,
           sub_tasks.estimated_hours AS estimated_hours, 
           sub_tasks.total_hours_worked AS total_hours_worked, 
@@ -1880,10 +1921,12 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.priority
         FROM sub_tasks
         LEFT JOIN users AS assigned_u ON sub_tasks.assigned_user_id = assigned_u.id
+        LEFT JOIN teams AS subtask_user_team ON assigned_u.team_id = subtask_user_team.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
          LEFT JOIN users AS subtask_user ON sub_tasks.user_id = subtask_user.id
+          LEFT JOIN teams AS subtask_assignee_team ON subtask_user.team_id = subtask_assignee_team.id
         LEFT JOIN users AS task_user ON tasks.user_id = task_user.id
-        WHERE task_id IN (?) 
+        WHERE task_id IN (?)
           AND sub_tasks.deleted_at IS NULL
       `;
       const queryParams = [taskIds];
@@ -1909,13 +1952,23 @@ exports.getTaskList = async (queryParams, res) => {
         query +=
           " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
         queryParams.push(user_id, user_id);
+        [allSubtasks] = await db.query(query, queryParams);
+      }else if (role_id === 3) {
+        const queryteam =
+        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+      const [rowteams] = await db.query(queryteam, [user_id]);
+      let teamIds = [];
+      if (rowteams.length > 0) {
+        teamIds = rowteams.map((row) => row.id);
       }
 
-      [allSubtasks] = await db.query(query, queryParams);
-    }else if (role_id === 3) {
- " AND subtask_user.team_id = ? OR (sub_tasks.user_id IS NULL AND task_user.team_id = ? AND sub_tasks.deleted_at IS NULL)";
-  queryParams.push(team_id, team_id);
+  query +=" AND sub_tasks.deleted_at IS NULL AND (sub_tasks.user_id IS NULL AND tasks.team_id IN (?)) OR (sub_tasks.user_id IS NOT NULL AND subtask_user.team_id IN (?) AND sub_tasks.deleted_at IS NULL)";
+   queryParams.push(teamIds, teamIds);  
+        [allSubtasks] = await db.query(query, queryParams);
       }
+
+
+    } 
 
     // Group subtasks by task_id
     const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
@@ -1923,7 +1976,6 @@ exports.getTaskList = async (queryParams, res) => {
       acc[subtask.task_id].push(subtask);
       return acc;
     }, {});
-
     // Define the task sections (groups)
     const groups = {
       To_Do: [],
@@ -1973,7 +2025,6 @@ exports.getTaskList = async (queryParams, res) => {
 
       const subtasks = subtasksByTaskId[task.task_id] || [];
       const groupedSubtasks = {};
-
       // If the task has subtasks, group them by subtask status
       if (subtasks.length > 0) {
         subtasks.forEach((subtask) => {
@@ -1990,6 +2041,7 @@ exports.getTaskList = async (queryParams, res) => {
               subtask_id: subtask.subtask_id,
               user_id: subtask.user_id,
               subtask_name: subtask.subtask_name,
+              team_name: subtask.subtask_user_team_name,
               estimated_hours: formatTimeDHMS(subtask.estimated_hours),
               assigned_by: subtask.assigned_user,
               assigned_by_id: subtask.assigned_user_id,
@@ -2037,21 +2089,21 @@ exports.getTaskList = async (queryParams, res) => {
       // });
 
       // Sort subtasks within each task group
-      if(role_id === 2) {
-      groups[groupKey].forEach((taskGroup) => {
-        taskGroup.subtask_details.sort((a, b) => {
-          const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
-          const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
+      if (role_id === 2) {
+        groups[groupKey].forEach((taskGroup) => {
+          taskGroup.subtask_details.sort((a, b) => {
+            const aAssigned = a.assigned_by_id === user_id ? 0 : 1;
+            const bAssigned = b.assigned_by_id === user_id ? 0 : 1;
 
-          if (aAssigned !== bAssigned) {
-            return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
-          }
+            if (aAssigned !== bAssigned) {
+              return aAssigned - bAssigned; // Prioritize subtasks assigned to the user
+            }
 
-          // If both have the same assignment status, sort by updated_at descending
-          // return new Date(a.updated_at) - new Date(b.updated_at);
+            // If both have the same assignment status, sort by updated_at descending
+            // return new Date(a.updated_at) - new Date(b.updated_at);
+          });
         });
-      });
-    }
+      }
     });
 
     const lastActiveTaskData = await lastActiveTask(user_id);
@@ -2283,9 +2335,9 @@ exports.doneTaskList = async (req, res) => {
 
 // Helper functions for task actions
 exports.startTask = async (taskOrSubtask, type, id, res) => {
-    if(type==="task"){
-    const[subtasksexist]=await db.query("SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",[id]);
-    if(subtasksexist.length>0){
+  if (type === "task") {
+    const [subtasksexist] = await db.query("SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL", [id]);
+    if (subtasksexist.length > 0) {
       throw {
         status: 500,
         success: false,
@@ -2368,8 +2420,8 @@ exports.endTask = async (
   comment,
   res
 ) => {
-    if(!comment){
-     throw {
+  if (!comment) {
+    throw {
       status: 400,
       success: false,
       message: "Comment is required",
@@ -2558,7 +2610,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         "SELECT id FROM users WHERE role_id IN (1, 2)"
       );
       const adminAndManagerIds = adminsAndManagers.map((user) => user.id);
-console.log("adminAndManagerIds", adminAndManagerIds);
+      console.log("adminAndManagerIds", adminAndManagerIds);
       const notificationPayload = {
         title: "Review Employee Tasks",
         body: "Please review employee pending tasks.",
@@ -2590,26 +2642,26 @@ console.log("adminAndManagerIds", adminAndManagerIds);
       if (team.length > 0) {
         const reportingUserId = team[0].reporting_user_id;
         const reportingUserSocketIds = userSockets[reportingUserId];
-        if(reportingUserId){
+        if (reportingUserId) {
           if (Array.isArray(reportingUserSocketIds)) {
-                    reportingUserSocketIds.forEach((socketId) => {
-                req.io
-                  .of("/notifications")
-                  .to(socketId)
-                  .emit("push_notification", notificationPayload);
-              });
-            }
-            await db.execute(
-              "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
-              [
-                reportingUserId,
-                notificationPayload.title,
-                notificationPayload.body,
-                0,
-              ]
-            );
+            reportingUserSocketIds.forEach((socketId) => {
+              req.io
+                .of("/notifications")
+                .to(socketId)
+                .emit("push_notification", notificationPayload);
+            });
+          }
+          await db.execute(
+            "INSERT INTO notifications (user_id, title, body, read_status, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+            [
+              reportingUserId,
+              notificationPayload.title,
+              notificationPayload.body,
+              0,
+            ]
+          );
         }
-        
+
       }
     } else {
       return errorResponse(res, "Invalid Type", 400);
