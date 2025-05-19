@@ -137,6 +137,8 @@ module.exports = (io) => {
 
         const recipientSocketId = connectedUsers[key];
         if (recipientSocketId) {
+          console.log(resultData[0]);
+          
           io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
           socket.emit('msg', 'Msg sended.');
         }
