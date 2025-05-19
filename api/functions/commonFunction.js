@@ -121,17 +121,46 @@ exports.getAllData = async (payload, res) => {
         else if (type === "ot_projects") {
             const users = await this.getAuthUserDetails(user_id, res);
             if (!users) return;
-            const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id = ?";
-            const [taskRows] = await db.query(queryTasks, [user_id]);
-
-            const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id = ?";
-            const [subtaskRows] = await db.query(querySubtasks, [user_id]);
-            let projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
-            if (projectIds.length === 0) {
-                projectIds = [-1]; // Prevent SQL error
+            let projectIds = [];
+            if (users.role_id === 2 || users.role_id === 1) {
+                const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND assigned_user_id = ?";
+                const [taskRows] = await db.query(queryTasks, [user_id]);
+                const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND assigned_user_id = ?";
+                const [subtaskRows] = await db.query(querySubtasks, [user_id]);
+                projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
             }
-            query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
-            queryParams.push(projectIds);
+            else if (users.role_id === 3) {
+                const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+                const [rows] = await db.query(query1, [user_id]);
+                let teamIds = [];
+                if(rows.length > 0){
+                    teamIds = rows.map(row => row.id);
+                }else{
+                     teamIds.push(users.team_id);
+                }
+                const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
+                const [userRows] = await db.query(userIdList, [teamIds]);
+                const userIds = userRows.map(row => row.id);
+                const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [taskRows] = await db.query(queryTasks, [userIds]);
+                const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)";
+                const [subtaskRows] = await db.query(querySubtasks, [userIds]);
+                projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
+               
+                }else if(users.role_id === 4){
+                const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id = ?";
+                const [taskRows] = await db.query(queryTasks, [user_id]);
+
+                const querySubtasks = "SELECT DISTINCT project_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id = ?";
+                const [subtaskRows] = await db.query(querySubtasks, [user_id]);
+                projectIds = [...new Set([...taskRows.map(row => row.project_id), ...subtaskRows.map(row => row.project_id)])];
+                
+            }
+            if (projectIds.length === 0) {
+                    projectIds = [-1]; // Prevent SQL error
+                }
+                query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
+                queryParams.push(projectIds);
         }
         
         else if (type === "issue") {
