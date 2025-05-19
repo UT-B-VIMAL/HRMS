@@ -1076,7 +1076,14 @@ exports.projectRequest = async (req, res) => {
           if (teamUsers.length > 0) {
             effectiveUserIds = teamUsers.map((user) => user.id); // Extract all user IDs
           }
-        }
+        }else{
+        return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
+      }
       } else if (role_id === 2) {
         taskConditions.push("t.assigned_user_id = ?");
         subtaskConditions.push("st.assigned_user_id = ?");
