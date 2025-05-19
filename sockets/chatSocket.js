@@ -126,7 +126,7 @@ module.exports = (io) => {
               WHEN tc.receiver_id = 0 THEN 'Anonymous'
               ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
             END AS receiver_name,
-            tc.created_at
+            CONVERT_TZ(tc.created_at, '+00:00', '+05:30') AS created_at
           FROM ticket_comments tc
           LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
           LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
