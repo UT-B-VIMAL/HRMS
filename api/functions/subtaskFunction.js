@@ -240,6 +240,7 @@ ORDER BY h.id DESC;
     const commentsData = validComments.map((comment) => ({
       comments_id: comment.id || "",
       comments: comment.comments || "",
+      comments:comment.user_id || "",
       comments:comment.is_edited,
       updated_by: comment.updated_by || "",
       shortName: comment.updated_by.substr(0, 2),
