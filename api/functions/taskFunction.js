@@ -2913,6 +2913,25 @@ exports.restoreTasks = async (req, res) => {
     const restoreQuery = `UPDATE ${table} SET deleted_at = null, updated_by = ? WHERE id = ?`;
     const values = [user_id, id];
     await db.query(restoreQuery, values);
+    const historyQuery = `
+      INSERT INTO task_histories (
+        old_data, new_data, task_id, subtask_id, text,
+        updated_by, status_flag, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+        const historyValues = [
+          null,
+          null,
+         task_id,
+          subtask_id,
+          isSubtask
+            ? "Subtask restored":
+            "Task restored",
+          user_id,
+          isSubtask ? 17 : 16,
+          moment().format("YYYY-MM-DD HH:mm:ss"),
+          moment().format("YYYY-MM-DD HH:mm:ss"), 
+        ];
+        await db.query(historyQuery, historyValues);
 
     return successResponse(res, "Record restored successfully", "Success", 200);
   } catch (error) {
