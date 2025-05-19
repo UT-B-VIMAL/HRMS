@@ -486,8 +486,8 @@ exports.getTask = async (queryParams, res) => {
         ? comments[0].map((comment) => ({
             comment_id: comment.id,
             comments: comment.comments,
-            comments:comment.user_id,
-            comments:comment.is_edited,
+            user_id: comment.user_id,
+            is_edited:comment.is_edited,
             updated_by: comment.updated_by || "",
             shortName: comment.updated_by.substr(0, 2),
             time_date: moment
