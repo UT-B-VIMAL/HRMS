@@ -15,7 +15,7 @@ const {
   formatTimeDHMS,
   commonStatusGroup,
   checkUpdatePermission,
-  addHistorydata
+  addHistorydata,
 } = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
@@ -241,8 +241,8 @@ ORDER BY h.id DESC;
     const commentsData = validComments.map((comment) => ({
       comments_id: comment.id || "",
       comments: comment.comments || "",
-      user_id:comment.user_id || "",
-      is_edited:comment.is_edited,
+      user_id: comment.user_id || "",
+      is_edited: comment.is_edited,
       updated_by: comment.updated_by || "",
       shortName: comment.updated_by.substr(0, 2),
       time_date: moment
@@ -437,9 +437,9 @@ exports.updateSubTask = async (id, payload, res) => {
 
 // Delete Task
 exports.deleteSubTask = async (req, res) => {
-   const id = req.params.id;
-    
-    const updated_by = req.body.updated_by;
+  const id = req.params.id;
+
+  const updated_by = req.body.updated_by;
   try {
     // Fetch subtask status
     const statusQuery =
@@ -475,7 +475,7 @@ exports.deleteSubTask = async (req, res) => {
       return errorResponse(res, null, "SubTask not found", 204);
     }
 
-     // Get status_flag for "Task Deleted"
+    // Get status_flag for "Task Deleted"
     const flagQuery = `
   SELECT new_data 
   FROM task_histories 
@@ -485,10 +485,8 @@ exports.deleteSubTask = async (req, res) => {
   ORDER BY created_at DESC 
   LIMIT 1
 `;
-const [flagResult] = await db.query(flagQuery, [task_id, id]);
-const old_data = flagResult[0]?.new_data || null;
-
-
+    const [flagResult] = await db.query(flagQuery, [task_id, id]);
+    const old_data = flagResult[0]?.new_data || null;
 
     await addHistorydata(
       old_data,
@@ -551,18 +549,15 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     const currentTask = tasks[0];
     const assigneeId = currentTask.user_id;
 
-  
-
     if (status && active_status && reopen_status) {
-        if (!assigneeId){
-           return errorResponse(
+      if (!assigneeId) {
+        return errorResponse(
           res,
           null,
           "SubTask is not assigned to any user",
           400
-          );
-
-          }
+        );
+      }
       const result = await checkUpdatePermission({
         id,
         type: "subtask",
@@ -575,12 +570,11 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       if (!result.allowed) {
         return res.status(403).json({ message: result.message });
       }
-    
-  }
-  
-  // else{
-  //   return errorResponse(res, null, "Status cannot be changed without an assigned user.", 400);
-  // }
+    }
+
+    // else{
+    //   return errorResponse(res, null, "Status cannot be changed without an assigned user.", 400);
+    // }
 
     if (user_id) {
       const [assignee] = await db.query(
@@ -821,6 +815,34 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
             400
           );
         }
+      }
+    }
+
+    if (payload.start_date) {
+      const dueDateToCheck = payload.due_date || currentTask.due_date;
+
+      const newStart = new Date(payload.start_date);
+      const existingDue = new Date(dueDateToCheck);
+
+      // Normalize both dates (remove time & timezone)
+      const localNewStart = new Date(
+        newStart.getFullYear(),
+        newStart.getMonth(),
+        newStart.getDate()
+      );
+      const localDue = new Date(
+        existingDue.getFullYear(),
+        existingDue.getMonth(),
+        existingDue.getDate()
+      );
+
+      if (localNewStart > localDue) {
+        return errorResponse(
+          res,
+          null,
+          "Start date cannot be after the due date.",
+          400
+        );
       }
     }
 
