@@ -8,11 +8,11 @@ const validationschema = {
       "number.integer": "Project ID must be an integer",
       "any.required": "Project ID is required",
     }),
-    task_id: Joi.number().integer().required().messages({
-      "number.base": "Task ID must be a number",
-      "number.integer": "Task ID must be an integer",
-      "any.required": "Task ID is required",
-    }),
+    // task_id: Joi.number().integer().required().messages({
+    //   "number.base": "Task ID must be a number",
+    //   "number.integer": "Task ID must be an integer",
+    //   "any.required": "Task ID is required",
+    // }),
     date: Joi.date().required().messages({
       "date.base": "Date must be a valid date",
       "any.required": "Date is required",
