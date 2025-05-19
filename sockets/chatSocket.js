@@ -98,10 +98,10 @@ module.exports = (io) => {
         console.log('Received data:', data);
 
         socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
-
+        const createdAt = new Date();
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, NOW(), NOW(), NULL)`,
+          VALUES (?, ?, ?, ?, createdAt, createdAt, NULL)`,
           [ticket_id, sender_id, receiver_id, comments]
         );
 
