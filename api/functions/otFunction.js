@@ -1993,10 +1993,25 @@ exports.getOtReportData = async (queryParams, res) => {
           JSON_ARRAYAGG(DATE_FORMAT(date, '%d-%m-%Y')) AS date,
           users.employee_id AS employee_id,
           users.first_name AS user_name,
-          JSON_ARRAYAGG(time) AS time,
+          JSON_ARRAYAGG(
+            CASE 
+              WHEN pmedited_time != '00:00:00' THEN pmedited_time
+              WHEN tledited_time != '00:00:00' THEN tledited_time
+              ELSE time
+            END
+          ) AS time,
+
           JSON_ARRAYAGG(projects.name) AS projects,
           JSON_ARRAYAGG(comments) AS work_done,
-          SEC_TO_TIME(SUM(TIME_TO_SEC(time))) AS total_hours
+              SEC_TO_TIME(SUM(
+        TIME_TO_SEC(
+          CASE 
+            WHEN pmedited_time != '00:00:00' THEN pmedited_time
+            WHEN tledited_time != '00:00:00' THEN tledited_time
+            ELSE time
+          END
+        )
+      )) AS total_hours
       FROM 
           ot_details
       LEFT JOIN projects ON projects.id = ot_details.project_id
