@@ -524,7 +524,8 @@ module.exports = {
   logoutUser,
   changePassword,
   forgotPassword,
-  resetPasswordWithKeycloak
+  resetPasswordWithKeycloak,
+   getAdminToken
 };
 
 

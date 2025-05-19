@@ -665,62 +665,72 @@ exports.fetchStatisticschart = async (req, res) => {
 exports.fetchRatings = async (req, res) => {
   try {
     const userId = req.query.user_id;
+    const inputMonth = req.query.month; // Optional param (format: YYYY-MM)
+
     if (!userId) {
       return errorResponse(res, null, "User ID is required", 400);
     }
 
     const now = new Date();
     const currentMonth = now.toISOString().slice(0, 7); // Format: YYYY-MM
-    const currentYear = now.getFullYear(); // Get current year
-    const monthName = now
+
+    // If month is passed, validate it is not in the future
+    if (inputMonth) {
+      // Ensure it's in valid YYYY-MM format using RegEx
+      const isValidMonthFormat = /^\d{4}-(0[1-9]|1[0-2])$/.test(inputMonth);
+      if (!isValidMonthFormat) {
+        return errorResponse(res, null, "Invalid month format (expected YYYY-MM)", 400);
+      }
+
+      // Check if input month is in the future
+      if (inputMonth > currentMonth) {
+        return errorResponse(res, null, "Month cannot exceed the current month", 400);
+      }
+    }
+
+    const monthToUse = inputMonth || currentMonth;
+    const currentYear = monthToUse.split("-")[0];
+    const dateForMonthName = new Date(`${monthToUse}-01`);
+    const monthName = dateForMonthName
       .toLocaleString("en-US", { month: "short" })
-      .toUpperCase(); // Get abbreviated month name
+      .toUpperCase();
 
-    // Query for current month's rating
+    // Query for selected/current month's rating
     const ratingQuery = `
-    SELECT SUM(average) AS total_average
-    FROM ratings 
-    WHERE user_id = ? AND month = ?
-`;
+      SELECT SUM(average) AS total_average
+      FROM ratings 
+      WHERE user_id = ? AND month = ?
+    `;
 
-    const [ratingRecords] = await db.query(ratingQuery, [userId, currentMonth]);
-
+    const [ratingRecords] = await db.query(ratingQuery, [userId, monthToUse]);
     const totalAverage = ratingRecords[0]?.total_average || 0;
 
-    // Query for yearly average calculation (excluding month filter)
+    // Yearly average calculation (based on selected/current month)
     const yearAvgQuery = `
-    SELECT SUM(average) AS total_average, COUNT(*) AS record_count
-    FROM ratings 
-    WHERE user_id = ? AND month LIKE ?
-`;
+      SELECT SUM(average) AS total_average, COUNT(*) AS record_count
+      FROM ratings 
+      WHERE user_id = ? AND month LIKE ?
+    `;
 
     const [yearlyAvgRecord] = await db.query(yearAvgQuery, [
       userId,
       `${currentYear}-%`,
     ]);
 
-    const totalAverages = yearlyAvgRecord[0]?.total_average || 0; // Sum of all averages
-    const recordCount = yearlyAvgRecord[0]?.record_count || 1; // Avoid division by zero
-
-    // Step 1: Divide total average by 2 first
+    const totalAverages = yearlyAvgRecord[0]?.total_average || 0;
+    const recordCount = yearlyAvgRecord[0]?.record_count || 1;
     const adjustedTotal = Math.round(recordCount / 2);
-
-    // Step 2: Use adjustedTotal to calculate yearly average dynamically
     const yearlyAverage = totalAverages / adjustedTotal;
 
     let empRating;
-
     if (totalAverage) {
-      const ratingValue = totalAverage || 0; // Sum of rating and average for current month
-      const averageValue = yearlyAverage; // Yearly average
-
-      const ratingPercentage = (ratingValue / 10) * 100;
-      const averagePercentage = (averageValue / 10) * 100;
+      const ratingPercentage = (totalAverage / 10) * 100;
+      const averagePercentage = (yearlyAverage / 10) * 100;
 
       empRating = {
         month: monthName,
-        rating_value: ratingValue,
-        average_value: parseFloat(averageValue.toFixed(2)), // Yearly average rounded to 2 decimal places
+        rating_value: totalAverage,
+        average_value: parseFloat(yearlyAverage.toFixed(2)),
         rating_percentage: parseFloat(ratingPercentage.toFixed(2)),
         average_percentage: parseFloat(averagePercentage.toFixed(2)),
       };
@@ -745,6 +755,8 @@ exports.fetchRatings = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching ratings", 500);
   }
 };
+
+
 exports.logincheck = async (req, res) => {
   try {
     const email = "pm@gmail.com";

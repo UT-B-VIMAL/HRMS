@@ -3,7 +3,7 @@ const {
   successResponse,
   errorResponse,
 } = require("../../helpers/responseHelper");
-
+const { getUserIdFromAccessToken } = require("./commonFunction");
 // add task and subtask Comments
 exports.addComments = async (payload, res) => {
   const { task_id, subtask_id, user_id, comments, updated_by } = payload;
@@ -126,11 +126,26 @@ exports.addComments = async (payload, res) => {
 };
 
 exports.updateComments = async (id, payload, res) => {
-  const { comments, updated_by } = payload;
+  const { comments, user_id, updated_by } = payload;
+
+    if (user_id) {
+      const [user] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [user_id]
+      );
+      if (user.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "User not found or has been deleted",
+          404
+        );
+      }
+    }
 
   try {
     const [existingComment] = await db.query(
-      "SELECT id, comments AS old_comments, task_id, subtask_id FROM task_comments WHERE id = ? AND deleted_at IS NULL",
+      "SELECT id, comments AS old_comments, task_id, subtask_id,user_id AS owner_id FROM task_comments WHERE id = ? AND deleted_at IS NULL",
       [id]
     );
 
@@ -142,7 +157,17 @@ exports.updateComments = async (id, payload, res) => {
         404
       );
     }
-    const { old_comments, task_id, subtask_id } = existingComment[0];
+    const { old_comments, task_id, subtask_id, owner_id } = existingComment[0];
+
+    if (Number(owner_id) !== Number(user_id)) {
+      return errorResponse(
+        res,
+        null,
+        "You are not authorized to update this comment",
+        403
+      );
+    }
+
     const getISTTime = () => {
       const now = new Date();
       const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
@@ -154,7 +179,7 @@ exports.updateComments = async (id, payload, res) => {
 
     const query = `
   UPDATE task_comments
-  SET comments = ?, updated_by = ?, updated_at = ?
+  SET comments = ?, updated_by = ?, updated_at = ?,is_edited = 1
   WHERE id = ? AND deleted_at IS NULL
 `;
     const values = [comments, updated_by, localISTTime, id];
@@ -207,9 +232,24 @@ exports.updateComments = async (id, payload, res) => {
   }
 };
 
-exports.deleteComments = async (req, res) => {
-  const { id, updated_by } = req.query;
+exports.deleteComments = async (id, payload, res) => {
+  const  {user_id, updated_by} = payload;
 
+    if (user_id) {
+      const [user] = await db.query(
+        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+        [user_id]
+      );
+      if (user.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "User not found or has been deleted",
+          404
+        );
+      }
+    }
+  
   try {
     if (!updated_by) {
       return errorResponse(
@@ -230,7 +270,7 @@ exports.deleteComments = async (req, res) => {
       return errorResponse(res, null, "User Not Found", 400);
     }
     const [existingComment] = await db.query(
-      "SELECT id, comments AS old_comments, task_id, subtask_id FROM task_comments WHERE id = ? AND deleted_at IS NULL",
+      "SELECT id, comments AS old_comments, task_id, subtask_id,user_id AS owner_id  FROM task_comments WHERE id = ? AND deleted_at IS NULL",
       [id]
     );
 
@@ -242,7 +282,16 @@ exports.deleteComments = async (req, res) => {
         404
       );
     }
-    const { task_id, subtask_id } = existingComment[0];
+    const { task_id, subtask_id, owner_id } = existingComment[0];
+
+    if (Number(owner_id) !== Number(user_id)) {
+      return errorResponse(
+        res,
+        null,
+        "You are not authorized to update this comment",
+        403
+      );
+    }
 
     const query = `
         UPDATE task_comments

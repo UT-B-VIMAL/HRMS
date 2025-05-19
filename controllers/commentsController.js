@@ -31,13 +31,15 @@ addComments: async (req, res) => {
 
   deleteComments: async (req, res) => {
     try {
-        const { id } = req.query;
-        
+        const { id } = req.body;
+         const payload = req.body;
+         console.log(payload);
+         
         const idValidation = Joi.string().required().validate(id);
         if (idValidation.error) {
           return errorResponse(res, { id: 'Comments ID is required and must be valid' }, 'Validation Error', 403);
         }
-      await deleteComments(req, res);
+      await deleteComments(id, payload, res);
     } catch (error) {
       return errorResponse(res, error.message, 'Error deleting task comments', 500);
     }

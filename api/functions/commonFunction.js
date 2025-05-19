@@ -1,5 +1,6 @@
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const keycloakConfig =require('../../config/keycloak');
 
 exports.getAllData = async (payload, res) => {
     const { type, id, user_id ,task_user_id} = payload;
@@ -309,6 +310,50 @@ exports.getticketCount = async (req, res) => {
         return errorResponse(res, error.message, "Error fetching Ticket Count", 500);
     }
 };
+exports.reportingUser = async (req, res) => {
+    try {
+         const { id } = req.params;
+        const user_id = id;
+
+    if (!user_id) {
+      return errorResponse(res, null, "User ID is required", 400);
+    }
+
+    const [rows] = await db.query(
+      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    if (rows.length === 0) {
+      return errorResponse(res, null, "User Not Found", 400);
+    }
+
+    // Fetch team IDs
+    const [teamResult] = await db.query(
+      "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+      [user_id]
+    );
+
+    if (teamResult.length === 0) {
+      return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
+    }else{
+         return successResponse(
+          res,
+          null,
+          "You have a team",
+          200
+        );
+    }
+    } catch (error) {
+        console.error("Error fetching reporting TL:", error);
+        return errorResponse(res, error.message, "Error fetching reporting TL", 500);
+    }
+};
 
 async function checkUpdatePermission({ id, type, status, active_status, reopen_status, role_id, res }) {
     let selectQuery;
@@ -405,6 +450,66 @@ exports.checkUpdatePermission = checkUpdatePermission;
       return "";
     };
 
+
+    // exports.getUserIdFromAccessToken = async (accessToken) => {
+    //     try {
+
+            
+    //         if (!accessToken) {
+    //             throw new Error('Access token is missing or invalid');
+    //         }
+
+    //         console.log(keycloakConfig.serverUrl);
+            
+    //         console.log('keycloakConfig:', keycloakConfig.serverUrl/'realms/', keycloakConfig.realm, '/protocol/openid-connect/userinfo');
+            
+            
+    
+    //         // Validate the access token by calling the userinfo endpoint
+    //         const userInfoResponse = await axios.get(
+    //             `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/userinfo`,
+    //             { headers: { Authorization: `Bearer ${accessToken}` } }
+    //         );
+
+    //         console.log(userInfoResponse );
+            
+    //         const keycloakId = userInfoResponse.data.sub;
+    //         if (!keycloakId) {
+    //             throw new Error('Keycloak user ID (sub) not found in token');
+    //         }
+    // console.log(keycloakId);
+    
+    //         // Get admin token
+    //         const adminToken = await getAdminToken();
+    //         if (!adminToken) {
+    //             throw new Error('Failed to retrieve admin token');
+    //         }
+    
+    //         // Use admin token to fetch user details
+    //         const keycloakUserResponse = await axios.get(
+    //             `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${keycloakId}`,
+    //             { headers: { Authorization: `Bearer ${adminToken}` } }
+    //         );
+    
+    //         if (!keycloakUserResponse.data || keycloakUserResponse.data.length === 0) {
+    //             throw new Error('User not found in Keycloak');
+    //         }
+    
+    //         const keycloakUser = keycloakUserResponse.data;
+    //         // Fetch user from MongoDB
+    //         const user = await User.findOne({ keycloak_id: keycloakUser.id });
+    //         if (!user) {
+    //             throw new Error('User not found in the database');
+    //         }
+    
+    //         return user._id; // Return the MongoDB user ID
+    //     } catch (error) {
+    //         console.error('Error retrieving user ID from access token:', error.message);
+    //         throw new Error('Error retrieving user ID: ' + error.message);
+    //     }
+    // };
+    
+    
 
 
 
