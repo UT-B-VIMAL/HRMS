@@ -1952,7 +1952,6 @@ exports.getTaskList = async (queryParams, res) => {
         query +=
           " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
         queryParams.push(user_id, user_id);
-        [allSubtasks] = await db.query(query, queryParams);
       }else if (role_id === 3) {
         const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
@@ -1964,8 +1963,8 @@ exports.getTaskList = async (queryParams, res) => {
 
   query += " AND sub_tasks.deleted_at IS NULL AND (sub_tasks.user_id IS NULL AND tasks.team_id IN (?)) OR (sub_tasks.user_id IS NOT NULL AND subtask_user.team_id IN (?) AND sub_tasks.deleted_at IS NULL)";
    queryParams.push(teamIds, teamIds);  
-        [allSubtasks] = await db.query(query, queryParams);
       }
+        [allSubtasks] = await db.query(query, queryParams);
 
 
     } 
