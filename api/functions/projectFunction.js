@@ -1086,7 +1086,14 @@ exports.projectRequest = async (req, res) => {
           if (teamUsers.length > 0) {
             effectiveUserIds = teamUsers.map((user) => user.id); // Extract all user IDs
           }
-        }
+        }else{
+        return errorResponse(
+        res,
+        null,
+        "You are not currently assigned a reporting TL for your team.",
+        404
+      );
+      }
       } else if (role_id === 2) {
         taskConditions.push("t.assigned_user_id = ?");
         subtaskConditions.push("st.assigned_user_id = ?");
@@ -1180,7 +1187,7 @@ exports.projectRequest = async (req, res) => {
   FROM sub_tasks st
   LEFT JOIN tasks t ON t.id = st.task_id
   LEFT JOIN users u ON u.id = st.user_id
-  LEFT JOIN users ua ON ua.id = st.created_by
+  LEFT JOIN users ua ON ua.id = st.assigned_user_id
   LEFT JOIN projects pr ON pr.id = t.project_id
   LEFT JOIN teams tm ON tm.id = u.team_id
   LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
@@ -1202,7 +1209,7 @@ exports.projectRequest = async (req, res) => {
     t.updated_at
   FROM tasks t
   LEFT JOIN users u ON u.id = t.user_id
-  LEFT JOIN users ua ON ua.id = t.created_by
+  LEFT JOIN users ua ON ua.id = t.assigned_user_id
   LEFT JOIN projects pr ON pr.id = t.project_id
   LEFT JOIN teams tm ON tm.id = u.team_id
   LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
