@@ -1,5 +1,6 @@
 const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const keycloakConfig =require('../../config/keycloak');
 
 exports.getAllData = async (payload, res) => {
     const { type, id, user_id ,task_user_id} = payload;
@@ -405,6 +406,66 @@ exports.checkUpdatePermission = checkUpdatePermission;
       return "";
     };
 
+
+    // exports.getUserIdFromAccessToken = async (accessToken) => {
+    //     try {
+
+            
+    //         if (!accessToken) {
+    //             throw new Error('Access token is missing or invalid');
+    //         }
+
+    //         console.log(keycloakConfig.serverUrl);
+            
+    //         console.log('keycloakConfig:', keycloakConfig.serverUrl/'realms/', keycloakConfig.realm, '/protocol/openid-connect/userinfo');
+            
+            
+    
+    //         // Validate the access token by calling the userinfo endpoint
+    //         const userInfoResponse = await axios.get(
+    //             `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/userinfo`,
+    //             { headers: { Authorization: `Bearer ${accessToken}` } }
+    //         );
+
+    //         console.log(userInfoResponse );
+            
+    //         const keycloakId = userInfoResponse.data.sub;
+    //         if (!keycloakId) {
+    //             throw new Error('Keycloak user ID (sub) not found in token');
+    //         }
+    // console.log(keycloakId);
+    
+    //         // Get admin token
+    //         const adminToken = await getAdminToken();
+    //         if (!adminToken) {
+    //             throw new Error('Failed to retrieve admin token');
+    //         }
+    
+    //         // Use admin token to fetch user details
+    //         const keycloakUserResponse = await axios.get(
+    //             `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${keycloakId}`,
+    //             { headers: { Authorization: `Bearer ${adminToken}` } }
+    //         );
+    
+    //         if (!keycloakUserResponse.data || keycloakUserResponse.data.length === 0) {
+    //             throw new Error('User not found in Keycloak');
+    //         }
+    
+    //         const keycloakUser = keycloakUserResponse.data;
+    //         // Fetch user from MongoDB
+    //         const user = await User.findOne({ keycloak_id: keycloakUser.id });
+    //         if (!user) {
+    //             throw new Error('User not found in the database');
+    //         }
+    
+    //         return user._id; // Return the MongoDB user ID
+    //     } catch (error) {
+    //         console.error('Error retrieving user ID from access token:', error.message);
+    //         throw new Error('Error retrieving user ID: ' + error.message);
+    //     }
+    // };
+    
+    
 
 
 

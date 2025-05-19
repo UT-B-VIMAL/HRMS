@@ -459,10 +459,14 @@ exports.projectStatus = async (req, res) => {
 
     const mapStatus = (statusCode) => {
       switch (statusCode) {
-        case 0: return "To Do";
-        case 1: return "In Progress";
-        case 3: return "Done";
-        default: return "Unknown";
+        case 0:
+          return "To Do";
+        case 1:
+          return "In Progress";
+        case 3:
+          return "Done";
+        default:
+          return "Unknown";
       }
     };
 
@@ -506,40 +510,46 @@ exports.projectStatus = async (req, res) => {
       team_id: subtask.team_id,
       team_name: subtask.team_name,
       start_time: subtask.start_time ? subtask.start_time : "-",
-      end_time: subtask.subtask_status === 3 && subtask.end_time ? subtask.end_time : "-",
+      end_time:
+        subtask.subtask_status === 3 && subtask.end_time
+          ? subtask.end_time
+          : "-",
       time_taken: subtask.subtask_status === 3 ? subtask.time_taken : "-",
-      subtask_duration: subtask.subtask_status === 3 ? subtask.subtask_duration : "-",
+      subtask_duration:
+        subtask.subtask_status === 3 ? subtask.subtask_duration : "-",
       task_updated_at: subtask.updated_at
         ? moment(subtask.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
     }));
 
     // Combine and sort both task types by updated_at
-    const combined = [...Subtasks, ...Tasks].sort((a, b) =>
-      new Date(b.task_updated_at) - new Date(a.task_updated_at)
+    const combinedData = [...Subtasks, ...Tasks].sort(
+      (a, b) => new Date(b.task_updated_at) - new Date(a.task_updated_at)
     );
 
-    const paginated = combined.slice(offset, offset + parseInt(perPage));
+    // const paginated = combined.slice(offset, offset + parseInt(perPage));
 
-    return res.status(200).json({
-      success: true,
-      message: "Project status fetched successfully",
-      data: paginated,
-      total: combined.length,
-      currentPage: parseInt(page),
-      perPage: parseInt(perPage),
-      totalPages: Math.ceil(combined.length / perPage),
-    });
+    const totalRecords = combinedData.length;
+    const startIndex = (page - 1) * perPage;
+    const endIndex = page * perPage;
+    const paginatedData = combinedData.slice(startIndex, endIndex);
+
+    const pagination = getPagination(page, perPage, totalRecords);
+
+    successResponse(
+      res,
+      combinedData,
+      combinedData.length === 0
+        ? "No data found"
+        : "Data retrieved successfully",
+      200,
+      pagination
+    );
   } catch (error) {
-    console.error("Error in projectStatus:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong.",
-      error: error.message,
-    });
+    console.error("Error fetching tasks and subtasks:", error);
+    return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
 
 // exports.projectStatus_ToDo = async (req, res) => {
 //   try {
