@@ -2979,8 +2979,8 @@ exports.restoreTasks = async (req, res) => {
         updated_by, status_flag, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
     const historyValues = [
-      null,
-      null,
+      "Deleted",
+      "Restored",
       task_id,
       subtask_id,
       isSubtask ? "Subtask restored" : "Task restored",
