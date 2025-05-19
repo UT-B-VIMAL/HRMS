@@ -856,7 +856,28 @@ exports.updateTaskData = async (id, payload, res, req) => {
   try {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
-    if (status && active_status && reopen_status) {
+   
+
+    const [tasks] = await db.query(
+      "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
+    const [sub_task_counts] = await db.query(
+      "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",
+      [id]
+    );
+    const currentTask = tasks[0];
+    const assignee_id = currentTask.user_id;
+
+     if (status && active_status && reopen_status) {
+      if (!assignee_id && sub_task_counts.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "Task is not assigned to any user",
+          400
+          );
+      }
       const result = await checkUpdatePermission({
         id,
         type: "task",
@@ -935,15 +956,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
       }
     }
-    const [tasks] = await db.query(
-      "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
-      [id]
-    );
-    const [sub_task_counts] = await db.query(
-      "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",
-      [id]
-    );
-    const currentTask = tasks[0];
+    
 
     if (!currentTask) {
       return errorResponse(
@@ -1644,7 +1657,6 @@ exports.getTaskList = async (queryParams, res) => {
         u.team_id,
         projects.name AS project_name,
         asu.first_name AS assigned_user,
-
         products.name AS product_name,
         u.first_name AS assignee_name,
         teams.name AS team_name,
@@ -1670,7 +1682,8 @@ exports.getTaskList = async (queryParams, res) => {
         )
       )`;
       params.push(team_id, team_id);
-    } else if (role_id === 3) {
+    } 
+    if (role_id === 3) {
       const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
       const [rowteams] = await db.query(queryteam, [user_id]);
@@ -1862,12 +1875,14 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.status AS status, 
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
-          users.first_name AS assigned_user,
+          assigned_u.first_name AS assigned_user,
           sub_tasks.updated_at,
           sub_tasks.priority
         FROM sub_tasks
-        LEFT JOIN users ON sub_tasks.assigned_user_id = users.id
+        LEFT JOIN users AS assigned_u ON sub_tasks.assigned_user_id = assigned_u.id
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
+         LEFT JOIN users AS subtask_user ON sub_tasks.user_id = subtask_user.id
+        LEFT JOIN users AS task_user ON tasks.user_id = task_user.id
         WHERE task_id IN (?) 
           AND sub_tasks.deleted_at IS NULL
       `;
@@ -1897,7 +1912,10 @@ exports.getTaskList = async (queryParams, res) => {
       }
 
       [allSubtasks] = await db.query(query, queryParams);
-    }
+    }else if (role_id === 3) {
+ " AND subtask_user.team_id = ? OR (sub_tasks.user_id IS NULL AND task_user.team_id = ? AND sub_tasks.deleted_at IS NULL)";
+  queryParams.push(team_id, team_id);
+      }
 
     // Group subtasks by task_id
     const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
@@ -2737,7 +2755,8 @@ exports.deleteTaskList = async (req, res) => {
         t.id AS task_id,
         st.id AS subtask_id,
         st.priority AS priority,
-        st.user_id AS subtask_user_id
+        st.user_id AS subtask_user_id,
+        st.deleted_at AS deleted_at
       FROM sub_tasks st
       LEFT JOIN tasks t ON t.id = st.task_id
       LEFT JOIN users u ON u.id = st.user_id
@@ -2745,6 +2764,7 @@ exports.deleteTaskList = async (req, res) => {
       LEFT JOIN projects pr ON pr.id = t.project_id
       LEFT JOIN teams tm ON tm.id = u.team_id
       WHERE st.deleted_at IS NOT NULL AND pr.deleted_at IS  NULL AND p.deleted_at IS  NULL ${subtaskWhereClause}
+      ORDER BY st.deleted_at DESC
     `;
 
     // Query to fetch deleted tasks (not linked to subtasks)
@@ -2761,7 +2781,8 @@ exports.deleteTaskList = async (req, res) => {
         t.id AS task_id,
         t.priority AS priority,
         NULL AS subtask_id,
-        t.user_id AS task_user_id
+        t.user_id AS task_user_id,
+        t.deleted_at AS deleted_at
       FROM tasks t
       LEFT JOIN users u ON u.id = t.user_id
       LEFT JOIN products p ON p.id = t.product_id
@@ -2770,6 +2791,7 @@ exports.deleteTaskList = async (req, res) => {
       WHERE t.deleted_at IS NOT NULL 
         AND t.id NOT IN (SELECT task_id FROM sub_tasks) AND pr.deleted_at IS  NULL AND p.deleted_at IS  NULL
         ${taskWhereClause}
+      ORDER BY t.deleted_at DESC
     `;
 
     // Execute both queries
@@ -2778,6 +2800,8 @@ exports.deleteTaskList = async (req, res) => {
 
     // Combine the results
     const mergedResults = [...subtasks, ...tasks];
+    mergedResults.sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+
     console.log("mergedResults", mergedResults);
     // Fetch assignee names and remove user_id
     const processedData = await Promise.all(
