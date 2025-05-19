@@ -84,7 +84,7 @@ exports.getAttendance = async (req, res) => {
     if (user.role_id === 1 || user.role_id === 2) {
       query += ` AND u.role_id IN (2, 3) `;
     } else {
-      query += ` AND (t.reporting_user_id = ? OR u.team_id = ?) AND u.role_id != 2 AND u.id != ? `;
+      query += ` AND (t.reporting_user_id = ? OR u.team_id = ?) AND u.role_id NOT IN (2,3) AND u.id != ? `;
       queryParams.push(user_id, user.team_id, user_id);
     }
 
@@ -470,13 +470,56 @@ exports.getEmployeeAttendance = async (req, res) => {
   
       // Handle export
       if (export_status == 1) {
+        if (export_status == 1) {
         const { Parser } = require("json2csv");
-        const json2csvParser = new Parser();
-        const csv = json2csvParser.parse(rowsWithSerialNo);
-  
+
+        // Group by user_id
+        const groupedData = {};
+
+        rowsWithSerialNo.forEach(row => {
+          const userId = row.user_ids;
+
+          if (!groupedData[userId]) {
+            groupedData[userId] = {
+              s_no: row.s_no,
+              employee_id: row.employee_id,
+              employee_name: row.employee_name,
+              joining_date: row.joining_date,
+              team_name: row.team_name,
+              dates: [],
+              statuses: [],
+              day_types: [],
+              half_types: [],
+            };
+          }
+
+          groupedData[userId].dates.push(row.date);
+          groupedData[userId].statuses.push(row.status);
+          groupedData[userId].day_types.push(row.day_type);
+          groupedData[userId].half_types.push(row.half_type);
+        });
+
+        // Prepare export array
+        const exportData = Object.values(groupedData).map(user => ({
+          "S.No": user.s_no,
+          "Employee ID": user.employee_id,
+          "Employee Name": user.employee_name,
+          "Team Name": user.team_name,
+          "Dates": user.dates.join(', '),
+          "Day Types(L)": user.day_types.join(', '),
+          "Half Types(L)": user.half_types.join(', '),
+          "Attendance Statuses": user.statuses.join(', '),
+
+        }));
+
+        const json2csvParser = new Parser({ });
+        const csv = json2csvParser.parse(exportData);
+
         res.header('Content-Type', 'text/csv');
         res.attachment('attendance_data.csv');
         return res.send(csv);
+      }
+
       }
   
       // Count total records
