@@ -16,8 +16,28 @@ exports.createOt = async (payload, res, req) => {
   const missingFields = [];
   if (!date) missingFields.push("date");
   if (!project_id) missingFields.push("project_id");
-  if (!task_id) missingFields.push("task_id");
   if (!user_id) missingFields.push("user_id");
+
+  const userQuery = `
+        SELECT id,team_id,role_id 
+        FROM users 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+  const [userResult] = await db.query(userQuery, [user_id]);
+
+  if (userResult.length === 0) {
+    return errorResponse(
+      res,
+      "User not found or deleted",
+      "Error creating OT",
+      404
+    );
+  }
+  const { team_id, role_id } = userResult[0];
+
+  if (role_id == 4) {
+    if (!task_id) missingFields.push("task_id");
+  }
 
   // If any field is missing, return an error response
   if (missingFields.length > 0) {
@@ -125,38 +145,23 @@ exports.createOt = async (payload, res, req) => {
       );
     }
 
-    const taskQuery = `
+    if (role_id == 4) {
+      const taskQuery = `
         SELECT id 
         FROM tasks 
         WHERE deleted_at IS NULL AND id = ? AND project_id = ?
       `;
-    const [taskResult] = await db.query(taskQuery, [task_id, project_id]);
+      const [taskResult] = await db.query(taskQuery, [task_id, project_id]);
 
-    if (taskResult.length === 0) {
-      return errorResponse(
-        res,
-        "Task not found or does not belong to the specified project",
-        "Error creating OT",
-        404
-      );
+      if (taskResult.length === 0) {
+        return errorResponse(
+          res,
+          "Task not found or does not belong to the specified project",
+          "Error creating OT",
+          404
+        );
+      }
     }
-
-    const userQuery = `
-        SELECT id,team_id,role_id 
-        FROM users 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
-    const [userResult] = await db.query(userQuery, [user_id]);
-
-    if (userResult.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error creating OT",
-        404
-      );
-    }
-    const { team_id, role_id } = userResult[0];
 
     let tl_status;
     let statuss;
@@ -168,19 +173,23 @@ exports.createOt = async (payload, res, req) => {
       tl_status = 0;
       statuss = 0;
     }
-
     // Check for duplicate OT entry for same user, date, and project
-    const duplicateCheckQuery = `
+    let duplicateCheckQuery = `
 SELECT id 
 FROM ot_details 
-WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at IS NULL
+WHERE user_id = ? AND project_id = ? AND date = ? AND deleted_at IS NULL
 `;
-    const [duplicateCheckResult] = await db.query(duplicateCheckQuery, [
-      user_id,
-      project_id,
-      date,
-      task_id,
-    ]);
+    let queryParams = [user_id, project_id, date];
+    if (role_id == 4) {
+      duplicateCheckQuery += " AND task_id = ?";
+      queryParams.push(task_id);
+    } else {
+      duplicateCheckQuery += " AND task_id IS NULL";
+    }
+    const [duplicateCheckResult] = await db.query(
+      duplicateCheckQuery,
+      queryParams
+    );
 
     if (duplicateCheckResult.length > 0) {
       return errorResponse(
@@ -189,6 +198,13 @@ WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at
         "Duplicate OT entry",
         409
       );
+    }
+
+    console.log("task", task_id);
+
+    let taskValue = null;
+    if (role_id == 4) {
+      taskValue = task_id;
     }
 
     const insertQuery = `
@@ -200,7 +216,7 @@ WHERE user_id = ? AND project_id = ? AND date = ? AND task_id = ? AND deleted_at
       user_id,
       product_id,
       project_id,
-      task_id,
+      taskValue,
       team_id,
       comments,
       statuss,
@@ -1676,7 +1692,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
     );
 
     if (teamResult.length === 0) {
-       return errorResponse(
+      return errorResponse(
         res,
         null,
         "You are not currently assigned a reporting TL for your team.",
