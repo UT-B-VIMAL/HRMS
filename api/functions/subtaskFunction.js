@@ -819,7 +819,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     }
 
     if (payload.start_date) {
-      const dueDateToCheck = payload.due_date || currentTask.due_date;
+      const dueDateToCheck = payload.due_date || currentTask.end_date;
 
       const newStart = new Date(payload.start_date);
       const existingDue = new Date(dueDateToCheck);
