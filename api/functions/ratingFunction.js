@@ -66,7 +66,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
       [user_id]
     );
     if(teamRows.length == 0){
-      return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+      return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
     }
     const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
     query += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
@@ -442,7 +442,7 @@ exports.getRatings = async (req, res) => {
       );
 
         if (teamRows.length == 0) {
-          return errorResponse(res, null, "You currently have no teams assigned to you.", 400);
+          return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
         }
       const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
       whereClause += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
