@@ -674,15 +674,15 @@ exports.fetchRatings = async (req, res) => {
     const now = new Date();
     const currentMonth = now.toISOString().slice(0, 7); // Format: YYYY-MM
 
-    // If month is passed, validate it is not in the future
+    
     if (inputMonth) {
-      // Ensure it's in valid YYYY-MM format using RegEx
+      
       const isValidMonthFormat = /^\d{4}-(0[1-9]|1[0-2])$/.test(inputMonth);
       if (!isValidMonthFormat) {
         return errorResponse(res, null, "Invalid month format (expected YYYY-MM)", 400);
       }
 
-      // Check if input month is in the future
+      
       if (inputMonth > currentMonth) {
         return errorResponse(res, null, "Month cannot exceed the current month", 400);
       }
