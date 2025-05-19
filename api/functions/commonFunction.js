@@ -478,6 +478,44 @@ exports.checkUpdatePermission = checkUpdatePermission;
       }
       return "";
     };
+     
+ exports.addHistorydata = async (
+  old_data = null,
+  new_data = null,
+  task_id = null,
+  subtask_id = null,
+  updated_by,
+  status_flag
+) => {
+    try{
+  const textQuery = `SELECT description FROM task_status_flags WHERE id = ?`;
+  const [flagResult] = await db.query(textQuery, [status_flag]);
+  const text = flagResult[0]?.description || "Unknown action";
+
+  const historyQuery = `
+    INSERT INTO task_histories (
+      old_data, new_data, task_id, subtask_id, text,
+      updated_by, status_flag, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+  `;
+
+  const values = [
+      old_data || null,
+      new_data || null,
+      task_id || null,
+      subtask_id || null,
+      text,
+      updated_by,
+      status_flag,
+    ];
+
+  await db.query(historyQuery, values);
+  } catch (error) {
+    console.error("Error saving task history:", error);
+    return errorResponse(res, null, error.message, 400);
+  }
+};
+
 
 
     // exports.getUserIdFromAccessToken = async (accessToken) => {
