@@ -523,9 +523,18 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     const currentTask = tasks[0];
     const assigneeId = currentTask.user_id;
 
-    if (assigneeId){
+  
 
     if (status && active_status && reopen_status) {
+        if (!assigneeId){
+           return errorResponse(
+          res,
+          null,
+          "SubTask is not assigned to any user",
+          400
+          );
+
+          }
       const result = await checkUpdatePermission({
         id,
         type: "subtask",
@@ -538,7 +547,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       if (!result.allowed) {
         return res.status(403).json({ message: result.message });
       }
-    }
+    
   }
   
   // else{
