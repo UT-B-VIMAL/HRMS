@@ -698,7 +698,7 @@ exports.getAllOts = async (req, res) => {
 };
 
 // Update OT
-exports.updateOt = async (id, payload, res) => {
+exports.updateOt = async (req, res) => {
    const { id } = req.params;
   const {
     date,
