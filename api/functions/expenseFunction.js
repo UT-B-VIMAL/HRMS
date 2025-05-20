@@ -601,13 +601,12 @@ LIMIT ?, ?
 
 // Update Expense
 exports.updateexpenses = async (id, req, res) => {
-  const { date, category, amount, description } = req.body;
+  const { date, user_id, category, amount, description } = req.body;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
 
   try {
@@ -1723,6 +1722,7 @@ exports.updateOrApproveExpense = async (id, req, res) => {
     description,
     approve_reject_flag,
     role,
+    user_id,
   } = req.body;
 
 
@@ -1730,7 +1730,6 @@ exports.updateOrApproveExpense = async (id, req, res) => {
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
   try {
     // Fetch the existing expense details
