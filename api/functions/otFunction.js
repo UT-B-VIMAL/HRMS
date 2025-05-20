@@ -2333,9 +2333,9 @@ exports.approve_reject_updateOt = async (req, res) => {
   };
 
   // Apply the function to time, pmtime, and tltime
-  payload.time = formatTime(time, "time");
-  payload.pmtime = formatTime(pmtime, "pmtime");
-  payload.tltime = formatTime(tltime, "tltime");
+  req.payload.time = formatTime(time, "time");
+  req.payload.pmtime = formatTime(pmtime, "pmtime");
+  req.payload.tltime = formatTime(tltime, "tltime");
 
   try {
     const checkQuery = `
@@ -2463,9 +2463,9 @@ exports.approve_reject_updateOt = async (req, res) => {
       task_id,
       comments,
       date,
-      payload.time,
-      payload.tltime,
-      payload.pmtime,
+      req.payload.time,
+      req.payload.tltime,
+      req.payload.pmtime,
       updated_by,
       id,
     ];
