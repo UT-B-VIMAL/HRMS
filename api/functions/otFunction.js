@@ -598,7 +598,7 @@ exports.getAllOts = async (req, res) => {
           statusFilters.push(`(ot.pm_status = 0 AND ot.user_id = ${user_id})`);
         else if (role_id == 4)
           statusFilters.push(
-            `(ot.tl_status = 0 AND ot.pm_status = 0 AND ot.user_id = ${user_id})`
+            `(ot.tl_status = 0 OR ot.pm_status = 0) AND ot.user_id = ${user_id}`
           );
         else
           statusFilters.push(
