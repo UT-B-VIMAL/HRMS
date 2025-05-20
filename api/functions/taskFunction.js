@@ -19,6 +19,7 @@ const {
   getISTTime,
   checkUpdatePermission,
   commonStatusGroup,
+  getColorForProduct
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -2010,6 +2011,7 @@ exports.getTaskList = async (queryParams, res) => {
         task_name: task.task_name,
         project_name: task.project_name,
         product_name: task.product_name,
+        product_color: getColorForProduct(task.product_name),
         priority: task.priority,
         estimated_hours: formatTimeDHMS(task.estimated_hours),
         assignee_name: task.assignee_name,
