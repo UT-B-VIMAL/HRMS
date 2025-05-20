@@ -2297,7 +2297,6 @@ exports.doneTaskList = async (req, res) => {
 
     // Execute both queries
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
-    console.log("Subtasks:", subtasks);
 
     const [tasks] = await db.query(tasksQuery, taskValues);
 
