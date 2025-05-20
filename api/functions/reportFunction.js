@@ -219,12 +219,14 @@ exports.getTimeListReport = async (req, res) => {
             )`;
         }
 
-        query += `
+       query += `
             GROUP BY u.id, dr.date, el.day_type, el.id, t.name
             ORDER BY dr.date DESC, u.id DESC
-            LIMIT ${limit} OFFSET ${offset};
         `;
 
+        if (export_status != 1) {
+            query += ` LIMIT ${limit} OFFSET ${offset}`;
+        }
         const [results] = await db.query(query);
 
         // Format time values
