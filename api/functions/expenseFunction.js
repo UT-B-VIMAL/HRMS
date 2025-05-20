@@ -1626,6 +1626,7 @@ exports.getExpenseReport = async (queryParams, res) => {
         users.first_name,
         GROUP_CONCAT(DATE_FORMAT(expenses.date, '%d-%m-%Y') ORDER BY expenses.date) AS dates,
         GROUP_CONCAT(expenses.expense_amount ORDER BY expenses.date) AS amounts,
+        GROUP_CONCAT(expenses.description ORDER BY expenses.date) AS reason,
         SUM(expenses.expense_amount) AS total
       FROM 
         expense_details AS expenses
@@ -1657,7 +1658,8 @@ exports.getExpenseReport = async (queryParams, res) => {
       "S.No": index + 1,
       "Emp.ID": row.employee_id,
       Name: row.first_name,
-      Date: row.dates,      // ❌ causes ["...","..."]
+      Date: row.dates,  
+      "Reason": row.reason,
       "Amount(Rs)": row.amounts,  // ❌ causes ["...","..."]
       "Total Travel/Food Expenses": row.total,
     }));
