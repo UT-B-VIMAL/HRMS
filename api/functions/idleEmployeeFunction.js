@@ -5,11 +5,18 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
+const {getUserIdFromAccessToken} = require("../../api/functions/commonFunction");
 
 exports.get_idleEmployee = async (req, res) => {
   try {
-    const { user_id, team_id, page = 1, perPage = 10 } = req.query;
+    const { team_id, page = 1, perPage = 10 } = req.query;
 
+    const accessToken = req.headers.authorization?.split(' ')[1];
+        if (!accessToken) {
+            return errorResponse(res, 'Access token is required', 401);
+        }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
     const pageNumber = parseInt(page, 10);
     const perPageNumber = parseInt(perPage, 10);
     const offset = (pageNumber - 1) * perPageNumber;

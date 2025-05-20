@@ -20,6 +20,7 @@ const {
   checkUpdatePermission,
   commonStatusGroup,
   getColorForProduct,
+  getUserIdFromAccessToken
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -251,10 +252,16 @@ exports.createTask = async (payload, res) => {
   }
 };
 
-exports.getTask = async (queryParams, res) => {
+exports.getTask = async (queryParams, res,req) => {
   try {
-    const { id, user_id } = queryParams;
+    const { id } = queryParams;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+        if (!accessToken) {
+            return errorResponse(res, 'Access token is required', 401);
+        }
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
+         
     if (!user_id) {
       return errorResponse(
         res,
