@@ -3055,78 +3055,78 @@ exports.getWorkReportData = async (queryParams, res) => {
     } = queryParams;
 
     let baseQuery = `
-   SELECT 
-  DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
-  su.id AS timeline_id,
-  u.employee_id,  -- Fetching employee_id from users table
-  CONCAT(u.first_name, ' ', u.last_name) AS name,
-  COALESCE(p.name, '') AS project_name,  -- Fetching project_name from projects table
-  -- COALESCE(CASE WHEN su.subtask_id IS NULL THEN t.name ELSE st.name END, '') AS task_name,
- 
-  -- Check if status and active_status are both 1, mark as in progress
-  CASE 
-    WHEN (
-      (su.subtask_id IS NULL AND t.status = 1 AND t.active_status = 1) 
-      OR (su.subtask_id IS NOT NULL AND st.status = 1 AND st.active_status = 1)
-    ) THEN 
+      SELECT 
+      DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
+      su.id AS timeline_id,
+      u.employee_id,  -- Fetching employee_id from users table
+      CONCAT(u.first_name, ' ', u.last_name) AS name,
+      COALESCE(p.name, '') AS project_name,  -- Fetching project_name from projects table
+      -- COALESCE(CASE WHEN su.subtask_id IS NULL THEN t.name ELSE st.name END, '') AS task_name,
+    
+      -- Check if status and active_status are both 1, mark as in progress
       CASE 
-        WHEN su.subtask_id IS NULL THEN t.name
-        ELSE st.name
-      END
-    ELSE NULL
-  END AS in_progress,
+        WHEN (
+          (su.subtask_id IS NULL AND t.status = 1 AND t.active_status = 1) 
+          OR (su.subtask_id IS NOT NULL AND st.status = 1 AND st.active_status = 1)
+        ) THEN 
+          CASE 
+            WHEN su.subtask_id IS NULL THEN t.name
+            ELSE st.name
+          END
+        ELSE NULL
+      END AS in_progress,
 
-  -- Mark as completed if status or active_status is not 1 (not in progress)
-  CASE 
-    WHEN (
-      (su.subtask_id IS NULL AND t.status = 3) 
-      OR (su.subtask_id IS NOT NULL AND st.status = 3)
-    ) THEN 
+      -- Mark as completed if status or active_status is not 1 (not in progress)
       CASE 
-        WHEN su.subtask_id IS NULL THEN t.name
-        ELSE st.name
-      END
-    ELSE NULL
-  END AS completed,
-   SEC_TO_TIME(
-    SUM(
-      TIMESTAMPDIFF(SECOND, su.start_time, COALESCE(su.end_time, NOW()))
-    )
-  ) AS total_hours_worked
+        WHEN (
+          (su.subtask_id IS NULL AND t.status = 3) 
+          OR (su.subtask_id IS NOT NULL AND st.status = 3)
+        ) THEN 
+          CASE 
+            WHEN su.subtask_id IS NULL THEN t.name
+            ELSE st.name
+          END
+        ELSE NULL
+      END AS completed,
+      SEC_TO_TIME(
+        SUM(
+          TIMESTAMPDIFF(SECOND, su.start_time, COALESCE(su.end_time, NOW()))
+        )
+      ) AS total_hours_worked
 
-FROM 
-  sub_tasks_user_timeline su
-LEFT JOIN 
-  tasks t ON su.task_id = t.id
-LEFT JOIN 
-  sub_tasks st ON su.subtask_id = st.id
-LEFT JOIN 
-  projects p ON t.project_id = p.id  -- Join projects table to get project_name
-LEFT JOIN 
-  users u ON su.user_id = u.id  -- Join users table to get employee_id and first_name
-WHERE 
-  su.deleted_at IS NULL
-  AND (
-    (
-      su.subtask_id IS NULL 
-      AND t.deleted_at IS NULL 
+    FROM 
+      sub_tasks_user_timeline su
+    LEFT JOIN 
+      tasks t ON su.task_id = t.id
+    LEFT JOIN 
+      sub_tasks st ON su.subtask_id = st.id
+    LEFT JOIN 
+      projects p ON t.project_id = p.id  -- Join projects table to get project_name
+    LEFT JOIN 
+      users u ON su.user_id = u.id  -- Join users table to get employee_id and first_name
+    WHERE 
+      su.deleted_at IS NULL
       AND (
-        (t.status = 1 AND t.active_status = 1) 
-        OR t.status = 3
+        (
+          su.subtask_id IS NULL 
+          AND t.deleted_at IS NULL 
+          AND (
+            (t.status = 1 AND t.active_status = 1) 
+            OR t.status = 3
+          )
+        )
+        OR (
+          su.subtask_id IS NOT NULL 
+          AND st.deleted_at IS NULL 
+          AND (
+            (st.status = 1 AND st.active_status = 1) 
+            OR st.status = 3
+          )
+        )
       )
-    )
-    OR (
-      su.subtask_id IS NOT NULL 
-      AND st.deleted_at IS NULL 
-      AND (
-        (st.status = 1 AND st.active_status = 1) 
-        OR st.status = 3
-      )
-    )
-  )
-  AND p.deleted_at IS NULL
-  AND u.deleted_at IS NULL
-`;
+      AND p.deleted_at IS NULL
+      AND u.deleted_at IS NULL
+    `;
 
     const params = [];
 
@@ -3185,7 +3185,13 @@ WHERE
         const { Parser } = require("json2csv");
 
         const groupedData = {};
-
+        let betweenDate="";
+        if(from_date=== to_date){
+          betweenDate=moment(from_date).format("DD-MM-YYYY");
+        }
+        else{
+          betweenDate= moment(from_date).format("DD-MM-YYYY")+ " to " + moment(to_date).format("DD-MM-YYYY");
+        }
         results.forEach((row) => {
           const userId = row.employee_id;
 
@@ -3194,16 +3200,14 @@ WHERE
               s_no: 0,
               employee_id: row.employee_id,
               name: row.name,
-              date: [],
-              project_name: [],
+              project_name: new Set(), 
               in_progress: [],
               completed: [],
               total_seconds: 0, // store seconds for summing
             };
           }
 
-          groupedData[userId].date.push(row.date);
-          groupedData[userId].project_name.push(row.project_name);
+          groupedData[userId].project_name.add(row.project_name);
           groupedData[userId].completed.push(row.completed);
           groupedData[userId].in_progress.push(row.in_progress);
 
@@ -3228,16 +3232,15 @@ WHERE
           "S.No": index + 1,
           "Employee ID": user.employee_id,
           "Employee Name": user.name,
-          Date: user.date.join(", "),
-          "Project Name": user.project_name.join(", "),
+          "Date": betweenDate ,
+          "Project Name": Array.from(user.project_name).join(', '),
           "In Progress": user.in_progress.join(", "),
-          Completed: user.completed.join(", "),
+          "Completed": user.completed.join(", "),
           "Total Hours Worked": formatSecondsToHHMMSS(user.total_seconds),
         }));
 
         const json2csvParser = new Parser({});
         const csv = json2csvParser.parse(exportData);
-
         res.header("Content-Type", "text/csv");
         res.attachment("attendance_data.csv");
         return res.send(csv);
