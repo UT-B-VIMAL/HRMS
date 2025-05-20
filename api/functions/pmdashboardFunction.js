@@ -4,7 +4,8 @@ const {
   errorResponse,
 } = require("../../helpers/responseHelper");
 const {
-  getColorForProduct
+  getColorForProduct,
+  getUserIdFromAccessToken
 } = require("../../api/functions/commonFunction");
 
 exports.fetchProducts = async (payload, res) => {
@@ -407,10 +408,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
       product_id,
       project_id,
       team_id,
-      user_id,
       date,
       search,
     } = req.query;
+
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     // Validate if product_id exists
     if (!product_id) {
