@@ -3,6 +3,9 @@ const {
   successResponse,
   errorResponse,
 } = require("../../helpers/responseHelper");
+const {
+  getColorForProduct
+} = require("../../api/functions/commonFunction");
 
 exports.fetchAttendance = async (req, res) => {
   try {
@@ -1299,6 +1302,7 @@ exports.fetchTlviewproductdata = async (req, res) => {
         EmployeeName: task.employee_name || "N/A",
         Priority: task.priority || "N/A",
         ProjectName: task.project_name || "N/A",
+        projectColor: getColorForProduct(task.project_name),
         TaskName: task.name || "N/A",
         TaskId: task.id || "N/A",
         TotalSubtaskCount: totalSubtasks,
@@ -1334,6 +1338,7 @@ exports.fetchTlviewproductdata = async (req, res) => {
         team_name: row.team_name,
         employee_name: row.employee_name,
         project_name: row.project_name,
+        project_color: getColorForProduct(row.project_name),
       };
 
       const subtask = row.subtask_id
