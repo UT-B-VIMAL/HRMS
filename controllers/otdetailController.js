@@ -67,7 +67,7 @@ exports.updateOtdetail = async (req, res) => {
 };
 exports.approve_reject_updateOtdetail = async (req, res) => {
   try {
-    const { id } = req.params;
+    // const { id } = req.params;
     const payload = req.body;
     const { error } = updateOTSchema.validate(payload, { abortEarly: false });
     if (error) {
@@ -79,7 +79,7 @@ exports.approve_reject_updateOtdetail = async (req, res) => {
       return errorResponse(res, errorMessages, "Validation Error", 403);
     }
 
-    await approve_reject_updateOt(id, payload, res);
+    await approve_reject_updateOt(req, res);
   } catch (error) {
     return errorResponse(res, error.message, "Error updating OT detail", 500);
   }

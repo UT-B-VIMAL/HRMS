@@ -2222,7 +2222,8 @@ exports.getOtReportData = async (queryParams, res) => {
 };
 
 // Update OT
-exports.approve_reject_updateOt = async (id, payload, res) => {
+exports.approve_reject_updateOt = async (req, res) => {
+   const { id } = req.params;
   const {
     date,
     time,
@@ -2234,7 +2235,7 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
     updated_by,
     approve_reject_flag,
     role,
-  } = payload;
+  } = req.body;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
