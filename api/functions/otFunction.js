@@ -1535,13 +1535,12 @@ const addTimes = (time1, time2) => {
 
 // Approve or reject OT
 exports.approve_reject_ot = async (payload, res, req) => {
-  const { status, role } = payload;
+  const { status, role, user_id } = payload;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
 
   try {
