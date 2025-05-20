@@ -459,59 +459,59 @@ exports.getTask = async (queryParams, res,req) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-            subtask_id: subtask.id,
-            owner_id: subtask.user_id || "",
-            name: subtask.name || "",
-            status: subtask.status,
-            active_status: subtask.active_status,
-            reopen_status: subtask.reopen_status,
-            assignee: subtask.user_id,
-            assigneename: subtask.assignee_name || "",
-            short_name: (subtask.assignee_name || "").substr(0, 2),
-            // status_text: statusMap[subtask.status] || "Unknown",
-            status_text: commonStatusGroup(
-              subtask.status,
-              subtask.reopen_status,
-              subtask.active_status
-            ),
-          }))
+          subtask_id: subtask.id,
+          owner_id: subtask.user_id || "",
+          name: subtask.name || "",
+          status: subtask.status,
+          active_status: subtask.active_status,
+          reopen_status: subtask.reopen_status,
+          assignee: subtask.user_id,
+          assigneename: subtask.assignee_name || "",
+          short_name: (subtask.assignee_name || "").substr(0, 2),
+          // status_text: statusMap[subtask.status] || "Unknown",
+          status_text: commonStatusGroup(
+            subtask.status,
+            subtask.reopen_status,
+            subtask.active_status
+          ),
+        }))
         : [];
 
     const historiesData =
       Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
-            histories[0].map(async (history) => ({
-              old_data: history.old_data,
-              new_data: history.new_data,
-              description: history.status_description || "Changed the status",
-              updated_by: history.updated_by,
-              shortName: history.short_name,
-              time_date: moment
-                .utc(history.updated_at)
-                .tz("Asia/Kolkata")
-                .format("YYYY-MM-DD HH:mm:ss"),
-              time_utc: history.updated_at,
-              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-            }))
-          )
+          histories[0].map(async (history) => ({
+            old_data: history.old_data,
+            new_data: history.new_data,
+            description: history.status_description || "Changed the status",
+            updated_by: history.updated_by,
+            shortName: history.short_name,
+            time_date: moment
+              .utc(history.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: history.updated_at,
+            time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+          }))
+        )
         : [];
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-            comment_id: comment.id,
-            comments: comment.comments,
-            user_id: comment.user_id,
-            is_edited: comment.is_edited,
-            updated_by: comment.updated_by || "",
-            shortName: comment.updated_by.substr(0, 2),
-            time_date: moment
-              .utc(comment.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: comment.updated_at,
-            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
-          }))
+          comment_id: comment.id,
+          comments: comment.comments,
+          user_id: comment.user_id,
+          is_edited: comment.is_edited,
+          updated_by: comment.updated_by || "",
+          shortName: comment.updated_by.substr(0, 2),
+          time_date: moment
+            .utc(comment.updated_at)
+            .tz("Asia/Kolkata")
+            .format("YYYY-MM-DD HH:mm:ss"),
+          time_utc: comment.updated_at,
+          time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+        }))
         : [];
 
     // Final response
@@ -1361,8 +1361,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-    .join(", ")}
+          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+          .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -1576,8 +1576,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-      ? true
-      : false;
+        ? true
+        : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -1626,7 +1626,7 @@ exports.getTaskList = async (queryParams, res) => {
       project_id,
       team_id,
       priority,
-      search,
+      search: rawSearch,
       member_id,
       dropdown_products,
       dropdown_projects,
@@ -1863,36 +1863,6 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-    if (search) {
-      const searchTerm = `%${search}%`;
-      baseQuery += `
-        AND (
-          tasks.name LIKE ?
-          OR EXISTS (
-            SELECT 1 
-            FROM sub_tasks
-            WHERE sub_tasks.task_id = tasks.id 
-              AND sub_tasks.name LIKE ? 
-              AND sub_tasks.deleted_at IS NULL
-          )
-          OR projects.name LIKE ?
-          OR products.name LIKE ?
-          OR u.first_name LIKE ?
-          OR u.last_name LIKE ?
-          OR teams.name LIKE ?
-          OR tasks.priority LIKE ?
-        )`;
-      params.push(
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm
-      );
-    }
 
     if (role_id === 2) {
       baseQuery += `
@@ -1933,6 +1903,8 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.reopen_status AS reopen_status, 
           sub_tasks.active_status AS active_status,
           assigned_u.first_name AS assigned_user,
+          subtask_user.first_name AS subtask_user_name,
+          subtask_user.team_id AS subtask_user_team_id,
           sub_tasks.updated_at,
           sub_tasks.priority
         FROM sub_tasks
@@ -2017,77 +1989,128 @@ exports.getTaskList = async (queryParams, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
-    // Iterate through tasks and categorize
-    tasks.forEach((task) => {
-      const taskDetails = {
-        task_id: task.task_id,
-        user_id: task.user_id,
-        task_name: task.task_name,
-        project_name: task.project_name,
-        product_name: task.product_name,
-        product_color: getColorForProduct(task.product_name),
-        priority: task.priority,
-        estimated_hours: formatTimeDHMS(task.estimated_hours),
-        assignee_name: task.assignee_name,
-        team_name: task.team_name,
-        team_id: task.team_id,
-        assigned_by: task.assigned_user,
-        assigned_by_id: task.assigned_user_id,
-        created_by: task.created_by,
-        created_at: task.created_at,
-        updated_at: task.updated_at,
-      };
+   // from your destructure:
+let search = (rawSearch || "").toLowerCase().trim();
+const isSearching = search !== "";
+const teamIdFilter = team_id && team_id !== '' ? Number(team_id) : null;
+const priorityFilter = priority && priority !== '' ? priority : null;
 
-      const subtasks = subtasksByTaskId[task.task_id] || [];
-      const groupedSubtasks = {};
-      // If the task has subtasks, group them by subtask status
-      if (subtasks.length > 0) {
-        subtasks.forEach((subtask) => {
-          const group = getStatusGroup(
-            subtask.status,
-            subtask.reopen_status,
-            subtask.active_status
-          );
-          if (group) {
-            if (!groupedSubtasks[group]) {
-              groupedSubtasks[group] = [];
-            }
-            groupedSubtasks[group].push({
-              subtask_id: subtask.subtask_id,
-              user_id: subtask.user_id,
-              subtask_name: subtask.subtask_name,
-              team_name: subtask.subtask_user_team_name,
-              estimated_hours: formatTimeDHMS(subtask.estimated_hours),
-              assigned_by: subtask.assigned_user,
-              assigned_by_id: subtask.assigned_user_id,
-              assignee_id: subtask.assignee_id,
-              updated_at: subtask.updated_at,
-              status: subtask.status,
-              priority: subtask.priority,
-              reopen_status: subtask.reopen_status,
-              active_status: subtask.active_status,
-            });
-          }
-        });
-      } else {
-        // If no subtasks, classify based on task status
-        const group = getStatusGroup(
-          task.task_status,
-          task.reopen_status,
-          task.active_status
-        );
-        if (group) {
-          groupedSubtasks[group] = [];
-        }
-      }
-      // Add task to respective groups
-      Object.keys(groupedSubtasks).forEach((group) => {
-        groups[group].push({
-          task_details: taskDetails,
-          subtask_details: groupedSubtasks[group],
-        });
+tasks.forEach((task) => {
+  // basic task details
+  const taskDetails = {
+    task_id:       task.task_id,
+    user_id:       task.user_id,
+    task_name:     task.task_name,
+    project_name:  task.project_name,
+    product_name:  task.product_name,
+    product_color: getColorForProduct(task.product_name),
+    priority:      task.priority,
+    estimated_hours: formatTimeDHMS(task.estimated_hours),
+    assignee_name: task.assignee_name,
+    team_name:     task.team_name,
+    team_id:       task.team_id,
+    assigned_by:   task.assigned_user,
+    assigned_by_id: task.assigned_user_id,
+    created_by:    task.created_by,
+    created_at:    task.created_at,
+    updated_at:    task.updated_at,
+  };
+
+  const subtasks = subtasksByTaskId[task.task_id] || [];
+
+  if (subtasks.length > 0) {
+    //––– TASK HAS SUBTASKS: filter them by team, search & priority –––
+    const matchedSubtasks = subtasks.filter((st) => {
+      // 1) team match on subtask
+      const teamMatch = teamIdFilter !== null
+        ? Number(st.subtask_user_team_id) === teamIdFilter
+        : true;
+
+      // 2) search match on subtask
+      const searchMatch = !isSearching
+        ? true
+        : [ st.subtask_name, st.subtask_user_name ]
+            .some(f => f?.toLowerCase().includes(search));
+
+      // 3) priority match on subtask (case-sensitive)
+      const priorityMatch = priorityFilter
+        ? st.priority === priorityFilter
+        : true;
+
+      return teamMatch && searchMatch && priorityMatch;
+    });
+
+    // if none of its subtasks match → skip entire task
+    if (matchedSubtasks.length === 0) return;
+
+    // group only the matched subtasks
+    const groupedSubtasks = {};
+    matchedSubtasks.forEach((st) => {
+      const grp = getStatusGroup(st.status, st.reopen_status, st.active_status);
+      if (!grp) return;
+      if (!groupedSubtasks[grp]) groupedSubtasks[grp] = [];
+      groupedSubtasks[grp].push({
+        subtask_id:   st.subtask_id,
+        user_id:      st.user_id,
+        subtask_name: st.subtask_name,
+        team_name:    st.subtask_user_team_name,
+        team_id:      st.subtask_user_team_id,
+        estimated_hours: formatTimeDHMS(st.estimated_hours),
+        assigned_by:  st.assigned_user,
+        assigned_by_id: st.assigned_user_id,
+        assignee_id:   st.assignee_id,
+        assignee_name: st.subtask_user_name,
+        updated_at:    st.updated_at,
+        status:        st.status,
+        priority:      st.priority,
+        reopen_status: st.reopen_status,
+        active_status: st.active_status,
       });
     });
+
+    // push task + its filtered subtasks into each status group
+    Object.keys(groupedSubtasks).forEach((grp) => {
+      groups[grp].push({
+        task_details:    taskDetails,
+        subtask_details: groupedSubtasks[grp],
+      });
+    });
+
+  } else {
+    //––– TASK HAS NO SUBTASKS: check task’s own team, search & priority –––
+    const teamMatch = teamIdFilter !== null
+      ? Number(task.team_id) === teamIdFilter
+      : true;
+
+    const searchMatch = !isSearching
+      ? true
+      : [
+          task.product_name,
+          task.project_name,
+          task.task_name,
+          task.team_name,
+          task.assignee_name
+        ].some(f => f?.toLowerCase().includes(search));
+
+    const priorityMatch = priorityFilter
+      ? task.priority === priorityFilter
+      : true;
+
+    if (!teamMatch || !searchMatch || !priorityMatch) return;
+
+    const grp = getStatusGroup(task.task_status, task.reopen_status, task.active_status);
+    if (!grp) return;
+
+    groups[grp].push({
+      task_details:    taskDetails,
+      subtask_details: [],  // no subtasks
+    });
+  }
+});
+
+
+
+
 
     // Sort tasks within each group
     Object.keys(groups).forEach((groupKey) => {

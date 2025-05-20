@@ -6,10 +6,20 @@ const {
 } = require("../../helpers/responseHelper");
 const { uploadexpenseFileToS3, deleteFileFromS3 } = require("../../config/s3");
 const { userSockets } = require("../../helpers/notificationHelper");
+const {
+  getUserIdFromAccessToken,
+} = require("../../api/functions/commonFunction");
 
 // Insert Expense
 exports.createexpense = async (req, res) => {
-  const { date, category, amount, user_id, description, created_by } = req.body;
+  const { date, category, amount, description } = req.body;
+
+  const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
+        const created_by = await getUserIdFromAccessToken(accessToken);
   const allowedExtensions = ["jpg", "jpeg", "png", "pdf", "doc", "docx"];
   const missingFields = [];
   if (!category) missingFields.push("category");
@@ -399,7 +409,6 @@ WHERE
 exports.getAllexpense = async (req, res) => {
   try {
     const {
-      user_id,
       status,
       search,
       page = 1,
@@ -407,6 +416,13 @@ exports.getAllexpense = async (req, res) => {
       category_id,
     } = req.query;
 
+
+
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
     if (!user_id || !status) {
       return errorResponse(
         res,
@@ -585,7 +601,14 @@ LIMIT ?, ?
 
 // Update Expense
 exports.updateexpenses = async (id, req, res) => {
-  const { date, category, amount, user_id, description, updated_by } = req.body;
+  const { date, category, amount, description } = req.body;
+
+  const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
+        const updated_by = await getUserIdFromAccessToken(accessToken);
 
   try {
     // Fetch the existing expense details
@@ -786,7 +809,6 @@ exports.deleteExpense = async (id, res) => {
 exports.getAllpmemployeexpense = async (req, res) => {
   try {
     const {
-      user_id,
       team_id,
       date,
       status,
@@ -796,6 +818,12 @@ exports.getAllpmemployeexpense = async (req, res) => {
       perPage = 10,
     } = req.query;
 
+
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
     if (!user_id) {
       return errorResponse(
         res,
@@ -1032,8 +1060,12 @@ exports.getAllpmemployeexpense = async (req, res) => {
 
 // Approve or reject
 exports.approve_reject_expense = async (payload, res, req) => {
-  const { id, status, updated_by, role } = payload;
-
+  const { id, status, role } = payload;
+const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const updated_by = await getUserIdFromAccessToken(accessToken);
   try {
     // Validate required fields
     if (!id) {
@@ -1233,7 +1265,6 @@ exports.approve_reject_expense = async (payload, res, req) => {
 exports.getAlltlemployeeexpense = async (req, res) => {
   try {
     const {
-      user_id,
       date,
       status,
       search,
@@ -1242,6 +1273,11 @@ exports.getAlltlemployeeexpense = async (req, res) => {
       perPage = 10,
     } = req.query;
 
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
     // Validate user_id
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -1682,13 +1718,18 @@ exports.updateOrApproveExpense = async (id, req, res) => {
     date,
     category,
     amount,
-    user_id,
     description,
-    updated_by,
     approve_reject_flag,
     role,
   } = req.body;
 
+
+  const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
+        const updated_by = await getUserIdFromAccessToken(accessToken);
   try {
     // Fetch the existing expense details
     const [expenseResult] = await db.query(

@@ -481,7 +481,6 @@ exports.getEmployeeAttendance = async (req, res) => {
 
           if (!groupedData[userId]) {
             groupedData[userId] = {
-              s_no: row.s_no,
               employee_id: row.employee_id,
               employee_name: row.employee_name,
               joining_date: row.joining_date,
@@ -500,8 +499,8 @@ exports.getEmployeeAttendance = async (req, res) => {
         });
 
         // Prepare export array
-        const exportData = Object.values(groupedData).map(user => ({
-          "S.No": user.s_no,
+        const exportData = Object.values(groupedData).map((user,index )=> ({
+          "S.No": index + 1,
           "Employee ID": user.employee_id,
           "Employee Name": user.employee_name,
           "Team Name": user.team_name,

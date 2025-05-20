@@ -6,7 +6,7 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const { projectSchema } = require("../../validators/projectValidator");
-const { getAuthUserDetails } = require("./commonFunction");
+const { getAuthUserDetails, getUserIdFromAccessToken } = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Create Project
@@ -1048,13 +1048,18 @@ exports.projectRequest = async (req, res) => {
   try {
     const {
       project_id,
-      user_id,
       employee_id,
       date,
       search,
       page = 1,
       perPage = 10,
     } = req.query;
+
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
     const offset = (page - 1) * perPage;
 
     let effectiveUserIds = [];
@@ -1491,8 +1496,14 @@ exports.getRequestupdate = async (req, res) => {
 // };
 
 exports.getRequestchange = async (id, payload, res, req) => {
-  const { user_id, type, remark, rating, action } = payload;
+  const { type, remark, rating, action } = payload;
 
+
+  const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
   const requiredFields = [
     { key: "type", message: "Type is required" },
     { key: "action", message: "Action is required" },
