@@ -360,7 +360,7 @@ exports.getTask = async (queryParams, res) => {
       FROM task_histories h
       LEFT JOIN users u ON h.updated_by = u.id
       LEFT JOIN task_status_flags s ON h.status_flag = s.id
-      WHERE h.task_id = ? 
+      WHERE h.task_id = ? and h.subtask_id IS NULL
         AND h.deleted_at IS NULL
       ORDER BY h.id DESC;
     `;
