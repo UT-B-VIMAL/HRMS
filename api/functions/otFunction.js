@@ -705,6 +705,7 @@ exports.updateOt = async (req, res) => {
     time,
     tltime,
     pmtime,
+    user_id,
     project_id,
     task_id,
     comments,
@@ -714,7 +715,6 @@ exports.updateOt = async (req, res) => {
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
 
   const formatTime = (timeValue, fieldName) => {
@@ -2230,8 +2230,8 @@ exports.approve_reject_updateOt = async (req,id, payload, res) => {
     pmtime,
     project_id,
     task_id,
+    user_id,
     comments,
-    updated_by,
     approve_reject_flag,
     role,
   } = payload;
@@ -2240,7 +2240,7 @@ exports.approve_reject_updateOt = async (req,id, payload, res) => {
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+        const updated_by = await getUserIdFromAccessToken(accessToken);
 
   if (!approve_reject_flag || ![1, 2].includes(Number(approve_reject_flag))) {
     return errorResponse(
