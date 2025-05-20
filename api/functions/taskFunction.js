@@ -20,6 +20,7 @@ const {
   checkUpdatePermission,
   commonStatusGroup,
   getColorForProduct,
+  getUserIdFromAccessToken
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -251,10 +252,16 @@ exports.createTask = async (payload, res) => {
   }
 };
 
-exports.getTask = async (queryParams, res) => {
+exports.getTask = async (queryParams, res,req) => {
   try {
-    const { id, user_id } = queryParams;
+    const { id } = queryParams;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+        if (!accessToken) {
+            return errorResponse(res, 'Access token is required', 401);
+        }
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
+         
     if (!user_id) {
       return errorResponse(
         res,
@@ -1856,36 +1863,6 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-    // if (search) {
-    //   const searchTerm = `%${search}%`;
-    //   baseQuery += `
-    //     AND (
-    //       tasks.name LIKE ?
-    //       OR EXISTS (
-    //         SELECT 1 
-    //         FROM sub_tasks
-    //         WHERE sub_tasks.task_id = tasks.id 
-    //           AND sub_tasks.name LIKE ? 
-    //           AND sub_tasks.deleted_at IS NULL
-    //       )
-    //       OR projects.name LIKE ?
-    //       OR products.name LIKE ?
-    //       OR u.first_name LIKE ?
-    //       OR u.last_name LIKE ?
-    //       OR teams.name LIKE ?
-    //       OR tasks.priority LIKE ?
-    //     )`;
-    //   params.push(
-    //     searchTerm,
-    //     searchTerm,
-    //     searchTerm,
-    //     searchTerm,
-    //     searchTerm,
-    //     searchTerm,
-    //     searchTerm,
-    //     searchTerm
-    //   );
-    // }
 
     if (role_id === 2) {
       baseQuery += `
@@ -1927,6 +1904,7 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.active_status AS active_status,
           assigned_u.first_name AS assigned_user,
           subtask_user.first_name AS subtask_user_name,
+          subtask_user.team_id AS subtask_user_team_id,
           sub_tasks.updated_at,
           sub_tasks.priority
         FROM sub_tasks
@@ -2011,110 +1989,126 @@ exports.getTaskList = async (queryParams, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
-    let search = (rawSearch || "").toLowerCase().trim(); // ✅ Safe reassignment
-    const isSearching = search !== "";
+   // from your destructure:
+let search = (rawSearch || "").toLowerCase().trim();
+const isSearching = search !== "";
+const teamIdFilter = team_id && team_id !== '' ? Number(team_id) : null;
+const priorityFilter = priority && priority !== '' ? priority : null;
 
-    tasks.forEach((task) => {
-      const taskDetails = {
-        task_id: task.task_id,
-        user_id: task.user_id,
-        task_name: task.task_name,
-        project_name: task.project_name,
-        product_name: task.product_name,
-        product_color: getColorForProduct(task.product_name),
-        priority: task.priority,
-        estimated_hours: formatTimeDHMS(task.estimated_hours),
-        assignee_name: task.assignee_name,
-        team_name: task.team_name,
-        team_id: task.team_id,
-        assigned_by: task.assigned_user,
-        assigned_by_id: task.assigned_user_id,
-        created_by: task.created_by,
-        created_at: task.created_at,
-        updated_at: task.updated_at,
-      };
+tasks.forEach((task) => {
+  // basic task details
+  const taskDetails = {
+    task_id:       task.task_id,
+    user_id:       task.user_id,
+    task_name:     task.task_name,
+    project_name:  task.project_name,
+    product_name:  task.product_name,
+    product_color: getColorForProduct(task.product_name),
+    priority:      task.priority,
+    estimated_hours: formatTimeDHMS(task.estimated_hours),
+    assignee_name: task.assignee_name,
+    team_name:     task.team_name,
+    team_id:       task.team_id,
+    assigned_by:   task.assigned_user,
+    assigned_by_id: task.assigned_user_id,
+    created_by:    task.created_by,
+    created_at:    task.created_at,
+    updated_at:    task.updated_at,
+  };
 
-      const subtasks = subtasksByTaskId[task.task_id] || [];
+  const subtasks = subtasksByTaskId[task.task_id] || [];
 
-      if (subtasks.length > 0) {
-        // Task has subtasks — filter subtasks based on search
-        const matchedSubtasks = subtasks.filter((subtask) => {
-          if (!isSearching) return true; // no search, include all
+  if (subtasks.length > 0) {
+    //––– TASK HAS SUBTASKS: filter them by team, search & priority –––
+    const matchedSubtasks = subtasks.filter((st) => {
+      // 1) team match on subtask
+      const teamMatch = teamIdFilter !== null
+        ? Number(st.subtask_user_team_id) === teamIdFilter
+        : true;
 
-          return [
-            subtask.subtask_name,
-            subtask.subtask_user_name,
-          ].some((field) => field?.toLowerCase().includes(search));
-        });
+      // 2) search match on subtask
+      const searchMatch = !isSearching
+        ? true
+        : [ st.subtask_name, st.subtask_user_name ]
+            .some(f => f?.toLowerCase().includes(search));
 
-        if (matchedSubtasks.length === 0) {
-          // No matching subtasks — exclude task
-          return;
-        }
+      // 3) priority match on subtask (case-sensitive)
+      const priorityMatch = priorityFilter
+        ? st.priority === priorityFilter
+        : true;
 
-        // Group only matched subtasks by status group
-        const groupedSubtasks = {};
-        matchedSubtasks.forEach((subtask) => {
-          const group = getStatusGroup(
-            subtask.status,
-            subtask.reopen_status,
-            subtask.active_status
-          );
-          if (group) {
-            if (!groupedSubtasks[group]) groupedSubtasks[group] = [];
-            groupedSubtasks[group].push({
-              subtask_id: subtask.subtask_id,
-              user_id: subtask.user_id,
-              subtask_name: subtask.subtask_name,
-              team_name: subtask.subtask_user_team_name,
-              estimated_hours: formatTimeDHMS(subtask.estimated_hours),
-              assigned_by: subtask.assigned_user,
-              assigned_by_id: subtask.assigned_user_id,
-              assignee_id: subtask.assignee_id,
-              assignee_name: subtask.subtask_user_name,
-              updated_at: subtask.updated_at,
-              status: subtask.status,
-              priority: subtask.priority,
-              reopen_status: subtask.reopen_status,
-              active_status: subtask.active_status,
-            });
-          }
-        });
-
-        Object.keys(groupedSubtasks).forEach((group) => {
-          groups[group].push({
-            task_details: taskDetails,
-            subtask_details: groupedSubtasks[group],
-          });
-        });
-      } else {
-        // Task has no subtasks — check if task matches the search
-        const taskMatches = isSearching
-          ? [
-            task.product_name,
-            task.project_name,
-            task.task_name,
-            task.team_name,
-            task.assignee_name,
-          ].some((field) => field?.toLowerCase().includes(search))
-          : true;
-
-        if (!taskMatches) return; // exclude if no match
-
-        // Put task into its status group
-        const group = getStatusGroup(
-          task.task_status,
-          task.reopen_status,
-          task.active_status
-        );
-        if (group) {
-          groups[group].push({
-            task_details: taskDetails,
-            subtask_details: [],
-          });
-        }
-      }
+      return teamMatch && searchMatch && priorityMatch;
     });
+
+    // if none of its subtasks match → skip entire task
+    if (matchedSubtasks.length === 0) return;
+
+    // group only the matched subtasks
+    const groupedSubtasks = {};
+    matchedSubtasks.forEach((st) => {
+      const grp = getStatusGroup(st.status, st.reopen_status, st.active_status);
+      if (!grp) return;
+      if (!groupedSubtasks[grp]) groupedSubtasks[grp] = [];
+      groupedSubtasks[grp].push({
+        subtask_id:   st.subtask_id,
+        user_id:      st.user_id,
+        subtask_name: st.subtask_name,
+        team_name:    st.subtask_user_team_name,
+        team_id:      st.subtask_user_team_id,
+        estimated_hours: formatTimeDHMS(st.estimated_hours),
+        assigned_by:  st.assigned_user,
+        assigned_by_id: st.assigned_user_id,
+        assignee_id:   st.assignee_id,
+        assignee_name: st.subtask_user_name,
+        updated_at:    st.updated_at,
+        status:        st.status,
+        priority:      st.priority,
+        reopen_status: st.reopen_status,
+        active_status: st.active_status,
+      });
+    });
+
+    // push task + its filtered subtasks into each status group
+    Object.keys(groupedSubtasks).forEach((grp) => {
+      groups[grp].push({
+        task_details:    taskDetails,
+        subtask_details: groupedSubtasks[grp],
+      });
+    });
+
+  } else {
+    //––– TASK HAS NO SUBTASKS: check task’s own team, search & priority –––
+    const teamMatch = teamIdFilter !== null
+      ? Number(task.team_id) === teamIdFilter
+      : true;
+
+    const searchMatch = !isSearching
+      ? true
+      : [
+          task.product_name,
+          task.project_name,
+          task.task_name,
+          task.team_name,
+          task.assignee_name
+        ].some(f => f?.toLowerCase().includes(search));
+
+    const priorityMatch = priorityFilter
+      ? task.priority === priorityFilter
+      : true;
+
+    if (!teamMatch || !searchMatch || !priorityMatch) return;
+
+    const grp = getStatusGroup(task.task_status, task.reopen_status, task.active_status);
+    if (!grp) return;
+
+    groups[grp].push({
+      task_details:    taskDetails,
+      subtask_details: [],  // no subtasks
+    });
+  }
+});
+
+
 
 
 
@@ -3061,78 +3055,78 @@ exports.getWorkReportData = async (queryParams, res) => {
     } = queryParams;
 
     let baseQuery = `
-   SELECT 
-  DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
-  su.id AS timeline_id,
-  u.employee_id,  -- Fetching employee_id from users table
-  CONCAT(u.first_name, ' ', u.last_name) AS name,
-  COALESCE(p.name, '') AS project_name,  -- Fetching project_name from projects table
-  -- COALESCE(CASE WHEN su.subtask_id IS NULL THEN t.name ELSE st.name END, '') AS task_name,
- 
-  -- Check if status and active_status are both 1, mark as in progress
-  CASE 
-    WHEN (
-      (su.subtask_id IS NULL AND t.status = 1 AND t.active_status = 1) 
-      OR (su.subtask_id IS NOT NULL AND st.status = 1 AND st.active_status = 1)
-    ) THEN 
+      SELECT 
+      DATE_FORMAT(su.start_time, '%d-%m-%Y') AS date,
+      su.id AS timeline_id,
+      u.employee_id,  -- Fetching employee_id from users table
+      CONCAT(u.first_name, ' ', u.last_name) AS name,
+      COALESCE(p.name, '') AS project_name,  -- Fetching project_name from projects table
+      -- COALESCE(CASE WHEN su.subtask_id IS NULL THEN t.name ELSE st.name END, '') AS task_name,
+    
+      -- Check if status and active_status are both 1, mark as in progress
       CASE 
-        WHEN su.subtask_id IS NULL THEN t.name
-        ELSE st.name
-      END
-    ELSE NULL
-  END AS in_progress,
+        WHEN (
+          (su.subtask_id IS NULL AND t.status = 1 AND t.active_status = 1) 
+          OR (su.subtask_id IS NOT NULL AND st.status = 1 AND st.active_status = 1)
+        ) THEN 
+          CASE 
+            WHEN su.subtask_id IS NULL THEN t.name
+            ELSE st.name
+          END
+        ELSE NULL
+      END AS in_progress,
 
-  -- Mark as completed if status or active_status is not 1 (not in progress)
-  CASE 
-    WHEN (
-      (su.subtask_id IS NULL AND t.status = 3) 
-      OR (su.subtask_id IS NOT NULL AND st.status = 3)
-    ) THEN 
+      -- Mark as completed if status or active_status is not 1 (not in progress)
       CASE 
-        WHEN su.subtask_id IS NULL THEN t.name
-        ELSE st.name
-      END
-    ELSE NULL
-  END AS completed,
-   SEC_TO_TIME(
-    SUM(
-      TIMESTAMPDIFF(SECOND, su.start_time, COALESCE(su.end_time, NOW()))
-    )
-  ) AS total_hours_worked
+        WHEN (
+          (su.subtask_id IS NULL AND t.status = 3) 
+          OR (su.subtask_id IS NOT NULL AND st.status = 3)
+        ) THEN 
+          CASE 
+            WHEN su.subtask_id IS NULL THEN t.name
+            ELSE st.name
+          END
+        ELSE NULL
+      END AS completed,
+      SEC_TO_TIME(
+        SUM(
+          TIMESTAMPDIFF(SECOND, su.start_time, COALESCE(su.end_time, NOW()))
+        )
+      ) AS total_hours_worked
 
-FROM 
-  sub_tasks_user_timeline su
-LEFT JOIN 
-  tasks t ON su.task_id = t.id
-LEFT JOIN 
-  sub_tasks st ON su.subtask_id = st.id
-LEFT JOIN 
-  projects p ON t.project_id = p.id  -- Join projects table to get project_name
-LEFT JOIN 
-  users u ON su.user_id = u.id  -- Join users table to get employee_id and first_name
-WHERE 
-  su.deleted_at IS NULL
-  AND (
-    (
-      su.subtask_id IS NULL 
-      AND t.deleted_at IS NULL 
+    FROM 
+      sub_tasks_user_timeline su
+    LEFT JOIN 
+      tasks t ON su.task_id = t.id
+    LEFT JOIN 
+      sub_tasks st ON su.subtask_id = st.id
+    LEFT JOIN 
+      projects p ON t.project_id = p.id  -- Join projects table to get project_name
+    LEFT JOIN 
+      users u ON su.user_id = u.id  -- Join users table to get employee_id and first_name
+    WHERE 
+      su.deleted_at IS NULL
       AND (
-        (t.status = 1 AND t.active_status = 1) 
-        OR t.status = 3
+        (
+          su.subtask_id IS NULL 
+          AND t.deleted_at IS NULL 
+          AND (
+            (t.status = 1 AND t.active_status = 1) 
+            OR t.status = 3
+          )
+        )
+        OR (
+          su.subtask_id IS NOT NULL 
+          AND st.deleted_at IS NULL 
+          AND (
+            (st.status = 1 AND st.active_status = 1) 
+            OR st.status = 3
+          )
+        )
       )
-    )
-    OR (
-      su.subtask_id IS NOT NULL 
-      AND st.deleted_at IS NULL 
-      AND (
-        (st.status = 1 AND st.active_status = 1) 
-        OR st.status = 3
-      )
-    )
-  )
-  AND p.deleted_at IS NULL
-  AND u.deleted_at IS NULL
-`;
+      AND p.deleted_at IS NULL
+      AND u.deleted_at IS NULL
+    `;
 
     const params = [];
 
@@ -3191,7 +3185,13 @@ WHERE
         const { Parser } = require("json2csv");
 
         const groupedData = {};
-
+        let betweenDate="";
+        if(from_date=== to_date){
+          betweenDate=moment(from_date).format("DD-MM-YYYY");
+        }
+        else{
+          betweenDate= moment(from_date).format("DD-MM-YYYY")+ " to " + moment(to_date).format("DD-MM-YYYY");
+        }
         results.forEach((row) => {
           const userId = row.employee_id;
 
@@ -3200,16 +3200,14 @@ WHERE
               s_no: 0,
               employee_id: row.employee_id,
               name: row.name,
-              date: [],
-              project_name: [],
+              project_name: new Set(), 
               in_progress: [],
               completed: [],
               total_seconds: 0, // store seconds for summing
             };
           }
 
-          groupedData[userId].date.push(row.date);
-          groupedData[userId].project_name.push(row.project_name);
+          groupedData[userId].project_name.add(row.project_name);
           groupedData[userId].completed.push(row.completed);
           groupedData[userId].in_progress.push(row.in_progress);
 
@@ -3234,16 +3232,15 @@ WHERE
           "S.No": index + 1,
           "Employee ID": user.employee_id,
           "Employee Name": user.name,
-          Date: user.date.join(", "),
-          "Project Name": user.project_name.join(", "),
+          "Date": betweenDate ,
+          "Project Name": Array.from(user.project_name).join(', '),
           "In Progress": user.in_progress.join(", "),
-          Completed: user.completed.join(", "),
+          "Completed": user.completed.join(", "),
           "Total Hours Worked": formatSecondsToHHMMSS(user.total_seconds),
         }));
 
         const json2csvParser = new Parser({});
         const csv = json2csvParser.parse(exportData);
-
         res.header("Content-Type", "text/csv");
         res.attachment("attendance_data.csv");
         return res.send(csv);
