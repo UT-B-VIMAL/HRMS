@@ -94,18 +94,18 @@ module.exports = (io) => {
 
     socket.on('chat message', async (data) => {
       try {
-        const { ticket_id, sender_id, receiver_id, comments } = data;
+        const { ticket_id, sender_id, receiver_id, comments, datetime } = data;
 
         console.log('Received data:', data);
 
         socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
-        const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
-        console.log("isttime",istTime);
+        // const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+        // console.log("isttime",istTime);
         
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
           VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-          [ticket_id, sender_id, receiver_id, comments, istTime, istTime]
+          [ticket_id, sender_id, receiver_id, comments, datetime, datetime]
         );
 
         console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
