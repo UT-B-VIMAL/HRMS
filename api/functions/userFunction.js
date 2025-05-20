@@ -9,7 +9,7 @@ const {
 } = require("../../api/functions/commonFunction");
 
 // Create User
-exports.createUser = async (payload, res) => {
+exports.createUser = async (payload, res, req) => {
   const {
     first_name, last_name, employee_id, email,
     password, team_id, role_id, designation_id,
@@ -212,7 +212,7 @@ exports.getAllUsers = async (req, res) => {
 
 
 // Update User
-exports.updateUser = async (id, payload, res) => {
+exports.updateUser = async (id, payload, res, req) => {
   const {
     first_name,
     last_name,
