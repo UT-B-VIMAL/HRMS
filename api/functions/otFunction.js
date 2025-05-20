@@ -598,7 +598,7 @@ exports.getAllOts = async (req, res) => {
           statusFilters.push(`(ot.pm_status = 0 AND ot.user_id = ${user_id})`);
         else if (role_id == 4)
           statusFilters.push(
-            `(ot.tl_status = 0 AND ot.pm_status = 0 AND ot.user_id = ${user_id})`
+            `(ot.tl_status = 0 OR ot.pm_status = 0) AND ot.user_id = ${user_id}`
           );
         else
           statusFilters.push(
@@ -1351,7 +1351,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       LEFT JOIN 
         designations d ON d.id = u.designation_id
       ${otWhereClause}
-      ORDER BY ot.created_at DESC
+      ORDER BY ot.updated_at DESC
     `;
 
     const [ots] = await db.query(otQuery, otValues);
@@ -1872,7 +1872,7 @@ exports.getAlltlemployeeOts = async (req, res) => {
         ${otWhereClause}
         AND ot.deleted_at IS NULL
         ORDER BY 
-          ot.created_at DESC
+          ot.updated_at DESC
       `;
 
     // Execute the query

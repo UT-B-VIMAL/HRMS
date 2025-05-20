@@ -481,7 +481,7 @@ exports.getAllexpense = async (req, res) => {
         if (role_id == 3)
           statusFilters.push(`(et.pm_status = 0 AND et.user_id = ${user_id})`);
         else if (role_id == 4)
-          statusFilters.push(`(et.tl_status = 0 AND et.pm_status = 0)`);
+          statusFilters.push(`(et.tl_status = 0 OR et.pm_status = 0)`);
         else
           statusFilters.push(
             `et.status = 2  AND et.tl_status = 2  AND et.pm_status = 0`

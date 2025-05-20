@@ -77,7 +77,7 @@ module.exports = (io) => {
               WHEN tc.receiver_id = 0 THEN 'Anonymous'
               ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
             END AS receiver_name,
-            CONVERT_TZ(tc.created_at, '+00:00', '+05:30') AS created_at
+            tc.created_at
           FROM ticket_comments tc
           LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
           LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
@@ -100,6 +100,7 @@ module.exports = (io) => {
 
         socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
         const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+        console.log("isttime",istTime);
         
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
@@ -125,7 +126,7 @@ module.exports = (io) => {
               WHEN tc.receiver_id = 0 THEN 'Anonymous'
               ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
             END AS receiver_name,
-            CONVERT_TZ(tc.created_at, '+00:00', '+05:30') AS created_at
+            tc.created_at
           FROM ticket_comments tc
           LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
           LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
@@ -136,7 +137,7 @@ module.exports = (io) => {
 
         const recipientSocketId = connectedUsers[key];
         if (recipientSocketId) {
-          console.log(resultData[0]);
+          console.log("socketmsgdata",{ ...resultData[0] });
           
           io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
           socket.emit('msg', 'Msg sended.');

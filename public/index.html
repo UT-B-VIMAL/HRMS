@@ -24,7 +24,7 @@
     <ul id="messages"></ul>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io('https://frontendnode.hrms.utwebapps.com:8095/chat');
+        const socket = io('https://backend.hrms.utwebapps.com:8095/chat');
         const ticketId = '11';
         document.getElementById('register').addEventListener('click', () => {
             const username = document.getElementById('fromID').value;

@@ -577,7 +577,7 @@ exports.checkUpdatePermission = checkUpdatePermission;
     // };
     
 
-    const productColors = [
+   const productColors = [
   { fill: '#352542', stroke: '#492E62', text: '#9B51E0' },
   { fill: '#2B4740', stroke: '#376B5E', text: '#6AF9D7' },
   { fill: '#423B1E', stroke: '#615521', text: '#DCC02E' },
@@ -588,12 +588,33 @@ exports.checkUpdatePermission = checkUpdatePermission;
   { fill: '#491B46', stroke: '#6D1C69', text: '#FF1FF4' },
 ];
 
+// Memory store to track unique assignments
+const assignedColors = new Map(); // productIdOrName => color
+
+let recycledIndex = 0;
+
 exports.getColorForProduct = (productIdOrName) => {
-  const hash = [...productIdOrName].reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const index = hash % productColors.length;
-  return productColors[index];
+  // If already assigned, return the same color
+  if (assignedColors.has(productIdOrName)) {
+    return assignedColors.get(productIdOrName);
+  }
+
+  let color;
+  const currentAssignedCount = assignedColors.size;
+
+  if (currentAssignedCount < productColors.length) {
+    // Assign unique colors from the base palette
+    color = productColors[currentAssignedCount];
+  } else {
+    // Assign recycled colors using a rolling index
+    color = productColors[recycledIndex % productColors.length];
+    recycledIndex++;
+  }
+
+  assignedColors.set(productIdOrName, color);
+  return color;
 };
-    
+
 
 
 
