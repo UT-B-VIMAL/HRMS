@@ -94,13 +94,12 @@ const taskController = {
   getTask: async (req, res) => {
     try {
       const { id } = req.params; 
-      const { user_id } = req.query;  
       // const { status } = req.query;  
       // const { reopen_status } = req.query;  
       // const { active_status } = req.query;  
 
-      const queryParams = { id, user_id};  
-      await getTask(queryParams, res);
+      const queryParams = { id};  
+      await getTask(queryParams, res,req);
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error fetching task', 500);
