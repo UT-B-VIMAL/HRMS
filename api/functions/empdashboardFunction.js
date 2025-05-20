@@ -3,10 +3,18 @@ const {
   successResponse,
   errorResponse,
 } = require("../../helpers/responseHelper");
+const {
+  getUserIdFromAccessToken
+} = require("../../api/functions/commonFunction");
 
 exports.fetchPendingTask = async (req, res) => {
   try {
-    const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
+    // const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const userId = await getUserIdFromAccessToken(accessToken);
     if (!userId) {
       return errorResponse(res, null, "User ID is required", 400);
     }
@@ -169,7 +177,12 @@ exports.fetchPendingTask = async (req, res) => {
 
 exports.fetchDailybreakdown = async (req, res) => {
   try {
-    const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
+    // const userId = req.query.user_id; // Assuming user ID is passed as a query parameter
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const userId = await getUserIdFromAccessToken(accessToken);
     if (!userId) {
       return errorResponse(res, null, "User ID is required", 400);
     }
@@ -289,8 +302,13 @@ exports.fetchDailybreakdown = async (req, res) => {
 
 exports.fetchStatistics = async (req, res) => {
   try {
-    const user_id = req.query.user_id;
+    // const user_id = req.query.user_id;
     const date = req.query.date;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -464,8 +482,13 @@ exports.fetchStatistics = async (req, res) => {
 
 exports.fetchStatisticschart = async (req, res) => {
   try {
-    const user_id = req.query.user_id;
+    // const user_id = req.query.user_id;
     const date = req.query.date;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -664,7 +687,12 @@ exports.fetchStatisticschart = async (req, res) => {
 
 exports.fetchRatings = async (req, res) => {
   try {
-    const userId = req.query.user_id;
+    // const userId = req.query.user_id;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const userId = await getUserIdFromAccessToken(accessToken);
     const inputMonth = req.query.month; // Optional param (format: YYYY-MM)
 
     if (!userId) {

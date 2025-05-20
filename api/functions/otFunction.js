@@ -7,12 +7,21 @@ const {
 const moment = require("moment");
 const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
+const {
+  getUserIdFromAccessToken,
+} = require("../../api/functions/commonFunction");
 
 // Insert OT
 exports.createOt = async (payload, res, req) => {
-  const { date, time, project_id, task_id, user_id, comments, created_by } =
+  const { date, time, project_id, task_id, comments } =
     payload;
 
+     const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
+        const created_by = await getUserIdFromAccessToken(accessToken);
   const missingFields = [];
   if (!date) missingFields.push("date");
   if (!project_id) missingFields.push("project_id");
@@ -526,7 +535,6 @@ exports.getAllOts = async (req, res) => {
   try {
     const {
       project_id,
-      user_id,
       date,
       status,
       product_id,
@@ -535,6 +543,11 @@ exports.getAllOts = async (req, res) => {
       perPage = 10,
     } = req.query;
 
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
     if (!user_id || !status) {
       return errorResponse(
         res,
@@ -693,10 +706,15 @@ exports.updateOt = async (id, payload, res) => {
     pmtime,
     project_id,
     task_id,
-    user_id,
     comments,
-    updated_by,
   } = payload;
+
+  const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
+        const updated_by = await getUserIdFromAccessToken(accessToken);
 
   const formatTime = (timeValue, fieldName) => {
     if (timeValue) {
@@ -1179,7 +1197,6 @@ exports.deleteOt = async (id, res) => {
 exports.getAllpmemployeeOts = async (req, res) => {
   try {
     const {
-      user_id,
       team_id,
       start_date,
       end_date,
@@ -1188,6 +1205,12 @@ exports.getAllpmemployeeOts = async (req, res) => {
       page = 1,
       perPage = 10,
     } = req.query;
+
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(
@@ -1511,7 +1534,14 @@ const addTimes = (time1, time2) => {
 
 // Approve or reject OT
 exports.approve_reject_ot = async (payload, res, req) => {
-  const { user_id, status, updated_by, role } = payload;
+  const { status, role } = payload;
+
+  const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
+        const updated_by = await getUserIdFromAccessToken(accessToken);
 
   try {
     // Validate required fields
@@ -1692,7 +1722,6 @@ exports.approve_reject_ot = async (payload, res, req) => {
 exports.getAlltlemployeeOts = async (req, res) => {
   try {
     const {
-      user_id,
       start_date,
       end_date,
       status,
@@ -1701,6 +1730,11 @@ exports.getAlltlemployeeOts = async (req, res) => {
       perPage = 10,
     } = req.query;
 
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
@@ -2195,12 +2229,17 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
     pmtime,
     project_id,
     task_id,
-    user_id,
     comments,
     updated_by,
     approve_reject_flag,
     role,
   } = payload;
+
+  const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
   if (!approve_reject_flag || ![1, 2].includes(Number(approve_reject_flag))) {
     return errorResponse(
