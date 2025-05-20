@@ -444,8 +444,8 @@ exports.projectStatus = async (req, res) => {
       FROM sub_tasks st
       LEFT JOIN tasks t ON t.id = st.task_id
       LEFT JOIN users u ON u.id = st.user_id
-      LEFT JOIN products p ON p.id = t.product_id
-      LEFT JOIN projects pr ON pr.id = t.project_id
+      LEFT JOIN products p ON p.id = st.product_id
+      LEFT JOIN projects pr ON pr.id = st.project_id
       LEFT JOIN sub_tasks_user_timeline stut ON stut.subtask_id = st.id
       LEFT JOIN teams tm ON tm.id = st.team_id
       WHERE st.deleted_at IS NULL

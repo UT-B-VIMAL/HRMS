@@ -2,7 +2,6 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const jwt = require('jsonwebtoken')
 
-
 exports.getAllData = async (payload, res) => {
     const { type, id, user_id, task_user_id } = payload;
 
@@ -245,7 +244,6 @@ exports.getAllData = async (payload, res) => {
 
 exports.getAuthUserDetails = async (authUserId, res) => {
     try {
-        
         const authUserQuery = "SELECT * FROM users WHERE deleted_at IS NULL AND id = ?";
         const [authUserDetails] = await db.query(authUserQuery, [authUserId]);
 
@@ -546,9 +544,6 @@ exports.getUserIdFromAccessToken = async (accessToken) => {
         throw new Error('Error retrieving user ID: ' + error.message);
     }
 };
-
-
-
 
 
 const productColors = [
