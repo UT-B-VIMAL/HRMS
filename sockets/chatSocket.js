@@ -100,12 +100,11 @@ module.exports = (io) => {
 
         socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
         const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
-        console.log("isttime",istTime);
         
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, istTime, istTime, NULL)`,
-          [ticket_id, sender_id, receiver_id, comments]
+          VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+          [ticket_id, sender_id, receiver_id, comments, istTime, istTime]
         );
 
         console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
