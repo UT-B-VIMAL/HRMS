@@ -699,6 +699,7 @@ exports.getAllOts = async (req, res) => {
 
 // Update OT
 exports.updateOt = async (id, payload, res) => {
+   const { id } = req.params;
   const {
     date,
     time,
@@ -707,7 +708,7 @@ exports.updateOt = async (id, payload, res) => {
     project_id,
     task_id,
     comments,
-  } = payload;
+  } = req.body;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
