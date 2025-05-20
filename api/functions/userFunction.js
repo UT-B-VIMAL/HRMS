@@ -4,7 +4,8 @@ const { successResponse, errorResponse } = require('../../helpers/responseHelper
 const getPagination = require('../../helpers/pagination');
 const { createUserInKeycloak, deleteUserInKeycloak, editUserInKeycloak } = require("../functions/keycloakFunction");
 const {
-  getAuthUserDetails
+  getAuthUserDetails,
+  getUserIdFromAccessToken,
 } = require("../../api/functions/commonFunction");
 
 // Create User
@@ -16,6 +17,11 @@ exports.createUser = async (payload, res) => {
   } = payload;
 
   try {
+    const accessToken = req.headers.authorization?.split(' ')[1];
+        if (!accessToken) {
+            return errorResponse(res, 'Access token is required', 401);
+        }
+    const userId = await getUserIdFromAccessToken(accessToken);
     const [existingUsers] = await db.query(
       `SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL`,
       [employee_id]
@@ -69,7 +75,7 @@ exports.createUser = async (payload, res) => {
     const values = [
       first_name, last_name, employee_id, email,
       hashedPassword, team_id, role_id, designation_id,
-      created_by, keycloakId, deleted_at
+      userId, keycloakId, deleted_at
     ];
 
     const [result] = await db.query(insertQuery, values);
@@ -221,6 +227,12 @@ exports.updateUser = async (id, payload, res) => {
   } = payload;
 
   try {
+
+    const accessToken = req.headers.authorization?.split(' ')[1];
+        if (!accessToken) {
+            return errorResponse(res, 'Access token is required', 401);
+        }
+    const userId = await getUserIdFromAccessToken(accessToken);
     
     const [user] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
   if (user.length === 0) {
@@ -268,7 +280,7 @@ if (existingemail.length > 0) {
     team_id,
     role_id,
     designation_id,
-    updated_by,
+    userId,
     id,
   ];
 
@@ -376,21 +388,21 @@ exports.deleteUser = async (id, res) => {
 
 const getRoleName = async (roleId) => {
   try {
-    const query = "SELECT role FROM roles WHERE id = ?"; // Select 'role' column
+    const query = "SELECT role FROM roles WHERE id = ?"; 
     const values = [roleId];
     const [result] = await db.query(query, values);
 
-    console.log("Query Result:", result); // Log the result for debugging
+    console.log("Query Result:", result); 
 
     if (result.length === 0) {
       console.log(`No role found for roleId: ${roleId}`);
-      return null;  // Or you can return a default role or throw an error
+      return null;  
     }
 
     return result[0].role;
   } catch (error) {
     console.error('Error fetching role name:', error.message);
-    return null;  // Or handle error as needed
+    return null;  
   }
 };
 
