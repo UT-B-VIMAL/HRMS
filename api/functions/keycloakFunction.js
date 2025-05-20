@@ -33,48 +33,52 @@ async function getAdminToken() {
 
 async function signInUser(username, password) {
   try {
-      const response = await axios.post(
-          `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
-          new URLSearchParams({
-              grant_type: "password",
-              client_id: keycloakConfig.clientId,
-              client_secret: keycloakConfig.clientSecret,
-              username: username,
-              password: password,
-          }),
-          { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-      );
+    const response = await axios.post(
+      `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
+      new URLSearchParams({
+        grant_type: "password",
+        client_id: keycloakConfig.clientId,
+        client_secret: keycloakConfig.clientSecret,
+        username: username,
+        password: password,
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
 
-      const user = await getUserByEmployeeId(username);
-        
+    const user = await getUserByEmployeeId(username);
 
-      if (user) {
-        const role = await getRoleName(user.role_id);
-        let profileName = '';
-        if (user.last_name) {
-          const firstNameInitial = user.first_name ? user.first_name.charAt(0).toUpperCase() : '';
-          const lastNameInitial = user.last_name.charAt(0).toUpperCase();
-          profileName = `${firstNameInitial}${lastNameInitial}`;
-        } else if (user.first_name) {
-          profileName = user.first_name.substring(0, 2).toUpperCase();
-        }
-        return {
-          keycloak_id: user.keycloak_id,
-          user_id: user.id,
-          role_id: user.role_id,
-          employee_id: user.employee_id,
-          profile_name: profileName,
-          designation_name:user.designation_name,
-          role_name: role,
-          access_token: response.data.access_token,
-          refresh_token: response.data.refresh_token
-        };
-      } else {
-        throw new Error('User not found in the database');
+
+    if (user) {
+      const role = await getRoleName(user.role_id);
+      let profileName = '';
+      if (user.last_name) {
+        const firstNameInitial = user.first_name ? user.first_name.charAt(0).toUpperCase() : '';
+        const lastNameInitial = user.last_name.charAt(0).toUpperCase();
+        profileName = `${firstNameInitial}${lastNameInitial}`;
+      } else if (user.first_name) {
+        profileName = user.first_name.substring(0, 2).toUpperCase();
       }
+      const expiresInSeconds = response.data.expires_in;
+      const loginExpiry = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+      return {
+        keycloak_id: user.keycloak_id,
+        user_id: user.id,
+        role_id: user.role_id,
+        employee_id: user.employee_id,
+        profile_name: profileName,
+        designation_name: user.designation_name,
+        role_name: role,
+        access_token: response.data.access_token,
+        refresh_token: response.data.refresh_token,
+        login_expiry: loginExpiry
+      };
+    } else {
+      throw new Error('User not found in the database');
+    }
   } catch (error) {
-      console.error("Error signing in user:", error.response ? error.response.data : error.message);
-      throw error;
+    console.error("Error signing in user:", error.response ? error.response.data : error.message);
+    throw error;
   }
 }
 
@@ -152,7 +156,7 @@ async function forgotPassword(email, res) {
     await db.query(updateQuery, [resetToken, resetTokenExpiry, currentUser.id]);
 
     const transporter = nodemailer.createTransport({
-      service: 'gmail', 
+      service: 'gmail',
       auth: {
         user: 'nathishmanadarajan@gmail.com',
         pass: 'zlmu qdlu qgpg phnm',
@@ -164,8 +168,8 @@ async function forgotPassword(email, res) {
       to: currentUser.email,
       subject: 'Password Reset Request',
       text: `You requested a password reset. Please use the following link to reset your password:\n\n` +
-            `http://localhost:3000/reset_password\n\n` +
-            `If you did not request this, please ignore this email.`,
+        `http://localhost:3000/reset_password\n\n` +
+        `If you did not request this, please ignore this email.`,
     };
 
     await transporter.sendMail(mailOptions);
@@ -199,7 +203,7 @@ async function resetPasswordWithKeycloak(token, id, newPassword, res) {
     const updateQuery = "UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?";
     await db.query(updateQuery, [hashedPassword, id]);
 
-    
+
 
     // Now reset password in Keycloak
     await changePasswordInKeycloak(currentUser.keycloak_id, newPassword);
@@ -236,9 +240,9 @@ async function createUserInKeycloak(userData) {
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
-        console.log(roleName+'Group');
-        const groupResponse = await assignGroupToUser(userId, roleName+'Group');
-        
+        console.log(roleName + 'Group');
+        const groupResponse = await assignGroupToUser(userId, roleName + 'Group');
+
         if (groupResponse.error) {
           console.error("Group assignment failed:", groupResponse.details);
         } else {
@@ -285,9 +289,9 @@ async function editUserInKeycloak(userId, userData) {
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
-        console.log(roleName+'Group');
-        const groupResponse = await assignGroupToUser(userId, roleName+'Group');
-        
+        console.log(roleName + 'Group');
+        const groupResponse = await assignGroupToUser(userId, roleName + 'Group');
+
         if (groupResponse.error) {
           console.error("Group assignment failed:", groupResponse.details);
         } else {
@@ -334,15 +338,15 @@ async function deleteUserInKeycloak(userId) {
 
 async function listUsers() {
   try {
-      const token = await getAdminToken(); // Get the admin access token
-      const response = await axios.get(
-          `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users`,
-          { headers: { Authorization: `Bearer ${token}` } }
-      );
-      return response.data;
+    const token = await getAdminToken(); // Get the admin access token
+    const response = await axios.get(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
   } catch (error) {
-      console.error("Error listing roles:", error.response.data);
-      throw error;
+    console.error("Error listing roles:", error.response.data);
+    throw error;
   }
 }
 
@@ -443,7 +447,7 @@ async function assignGroupToUser(userId, groupName) {
 
 
 async function getUserByEmployeeId(employeeId) {
-  
+
   const query = `
   SELECT 
     users.id, 
@@ -456,11 +460,11 @@ async function getUserByEmployeeId(employeeId) {
   FROM users
   LEFT JOIN designations ON users.designation_id = designations.id
   WHERE users.employee_id = ? AND users.deleted_at IS NULL`;
-const params = [employeeId];
+  const params = [employeeId];
 
   try {
     const [rows] = await db.execute(query, params);  // Use your DB query method here (e.g., mysql2, sequelize)
-    
+
     if (rows.length > 0) {
       return rows[0];  // Return the first user that matches the employee_id
     } else {
@@ -525,7 +529,7 @@ module.exports = {
   changePassword,
   forgotPassword,
   resetPasswordWithKeycloak,
-   getAdminToken
+  getAdminToken
 };
 
 
