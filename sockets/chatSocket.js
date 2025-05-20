@@ -100,6 +100,7 @@ module.exports = (io) => {
 
         socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
         const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+        console.log("isttime",istTime);
         
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
@@ -136,7 +137,7 @@ module.exports = (io) => {
 
         const recipientSocketId = connectedUsers[key];
         if (recipientSocketId) {
-          console.log(resultData[0]);
+          console.log("socketmsgdata",{ ...resultData[0] });
           
           io.to(recipientSocketId).emit('chat message', { ...resultData[0] });
           socket.emit('msg', 'Msg sended.');
