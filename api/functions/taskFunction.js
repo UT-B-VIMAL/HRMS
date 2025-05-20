@@ -252,16 +252,16 @@ exports.createTask = async (payload, res) => {
   }
 };
 
-exports.getTask = async (queryParams, res,req) => {
+exports.getTask = async (queryParams, res, req) => {
   try {
     const { id } = queryParams;
     const accessToken = req.headers.authorization?.split(' ')[1];
-        if (!accessToken) {
-            return errorResponse(res, 'Access token is required', 401);
-        }
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
-         
+
     if (!user_id) {
       return errorResponse(
         res,
@@ -1989,124 +1989,127 @@ exports.getTaskList = async (queryParams, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
-   // from your destructure:
-let search = (rawSearch || "").toLowerCase().trim();
-const isSearching = search !== "";
-const teamIdFilter = team_id && team_id !== '' ? Number(team_id) : null;
-const priorityFilter = priority && priority !== '' ? priority : null;
+    // from your destructure:
+    let search = (rawSearch || "").toLowerCase().trim();
+    const isSearching = search !== "";
+    const teamIdFilter = team_id && team_id !== '' ? Number(team_id) : null;
+    const priorityFilter = priority && priority !== '' ? priority : null;
+    const memberIdFilter = member_id && member_id !== '' ? Number(member_id) : null;
 
-tasks.forEach((task) => {
-  // basic task details
-  const taskDetails = {
-    task_id:       task.task_id,
-    user_id:       task.user_id,
-    task_name:     task.task_name,
-    project_name:  task.project_name,
-    product_name:  task.product_name,
-    product_color: getColorForProduct(task.product_name),
-    priority:      task.priority,
-    estimated_hours: formatTimeDHMS(task.estimated_hours),
-    assignee_name: task.assignee_name,
-    team_name:     task.team_name,
-    team_id:       task.team_id,
-    assigned_by:   task.assigned_user,
-    assigned_by_id: task.assigned_user_id,
-    created_by:    task.created_by,
-    created_at:    task.created_at,
-    updated_at:    task.updated_at,
-  };
+    tasks.forEach((task) => {
+      // basic task details
+      const taskDetails = {
+        task_id: task.task_id,
+        user_id: task.user_id,
+        task_name: task.task_name,
+        project_name: task.project_name,
+        product_name: task.product_name,
+        product_color: getColorForProduct(task.product_name),
+        priority: task.priority,
+        estimated_hours: formatTimeDHMS(task.estimated_hours),
+        assignee_name: task.assignee_name,
+        team_name: task.team_name,
+        team_id: task.team_id,
+        assigned_by: task.assigned_user,
+        assigned_by_id: task.assigned_user_id,
+        created_by: task.created_by,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
+      };
 
-  const subtasks = subtasksByTaskId[task.task_id] || [];
+      const subtasks = subtasksByTaskId[task.task_id] || [];
 
-  if (subtasks.length > 0) {
-    //––– TASK HAS SUBTASKS: filter them by team, search & priority –––
-    const matchedSubtasks = subtasks.filter((st) => {
-      // 1) team match on subtask
-      const teamMatch = teamIdFilter !== null
-        ? Number(st.subtask_user_team_id) === teamIdFilter
-        : true;
+      if (subtasks.length > 0) {
+        //––– TASK HAS SUBTASKS: filter them by team, search, priority & member –––
+        const matchedSubtasks = subtasks.filter((st) => {
+          const teamMatch = teamIdFilter !== null
+            ? Number(st.subtask_user_team_id) === teamIdFilter
+            : true;
 
-      // 2) search match on subtask
-      const searchMatch = !isSearching
-        ? true
-        : [ st.subtask_name, st.subtask_user_name ]
-            .some(f => f?.toLowerCase().includes(search));
+          const searchMatch = !isSearching
+            ? true
+            : [st.subtask_name, st.subtask_user_name]
+              .some(f => f?.toLowerCase().includes(search));
 
-      // 3) priority match on subtask (case-sensitive)
-      const priorityMatch = priorityFilter
-        ? st.priority === priorityFilter
-        : true;
+          const priorityMatch = priorityFilter
+            ? st.priority === priorityFilter
+            : true;
 
-      return teamMatch && searchMatch && priorityMatch;
+          const memberMatch = memberIdFilter !== null
+            ? Number(st.assignee_id) === memberIdFilter
+            : true;
+
+          return teamMatch && searchMatch && priorityMatch && memberMatch;
+        });
+
+        if (matchedSubtasks.length === 0) return;
+
+        const groupedSubtasks = {};
+        matchedSubtasks.forEach((st) => {
+          const grp = getStatusGroup(st.status, st.reopen_status, st.active_status);
+          if (!grp) return;
+          if (!groupedSubtasks[grp]) groupedSubtasks[grp] = [];
+          groupedSubtasks[grp].push({
+            subtask_id: st.subtask_id,
+            subtask_name: st.subtask_name,
+            team_name: st.subtask_user_team_name,
+            team_id: st.subtask_user_team_id,
+            estimated_hours: formatTimeDHMS(st.estimated_hours),
+            assigned_by: st.assigned_user,
+            assigned_by_id: st.assigned_user_id,
+            assignee_id: st.assignee_id,
+            assignee_name: st.subtask_user_name,
+            updated_at: st.updated_at,
+            status: st.status,
+            priority: st.priority,
+            reopen_status: st.reopen_status,
+            active_status: st.active_status,
+          });
+        });
+
+        Object.keys(groupedSubtasks).forEach((grp) => {
+          groups[grp].push({
+            task_details: taskDetails,
+            subtask_details: groupedSubtasks[grp],
+          });
+        });
+
+      } else {
+        //––– TASK HAS NO SUBTASKS: check task’s own team, search, priority & member –––
+        const teamMatch = teamIdFilter !== null
+          ? Number(task.team_id) === teamIdFilter
+          : true;
+
+        const searchMatch = !isSearching
+          ? true
+          : [
+            task.product_name,
+            task.project_name,
+            task.task_name,
+            task.team_name,
+            task.assignee_name
+          ].some(f => f?.toLowerCase().includes(search));
+
+        const priorityMatch = priorityFilter
+          ? task.priority === priorityFilter
+          : true;
+
+        const memberMatch = memberIdFilter !== null
+          ? Number(task.user_id) === memberIdFilter
+          : true;
+
+        if (!teamMatch || !searchMatch || !priorityMatch || !memberMatch) return;
+
+        const grp = getStatusGroup(task.task_status, task.reopen_status, task.active_status);
+        if (!grp) return;
+
+        groups[grp].push({
+          task_details: taskDetails,
+          subtask_details: [],  // no subtasks
+        });
+      }
     });
 
-    // if none of its subtasks match → skip entire task
-    if (matchedSubtasks.length === 0) return;
-
-    // group only the matched subtasks
-    const groupedSubtasks = {};
-    matchedSubtasks.forEach((st) => {
-      const grp = getStatusGroup(st.status, st.reopen_status, st.active_status);
-      if (!grp) return;
-      if (!groupedSubtasks[grp]) groupedSubtasks[grp] = [];
-      groupedSubtasks[grp].push({
-        subtask_id:   st.subtask_id,
-        user_id:      st.user_id,
-        subtask_name: st.subtask_name,
-        team_name:    st.subtask_user_team_name,
-        team_id:      st.subtask_user_team_id,
-        estimated_hours: formatTimeDHMS(st.estimated_hours),
-        assigned_by:  st.assigned_user,
-        assigned_by_id: st.assigned_user_id,
-        assignee_id:   st.assignee_id,
-        assignee_name: st.subtask_user_name,
-        updated_at:    st.updated_at,
-        status:        st.status,
-        priority:      st.priority,
-        reopen_status: st.reopen_status,
-        active_status: st.active_status,
-      });
-    });
-
-    // push task + its filtered subtasks into each status group
-    Object.keys(groupedSubtasks).forEach((grp) => {
-      groups[grp].push({
-        task_details:    taskDetails,
-        subtask_details: groupedSubtasks[grp],
-      });
-    });
-
-  } else {
-    //––– TASK HAS NO SUBTASKS: check task’s own team, search & priority –––
-    const teamMatch = teamIdFilter !== null
-      ? Number(task.team_id) === teamIdFilter
-      : true;
-
-    const searchMatch = !isSearching
-      ? true
-      : [
-          task.product_name,
-          task.project_name,
-          task.task_name,
-          task.team_name,
-          task.assignee_name
-        ].some(f => f?.toLowerCase().includes(search));
-
-    const priorityMatch = priorityFilter
-      ? task.priority === priorityFilter
-      : true;
-
-    if (!teamMatch || !searchMatch || !priorityMatch) return;
-
-    const grp = getStatusGroup(task.task_status, task.reopen_status, task.active_status);
-    if (!grp) return;
-
-    groups[grp].push({
-      task_details:    taskDetails,
-      subtask_details: [],  // no subtasks
-    });
-  }
-});
 
 
 
@@ -3185,12 +3188,12 @@ exports.getWorkReportData = async (queryParams, res) => {
         const { Parser } = require("json2csv");
 
         const groupedData = {};
-        let betweenDate="";
-        if(from_date=== to_date){
-          betweenDate=moment(from_date).format("DD-MM-YYYY");
+        let betweenDate = "";
+        if (from_date === to_date) {
+          betweenDate = moment(from_date).format("DD-MM-YYYY");
         }
-        else{
-          betweenDate= moment(from_date).format("DD-MM-YYYY")+ " to " + moment(to_date).format("DD-MM-YYYY");
+        else {
+          betweenDate = moment(from_date).format("DD-MM-YYYY") + " to " + moment(to_date).format("DD-MM-YYYY");
         }
         results.forEach((row) => {
           const userId = row.employee_id;
@@ -3200,7 +3203,7 @@ exports.getWorkReportData = async (queryParams, res) => {
               s_no: 0,
               employee_id: row.employee_id,
               name: row.name,
-              project_name: new Set(), 
+              project_name: new Set(),
               in_progress: [],
               completed: [],
               total_seconds: 0, // store seconds for summing
@@ -3232,7 +3235,7 @@ exports.getWorkReportData = async (queryParams, res) => {
           "S.No": index + 1,
           "Employee ID": user.employee_id,
           "Employee Name": user.name,
-          "Date": betweenDate ,
+          "Date": betweenDate,
           "Project Name": Array.from(user.project_name).join(', '),
           "In Progress": user.in_progress.join(", "),
           "Completed": user.completed.join(", "),
