@@ -4,7 +4,7 @@ const {
   errorResponse,
 } = require("../../helpers/responseHelper");
 const {
-  getColorForProduct
+  getColorForProduct, getUserIdFromAccessToken
 } = require("../../api/functions/commonFunction");
 
 exports.fetchAttendance = async (req, res) => {
@@ -13,7 +13,12 @@ exports.fetchAttendance = async (req, res) => {
     const cutoffTime = new Date();
     cutoffTime.setHours(13, 30, 0, 0); // 1:30 PM cutoff
     const today = new Date().toISOString().split("T")[0];
-    const { user_id, employee_id } = req.query;
+    const { employee_id } = req.query;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -174,7 +179,12 @@ exports.fetchAttendance = async (req, res) => {
 
 exports.fetchTlrating = async (req, res) => {
   try {
-    const { user_id } = req.query;
+    // const { user_id } = req.query;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -285,7 +295,12 @@ exports.fetchTlrating = async (req, res) => {
 
 exports.fetchTLproducts = async (req, res) => {
   try {
-    const { user_id, product_id } = req.query;
+    const { product_id } = req.query;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -462,7 +477,12 @@ exports.fetchTLproducts = async (req, res) => {
 
 exports.fetchTLresourceallotment = async (req, res) => {
   try {
-    const { user_id } = req.query;
+    // const { user_id } = req.query;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -643,7 +663,12 @@ exports.fetchTLresourceallotment = async (req, res) => {
 
 exports.fetchTLdatas = async (req, res) => {
   try {
-    const { user_id } = req.query;
+    // const { user_id } = req.query;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -1075,7 +1100,12 @@ exports.fetchTLdatas = async (req, res) => {
 
 exports.fetchTlviewproductdata = async (req, res) => {
   try {
-    const { user_id, product_id, project_id, date, search } = req.query;
+    const { product_id, project_id, date, search } = req.query;
+    const accessToken = req.headers.authorization?.split(' ')[1];
+            if (!accessToken) {
+                return errorResponse(res, 'Access token is required', 401);
+            }
+        const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!product_id) {
       return errorResponse(res, null, "Product ID is required", 400);

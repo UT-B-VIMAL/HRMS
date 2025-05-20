@@ -26,7 +26,7 @@ exports.createSubTask = async (payload, res) => {
   try {
     // Retrieve `product_id` and `project_id` from the `tasks` table
     const selectQuery = `
-          SELECT product_id, project_id 
+          SELECT product_id, project_id ,status, active_status, reopen_status
           FROM tasks 
           WHERE deleted_at IS NULL AND id = ?
       `;
@@ -41,9 +41,9 @@ exports.createSubTask = async (payload, res) => {
       );
     }
 
-    const { product_id, project_id, status, reopen_status } = taskResult[0];
+    const { product_id, project_id, status, active_status } = taskResult[0];
 
-    if (status !== 0 && reopen_status == 1) {
+    if (status == 1 && active_status == 1) {
       return errorResponse(
         res,
         "Task is already active",
