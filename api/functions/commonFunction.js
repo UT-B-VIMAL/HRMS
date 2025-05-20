@@ -518,7 +518,7 @@ exports.addHistorydata = async (
 
 
 
-const getUserIdFromAccessToken = async (accessToken) => {
+exports.getUserIdFromAccessToken = async (accessToken) => {
     try {
         if (!accessToken) {
             throw new Error('Access token is missing or invalid');
@@ -544,9 +544,6 @@ const getUserIdFromAccessToken = async (accessToken) => {
         throw new Error('Error retrieving user ID: ' + error.message);
     }
 };
-
-
-module.exports = { getUserIdFromAccessToken };
 
 
 const productColors = [

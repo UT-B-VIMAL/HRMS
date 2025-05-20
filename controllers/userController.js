@@ -27,7 +27,7 @@ exports.createUser = async (req, res) => {
           return errorResponse(res, errorMessages, "Validation Error", 403);
       }
 
-      await createUser(payload, res);
+      await createUser(payload, res, req);
   } catch (error) {
       console.error('Error creating user:', error.message);
       return errorResponse(res, error.message, 'Error creating user', 500);
@@ -49,7 +49,7 @@ exports.updateUser = async (req, res) => {
           return errorResponse(res, errorMessages, "Validation Error", 403);
       }
 
-      await updateUser(id, payload, res);
+      await updateUser(id, payload, res, req);
   } catch (error) {
       return errorResponse(res, error.message, 'Error updating user', 500);
   }
