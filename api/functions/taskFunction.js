@@ -19,7 +19,7 @@ const {
   getISTTime,
   checkUpdatePermission,
   commonStatusGroup,
-  getColorForProduct
+  getColorForProduct,
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -452,59 +452,59 @@ exports.getTask = async (queryParams, res) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-          subtask_id: subtask.id,
-          owner_id: subtask.user_id || "",
-          name: subtask.name || "",
-          status: subtask.status,
-          active_status: subtask.active_status,
-          reopen_status: subtask.reopen_status,
-          assignee: subtask.user_id,
-          assigneename: subtask.assignee_name || "",
-          short_name: (subtask.assignee_name || "").substr(0, 2),
-          // status_text: statusMap[subtask.status] || "Unknown",
-          status_text: commonStatusGroup(
-            subtask.status,
-            subtask.reopen_status,
-            subtask.active_status
-          ),
-        }))
+            subtask_id: subtask.id,
+            owner_id: subtask.user_id || "",
+            name: subtask.name || "",
+            status: subtask.status,
+            active_status: subtask.active_status,
+            reopen_status: subtask.reopen_status,
+            assignee: subtask.user_id,
+            assigneename: subtask.assignee_name || "",
+            short_name: (subtask.assignee_name || "").substr(0, 2),
+            // status_text: statusMap[subtask.status] || "Unknown",
+            status_text: commonStatusGroup(
+              subtask.status,
+              subtask.reopen_status,
+              subtask.active_status
+            ),
+          }))
         : [];
 
     const historiesData =
       Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
-          histories[0].map(async (history) => ({
-            old_data: history.old_data,
-            new_data: history.new_data,
-            description: history.status_description || "Changed the status",
-            updated_by: history.updated_by,
-            shortName: history.short_name,
-            time_date: moment
-              .utc(history.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: history.updated_at,
-            time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-          }))
-        )
+            histories[0].map(async (history) => ({
+              old_data: history.old_data,
+              new_data: history.new_data,
+              description: history.status_description || "Changed the status",
+              updated_by: history.updated_by,
+              shortName: history.short_name,
+              time_date: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .format("YYYY-MM-DD HH:mm:ss"),
+              time_utc: history.updated_at,
+              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+            }))
+          )
         : [];
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-          comment_id: comment.id,
-          comments: comment.comments,
-          user_id: comment.user_id,
-          is_edited: comment.is_edited,
-          updated_by: comment.updated_by || "",
-          shortName: comment.updated_by.substr(0, 2),
-          time_date: moment
-            .utc(comment.updated_at)
-            .tz("Asia/Kolkata")
-            .format("YYYY-MM-DD HH:mm:ss"),
-          time_utc: comment.updated_at,
-          time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
-        }))
+            comment_id: comment.id,
+            comments: comment.comments,
+            user_id: comment.user_id,
+            is_edited: comment.is_edited,
+            updated_by: comment.updated_by || "",
+            shortName: comment.updated_by.substr(0, 2),
+            time_date: moment
+              .utc(comment.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: comment.updated_at,
+            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+          }))
         : [];
 
     // Final response
@@ -858,7 +858,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
 
-
     const [tasks] = await db.query(
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
       [id]
@@ -957,7 +956,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
       }
     }
-
 
     if (!currentTask) {
       return errorResponse(
@@ -1356,8 +1354,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-          .join(", ")}
+    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+    .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -1571,8 +1569,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-        ? true
-        : false;
+      ? true
+      : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -1615,7 +1613,17 @@ const formatTime = (seconds) => {
 
 exports.getTaskList = async (queryParams, res) => {
   try {
-    const { user_id, product_id, project_id, team_id, priority, search, member_id, dropdown_products, dropdown_projects } = queryParams;
+    const {
+      user_id,
+      product_id,
+      project_id,
+      team_id,
+      priority,
+      search,
+      member_id,
+      dropdown_products,
+      dropdown_projects,
+    } = queryParams;
 
     // Validate if user_id exists
     if (!user_id) {
@@ -1670,9 +1678,9 @@ exports.getTaskList = async (queryParams, res) => {
     `;
 
     const params = [];
-    if(role_id !== 3) {
-    if (team_id) {
-      baseQuery += ` AND (
+    if (role_id !== 3) {
+      if (team_id) {
+        baseQuery += ` AND (
         u.team_id = ? OR EXISTS (
           SELECT 1 FROM sub_tasks 
           LEFT JOIN users su ON sub_tasks.user_id = su.id
@@ -1681,9 +1689,9 @@ exports.getTaskList = async (queryParams, res) => {
           AND sub_tasks.deleted_at IS NULL
         )
       )`;
-      params.push(team_id, team_id);
+        params.push(team_id, team_id);
+      }
     }
-  }
     if (role_id === 3) {
       const queryteam =
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
@@ -1953,22 +1961,21 @@ exports.getTaskList = async (queryParams, res) => {
         query +=
           " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
         queryParams.push(user_id, user_id);
-      }else if (role_id === 3) {
+      } else if (role_id === 3) {
         const queryteam =
-        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-      const [rowteams] = await db.query(queryteam, [user_id]);
-      let teamIds = [];
-      if (rowteams.length > 0) {
-        teamIds = rowteams.map((row) => row.id);
+          "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+        const [rowteams] = await db.query(queryteam, [user_id]);
+        let teamIds = [];
+        if (rowteams.length > 0) {
+          teamIds = rowteams.map((row) => row.id);
+        }
+
+        query +=
+          " AND sub_tasks.deleted_at IS NULL AND (sub_tasks.user_id IS NULL AND tasks.team_id IN (?)) OR (sub_tasks.user_id IS NOT NULL AND subtask_user.team_id IN (?) AND sub_tasks.deleted_at IS NULL)";
+        queryParams.push(teamIds, teamIds);
       }
-
-  query += " AND sub_tasks.deleted_at IS NULL AND (sub_tasks.user_id IS NULL AND tasks.team_id IN (?)) OR (sub_tasks.user_id IS NOT NULL AND subtask_user.team_id IN (?) AND sub_tasks.deleted_at IS NULL)";
-   queryParams.push(teamIds, teamIds);  
-      }
-        [allSubtasks] = await db.query(query, queryParams);
-
-
-    } 
+      [allSubtasks] = await db.query(query, queryParams);
+    }
 
     // Group subtasks by task_id
     const subtasksByTaskId = allSubtasks.reduce((acc, subtask) => {
@@ -2217,43 +2224,46 @@ exports.doneTaskList = async (req, res) => {
 
     // Query to fetch subtasks with status = 2
     const subtasksQuery = `
-      SELECT 
-        p.name AS product_name,
-        pr.name AS project_name,
-        t.name AS task_name,
-        st.name AS subtask_name,
-        st.estimated_hours AS estimated_time,
-        st.total_hours_worked AS time_taken,
-        st.rating AS subtask_rating,
-        tm.name AS team_name,
-        'Subtask' AS type,
-        t.id AS task_id,
-        st.id AS subtask_id,
-        st.user_id AS subtask_user_id
-      FROM 
-        sub_tasks st
-      LEFT JOIN 
-        tasks t ON t.id = st.task_id
-      LEFT JOIN 
-        users u ON u.id = st.user_id
-      LEFT JOIN 
-        products p ON p.id = t.product_id
-      LEFT JOIN 
-        projects pr ON pr.id = t.project_id
-      LEFT JOIN 
-        teams tm ON tm.id = u.team_id
-      LEFT JOIN 
-        users u_assigned ON u_assigned.id = t.assigned_user_id
-
-      WHERE 
-        st.status = 3
-        AND st.deleted_at IS NULL
-        ${subtaskWhereClause}
-    `;
+  SELECT 
+    st.product_id AS product_id,
+    st.project_id AS project_id,
+    p.name AS product_name,
+    pr.name AS project_name,
+    t.name AS task_name,
+    st.name AS subtask_name,
+    st.estimated_hours AS estimated_time,
+    st.total_hours_worked AS time_taken,
+    st.rating AS subtask_rating,
+    tm.name AS team_name,
+    'Subtask' AS type,
+    t.id AS task_id,
+    st.id AS subtask_id,
+    st.user_id AS subtask_user_id
+  FROM 
+    sub_tasks st
+  LEFT JOIN 
+    tasks t ON t.id = st.task_id
+  LEFT JOIN 
+    users u ON u.id = st.user_id
+  LEFT JOIN 
+    products p ON p.id = st.product_id
+  LEFT JOIN 
+    projects pr ON pr.id = st.project_id
+  LEFT JOIN 
+    teams tm ON tm.id = u.team_id
+  LEFT JOIN 
+    users u_assigned ON u_assigned.id = t.assigned_user_id
+  WHERE 
+    st.status = 3
+    AND st.deleted_at IS NULL
+    ${subtaskWhereClause}
+`;
 
     // Query to fetch tasks without subtasks
     const tasksQuery = `
       SELECT 
+        t.product_id AS product_id,
+        t.project_id AS project_id,
         p.name AS product_name,
         pr.name AS project_name,
         t.name AS task_name,
@@ -2287,6 +2297,8 @@ exports.doneTaskList = async (req, res) => {
 
     // Execute both queries
     const [subtasks] = await db.query(subtasksQuery, subtaskValues);
+    console.log("Subtasks:", subtasks);
+
     const [tasks] = await db.query(tasksQuery, taskValues);
 
     // Combine the results
@@ -2337,7 +2349,10 @@ exports.doneTaskList = async (req, res) => {
 // Helper functions for task actions
 exports.startTask = async (taskOrSubtask, type, id, res) => {
   if (type === "task") {
-    const [subtasksexist] = await db.query("SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL", [id]);
+    const [subtasksexist] = await db.query(
+      "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",
+      [id]
+    );
     if (subtasksexist.length > 0) {
       throw {
         status: 500,
@@ -2662,7 +2677,6 @@ exports.updateTaskTimeLine = async (req, res) => {
             ]
           );
         }
-
       }
     } else {
       return errorResponse(res, "Invalid Type", 400);
@@ -2853,7 +2867,9 @@ exports.deleteTaskList = async (req, res) => {
 
     // Combine the results
     const mergedResults = [...subtasks, ...tasks];
-    mergedResults.sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+    mergedResults.sort(
+      (a, b) => new Date(b.deleted_at) - new Date(a.deleted_at)
+    );
 
     console.log("mergedResults", mergedResults);
     // Fetch assignee names and remove user_id
@@ -2995,7 +3011,6 @@ const formatDate = (date) => {
   const [year, month, day] = date.split("-");
   return `${year}-${month}-${day}`; // Convert to YYYY-MM-DD
 };
-
 
 exports.getWorkReportData = async (queryParams, res) => {
   try {
@@ -3140,65 +3155,64 @@ WHERE
       if (export_status == 1) {
         const { Parser } = require("json2csv");
 
-      const groupedData = {};
+        const groupedData = {};
 
-      results.forEach(row => {
-        const userId = row.employee_id;
+        results.forEach((row) => {
+          const userId = row.employee_id;
 
-        if (!groupedData[userId]) {
-          groupedData[userId] = {
-            s_no: 0,
-            employee_id: row.employee_id,
-            name: row.name,
-            date: [],
-            project_name: [],
-            in_progress: [],
-            completed: [],
-            total_seconds: 0, // store seconds for summing
-          };
+          if (!groupedData[userId]) {
+            groupedData[userId] = {
+              s_no: 0,
+              employee_id: row.employee_id,
+              name: row.name,
+              date: [],
+              project_name: [],
+              in_progress: [],
+              completed: [],
+              total_seconds: 0, // store seconds for summing
+            };
+          }
+
+          groupedData[userId].date.push(row.date);
+          groupedData[userId].project_name.push(row.project_name);
+          groupedData[userId].completed.push(row.completed);
+          groupedData[userId].in_progress.push(row.in_progress);
+
+          // Convert time string to seconds
+          const [hours, minutes, seconds] = row.total_hours_worked
+            .split(":")
+            .map(Number);
+          const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+          groupedData[userId].total_seconds += totalSeconds;
+        });
+
+        // Helper to convert seconds back to HH:MM:SS
+        function formatSecondsToHHMMSS(seconds) {
+          const h = Math.floor(seconds / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          const s = seconds % 60;
+          return [h, m, s].map((v) => String(v).padStart(2, "0")).join(":");
         }
 
-        groupedData[userId].date.push(row.date);
-        groupedData[userId].project_name.push(row.project_name);
-        groupedData[userId].completed.push(row.completed);
-        groupedData[userId].in_progress.push(row.in_progress);
+        // Prepare export array
+        const exportData = Object.values(groupedData).map((user, index) => ({
+          "S.No": index + 1,
+          "Employee ID": user.employee_id,
+          "Employee Name": user.name,
+          Date: user.date.join(", "),
+          "Project Name": user.project_name.join(", "),
+          "In Progress": user.in_progress.join(", "),
+          Completed: user.completed.join(", "),
+          "Total Hours Worked": formatSecondsToHHMMSS(user.total_seconds),
+        }));
 
-        // Convert time string to seconds
-        const [hours, minutes, seconds] = row.total_hours_worked.split(':').map(Number);
-        const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-        groupedData[userId].total_seconds += totalSeconds;
-      });
-
-      // Helper to convert seconds back to HH:MM:SS
-      function formatSecondsToHHMMSS(seconds) {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
-      }
-
-      // Prepare export array
-      const exportData = Object.values(groupedData).map((user, index) => ({
-        "S.No": index + 1,
-        "Employee ID": user.employee_id,
-        "Employee Name": user.name,
-        "Date": user.date.join(', '),
-        "Project Name": user.project_name.join(', '),
-        "In Progress": user.in_progress.join(', '),
-        "Completed": user.completed.join(', '),
-        "Total Hours Worked": formatSecondsToHHMMSS(user.total_seconds),
-      }));
-
-
-        const json2csvParser = new Parser({ });
+        const json2csvParser = new Parser({});
         const csv = json2csvParser.parse(exportData);
 
-        res.header('Content-Type', 'text/csv');
-        res.attachment('attendance_data.csv');
+        res.header("Content-Type", "text/csv");
+        res.attachment("attendance_data.csv");
         return res.send(csv);
       }
-
-     
 
       // Convert data to CSV
       const { Parser } = require("json2csv");
@@ -3233,4 +3247,3 @@ WHERE
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
