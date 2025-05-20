@@ -2222,8 +2222,7 @@ exports.getOtReportData = async (queryParams, res) => {
 };
 
 // Update OT
-exports.approve_reject_updateOt = async (req, res) => {
-   const { id } = req.params;
+exports.approve_reject_updateOt = async (req,id, payload, res) => {
   const {
     date,
     time,
@@ -2235,7 +2234,7 @@ exports.approve_reject_updateOt = async (req, res) => {
     updated_by,
     approve_reject_flag,
     role,
-  } = req.body;
+  } = payload;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
@@ -2333,9 +2332,9 @@ exports.approve_reject_updateOt = async (req, res) => {
   };
 
   // Apply the function to time, pmtime, and tltime
-  req.payload.time = formatTime(time, "time");
-  req.payload.pmtime = formatTime(pmtime, "pmtime");
-  req.payload.tltime = formatTime(tltime, "tltime");
+  payload.time = formatTime(time, "time");
+  payload.pmtime = formatTime(pmtime, "pmtime");
+  payload.tltime = formatTime(tltime, "tltime");
 
   try {
     const checkQuery = `
@@ -2463,9 +2462,9 @@ exports.approve_reject_updateOt = async (req, res) => {
       task_id,
       comments,
       date,
-      req.payload.time,
-      req.payload.tltime,
-      req.payload.pmtime,
+      payload.time,
+      payload.tltime,
+      payload.pmtime,
       updated_by,
       id,
     ];
