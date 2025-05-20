@@ -527,19 +527,24 @@ exports.projectStatus = async (req, res) => {
       (a, b) => new Date(b.task_updated_at) - new Date(a.task_updated_at)
     );
 
-    // const paginated = combined.slice(offset, offset + parseInt(perPage));
-
     const totalRecords = combinedData.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = page * perPage;
-    const paginatedData = combinedData.slice(startIndex, endIndex);
+
+    let paginatedData = combinedData.slice(startIndex, endIndex);
+
+    // Add s_no to paginated data
+    paginatedData = paginatedData.map((item, index) => ({
+      ...item,
+      s_no: startIndex + index + 1, // s_no is global
+    }));
 
     const pagination = getPagination(page, perPage, totalRecords);
 
     successResponse(
       res,
-      combinedData,
-      combinedData.length === 0
+      paginatedData, // ✅ return paginated data with s_no
+      paginatedData.length === 0
         ? "No data found"
         : "Data retrieved successfully",
       200,
@@ -1086,14 +1091,14 @@ exports.projectRequest = async (req, res) => {
           if (teamUsers.length > 0) {
             effectiveUserIds = teamUsers.map((user) => user.id); // Extract all user IDs
           }
-        }else{
-        return errorResponse(
-        res,
-        null,
-        "You are not currently assigned a reporting TL for your team.",
-        404
-      );
-      }
+        } else {
+          return errorResponse(
+            res,
+            null,
+            "You are not currently assigned a reporting TL for your team.",
+            404
+          );
+        }
       } else if (role_id === 2) {
         taskConditions.push("t.assigned_user_id = ?");
         subtaskConditions.push("st.assigned_user_id = ?");
