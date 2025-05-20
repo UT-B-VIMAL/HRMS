@@ -2,6 +2,7 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const jwt = require('jsonwebtoken')
 
+
 exports.getAllData = async (payload, res) => {
     const { type, id, user_id, task_user_id } = payload;
 
@@ -244,6 +245,7 @@ exports.getAllData = async (payload, res) => {
 
 exports.getAuthUserDetails = async (authUserId, res) => {
     try {
+        
         const authUserQuery = "SELECT * FROM users WHERE deleted_at IS NULL AND id = ?";
         const [authUserDetails] = await db.query(authUserQuery, [authUserId]);
 
@@ -518,7 +520,7 @@ exports.addHistorydata = async (
 
 
 
-const getUserIdFromAccessToken = async (accessToken) => {
+exports.getUserIdFromAccessToken = async (accessToken) => {
     try {
         if (!accessToken) {
             throw new Error('Access token is missing or invalid');
@@ -546,7 +548,7 @@ const getUserIdFromAccessToken = async (accessToken) => {
 };
 
 
-module.exports = { getUserIdFromAccessToken };
+
 
 
 const productColors = [
