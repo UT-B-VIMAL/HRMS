@@ -819,7 +819,7 @@ exports.updateOt = async (req, payload, res) => {
         404
       );
     }
-
+if (role_id == 4) {
     const taskQuery = `
         SELECT id 
         FROM tasks 
@@ -835,6 +835,7 @@ exports.updateOt = async (req, payload, res) => {
         404
       );
     }
+  }
 
     const userQuery = `
         SELECT id 
