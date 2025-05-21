@@ -81,17 +81,15 @@ exports.createOt = async (payload, res, req) => {
     );
   }
 
-  if (time) {
-  // Updated regex: Only allow h, m, s (no d)
-  const timeMatch = time.match(
-    /^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
-  );
+ if (time) {
+  // Regex only for h, m, s (no days allowed)
+  const timeMatch = time.match(/^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
 
   if (!timeMatch) {
     return errorResponse(
       res,
       null,
-      'Invalid format for time. Use formats like "2h 30m", "1h", or "4h 15m 10s". Days are not allowed.',
+      'Invalid format. Use like "2h 30m", "60m", "1h 10s". Days (d) not allowed.',
       400
     );
   }
@@ -100,25 +98,37 @@ exports.createOt = async (payload, res, req) => {
   const minutes = parseInt(timeMatch[4] || "0", 10);
   const seconds = parseInt(timeMatch[6] || "0", 10);
 
+  // Basic value validation
   if (
     hours < 0 ||
-    minutes < 0 ||
-    seconds < 0 ||
-    minutes >= 60 ||
-    seconds >= 60
+    minutes < 0 || minutes > 60 ||
+    seconds < 0 || seconds >= 60
   ) {
-    return errorResponse(res, null, "Invalid time values in time", 400);
+    return errorResponse(res, null, "Invalid time values", 400);
   }
 
-  if (hours < 1 || hours > 12) {
-    return errorResponse(res, null, "Hours must be between 1 and 12", 400);
+  // Calculate total seconds
+  const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+
+  if (totalSeconds < 3600) {
+    return errorResponse(res, null, "Total time must be at least 1 hour", 400);
+  }
+
+  if (totalSeconds > 43200) {
+    return errorResponse(res, null, "Total time must not exceed 12 hours", 400);
   }
 
   // Format as "HH:MM:SS"
-  payload.time = `${String(hours).padStart(2, "0")}:${String(
-    minutes
-  ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  const totalHours = Math.floor(totalSeconds / 3600);
+  const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
+  const totalRemSeconds = totalSeconds % 60;
+
+  payload.time = `${String(totalHours).padStart(2, "0")}:${String(
+    totalMinutes
+  ).padStart(2, "0")}:${String(totalRemSeconds).padStart(2, "0")}`;
 }
+
+
 
 
   try {
