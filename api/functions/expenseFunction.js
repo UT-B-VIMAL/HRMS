@@ -143,7 +143,7 @@ exports.createexpense = async (req, res) => {
       `;
       const [teamResult] = await db.query(teamQuery, [teamId]);
 
-      if (teamResult.length > 0) {
+      if (teamResult.length > 0 && teamResult[0].reporting_user_id) {
         const reportingUserId = teamResult[0].reporting_user_id;
 
         // Notification payload
