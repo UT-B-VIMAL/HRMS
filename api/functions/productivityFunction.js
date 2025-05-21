@@ -739,6 +739,9 @@ exports.getTeamwiseProductivity = async (req, res) => {
     if (from_date && to_date) {
       dateFilter = "AND DATE(utu.start_time) BETWEEN ? AND ?";
       params.push(from_date, to_date);
+    }else if (from_date) {
+      dateFilter = "AND DATE(utu.start_time) = ?";
+      params.push(from_date);
     }
 
     // Search filter
