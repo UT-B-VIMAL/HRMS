@@ -819,6 +819,22 @@ exports.updateOt = async (req, payload, res) => {
         404
       );
     }
+    const userQuery = `
+        SELECT id,team_id,role_id 
+        FROM users 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+  const [userResult] = await db.query(userQuery, [user_id]);
+
+  if (userResult.length === 0) {
+    return errorResponse(
+      res,
+      "User not found or deleted",
+      "Error creating OT",
+      404
+    );
+  }
+  const { role_id } = userResult[0];
 if (role_id == 4) {
     const taskQuery = `
         SELECT id 
@@ -836,22 +852,6 @@ if (role_id == 4) {
       );
     }
   }
-
-    const userQuery = `
-        SELECT id 
-        FROM users 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
-    const [userResult] = await db.query(userQuery, [user_id]);
-
-    if (userResult.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error updating OT",
-        404
-      );
-    }
 
     const updateQuery = `
         UPDATE ot_details 
