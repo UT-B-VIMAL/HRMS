@@ -654,7 +654,11 @@ exports.getAllOts = async (req, res) => {
         pr.name AS project_name,
         t.name AS task_name,
         DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-        ot.time,
+        CASE 
+          WHEN ot.pmedited_time IS NOT NULL AND ot.pmedited_time != '00:00:00' THEN ot.pmedited_time
+          WHEN ot.tledited_time IS NOT NULL AND ot.tledited_time != '00:00:00' THEN ot.tledited_time
+          ELSE ot.time
+        END AS time,
         ot.comments,
         ot.status,
         ot.tl_status,
