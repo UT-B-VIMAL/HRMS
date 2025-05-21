@@ -60,7 +60,7 @@ exports.updateOtdetail = async (req, res) => {
       return errorResponse(res, errorMessages, "Validation Error", 403);
     }
 
-    await updateOt(req, res);
+    await updateOt(req, payload, res);
   } catch (error) {
     return errorResponse(res, error.message, "Error updating OT detail", 500);
   }
