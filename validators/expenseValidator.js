@@ -26,9 +26,9 @@ const validationschema = {
       "string.base": "Description should be a string",
       "any.required": "Description is required",
     }),
-    // user_id: Joi.number().integer().optional().messages({
-    //   "number.base": "User ID should be an integer",
-    // }),
+    user_id: Joi.number().integer().optional().messages({
+      "number.base": "User ID should be an integer",
+    }),
     // file: Joi.string().uri().optional().messages({
     //   'string.uri': 'File URL should be a valid URI',
     //   "any.required": "File is required",
