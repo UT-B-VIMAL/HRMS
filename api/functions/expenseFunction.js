@@ -143,7 +143,7 @@ exports.createexpense = async (req, res) => {
       `;
       const [teamResult] = await db.query(teamQuery, [teamId]);
 
-      if (teamResult.length > 0) {
+      if (teamResult.length > 0 && teamResult[0].reporting_user_id) {
         const reportingUserId = teamResult[0].reporting_user_id;
 
         // Notification payload
@@ -601,13 +601,12 @@ LIMIT ?, ?
 
 // Update Expense
 exports.updateexpenses = async (id, req, res) => {
-  const { date, category, amount, description } = req.body;
+  const { date, user_id, category, amount, description } = req.body;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
 
   try {
@@ -1627,6 +1626,7 @@ exports.getExpenseReport = async (queryParams, res) => {
         users.first_name,
         GROUP_CONCAT(DATE_FORMAT(expenses.date, '%d-%m-%Y') ORDER BY expenses.date) AS dates,
         GROUP_CONCAT(expenses.expense_amount ORDER BY expenses.date) AS amounts,
+        GROUP_CONCAT(expenses.description ORDER BY expenses.date) AS reason,
         SUM(expenses.expense_amount) AS total
       FROM 
         expense_details AS expenses
@@ -1658,7 +1658,8 @@ exports.getExpenseReport = async (queryParams, res) => {
       "S.No": index + 1,
       "Emp.ID": row.employee_id,
       Name: row.first_name,
-      Date: row.dates,      // ❌ causes ["...","..."]
+      Date: row.dates,  
+      "Reason": row.reason,
       "Amount(Rs)": row.amounts,  // ❌ causes ["...","..."]
       "Total Travel/Food Expenses": row.total,
     }));
@@ -1721,6 +1722,7 @@ exports.updateOrApproveExpense = async (id, req, res) => {
     description,
     approve_reject_flag,
     role,
+    user_id,
   } = req.body;
 
 
@@ -1728,7 +1730,6 @@ exports.updateOrApproveExpense = async (id, req, res) => {
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
   try {
     // Fetch the existing expense details

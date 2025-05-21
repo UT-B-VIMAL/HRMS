@@ -81,44 +81,55 @@ exports.createOt = async (payload, res, req) => {
     );
   }
 
-  if (time) {
-    const timeMatch = time.match(
-      /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+ if (time) {
+  // Regex only for h, m, s (no days allowed)
+  const timeMatch = time.match(/^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
+
+  if (!timeMatch) {
+    return errorResponse(
+      res,
+      null,
+      'Invalid format. Use like "2h 30m", "60m", "1h 10s". Days (d) not allowed.',
+      400
     );
-
-    if (!timeMatch) {
-      return errorResponse(
-        res,
-        null,
-        'Invalid format for time. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
-        400
-      );
-    }
-
-    const days = parseInt(timeMatch[2] || "0", 10);
-    const hours = parseInt(timeMatch[4] || "0", 10);
-    const minutes = parseInt(timeMatch[6] || "0", 10);
-    const seconds = parseInt(timeMatch[8] || "0", 10);
-
-    if (
-      days < 0 ||
-      hours < 0 ||
-      minutes < 0 ||
-      seconds < 0 ||
-      minutes >= 60 ||
-      seconds >= 60
-    ) {
-      return errorResponse(res, null, "Invalid time values in time", 400);
-    }
-
-    // Convert days to hours and calculate total hours
-    const totalHours = days * 8 + hours;
-
-    // Format as "HH:MM:SS"
-    payload.time = `${String(totalHours).padStart(2, "0")}:${String(
-      minutes
-    ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
+
+  const hours = parseInt(timeMatch[2] || "0", 10);
+  const minutes = parseInt(timeMatch[4] || "0", 10);
+  const seconds = parseInt(timeMatch[6] || "0", 10);
+
+  // Basic value validation
+  if (
+    hours < 0 ||
+    minutes < 0 || minutes > 60 ||
+    seconds < 0 || seconds >= 60
+  ) {
+    return errorResponse(res, null, "Invalid time values", 400);
+  }
+
+  // Calculate total seconds
+  const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+
+  if (totalSeconds < 3600) {
+    return errorResponse(res, null, "Total time must be at least 1 hour", 400);
+  }
+
+  if (totalSeconds > 43200) {
+    return errorResponse(res, null, "Total time must not exceed 12 hours", 400);
+  }
+
+  // Format as "HH:MM:SS"
+  const totalHours = Math.floor(totalSeconds / 3600);
+  const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
+  const totalRemSeconds = totalSeconds % 60;
+
+  payload.time = `${String(totalHours).padStart(2, "0")}:${String(
+    totalMinutes
+  ).padStart(2, "0")}:${String(totalRemSeconds).padStart(2, "0")}`;
+}
+
+
+
 
   try {
     const projectQuery = `
@@ -265,7 +276,7 @@ WHERE user_id = ? AND project_id = ? AND date = ? AND deleted_at IS NULL
       `;
       const [teamResult] = await db.query(teamQuery, [teamId]);
 
-      if (teamResult.length > 0) {
+      if (teamResult.length > 0 && teamResult[0].reporting_user_id) {
         const reportingUserId = teamResult[0].reporting_user_id;
 
         // Notification payload
@@ -643,7 +654,11 @@ exports.getAllOts = async (req, res) => {
         pr.name AS project_name,
         t.name AS task_name,
         DATE_FORMAT(ot.date, '%Y-%m-%d') AS date,
-        ot.time,
+        CASE 
+          WHEN ot.pmedited_time IS NOT NULL AND ot.pmedited_time != '00:00:00' THEN ot.pmedited_time
+          WHEN ot.tledited_time IS NOT NULL AND ot.tledited_time != '00:00:00' THEN ot.tledited_time
+          ELSE ot.time
+        END AS time,
         ot.comments,
         ot.status,
         ot.tl_status,
@@ -698,71 +713,91 @@ exports.getAllOts = async (req, res) => {
 };
 
 // Update OT
-exports.updateOt = async (id, payload, res) => {
+exports.updateOt = async (req, payload, res) => {
+   const { id } = req.params;
   const {
     date,
     time,
     tltime,
     pmtime,
+    user_id,
     project_id,
     task_id,
     comments,
-  } = payload;
+  } = req.body;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
 
   const formatTime = (timeValue, fieldName) => {
-    if (timeValue) {
-      const timeMatch = timeValue.match(
-        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+  if (timeValue) {
+    // Only match h, m, s (no d)
+    const timeMatch = timeValue.match(/^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
+
+    if (!timeMatch) {
+      return errorResponse(
+        res,
+        null,
+        `Invalid format for ${fieldName}. Use formats like "1h 30m", "45m", or "2h 10s". Days (d) not allowed.`,
+        400
       );
-
-      if (!timeMatch) {
-        return errorResponse(
-          res,
-          null,
-          `Invalid format for ${fieldName}. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".`,
-          400
-        );
-      }
-
-      const days = parseInt(timeMatch[2] || "0", 10);
-      const hours = parseInt(timeMatch[4] || "0", 10);
-      const minutes = parseInt(timeMatch[6] || "0", 10);
-      const seconds = parseInt(timeMatch[8] || "0", 10);
-
-      if (
-        days < 0 ||
-        hours < 0 ||
-        minutes < 0 ||
-        seconds < 0 ||
-        minutes >= 60 ||
-        seconds >= 60
-      ) {
-        return errorResponse(
-          res,
-          null,
-          `Invalid time values in ${fieldName}`,
-          400
-        );
-      }
-
-      // Convert days to hours and calculate total hours
-      const totalHours = days * 8 + hours;
-
-      // Format as "HH:MM:SS"
-      return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(
-        2,
-        "0"
-      )}:${String(seconds).padStart(2, "0")}`;
     }
-    return null; // If timeValue is null/undefined, return null
-  };
+
+    const hours = parseInt(timeMatch[2] || "0", 10);
+    const minutes = parseInt(timeMatch[4] || "0", 10);
+    const seconds = parseInt(timeMatch[6] || "0", 10);
+
+    // Validate value ranges
+    if (
+      hours < 0 ||
+      minutes < 0 || minutes > 60 ||
+      seconds < 0 || seconds >= 60
+    ) {
+      return errorResponse(
+        res,
+        null,
+        `Invalid time values in ${fieldName}.`,
+        400
+      );
+    }
+
+    // Calculate total time in seconds
+    const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+
+    if (totalSeconds < 3600) {
+      return errorResponse(
+        res,
+        null,
+        `Total time in ${fieldName} must be at least 1 hour.`,
+        400
+      );
+    }
+
+    if (totalSeconds > 43200) {
+      return errorResponse(
+        res,
+        null,
+        `Total time in ${fieldName} must not exceed 12 hours.`,
+        400
+      );
+    }
+
+    // Format as HH:MM:SS
+    const totalHours = Math.floor(totalSeconds / 3600);
+    const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
+    const totalRemSeconds = totalSeconds % 60;
+
+    return `${String(totalHours).padStart(2, "0")}:${String(
+      totalMinutes
+    ).padStart(2, "0")}:${String(totalRemSeconds).padStart(2, "0")}`;
+  }
+
+  return null; // If no timeValue provided
+};
+
 
   // Apply the function to time, pmtime, and tltime
   payload.time = formatTime(time, "time");
@@ -818,7 +853,23 @@ exports.updateOt = async (id, payload, res) => {
         404
       );
     }
+    const userQuery = `
+        SELECT id,team_id,role_id 
+        FROM users 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+  const [userResult] = await db.query(userQuery, [user_id]);
 
+  if (userResult.length === 0) {
+    return errorResponse(
+      res,
+      "User not found or deleted",
+      "Error creating OT",
+      404
+    );
+  }
+  const { role_id } = userResult[0];
+if (role_id == 4) {
     const taskQuery = `
         SELECT id 
         FROM tasks 
@@ -834,22 +885,7 @@ exports.updateOt = async (id, payload, res) => {
         404
       );
     }
-
-    const userQuery = `
-        SELECT id 
-        FROM users 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
-    const [userResult] = await db.query(userQuery, [user_id]);
-
-    if (userResult.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error updating OT",
-        404
-      );
-    }
+  }
 
     const updateQuery = `
         UPDATE ot_details 
@@ -1534,13 +1570,12 @@ const addTimes = (time1, time2) => {
 
 // Approve or reject OT
 exports.approve_reject_ot = async (payload, res, req) => {
-  const { status, role } = payload;
+  const { status, role, user_id } = payload;
 
   const accessToken = req.headers.authorization?.split(' ')[1];
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
         const updated_by = await getUserIdFromAccessToken(accessToken);
 
   try {
@@ -2221,7 +2256,7 @@ exports.getOtReportData = async (queryParams, res) => {
 };
 
 // Update OT
-exports.approve_reject_updateOt = async (id, payload, res) => {
+exports.approve_reject_updateOt = async (req,id, payload, res) => {
   const {
     date,
     time,
@@ -2229,8 +2264,8 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
     pmtime,
     project_id,
     task_id,
+    user_id,
     comments,
-    updated_by,
     approve_reject_flag,
     role,
   } = payload;
@@ -2239,7 +2274,7 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
             if (!accessToken) {
                 return errorResponse(res, 'Access token is required', 401);
             }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+        const updated_by = await getUserIdFromAccessToken(accessToken);
 
   if (!approve_reject_flag || ![1, 2].includes(Number(approve_reject_flag))) {
     return errorResponse(
@@ -2282,53 +2317,49 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
     );
   }
 
-  const formatTime = (timeValue, fieldName) => {
-    if (timeValue) {
-      const timeMatch = timeValue.match(
-        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+const formatTime = (timeValue, fieldName) => {
+  if (timeValue) {
+    const timeMatch = timeValue.match(
+      /^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+    );
+
+    if (!timeMatch) {
+      return errorResponse(
+        res,
+        null,
+        `Invalid format for ${fieldName}. Use formats like "2h 30m", "45m 15s", or "1h".`,
+        400
       );
-
-      if (!timeMatch) {
-        return errorResponse(
-          res,
-          null,
-          `Invalid format for ${fieldName}. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".`,
-          400
-        );
-      }
-
-      const days = parseInt(timeMatch[2] || "0", 10);
-      const hours = parseInt(timeMatch[4] || "0", 10);
-      const minutes = parseInt(timeMatch[6] || "0", 10);
-      const seconds = parseInt(timeMatch[8] || "0", 10);
-
-      if (
-        days < 0 ||
-        hours < 0 ||
-        minutes < 0 ||
-        seconds < 0 ||
-        minutes >= 60 ||
-        seconds >= 60
-      ) {
-        return errorResponse(
-          res,
-          null,
-          `Invalid time values in ${fieldName}`,
-          400
-        );
-      }
-
-      // Convert days to hours and calculate total hours
-      const totalHours = days * 8 + hours;
-
-      // Format as "HH:MM:SS"
-      return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(
-        2,
-        "0"
-      )}:${String(seconds).padStart(2, "0")}`;
     }
-    return null; // If timeValue is null/undefined, return null
-  };
+
+    const hours = parseInt(timeMatch[2] || "0", 10);
+    const minutes = parseInt(timeMatch[4] || "0", 10);
+    const seconds = parseInt(timeMatch[6] || "0", 10);
+
+    if (
+      hours < 0 ||
+      minutes < 0 ||
+      seconds < 0 ||
+      minutes >= 60 ||
+      seconds >= 60
+    ) {
+      return errorResponse(
+        res,
+        null,
+        `Invalid time values in ${fieldName}`,
+        400
+      );
+    }
+
+    // Format as "HH:MM:SS"
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return null; // If timeValue is null/undefined, return null
+};
 
   // Apply the function to time, pmtime, and tltime
   payload.time = formatTime(time, "time");
@@ -2384,6 +2415,23 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
         404
       );
     }
+    const userQuery = `
+        SELECT id,team_id,role_id 
+        FROM users 
+        WHERE deleted_at IS NULL AND id = ?
+      `;
+  const [userResult] = await db.query(userQuery, [user_id]);
+
+  if (userResult.length === 0) {
+    return errorResponse(
+      res,
+      "User not found or deleted",
+      "Error creating OT",
+      404
+    );
+  }
+  const { role_id } = userResult[0];
+if (role_id == 4) {
 
     const taskQuery = `
         SELECT id 
@@ -2400,22 +2448,7 @@ exports.approve_reject_updateOt = async (id, payload, res) => {
         404
       );
     }
-
-    const userQuery = `
-        SELECT id 
-        FROM users 
-        WHERE deleted_at IS NULL AND id = ?
-      `;
-    const [userResult] = await db.query(userQuery, [user_id]);
-
-    if (userResult.length === 0) {
-      return errorResponse(
-        res,
-        "User not found or deleted",
-        "Error updating OT",
-        404
-      );
-    }
+  }
 
     let statusColumn = "";
     if (role === "tl") {
