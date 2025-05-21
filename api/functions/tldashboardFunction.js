@@ -519,7 +519,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
     const [absentEmployees] = await db.query(
       `SELECT user_id FROM employee_leave 
        WHERE date = ? 
-       AND user_id IN (SELECT id FROM users WHERE team_id IN (?) AND role_id != 3 AND deleted_at IS NULL) 
+       AND user_id IN (SELECT id FROM users WHERE team_id IN (?) AND role_id NOT IN (1, 2, 3) AND deleted_at IS NULL) 
        AND deleted_at IS NULL`,
       [today, teamIds]
     );
@@ -533,7 +533,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
       `SELECT COUNT(*) as total_count 
        FROM users 
        WHERE deleted_at IS NULL 
-       AND role_id != 3 
+       AND role_id NOT IN (1, 2, 3) 
        AND team_id IN (?) ${absentEmployeeCondition}`,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
@@ -550,7 +550,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
        WHERE deleted_at IS NULL 
        AND team_id IN (?) 
        AND status NOT IN (2, 3) 
-       AND user_id IN (SELECT id FROM users WHERE role_id != 3) ${absentEmployeeCondition}`,
+       AND user_id IN (SELECT id FROM users WHERE role_id NOT IN (1, 2, 3)) ${absentEmployeeCondition}`,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );
 
@@ -586,7 +586,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
         `SELECT id, role_id, designation_id, 
                 COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name 
          FROM users 
-         WHERE id IN (?) AND role_id != 3 
+         WHERE id IN (?) AND role_id NOT IN (1, 2, 3) 
          AND team_id IN (?) ${absentEmployeeCondition} 
          AND deleted_at IS NULL`,
         absentEmployeeIds.length > 0
@@ -610,7 +610,7 @@ exports.fetchTLresourceallotment = async (req, res) => {
               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS employee_name 
        FROM users 
        WHERE deleted_at IS NULL 
-       AND role_id != 3 
+       AND role_id NOT IN (1, 2, 3) 
        AND team_id IN (?) ${absentEmployeeCondition}`,
       absentEmployeeIds.length > 0 ? [teamIds, absentEmployeeIds] : [teamIds]
     );

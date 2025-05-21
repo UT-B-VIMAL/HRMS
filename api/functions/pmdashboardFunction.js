@@ -177,22 +177,33 @@ exports.fetchUtilization = async (req, res) => {
 
     // Step 2: Get working employees grouped by team, including team name
     const workingEmployeesQuery = `
-      SELECT 
-        u.id AS user_id,
-        COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
-        u.employee_id AS employee_id,
-        u.team_id AS team_id,
-        t.name AS team_name
-      FROM (
-        SELECT DISTINCT user_id FROM sub_tasks_user_timeline
-        WHERE DATE(start_time) = CURDATE()
-      ) stut
-      JOIN users u ON stut.user_id = u.id
-      JOIN teams t ON u.team_id = t.id
-      WHERE u.deleted_at IS NULL 
-        AND t.deleted_at IS NULL
-        ${team_id ? "AND t.id = ?" : ""}
-    `;
+  SELECT 
+    u.id AS user_id,
+    COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name,
+    u.employee_id AS employee_id,
+    u.team_id AS team_id,
+    t.name AS team_name
+  FROM (
+    SELECT user_id, MIN(start_time) AS start_time
+    FROM sub_tasks_user_timeline
+    WHERE DATE(start_time) = CURDATE()
+    GROUP BY user_id
+  ) stut
+  JOIN users u ON stut.user_id = u.id
+  JOIN teams t ON u.team_id = t.id
+  LEFT JOIN employee_leave el 
+    ON el.user_id = u.id 
+    AND DATE(el.date) = CURDATE()
+  WHERE u.deleted_at IS NULL 
+    AND t.deleted_at IS NULL
+    ${team_id ? "AND t.id = ?" : ""}
+    AND (
+      el.id IS NULL
+      OR (el.day_type = 2 AND el.half_type = 1 AND HOUR(CONVERT_TZ(stut.start_time, '+00:00', '+05:30')) >= 12)
+      OR (el.day_type = 2 AND el.half_type = 2 AND HOUR(CONVERT_TZ(stut.start_time, '+00:00', '+05:30')) < 12)
+    )
+`;
+
 
     const [workingEmployeesData] = await db.query(
       workingEmployeesQuery,
