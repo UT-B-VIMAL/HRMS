@@ -2319,14 +2319,15 @@ exports.approve_reject_updateOt = async (req,id, payload, res) => {
 
 const formatTime = (timeValue, fieldName) => {
   if (timeValue) {
-    // Only match h, m, s (no d)
-    const timeMatch = timeValue.match(/^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
+    const timeMatch = timeValue.match(
+      /^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+    );
 
     if (!timeMatch) {
       return errorResponse(
         res,
         null,
-        `Invalid format for ${fieldName}. Use formats like "1h 30m", "45m", or "2h 10s". Days (d) not allowed.`,
+        `Invalid format for ${fieldName}. Use formats like "2h 30m", "45m 15s", or "1h".`,
         400
       );
     }
@@ -2335,52 +2336,29 @@ const formatTime = (timeValue, fieldName) => {
     const minutes = parseInt(timeMatch[4] || "0", 10);
     const seconds = parseInt(timeMatch[6] || "0", 10);
 
-    // Validate value ranges
     if (
       hours < 0 ||
-      minutes < 0 || minutes > 60 ||
-      seconds < 0 || seconds >= 60
+      minutes < 0 ||
+      seconds < 0 ||
+      minutes >= 60 ||
+      seconds >= 60
     ) {
       return errorResponse(
         res,
         null,
-        `Invalid time values in ${fieldName}.`,
+        `Invalid time values in ${fieldName}`,
         400
       );
     }
 
-    // Calculate total time in seconds
-    const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-
-    if (totalSeconds < 3600) {
-      return errorResponse(
-        res,
-        null,
-        `Total time in ${fieldName} must be at least 1 hour.`,
-        400
-      );
-    }
-
-    if (totalSeconds > 43200) {
-      return errorResponse(
-        res,
-        null,
-        `Total time in ${fieldName} must not exceed 12 hours.`,
-        400
-      );
-    }
-
-    // Format as HH:MM:SS
-    const totalHours = Math.floor(totalSeconds / 3600);
-    const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
-    const totalRemSeconds = totalSeconds % 60;
-
-    return `${String(totalHours).padStart(2, "0")}:${String(
-      totalMinutes
-    ).padStart(2, "0")}:${String(totalRemSeconds).padStart(2, "0")}`;
+    // Format as "HH:MM:SS"
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(2, "0")}`;
   }
 
-  return null; // If no timeValue provided
+  return null; // If timeValue is null/undefined, return null
 };
 
   // Apply the function to time, pmtime, and tltime
