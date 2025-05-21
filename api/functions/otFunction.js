@@ -82,43 +82,44 @@ exports.createOt = async (payload, res, req) => {
   }
 
   if (time) {
-    const timeMatch = time.match(
-      /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+  // Updated regex: Only allow h, m, s (no d)
+  const timeMatch = time.match(
+    /^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+  );
+
+  if (!timeMatch) {
+    return errorResponse(
+      res,
+      null,
+      'Invalid format for time. Use formats like "2h 30m", "1h", or "4h 15m 10s". Days are not allowed.',
+      400
     );
-
-    if (!timeMatch) {
-      return errorResponse(
-        res,
-        null,
-        'Invalid format for time. Use formats like "1d 2h 30m 30s", "2h 30m", or "45m 15s".',
-        400
-      );
-    }
-
-    const days = parseInt(timeMatch[2] || "0", 10);
-    const hours = parseInt(timeMatch[4] || "0", 10);
-    const minutes = parseInt(timeMatch[6] || "0", 10);
-    const seconds = parseInt(timeMatch[8] || "0", 10);
-
-    if (
-      days < 0 ||
-      hours < 0 ||
-      minutes < 0 ||
-      seconds < 0 ||
-      minutes >= 60 ||
-      seconds >= 60
-    ) {
-      return errorResponse(res, null, "Invalid time values in time", 400);
-    }
-
-    // Convert days to hours and calculate total hours
-    const totalHours = days * 8 + hours;
-
-    // Format as "HH:MM:SS"
-    payload.time = `${String(totalHours).padStart(2, "0")}:${String(
-      minutes
-    ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
+
+  const hours = parseInt(timeMatch[2] || "0", 10);
+  const minutes = parseInt(timeMatch[4] || "0", 10);
+  const seconds = parseInt(timeMatch[6] || "0", 10);
+
+  if (
+    hours < 0 ||
+    minutes < 0 ||
+    seconds < 0 ||
+    minutes >= 60 ||
+    seconds >= 60
+  ) {
+    return errorResponse(res, null, "Invalid time values in time", 400);
+  }
+
+  if (hours < 1 || hours > 12) {
+    return errorResponse(res, null, "Hours must be between 1 and 12", 400);
+  }
+
+  // Format as "HH:MM:SS"
+  payload.time = `${String(hours).padStart(2, "0")}:${String(
+    minutes
+  ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 
   try {
     const projectQuery = `
