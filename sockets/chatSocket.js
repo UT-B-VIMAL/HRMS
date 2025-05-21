@@ -107,7 +107,7 @@ module.exports = (io) => {
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
           VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-          [ticket_id, sender_id, receiver_id, comments, datetime, datetime]
+          [ticket_id, sender_id, receiver_id, datetime, datetime, datetime]
         );
 
         console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
