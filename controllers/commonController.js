@@ -1,4 +1,5 @@
-const { 
+const server = globalThis.server;
+ const { 
     getAllData,
     getticketCount
   } = require('../api/functions/commonFunction');
