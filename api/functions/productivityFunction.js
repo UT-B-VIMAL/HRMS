@@ -30,7 +30,7 @@ function convertSecondsToReadableTime(totalSeconds) {
   const days = Math.floor(absSeconds / secondsInDay);
   const hours = Math.floor((absSeconds % secondsInDay) / 3600);
   const minutes = Math.floor((absSeconds % 3600) / 60);
-  const seconds = absSeconds % 60;
+  const seconds = Math.floor(absSeconds % 60); // 🔧 Fix: floor the seconds
 
   const timeString = `${
     days > 0 ? days + "d " : ""
@@ -38,6 +38,7 @@ function convertSecondsToReadableTime(totalSeconds) {
 
   return isNegative ? `-${timeString}` : timeString;
 }
+
 
 // exports.getTeamwiseProductivity = async (req, res) => {
 //   try {
