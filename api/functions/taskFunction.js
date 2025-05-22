@@ -546,7 +546,8 @@ exports.getTask = async (queryParams, res, req) => {
                 .tz("Asia/Kolkata")
                 .format("YYYY-MM-DD HH:mm:ss"),
               time_utc: history.updated_at,
-              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow()
+              time: moment(history.updated_at).fromNow(),
+              time1: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow()
             }))
           )
         : [];
@@ -565,7 +566,7 @@ exports.getTask = async (queryParams, res, req) => {
               .tz("Asia/Kolkata")
               .format("YYYY-MM-DD HH:mm:ss"),
             time_utc: comment.updated_at,
-            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow()
+            time: moment(comment.updated_at).fromNow()
           }))
         : [];
 
