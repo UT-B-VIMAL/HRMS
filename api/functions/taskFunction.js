@@ -426,13 +426,15 @@ exports.getTask = async (queryParams, res, req) => {
 
     // // Comments query
     const commentsQuery = `
-      SELECT c.*,  COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
-      FROM task_comments c
-      LEFT JOIN users u ON c.updated_by = u.id
-      WHERE c.task_id = ? AND c.subtask_id IS NULL
-      AND c.deleted_at IS NULL
-      ORDER BY c.id DESC;
-    `;
+  SELECT 
+    c.*,  
+    COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
+  FROM task_comments c
+  LEFT JOIN users u ON c.updated_by = u.id
+  WHERE c.task_id = ? AND c.subtask_id IS NULL
+    AND c.deleted_at IS NULL
+  ORDER BY c.id DESC;
+`;
 
     const comments = await db.query(commentsQuery, [id]);
 
@@ -542,7 +544,8 @@ exports.getTask = async (queryParams, res, req) => {
                 .tz("Asia/Kolkata")
                 .format("YYYY-MM-DD HH:mm:ss"),
               time_utc: history.updated_at,
-              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+              time: moment(history.updated_at).fromNow(),
+              time1: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow()
             }))
           )
         : [];
@@ -561,7 +564,7 @@ exports.getTask = async (queryParams, res, req) => {
               .tz("Asia/Kolkata")
               .format("YYYY-MM-DD HH:mm:ss"),
             time_utc: comment.updated_at,
-            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+            time: moment(comment.updated_at).fromNow()
           }))
         : [];
 
