@@ -793,15 +793,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
     const dataParams = [...dateParams, ...params, perPage, offset];
     const [rows] = await db.query(dataQuery, dataParams);
 
-    const totalPages = Math.ceil(totalUsers / perPage);
-    const pagination = {
-      total: totalUsers,
-      perPage,
-      currentPage,
-      totalPages,
-      hasNextPage: currentPage < totalPages,
-      hasPrevPage: currentPage > 1,
-    };
+      const pagination = getPagination(currentPage, perPage, totalUsers);
 
     // Return seconds directly, your existing helper can convert on frontend/backend
     const data = rows.map((item, index) => ({
