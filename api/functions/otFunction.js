@@ -1371,6 +1371,10 @@ exports.getAllpmemployeeOts = async (req, res) => {
       }
     }
 
+    if(currentRoleId === 2){
+      otConditions.push("u.role_id != 1");
+    }
+
     // Add deleted_at filter with AND or WHERE correctly
     const otWhereClause =
       otConditions.length > 0
