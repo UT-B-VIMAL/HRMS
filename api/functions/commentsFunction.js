@@ -125,8 +125,15 @@ exports.addComments = async (payload, res) => {
   }
 };
 
-exports.updateComments = async (id, payload, res) => {
-  const { comments, user_id, updated_by } = payload;
+exports.updateComments = async (id, payload, res,req) => {
+  const { comments,  updated_by } = payload;
+
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (user_id) {
       const [user] = await db.query(
@@ -232,8 +239,14 @@ exports.updateComments = async (id, payload, res) => {
   }
 };
 
-exports.deleteComments = async (id, payload, res) => {
-  const  {user_id, updated_by} = payload;
+exports.deleteComments = async (id, payload, res,req) => {
+  const  { updated_by} = payload;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (user_id) {
       const [user] = await db.query(
