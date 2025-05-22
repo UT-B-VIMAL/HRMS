@@ -62,7 +62,9 @@ exports.fetchAttendance = async (req, res) => {
     const [absentEmployees] = await db.query(
       `
         SELECT e.user_id AS employee_id, u.employee_id AS employeeId,role_id ,designation_id,
-               COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name
+               COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name,
+               e.day_type,
+              e.half_type
         FROM employee_leave e
         JOIN users u ON e.user_id = u.id
         WHERE DATE(e.date) = ?
@@ -89,7 +91,9 @@ exports.fetchAttendance = async (req, res) => {
     const [presentEmployees] = await db.query(
       `
         SELECT id AS user_id,employee_id AS employeeId, role_id ,designation_id,
-               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name
+               COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name,
+               NULL AS day_type,
+              NULL AS half_type
         FROM users
         WHERE team_id IN (?) 
           AND deleted_at IS NULL
@@ -111,6 +115,8 @@ exports.fetchAttendance = async (req, res) => {
         role_id: emp.role_id,
         designation_id: emp.designation_id,
         status: "Absent",
+        day_type: emp.day_type,
+        half_type: emp.half_type,
       })),
       ...presentEmployees.map((emp) => ({
         employee_id: emp.employeeId,
@@ -119,6 +125,8 @@ exports.fetchAttendance = async (req, res) => {
         role_id: emp.role_id,
         designation_id: emp.designation_id,
         status: "Present",
+        day_type: emp.day_type,
+        half_type: emp.half_type,
       })),
     ];
 
