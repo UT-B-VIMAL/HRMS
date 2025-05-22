@@ -512,60 +512,60 @@ exports.getTask = async (queryParams, res, req) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-            subtask_id: subtask.id,
-            owner_id: subtask.user_id || "",
-            name: subtask.name || "",
-            status: subtask.status,
-            active_status: subtask.active_status,
-            reopen_status: subtask.reopen_status,
-            assignee: subtask.user_id,
-            assigneename: subtask.assignee_name || "",
-            short_name: (subtask.assignee_name || "").substr(0, 2),
-            // status_text: statusMap[subtask.status] || "Unknown",
-            status_text: commonStatusGroup(
-              subtask.status,
-              subtask.reopen_status,
-              subtask.active_status
-            ),
-          }))
+          subtask_id: subtask.id,
+          owner_id: subtask.user_id || "",
+          name: subtask.name || "",
+          status: subtask.status,
+          active_status: subtask.active_status,
+          reopen_status: subtask.reopen_status,
+          assignee: subtask.user_id,
+          assigneename: subtask.assignee_name || "",
+          short_name: (subtask.assignee_name || "").substr(0, 2),
+          // status_text: statusMap[subtask.status] || "Unknown",
+          status_text: commonStatusGroup(
+            subtask.status,
+            subtask.reopen_status,
+            subtask.active_status
+          ),
+        }))
         : [];
 
     const historiesData =
       Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
-            histories[0].map(async (history) => ({
-              old_data: history.old_data,
-              new_data: history.new_data,
-              description: history.status_description || "Changed the status",
-              updated_by: history.updated_by,
-              shortName: history.short_name,
-              time_date: moment
-                .utc(history.updated_at)
-                .tz("Asia/Kolkata")
-                .format("YYYY-MM-DD HH:mm:ss"),
-              time_utc: history.updated_at,
-              time: moment(history.updated_at).fromNow(),
-              time1: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow()
-            }))
-          )
+          histories[0].map(async (history) => ({
+            old_data: history.old_data,
+            new_data: history.new_data,
+            description: history.status_description || "Changed the status",
+            updated_by: history.updated_by,
+            shortName: history.short_name,
+            time_date: moment
+              .utc(history.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: history.updated_at,
+            time: moment(history.updated_at).fromNow(),
+            time1: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow()
+          }))
+        )
         : [];
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-            comment_id: comment.id,
-            comments: comment.comments,
-            user_id: comment.user_id,
-            is_edited: comment.is_edited,
-            updated_by: comment.updated_by || "",
-            shortName: comment.updated_by.substr(0, 2),
-            time_date: moment
-              .utc(comment.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: comment.updated_at,
-            time: moment(comment.updated_at).fromNow()
-          }))
+          comment_id: comment.id,
+          comments: comment.comments,
+          user_id: comment.user_id,
+          is_edited: comment.is_edited,
+          updated_by: comment.updated_by || "",
+          shortName: comment.updated_by.substr(0, 2),
+          time_date: moment
+            .utc(comment.updated_at)
+            .tz("Asia/Kolkata")
+            .format("YYYY-MM-DD HH:mm:ss"),
+          time_utc: comment.updated_at,
+          time: moment(comment.updated_at).fromNow()
+        }))
         : [];
 
     // Final response
@@ -1415,8 +1415,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-    .join(", ")}
+          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+          .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -1630,8 +1630,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-      ? true
-      : false;
+        ? true
+        : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -2089,9 +2089,15 @@ exports.getTaskList = async (queryParams, res) => {
 
           const searchMatch = !isSearching
             ? true
-            : [st.subtask_name, st.subtask_user_name].some((f) =>
-                f?.toLowerCase().includes(search)
-              );
+            : [
+              st.subtask_name,
+              st.subtask_user_name,
+              task.task_name,
+              task.product_name,
+              task.project_name,
+              task.team_name,
+            ].some((f) => f?.toLowerCase().includes(search));
+
 
           const priorityMatch = priorityFilter
             ? st.priority === priorityFilter
@@ -2148,12 +2154,12 @@ exports.getTaskList = async (queryParams, res) => {
         const searchMatch = !isSearching
           ? true
           : [
-              task.product_name,
-              task.project_name,
-              task.task_name,
-              task.team_name,
-              task.assignee_name,
-            ].some((f) => f?.toLowerCase().includes(search));
+            task.product_name,
+            task.project_name,
+            task.task_name,
+            task.team_name,
+            task.assignee_name,
+          ].some((f) => f?.toLowerCase().includes(search));
 
         const priorityMatch = priorityFilter
           ? task.priority === priorityFilter

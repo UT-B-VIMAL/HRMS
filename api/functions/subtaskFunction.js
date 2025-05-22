@@ -592,8 +592,8 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       payload.team_id = assignee[0].team_id;
 
       const notificationPayload = {
-        title: "New Task Assigned",
-        body: "A new task has been assigned to you. Check your dashboard for details.",
+        title: "New SubTask Assigned",
+        body: "A new subtask has been assigned to you. Check your dashboard for details.",
       };
       const socketIds = userSockets[user_id];
       if (Array.isArray(socketIds)) {

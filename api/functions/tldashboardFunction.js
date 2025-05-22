@@ -14,32 +14,29 @@ exports.fetchAttendance = async (req, res) => {
     cutoffTime.setHours(13, 30, 0, 0); // 1:30 PM cutoff
     const today = new Date().toISOString().split("T")[0];
     const { employee_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
 
+    const accessToken = req.headers.authorization?.split(' ')[1];
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
 
-    // Check if the user exists
     const [userCheck] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
-
     if (userCheck.length === 0) {
       return errorResponse(res, null, "User Not Found", 400);
     }
 
-    // Fetch teams for the reporting user
     const [teamResult] = await db.query(
       "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
       [user_id]
     );
-
     if (teamResult.length === 0) {
       return errorResponse(
         res,
@@ -51,58 +48,71 @@ exports.fetchAttendance = async (req, res) => {
 
     const teamIds = teamResult.map((team) => team.id);
 
-    // Get total team strength
     const [totalStrengthResult] = await db.query(
       "SELECT COUNT(*) AS total_strength FROM users WHERE team_id IN (?) AND role_id = 4 AND deleted_at IS NULL",
       [teamIds]
     );
     const totalStrength = totalStrengthResult[0]?.total_strength || 0;
 
-    // Fetch absent employees
-    const [absentEmployees] = await db.query(
+    // Fetch today's leave records
+    const [leaveRecords] = await db.query(
       `
-        SELECT e.user_id AS employee_id, u.employee_id AS employeeId,role_id ,designation_id,
+        SELECT e.user_id AS employee_id, u.employee_id AS employeeId, u.role_id, u.designation_id,
                COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS full_name,
-               e.day_type,
-              e.half_type
+               e.day_type, e.half_type
         FROM employee_leave e
         JOIN users u ON e.user_id = u.id
         WHERE DATE(e.date) = ?
-          AND (
-            e.day_type = 1
-            OR (e.day_type = 2 AND e.half_type = 1 AND ? < ?)
-          )
           AND u.team_id IN (?)
           AND u.deleted_at IS NULL
           AND u.role_id = 4
           AND e.deleted_at IS NULL
           ${employee_id ? "AND u.employee_id = ?" : ""}
       `,
-      employee_id
-        ? [today, currentTime, cutoffTime, teamIds, employee_id]
-        : [today, currentTime, cutoffTime, teamIds]
+      employee_id ? [today, teamIds, employee_id] : [today, teamIds]
     );
 
-    const absentEmployeeIds = absentEmployees.map((emp) => emp.employee_id);
-    const absentEmployeeIdsCondition =
-      absentEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
+    const absentEmployees = [];
+    const leaveEmployeeIds = [];
 
-    // Fetch present employees
+    for (const emp of leaveRecords) {
+      const { day_type, half_type } = emp;
+      let isAbsent = false;
+
+      if (day_type === 1) {
+        isAbsent = true;
+      } else if (day_type === 2) {
+        if (half_type === 1 && currentTime <= cutoffTime) {
+          isAbsent = true; // first half leave before 1:30
+        } else if (half_type === 2 && currentTime > cutoffTime) {
+          isAbsent = true; // second half leave after 1:30
+        }
+      }
+
+      if (isAbsent) {
+        absentEmployees.push(emp);
+        leaveEmployeeIds.push(emp.employee_id);
+      }
+    }
+
+    // Fetch present employees excluding absent ones
+    const leaveCondition = leaveEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
+
     const [presentEmployees] = await db.query(
       `
-        SELECT id AS user_id,employee_id AS employeeId, role_id ,designation_id,
+        SELECT id AS user_id, employee_id AS employeeId, role_id ,designation_id,
                COALESCE(CONCAT(first_name, ' ', last_name), first_name, last_name) AS full_name,
                NULL AS day_type,
-              NULL AS half_type
+               NULL AS half_type
         FROM users
         WHERE team_id IN (?) 
           AND deleted_at IS NULL
           AND role_id = 4
-          ${absentEmployeeIdsCondition}
+          ${leaveCondition}
           ${employee_id ? "AND employee_id = ?" : ""}
       `,
-      absentEmployeeIds.length > 0
-        ? [teamIds, absentEmployeeIds, employee_id || []]
+      leaveEmployeeIds.length > 0
+        ? [teamIds, leaveEmployeeIds, employee_id || []]
         : [teamIds, employee_id || []]
     );
 
@@ -130,13 +140,12 @@ exports.fetchAttendance = async (req, res) => {
       })),
     ];
 
-    // Add initials to attendance data
+    // Add initials
     const attendanceWithInitials = attendanceList.map((employee) => {
       const nameParts = employee.full_name
         ? employee.full_name.split(" ").filter((part) => part.trim() !== "")
         : [];
-
-      let initials = "";
+      let initials = "NA";
 
       if (nameParts.length > 1) {
         initials =
@@ -144,8 +153,6 @@ exports.fetchAttendance = async (req, res) => {
           (nameParts[1][0]?.toUpperCase() || "");
       } else if (nameParts.length === 1) {
         initials = nameParts[0].slice(0, 2).toUpperCase();
-      } else {
-        initials = "NA";
       }
 
       return {
@@ -164,7 +171,6 @@ exports.fetchAttendance = async (req, res) => {
       ? Math.round((totalAbsentEmployees / totalStrength) * 100)
       : 0;
 
-    // Return the response
     return res.status(200).json({
       message: "Attendance data fetched successfully",
       data: {
@@ -184,6 +190,7 @@ exports.fetchAttendance = async (req, res) => {
     });
   }
 };
+
 
 exports.fetchTlrating = async (req, res) => {
   try {
