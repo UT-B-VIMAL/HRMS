@@ -740,7 +740,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
     if (from_date && to_date) {
       dateFilter = "AND DATE(utu.start_time) BETWEEN ? AND ?";
       params.push(from_date, to_date);
-    }else if (from_date) {
+    } else if (from_date) {
       dateFilter = "AND DATE(utu.start_time) = ?";
       params.push(from_date);
     }
@@ -757,9 +757,74 @@ exports.getTeamwiseProductivity = async (req, res) => {
       params.push(team_id);
     }
 
-    // Pagination
-    params.push(perPage, offset);
+    const dataParams = [...params, perPage, offset];
 
+    // COUNT query
+    const countSql = `
+      WITH TaskWork AS (
+        SELECT
+          utu.task_id,
+          utu.subtask_id,
+          utu.user_id,
+          SUM(TIMESTAMPDIFF(SECOND, utu.start_time, COALESCE(utu.end_time, NOW()))) AS user_worked_seconds
+        FROM sub_tasks_user_timeline utu
+        WHERE 1=1
+          ${dateFilter}
+        GROUP BY utu.task_id, utu.subtask_id, utu.user_id
+      ),
+      TaskTotals AS (
+        SELECT
+          task_id,
+          subtask_id,
+          SUM(user_worked_seconds) AS total_worked_seconds
+        FROM TaskWork
+        GROUP BY task_id, subtask_id
+      ),
+      EstimatedSubtaskTimes AS (
+        SELECT
+          st.id AS subtask_id,
+          TIME_TO_SEC(COALESCE(st.estimated_hours, '00:00:00')) AS estimated_seconds
+        FROM sub_tasks st
+      ),
+      EstimatedTaskTimes AS (
+        SELECT
+          t.id AS task_id,
+          TIME_TO_SEC(COALESCE(t.estimated_hours, '00:00:00')) AS estimated_seconds
+        FROM tasks t
+      ),
+      ExtendedWork AS (
+        SELECT
+          tw.user_id,
+          tw.task_id,
+          tw.subtask_id,
+          tw.user_worked_seconds,
+          tt.total_worked_seconds,
+          COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0) AS estimated_seconds,
+          CASE
+            WHEN COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0) = 0 THEN 0
+            WHEN tt.total_worked_seconds <= COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0) THEN 0
+            ELSE GREATEST(
+              tw.user_worked_seconds - (COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0) * tw.user_worked_seconds / tt.total_worked_seconds),
+              0
+            )
+          END AS user_extended_seconds
+        FROM TaskWork tw
+        JOIN TaskTotals tt ON tw.task_id = tt.task_id AND ((tw.subtask_id = tt.subtask_id) OR (tw.subtask_id IS NULL AND tt.subtask_id IS NULL))
+        LEFT JOIN EstimatedSubtaskTimes ets ON tw.subtask_id IS NOT NULL AND ets.subtask_id = tw.subtask_id
+        LEFT JOIN EstimatedTaskTimes ett ON tw.subtask_id IS NULL AND ett.task_id = tw.task_id
+      )
+      SELECT COUNT(DISTINCT u.id) AS total_users
+      FROM users u
+      LEFT JOIN ExtendedWork ew ON u.id = ew.user_id
+      WHERE u.deleted_at IS NULL
+        ${searchFilter}
+        ${teamFilter}
+    `;
+
+    const [countRows] = await db.query(countSql, params);
+    const totalUsers = countRows[0]?.total_users || 0;
+
+    // Data query
     const sql = `
       WITH TaskWork AS (
         SELECT
@@ -803,7 +868,10 @@ exports.getTeamwiseProductivity = async (req, res) => {
           CASE
             WHEN COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0) = 0 THEN 0
             WHEN tt.total_worked_seconds <= COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0) THEN 0
-            ELSE tw.user_worked_seconds - (tw.user_worked_seconds / tt.total_worked_seconds) * COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0)
+            ELSE GREATEST(
+              tw.user_worked_seconds - (COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0) * tw.user_worked_seconds / tt.total_worked_seconds),
+              0
+            )
           END AS user_extended_seconds
         FROM TaskWork tw
         JOIN TaskTotals tt ON tw.task_id = tt.task_id AND ((tw.subtask_id = tt.subtask_id) OR (tw.subtask_id IS NULL AND tt.subtask_id IS NULL))
@@ -814,7 +882,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
         u.id AS user_id,
         COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS employee_name,
         u.employee_id,
-         u.team_id,
+        u.team_id,
         COALESCE(SUM(COALESCE(ets.estimated_seconds, ett.estimated_seconds, 0)), 0) AS total_estimated_seconds,
         COALESCE(SUM(ew.user_worked_seconds), 0) AS total_worked_seconds,
         COALESCE(SUM(ew.user_extended_seconds), 0) AS total_extended_seconds
@@ -830,9 +898,8 @@ exports.getTeamwiseProductivity = async (req, res) => {
       LIMIT ? OFFSET ?
     `;
 
-    const [rows] = await db.query(sql, params);
+    const [rows] = await db.query(sql, dataParams);
 
-    const totalUsers = rows.length;
     const pagination = getPagination(currentPage, perPage, totalUsers);
 
     const data = rows.map((item, index) => ({
@@ -840,15 +907,9 @@ exports.getTeamwiseProductivity = async (req, res) => {
       employee_name: item.employee_name,
       employee_id: item.employee_id,
       team_id: item.team_id,
-      total_estimated_hours: convertSecondsToReadableTime(
-        item.total_estimated_seconds
-      ),
-      total_worked_hours: convertSecondsToReadableTime(
-        item.total_worked_seconds
-      ),
-      total_extended_hours: convertSecondsToReadableTime(
-        item.total_extended_seconds
-      ),
+      total_estimated_hours: convertSecondsToReadableTime(item.total_estimated_seconds),
+      total_worked_hours: convertSecondsToReadableTime(item.total_worked_seconds),
+      total_extended_hours: convertSecondsToReadableTime(item.total_extended_seconds),
       difference_hours: convertSecondsToReadableTime(
         item.total_worked_seconds - item.total_estimated_seconds
       ),
@@ -856,9 +917,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      message: data.length
-        ? "Productivity retrieved successfully"
-        : "No data found",
+      message: data.length ? "Productivity retrieved successfully" : "No data found",
       data,
       pagination,
     });
