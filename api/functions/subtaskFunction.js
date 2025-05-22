@@ -118,6 +118,7 @@ exports.getSubTask = async (id, res) => {
     // // Histories query
     const historiesQuery = `
     SELECT h.*, 
+    CONVERT_TZ(h.updated_at, '+00:00', '+05:30') AS updated_at,
  COALESCE(
     CASE 
         WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
@@ -143,7 +144,8 @@ ORDER BY h.id DESC;
 
     // // Comments query
     const commentsQuery = `
-      SELECT c.*, COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
+      SELECT c.*, COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,
+      CONVERT_TZ(c.updated_at, '+00:00', '+05:30') AS updated_at
       FROM task_comments c
       LEFT JOIN users u ON c.updated_by = u.id
       WHERE c.subtask_id = ? 
@@ -250,7 +252,7 @@ ORDER BY h.id DESC;
         .tz("Asia/Kolkata")
         .format("YYYY-MM-DD HH:mm:ss"),
       time_utc: comment.updated_at,
-      time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+       time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow()
     }));
 
     // Final response

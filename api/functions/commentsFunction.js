@@ -51,14 +51,7 @@ exports.addComments = async (payload, res) => {
     }
 
     const validSubtaskId = subtask_id || null;
-    const getISTTime = () => {
-      const now = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-      const istTime = new Date(now.getTime() + istOffset);
-      return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
-    };
 
-    const localISTTime = getISTTime();
 
     // Insert the new comment
     const insertCommentQuery = `
@@ -71,8 +64,7 @@ exports.addComments = async (payload, res) => {
       user_id,
       comments,
       updated_by,
-      localISTTime,
-      localISTTime,
+
     ];
 
     const [commentResult] = await db.query(insertCommentQuery, commentValues);
@@ -95,8 +87,7 @@ exports.addComments = async (payload, res) => {
       "Comment Added",
       updated_by,
       7,
-      localISTTime,
-      localISTTime, // Default flag for added comments
+
     ];
 
     const [historyResult] = await db.query(historyQuery, historyValues);
@@ -175,21 +166,14 @@ exports.updateComments = async (id, payload, res,req) => {
       );
     }
 
-    const getISTTime = () => {
-      const now = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-      const istTime = new Date(now.getTime() + istOffset);
-      return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
-    };
 
-    const localISTTime = getISTTime();
 
-    const query = `
+const query = `
   UPDATE task_comments
-  SET comments = ?, updated_by = ?, updated_at = ?,is_edited = 1
+  SET comments = ?, updated_by = ?, updated_at = NOW(), is_edited = 1
   WHERE id = ? AND deleted_at IS NULL
 `;
-    const values = [comments, updated_by, localISTTime, id];
+const values = [comments, updated_by, id]; 
 
     const [result] = await db.query(query, values);
 
