@@ -144,6 +144,7 @@ apiRouter.put(
   loginController.changePassword
 );
 apiRouter.post("/forgot_password", loginController.forgotPassword);
+apiRouter.post("/verifyOtp", loginController.verifyOtp);
 apiRouter.post("/reset_password", loginController.reset_password);
 apiRouter.post("/profile", profileController.createOrUpdateProfile);
 apiRouter.get("/profile/:id", profileController.getProfile);
