@@ -2318,24 +2318,29 @@ exports.approve_reject_updateOt = async (req,id, payload, res) => {
 
 const formatTime = (timeValue, fieldName) => {
   if (timeValue) {
-    // Match only h and m (no s)
-    const timeMatch = timeValue.match(/^((\d+)h\s*)?((\d+)m\s*)?$/);
+    const timeMatch = timeValue.match(
+      /^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+    );
 
     if (!timeMatch) {
       return errorResponse(
         res,
         null,
-        `Invalid format for ${fieldName}. Use formats like "2h 30m", "45m", or "1h". Seconds (s) are not allowed.`,
+        `Invalid format for ${fieldName}. Use formats like "2h 30m", "45m 15s", or "1h".`,
         400
       );
     }
 
     const hours = parseInt(timeMatch[2] || "0", 10);
     const minutes = parseInt(timeMatch[4] || "0", 10);
+    const seconds = parseInt(timeMatch[6] || "0", 10);
 
     if (
       hours < 0 ||
-      minutes < 0 || minutes >= 60
+      minutes < 0 ||
+      seconds < 0 ||
+      minutes >= 60 ||
+      seconds >= 60
     ) {
       return errorResponse(
         res,
@@ -2345,16 +2350,15 @@ const formatTime = (timeValue, fieldName) => {
       );
     }
 
-    // Format as "HH:MM:00" — seconds are always 00
+    // Format as "HH:MM:SS"
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
       2,
       "0"
-    )}:00`;
+    )}:${String(seconds).padStart(2, "0")}`;
   }
 
   return null; // If timeValue is null/undefined, return null
 };
-
 
   // Apply the function to time, pmtime, and tltime
   payload.time = formatTime(time, "time");
