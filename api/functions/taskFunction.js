@@ -20,7 +20,7 @@ const {
   checkUpdatePermission,
   commonStatusGroup,
   getColorForProduct,
-  getUserIdFromAccessToken
+  getUserIdFromAccessToken,
 } = require("../../api/functions/commonFunction");
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -255,9 +255,9 @@ exports.createTask = async (payload, res) => {
 exports.getTask = async (queryParams, res, req) => {
   try {
     const { id } = queryParams;
-    const accessToken = req.headers.authorization?.split(' ')[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
-      return errorResponse(res, 'Access token is required', 401);
+      return errorResponse(res, "Access token is required", 401);
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
@@ -301,8 +301,33 @@ exports.getTask = async (queryParams, res, req) => {
 
     // Role-based filtering
     if (userDetails.role_id === 3) {
-      taskQuery += ` AND t.team_id = ?`;
-      taskParams.push(userDetails.team_id);
+      const queryTeams = `
+    SELECT id FROM teams 
+    WHERE deleted_at IS NULL AND reporting_user_id = ?
+  `;
+      const [teamRows] = await db.query(queryTeams, [user_id]);
+
+      let teamIds = teamRows.map((row) => row.id);
+
+      // Also include the user's own team_id
+      if (userDetails.team_id) {
+        teamIds.push(userDetails.team_id);
+      }
+
+      if (teamIds.length > 0) {
+        // Use WHERE IN (...) clause correctly
+        const placeholders = teamIds.map(() => "?").join(",");
+        taskQuery += ` AND t.team_id IN (${placeholders})`;
+        taskParams.push(...teamIds);
+      } else {
+        // If no valid team IDs, prevent access
+        return errorResponse(
+          res,
+          "No accessible teams",
+          "This user does not have any team assigned or reporting teams",
+          403
+        );
+      }
     }
 
     const [task] = await db.query(taskQuery, taskParams);
@@ -323,15 +348,41 @@ exports.getTask = async (queryParams, res, req) => {
     let subtaskParams = [id];
 
     if (userDetails.role_id === 3) {
-      subtaskQuery += ` AND (
-    st.team_id = ? OR (
-      st.user_id IS NULL AND EXISTS (
-        SELECT 1 FROM tasks t
-        WHERE t.id = st.task_id AND t.team_id = ?
+      const queryTeams = `
+    SELECT id FROM teams 
+    WHERE deleted_at IS NULL AND reporting_user_id = ?
+  `;
+      const [teamRows] = await db.query(queryTeams, [user_id]);
+
+      let teamIds = teamRows.map((row) => row.id);
+
+      // Include the current user's own team
+      if (userDetails.team_id) {
+        teamIds.push(userDetails.team_id);
+      }
+
+      if (teamIds.length > 0) {
+        const placeholders = teamIds.map(() => "?").join(",");
+
+        subtaskQuery += ` AND (
+      st.team_id IN (${placeholders})
+      OR (
+        st.user_id IS NULL AND EXISTS (
+          SELECT 1 FROM tasks t
+          WHERE t.id = st.task_id AND t.team_id IN (${placeholders})
+        )
       )
-    )
-  )`;
-      subtaskParams.push(userDetails.team_id, userDetails.team_id);
+    )`;
+
+        subtaskParams.push(...teamIds, ...teamIds);
+      } else {
+        return errorResponse(
+          res,
+          "No accessible teams",
+          "This user does not have any team assigned or reporting teams",
+          403
+        );
+      }
     } else if (userDetails.role_id === 4) {
       // subtaskQuery += ` AND (st.user_id = ?)`;
       // subtaskParams.push(user_id);
@@ -459,59 +510,59 @@ exports.getTask = async (queryParams, res, req) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-          subtask_id: subtask.id,
-          owner_id: subtask.user_id || "",
-          name: subtask.name || "",
-          status: subtask.status,
-          active_status: subtask.active_status,
-          reopen_status: subtask.reopen_status,
-          assignee: subtask.user_id,
-          assigneename: subtask.assignee_name || "",
-          short_name: (subtask.assignee_name || "").substr(0, 2),
-          // status_text: statusMap[subtask.status] || "Unknown",
-          status_text: commonStatusGroup(
-            subtask.status,
-            subtask.reopen_status,
-            subtask.active_status
-          ),
-        }))
+            subtask_id: subtask.id,
+            owner_id: subtask.user_id || "",
+            name: subtask.name || "",
+            status: subtask.status,
+            active_status: subtask.active_status,
+            reopen_status: subtask.reopen_status,
+            assignee: subtask.user_id,
+            assigneename: subtask.assignee_name || "",
+            short_name: (subtask.assignee_name || "").substr(0, 2),
+            // status_text: statusMap[subtask.status] || "Unknown",
+            status_text: commonStatusGroup(
+              subtask.status,
+              subtask.reopen_status,
+              subtask.active_status
+            ),
+          }))
         : [];
 
     const historiesData =
       Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
-          histories[0].map(async (history) => ({
-            old_data: history.old_data,
-            new_data: history.new_data,
-            description: history.status_description || "Changed the status",
-            updated_by: history.updated_by,
-            shortName: history.short_name,
-            time_date: moment
-              .utc(history.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: history.updated_at,
-            time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
-          }))
-        )
+            histories[0].map(async (history) => ({
+              old_data: history.old_data,
+              new_data: history.new_data,
+              description: history.status_description || "Changed the status",
+              updated_by: history.updated_by,
+              shortName: history.short_name,
+              time_date: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .format("YYYY-MM-DD HH:mm:ss"),
+              time_utc: history.updated_at,
+              time: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow(),
+            }))
+          )
         : [];
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-          comment_id: comment.id,
-          comments: comment.comments,
-          user_id: comment.user_id,
-          is_edited: comment.is_edited,
-          updated_by: comment.updated_by || "",
-          shortName: comment.updated_by.substr(0, 2),
-          time_date: moment
-            .utc(comment.updated_at)
-            .tz("Asia/Kolkata")
-            .format("YYYY-MM-DD HH:mm:ss"),
-          time_utc: comment.updated_at,
-          time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
-        }))
+            comment_id: comment.id,
+            comments: comment.comments,
+            user_id: comment.user_id,
+            is_edited: comment.is_edited,
+            updated_by: comment.updated_by || "",
+            shortName: comment.updated_by.substr(0, 2),
+            time_date: moment
+              .utc(comment.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: comment.updated_at,
+            time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
+          }))
         : [];
 
     // Final response
@@ -1361,8 +1412,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-          .join(", ")}
+    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+    .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -1576,8 +1627,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-        ? true
-        : false;
+      ? true
+      : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -1863,7 +1914,6 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-
     if (role_id === 2) {
       baseQuery += `
           ORDER BY
@@ -1992,9 +2042,10 @@ exports.getTaskList = async (queryParams, res) => {
     // from your destructure:
     let search = (rawSearch || "").toLowerCase().trim();
     const isSearching = search !== "";
-    const teamIdFilter = team_id && team_id !== '' ? Number(team_id) : null;
-    const priorityFilter = priority && priority !== '' ? priority : null;
-    const memberIdFilter = member_id && member_id !== '' ? Number(member_id) : null;
+    const teamIdFilter = team_id && team_id !== "" ? Number(team_id) : null;
+    const priorityFilter = priority && priority !== "" ? priority : null;
+    const memberIdFilter =
+      member_id && member_id !== "" ? Number(member_id) : null;
 
     tasks.forEach((task) => {
       // basic task details
@@ -2022,22 +2073,25 @@ exports.getTaskList = async (queryParams, res) => {
       if (subtasks.length > 0) {
         //––– TASK HAS SUBTASKS: filter them by team, search, priority & member –––
         const matchedSubtasks = subtasks.filter((st) => {
-          const teamMatch = teamIdFilter !== null
-            ? Number(st.subtask_user_team_id) === teamIdFilter
-            : true;
+          const teamMatch =
+            teamIdFilter !== null
+              ? Number(st.subtask_user_team_id) === teamIdFilter
+              : true;
 
           const searchMatch = !isSearching
             ? true
-            : [st.subtask_name, st.subtask_user_name]
-              .some(f => f?.toLowerCase().includes(search));
+            : [st.subtask_name, st.subtask_user_name].some((f) =>
+                f?.toLowerCase().includes(search)
+              );
 
           const priorityMatch = priorityFilter
             ? st.priority === priorityFilter
             : true;
 
-          const memberMatch = memberIdFilter !== null
-            ? Number(st.assignee_id) === memberIdFilter
-            : true;
+          const memberMatch =
+            memberIdFilter !== null
+              ? Number(st.assignee_id) === memberIdFilter
+              : true;
 
           return teamMatch && searchMatch && priorityMatch && memberMatch;
         });
@@ -2046,7 +2100,11 @@ exports.getTaskList = async (queryParams, res) => {
 
         const groupedSubtasks = {};
         matchedSubtasks.forEach((st) => {
-          const grp = getStatusGroup(st.status, st.reopen_status, st.active_status);
+          const grp = getStatusGroup(
+            st.status,
+            st.reopen_status,
+            st.active_status
+          );
           if (!grp) return;
           if (!groupedSubtasks[grp]) groupedSubtasks[grp] = [];
           groupedSubtasks[grp].push({
@@ -2073,47 +2131,46 @@ exports.getTaskList = async (queryParams, res) => {
             subtask_details: groupedSubtasks[grp],
           });
         });
-
       } else {
         //––– TASK HAS NO SUBTASKS: check task’s own team, search, priority & member –––
-        const teamMatch = teamIdFilter !== null
-          ? Number(task.team_id) === teamIdFilter
-          : true;
+        const teamMatch =
+          teamIdFilter !== null ? Number(task.team_id) === teamIdFilter : true;
 
         const searchMatch = !isSearching
           ? true
           : [
-            task.product_name,
-            task.project_name,
-            task.task_name,
-            task.team_name,
-            task.assignee_name
-          ].some(f => f?.toLowerCase().includes(search));
+              task.product_name,
+              task.project_name,
+              task.task_name,
+              task.team_name,
+              task.assignee_name,
+            ].some((f) => f?.toLowerCase().includes(search));
 
         const priorityMatch = priorityFilter
           ? task.priority === priorityFilter
           : true;
 
-        const memberMatch = memberIdFilter !== null
-          ? Number(task.user_id) === memberIdFilter
-          : true;
+        const memberMatch =
+          memberIdFilter !== null
+            ? Number(task.user_id) === memberIdFilter
+            : true;
 
-        if (!teamMatch || !searchMatch || !priorityMatch || !memberMatch) return;
+        if (!teamMatch || !searchMatch || !priorityMatch || !memberMatch)
+          return;
 
-        const grp = getStatusGroup(task.task_status, task.reopen_status, task.active_status);
+        const grp = getStatusGroup(
+          task.task_status,
+          task.reopen_status,
+          task.active_status
+        );
         if (!grp) return;
 
         groups[grp].push({
           task_details: taskDetails,
-          subtask_details: [],  // no subtasks
+          subtask_details: [], // no subtasks
         });
       }
     });
-
-
-
-
-
 
     // Sort tasks within each group
     Object.keys(groups).forEach((groupKey) => {
@@ -3191,9 +3248,11 @@ exports.getWorkReportData = async (queryParams, res) => {
         let betweenDate = "";
         if (from_date === to_date) {
           betweenDate = moment(from_date).format("DD-MM-YYYY");
-        }
-        else {
-          betweenDate = moment(from_date).format("DD-MM-YYYY") + " to " + moment(to_date).format("DD-MM-YYYY");
+        } else {
+          betweenDate =
+            moment(from_date).format("DD-MM-YYYY") +
+            " to " +
+            moment(to_date).format("DD-MM-YYYY");
         }
         results.forEach((row) => {
           const userId = row.employee_id;
@@ -3235,10 +3294,10 @@ exports.getWorkReportData = async (queryParams, res) => {
           "S.No": index + 1,
           "Employee ID": user.employee_id,
           "Employee Name": user.name,
-          "Date": betweenDate,
-          "Project Name": Array.from(user.project_name).join(', '),
+          Date: betweenDate,
+          "Project Name": Array.from(user.project_name).join(", "),
           "In Progress": user.in_progress.join(", "),
-          "Completed": user.completed.join(", "),
+          Completed: user.completed.join(", "),
           "Total Hours Worked": formatSecondsToHHMMSS(user.total_seconds),
         }));
 
