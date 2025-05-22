@@ -547,14 +547,14 @@ exports.getUserIdFromAccessToken = async (accessToken) => {
 
 
 const productColors = [
-    { fill: '#352542', stroke: '#492E62', text: '#9B51E0' },
-    { fill: '#2B4740', stroke: '#376B5E', text: '#6AF9D7' },
-    { fill: '#423B1E', stroke: '#615521', text: '#DCC02E' },
-    { fill: '#183F29', stroke: '#155C35', text: '#DCC02E' },
-    { fill: '#49291B', stroke: '#6D351C', text: '#FF631F' },
-    { fill: '#491B32', stroke: '#6D1C45', text: '#FF1F93' },
-    { fill: '#1C2148', stroke: '#1C266D', text: '#1F3DFF' },
-    { fill: '#491B46', stroke: '#6D1C69', text: '#FF1FF4' },
+  { fill: '#3B2B1A', stroke: '#7A5A38', text: '#FFA25B' },
+  { fill: '#412D52', stroke: '#7541A6', text: '#C586FF' },
+  { fill: '#49291B', stroke: '#6D351C', text: '#FF631F' },
+  { fill: '#1E2A3A', stroke: '#486892', text: '#4AA8FF' },
+  { fill: '#183F29', stroke: '#155C35', text: '#0CD464' },
+  { fill: '#423B1E', stroke: '#615521', text: '#DCC02E' },
+  { fill: '#2B4740', stroke: '#376B5E', text: '#6AF9D7' },
+  { fill: '#491B46', stroke: '#6D1C69', text: '#FF1FF4' },
 ];
 
 const assignedColors = new Map();

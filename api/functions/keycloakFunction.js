@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const moment = require('moment');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+require('dotenv').config();
 
 async function getAdminToken() {
   try {
@@ -150,41 +151,132 @@ async function forgotPassword(email, res) {
 
     const currentUser = user[0];
 
-    const resetToken = crypto.randomBytes(20).toString('hex');
-    const resetTokenExpiry = moment().add(1, 'hour').format('YYYY-MM-DD HH:mm:ss');
-    const updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?";
-    await db.query(updateQuery, [resetToken, resetTokenExpiry, currentUser.id]);
+    // Generate 4-digit OTP
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    const otpExpiry = moment().add(10, 'minutes').format('YYYY-MM-DD HH:mm:ss');
 
+    // Save OTP in DB
+    const updateQuery = "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?";
+    await db.query(updateQuery, [otp, otpExpiry, currentUser.id]);
+
+    // Setup Nodemailer
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: 'nathishmanadarajan@gmail.com',
-        pass: 'zlmu qdlu qgpg phnm',
+        pass: 'zlmu qdlu qgpg phnm', // NOTE: Use environment variables for security!
       },
     });
+    const logoUrl = process.env.LOGO_URL;
 
     const mailOptions = {
       from: 'nathishmanadarajan@gmail.com',
       to: currentUser.email,
-      subject: 'Password Reset Request',
-      text: `You requested a password reset. Please use the following link to reset your password:\n\n` +
-        `http://localhost:3000/reset_password\n\n` +
-        `If you did not request this, please ignore this email.`,
+      subject: 'Your Password Reset OTP',
+      html: `
+    <div style="
+      font-family: Arial, sans-serif; 
+      padding: 30px; 
+      background-color: #f2f4f6;  /* Outer background unchanged */
+      min-height: 100vh;
+    ">
+      <div style="
+        max-width: 600px; 
+        margin: auto; 
+        border-radius: 8px; 
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); 
+        overflow: hidden;
+
+        /* Transparent gradient inside container only */
+        background: linear-gradient(
+          135deg, 
+          rgba(42, 122, 226, 0.15) 0%,    /* bright blue transparent */
+          rgba(27, 61, 145, 0.12) 40%,    /* dark blue transparent */
+          rgba(40, 167, 69, 0.15) 70%,    /* fresh green transparent */
+          rgba(255, 255, 255, 0.1) 100%   /* white transparent */
+        );
+
+        padding: 30px;
+      ">
+
+        <!-- Header -->
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+          <img src="${process.env.LOGO_URL}" alt="Unity Pvt Limited Logo" style="height: 40px;">
+        
+        </div>
+        <h2 style="margin: 0; font-size: 18px; color: #2c3e50; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">🔐</span> Password Reset Request
+        </h2>
+
+        <!-- Body -->
+        <p style="font-size: 16px; color: #333;">Hi there,</p>
+        <p style="font-size: 16px; color: #333;">
+          We received a request to reset the password for your <strong>Unity Pvt Limited</strong> account. Please use the OTP below to proceed.
+        </p>
+
+        <div style="margin: 25px 0; text-align: center;">
+          <div style="
+            display: inline-block; 
+            background-color: #f0f0f0; 
+            padding: 15px 30px; 
+            border-radius: 8px; 
+            font-size: 24px; 
+            font-weight: bold; 
+            letter-spacing: 5px; 
+            color: #2c3e50;
+          ">
+            ${otp}
+          </div>
+        </div>
+
+        <p style="font-size: 16px; color: #333;">
+          This OTP is valid for <strong>10 minutes</strong>. Please do not share it with anyone.
+        </p>
+
+        <p style="font-size: 14px; color: #777;">
+          If you didn’t request a password reset, please ignore this email or contact our support.
+        </p>
+
+        <p style="margin-top: 40px; font-size: 16px; color: #333;">
+          Regards,<br>
+          <strong>Unity Pvt Limited</strong>
+        </p>
+
+        <!-- Footer -->
+        <div style="
+          background-color: #f9f9f9; 
+          text-align: center; 
+          padding: 20px; 
+          font-size: 12px; 
+          color: #999;
+          margin-top: 30px;
+          border-radius: 0 0 8px 8px;
+        ">
+          Unity Pvt Limited<br>
+          126, Estate Main Rd, Industrial Estate, Perungudi,<br>
+          Chennai, Tamil Nadu 600096
+        </div>
+
+      </div>
+    </div>
+  `
     };
+
+
 
     await transporter.sendMail(mailOptions);
 
-    return successResponse(res, { token: resetToken, id: currentUser.id }, 'Password reset link has been sent to your email.');
+    return successResponse(res, { otp, id: currentUser.id }, 'OTP has been sent to your email.');
   } catch (error) {
-    console.error('Error sending password reset email:', error);
-    return errorResponse(res, error.message, 'Error sending password reset email', 500);
+    console.error('Error sending OTP:', error);
+    return errorResponse(res, error.message, 'Error sending OTP', 500);
   }
 }
 
 // After token validation and password update by user, reset password in Keycloak
-async function resetPasswordWithKeycloak(token, id, newPassword, res) {
+async function resetPasswordWithKeycloak(id, newPassword, res) {
   try {
-    const query = "SELECT id, reset_token, reset_token_expiry,keycloak_id FROM users WHERE id = ?";
+    const query = "SELECT id, password, keycloak_id FROM users WHERE id = ?";
     const [user] = await db.query(query, [id]);
 
     if (!user || user.length === 0) {
@@ -193,19 +285,18 @@ async function resetPasswordWithKeycloak(token, id, newPassword, res) {
 
     const currentUser = user[0];
 
-    // Check if token is valid and not expired
-    if (!token || currentUser.reset_token !== token || currentUser.reset_token_expiry < Date.now()) {
-      return errorResponse(res, null, 'Invalid or expired token', 400);
+    // Prevent reusing the old password
+    const isSamePassword = await bcrypt.compare(newPassword, currentUser.password);
+    if (isSamePassword) {
+      return errorResponse(res, null, 'New password cannot be same as the previous password', 400);
     }
 
-    // Reset password in the local database
+    // Hash and update new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const updateQuery = "UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?";
     await db.query(updateQuery, [hashedPassword, id]);
 
-
-
-    // Now reset password in Keycloak
+    // Update password in Keycloak
     await changePasswordInKeycloak(currentUser.keycloak_id, newPassword);
 
     return successResponse(res, null, 'Password updated successfully in both system and Keycloak.');
@@ -214,6 +305,7 @@ async function resetPasswordWithKeycloak(token, id, newPassword, res) {
     return errorResponse(res, error.message, 'Error resetting password', 500);
   }
 }
+
 
 
 
