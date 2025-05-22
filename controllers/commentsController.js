@@ -27,7 +27,7 @@ addComments: async (req, res) => {
           return errorResponse(res, { id: 'Comments ID is required and must be valid' }, 'Validation Error', 403);
         }
        if (!payload.comments || !payload.comments.trim()) {
-       return errorResponse(res, null, "Comments cannot be empty", 400);
+         return errorResponse(res, null, "Comments cannot be empty", 400);
        }
       await updateComments(id,payload, res,req);
     } catch (error) {
