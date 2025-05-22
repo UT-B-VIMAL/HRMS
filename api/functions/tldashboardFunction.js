@@ -334,17 +334,20 @@ exports.fetchTLproducts = async (req, res) => {
     }
 
     let productFilterQuery = `
-      SELECT DISTINCT p.* 
-      FROM products p
-      LEFT JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      LEFT JOIN sub_tasks s ON s.task_id = t.id AND s.deleted_at IS NULL
-      WHERE p.deleted_at IS NULL
-        AND (
-          (t.team_id IN (?) AND t.id IS NOT NULL)
-          OR
-          (s.team_id IN (?) AND s.id IS NOT NULL)
-        )
-    `;
+  SELECT DISTINCT p.* 
+  FROM products p
+  LEFT JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
+  LEFT JOIN sub_tasks s ON s.task_id = t.id AND s.deleted_at IS NULL
+  LEFT JOIN users tu ON t.user_id = tu.id AND tu.deleted_at IS NULL
+  LEFT JOIN users su ON s.user_id = su.id AND su.deleted_at IS NULL
+  WHERE p.deleted_at IS NULL
+    AND (
+      (tu.team_id IN (?) AND t.id IS NOT NULL)
+      OR
+      (su.team_id IN (?) AND s.id IS NOT NULL)
+    )
+`;
+
     const queryValues = [teamIds, teamIds];
 
     if (productIds.length) {
