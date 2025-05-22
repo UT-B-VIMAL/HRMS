@@ -303,14 +303,6 @@ exports.deleteComments = async (id, payload, res,req) => {
       return errorResponse(res, null, "Comment deletion failed", 400);
     }
 
-    const getISTTime = () => {
-      const now = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-      const istTime = new Date(now.getTime() + istOffset);
-      return istTime.toISOString().slice(0, 19).replace("T", " "); // Convert to MySQL DATETIME format
-    };
-
-    const localISTTime = getISTTime();
     const historyQuery = `
         INSERT INTO task_histories (
           old_data, new_data, task_id, subtask_id, text,
@@ -325,8 +317,6 @@ exports.deleteComments = async (id, payload, res,req) => {
       "Comment Deleted",
       updated_by,
       13,
-      localISTTime,
-      localISTTime, // Default flag for deleted comments
     ];
 
     const [historyResult] = await db.query(historyQuery, historyValues);
