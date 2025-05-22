@@ -1928,7 +1928,13 @@ exports.getTaskList = async (queryParams, res) => {
         `;
       params.push(user_id);
     } else {
-      baseQuery += ` ORDER BY tasks.updated_at DESC`;
+      baseQuery += `ORDER BY
+        CASE tasks.priority
+          WHEN 'High' THEN 1
+          WHEN 'Medium' THEN 2
+          WHEN 'Low' THEN 3
+          ELSE 4
+        END,tasks.updated_at DESC`;
     }
 
     // Execute the base query for tasks
