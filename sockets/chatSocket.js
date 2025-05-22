@@ -77,7 +77,7 @@ module.exports = (io) => {
               WHEN tc.receiver_id = 0 THEN 'Anonymous'
               ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
             END AS receiver_name,
-            CONVERT_TZ(tc.created_at, '+00:00', '+05:30') AS created_at
+            tc.created_at
           FROM ticket_comments tc
           LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
           LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
@@ -98,15 +98,15 @@ module.exports = (io) => {
 
         console.log('Received data:', data);
 
-        socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}-datetime:${datetime}`);
-        // const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
-        // console.log("isttime",istTime);
+        socket.emit('values', `ticket_id:${ticket_id}-sender_id:${sender_id}-receiver_id:${receiver_id}-comments:${comments}`);
+        const istTime = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+        console.log("isttime",istTime);
         
         
         const [result] = await db.execute(
           `INSERT INTO ticket_comments (ticket_id, sender_id, receiver_id, comments, created_at, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, NOW(), NOW(), NULL)`,
-          [ticket_id, sender_id, receiver_id, comments]
+          VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+          [ticket_id, sender_id, receiver_id, comments, istTime, istTime]
         );
 
         console.log(`Message inserted into ticket_comments with ID: ${result.insertId}`);
@@ -127,7 +127,7 @@ module.exports = (io) => {
               WHEN tc.receiver_id = 0 THEN 'Anonymous'
               ELSE CONCAT(COALESCE(receiver.first_name, ''), ' ', COALESCE(NULLIF(receiver.last_name, ''), '')) 
             END AS receiver_name,
-            CONVERT_TZ(tc.created_at, '+00:00', '+05:30') AS created_at
+            tc.created_at
           FROM ticket_comments tc
           LEFT JOIN users sender ON tc.sender_id = sender.id AND tc.sender_id != 0
           LEFT JOIN users receiver ON tc.receiver_id = receiver.id AND tc.receiver_id != 0
