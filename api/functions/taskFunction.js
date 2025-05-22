@@ -402,7 +402,6 @@ exports.getTask = async (queryParams, res, req) => {
 
     const historiesQuery = `
       SELECT h.*, 
-       CONVERT_TZ(h.updated_at, '+00:00', '+05:30') AS updated_at,
         COALESCE(
           CASE 
             WHEN u.first_name IS NOT NULL AND (u.last_name IS NOT NULL AND u.last_name <> '') THEN 
@@ -429,7 +428,6 @@ exports.getTask = async (queryParams, res, req) => {
     const commentsQuery = `
   SELECT 
     c.*,  
-    CONVERT_TZ(c.updated_at, '+00:00', '+05:30') AS updated_at,
     COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
   FROM task_comments c
   LEFT JOIN users u ON c.updated_by = u.id
