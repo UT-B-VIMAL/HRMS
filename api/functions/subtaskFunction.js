@@ -143,7 +143,7 @@ ORDER BY h.id DESC;
 
     // // Comments query
     const commentsQuery = `
-      SELECT c.*, COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,
+      SELECT c.*, COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
       FROM task_comments c
       LEFT JOIN users u ON c.updated_by = u.id
       WHERE c.subtask_id = ? 
