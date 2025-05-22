@@ -1,6 +1,7 @@
-const { signInUser, logoutUser, changePassword, forgotPassword,resetPasswordWithKeycloak } = require("../api/functions/keycloakFunction");
+const { signInUser, logoutUser, changePassword, forgotPassword,verifyOtp,resetPasswordWithKeycloak } = require("../api/functions/keycloakFunction");
 const { changePasswordSchema } = require("../validators/authValidator");
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
+const db = require("../config/db");
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;
@@ -77,19 +78,57 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
+exports.verifyOtp = async (req, res) => {
+  const { id, enteredOtp } = req.body;
+
+  try {
+    const query = "SELECT reset_token, reset_token_expiry FROM users WHERE id = ?";
+    const [user] = await db.query(query, [id]);
+
+    if (!user || user.length === 0) {
+      return errorResponse(res, null, 'User not found', 404);
+    }
+
+    const currentUser = user[0];
+
+    // Validate OTP
+    if (currentUser.reset_token !== enteredOtp) {
+      return errorResponse(res, null, 'Invalid OTP', 400);
+    }
+
+    // Check expiry
+    if (new Date(currentUser.reset_token_expiry) < new Date()) {
+      return errorResponse(res, null, 'OTP expired', 400);
+    }
+
+    return successResponse(res, null, 'OTP verified successfully.');
+  } catch (error) {
+    console.error("OTP verification failed:", error);
+    return errorResponse(res, error.message, 'Error verifying OTP', 500);
+  }
+};
+
+
+
 
 exports.reset_password = async (req, res) => {
   try {
-    const { token,id,newPassword } = req.body;
-    
-    if (!id) {
-      return res.status(400).json({ error: "id is required" });
+    const { id, newPassword, confirmPassword } = req.body;
+
+    if (!id || !newPassword || !confirmPassword) {
+      return errorResponse(res, null, 'id, newPassword, and confirmPassword are required', 400);
     }
-    await resetPasswordWithKeycloak( token, id, newPassword, res);
+
+    if (newPassword !== confirmPassword) {
+      return errorResponse(res, null, 'New password and confirm password do not match', 400);
+    }
+
+    await resetPasswordWithKeycloak(id, newPassword, res);
 
   } catch (error) {
-    return errorResponse(res, error.message, 'Error updating task', 500);
+    return errorResponse(res, error.message, 'Error resetting password', 500);
   }
 };
+
 
 
