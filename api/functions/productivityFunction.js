@@ -810,14 +810,14 @@ exports.getTeamwiseProductivity = async (req, res) => {
       employee_name: item.employee_name,
       employee_id: item.employee_id,
       team_id: item.team_id,
-      within_estimate_seconds: convertSecondsToReadableTime(
+      total_estimated_hours: convertSecondsToReadableTime(
         item.estimated_seconds
       ),
-            total_worked_seconds: convertSecondsToReadableTime(
+        total_worked_hours: convertSecondsToReadableTime(
         item.total_worked_seconds
       ),
-      exceed_seconds: convertSecondsToReadableTime(item.exceed_seconds),
-      difference_seconds: convertSecondsToReadableTime(
+       total_extended_hours: convertSecondsToReadableTime(item.exceed_seconds),
+       difference_hours: convertSecondsToReadableTime(
         item.total_worked_seconds - item.estimated_seconds
       ),
     }));
