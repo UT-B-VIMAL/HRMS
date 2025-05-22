@@ -12,6 +12,11 @@ exports.fetchAttendance = async (req, res) => {
     const currentTime = new Date();
     const cutoffTime = new Date();
     cutoffTime.setHours(13, 30, 0, 0); // 1:30 PM cutoff
+    console.log("🕒 Current Time (UTC):", currentTime.toISOString());
+console.log("🕒 Current Time (Local):", currentTime.toLocaleString());
+
+console.log("⏰ Cutoff Time (UTC):", cutoffTime.toISOString());
+console.log("⏰ Cutoff Time (Local):", cutoffTime.toLocaleString());
     const today = new Date().toISOString().split("T")[0];
     const { employee_id } = req.query;
 
