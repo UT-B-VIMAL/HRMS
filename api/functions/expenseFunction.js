@@ -951,6 +951,9 @@ exports.getAllpmemployeexpense = async (req, res) => {
           400
         );
     }
+     if(currentRoleId === 2){
+      otConditions.push("u.role_id != 1");
+    }
 
     // Combine all conditions into a WHERE clause
     const otWhereClause =
