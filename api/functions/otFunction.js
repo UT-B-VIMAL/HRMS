@@ -81,34 +81,32 @@ exports.createOt = async (payload, res, req) => {
     );
   }
 
- if (time) {
-  // Regex only for h, m, s (no days allowed)
-  const timeMatch = time.match(/^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
+if (time) {
+  // Regex for only hours and minutes, e.g., "2h 30m", "1h", "45m"
+  const timeMatch = time.match(/^((\d+)h\s*)?((\d+)m\s*)?$/);
 
   if (!timeMatch) {
     return errorResponse(
       res,
       null,
-      'Invalid format. Use like "2h 30m", "60m", "1h 10s". Days (d) not allowed.',
+      'Invalid format. Use like "2h 30m", "60m", or "1h". Seconds (s) not allowed.',
       400
     );
   }
 
   const hours = parseInt(timeMatch[2] || "0", 10);
   const minutes = parseInt(timeMatch[4] || "0", 10);
-  const seconds = parseInt(timeMatch[6] || "0", 10);
 
-  // Basic value validation
+  // Validate values
   if (
     hours < 0 ||
-    minutes < 0 || minutes > 60 ||
-    seconds < 0 || seconds >= 60
+    minutes < 0 || minutes >= 60
   ) {
     return errorResponse(res, null, "Invalid time values", 400);
   }
 
   // Calculate total seconds
-  const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+  const totalSeconds = (hours * 3600) + (minutes * 60);
 
   if (totalSeconds < 3600) {
     return errorResponse(res, null, "Total time must be at least 1 hour", 400);
@@ -118,15 +116,15 @@ exports.createOt = async (payload, res, req) => {
     return errorResponse(res, null, "Total time must not exceed 12 hours", 400);
   }
 
-  // Format as "HH:MM:SS"
+  // Format as "HH:MM:00"
   const totalHours = Math.floor(totalSeconds / 3600);
   const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
-  const totalRemSeconds = totalSeconds % 60;
 
   payload.time = `${String(totalHours).padStart(2, "0")}:${String(
     totalMinutes
-  ).padStart(2, "0")}:${String(totalRemSeconds).padStart(2, "0")}`;
+  ).padStart(2, "0")}:00`;
 }
+
 
 
 
@@ -732,29 +730,27 @@ exports.updateOt = async (req, payload, res) => {
             }
         const updated_by = await getUserIdFromAccessToken(accessToken);
 
-  const formatTime = (timeValue, fieldName) => {
+const formatTime = (timeValue, fieldName) => {
   if (timeValue) {
-    // Only match h, m, s (no d)
-    const timeMatch = timeValue.match(/^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
+    // Only match h and m (no s, no d)
+    const timeMatch = timeValue.match(/^((\d+)h\s*)?((\d+)m\s*)?$/);
 
     if (!timeMatch) {
       return errorResponse(
         res,
         null,
-        `Invalid format for ${fieldName}. Use formats like "1h 30m", "45m", or "2h 10s". Days (d) not allowed.`,
+        `Invalid format for ${fieldName}. Use formats like "1h 30m", "45m", or "2h". Seconds (s) and days (d) are not allowed.`,
         400
       );
     }
 
     const hours = parseInt(timeMatch[2] || "0", 10);
     const minutes = parseInt(timeMatch[4] || "0", 10);
-    const seconds = parseInt(timeMatch[6] || "0", 10);
 
     // Validate value ranges
     if (
       hours < 0 ||
-      minutes < 0 || minutes > 60 ||
-      seconds < 0 || seconds >= 60
+      minutes < 0 || minutes >= 60
     ) {
       return errorResponse(
         res,
@@ -765,7 +761,7 @@ exports.updateOt = async (req, payload, res) => {
     }
 
     // Calculate total time in seconds
-    const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+    const totalSeconds = (hours * 3600) + (minutes * 60);
 
     if (totalSeconds < 3600) {
       return errorResponse(
@@ -785,14 +781,13 @@ exports.updateOt = async (req, payload, res) => {
       );
     }
 
-    // Format as HH:MM:SS
+    // Format as HH:MM:00 (seconds always zero)
     const totalHours = Math.floor(totalSeconds / 3600);
     const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
-    const totalRemSeconds = totalSeconds % 60;
 
     return `${String(totalHours).padStart(2, "0")}:${String(
       totalMinutes
-    ).padStart(2, "0")}:${String(totalRemSeconds).padStart(2, "0")}`;
+    ).padStart(2, "0")}:00`;
   }
 
   return null; // If no timeValue provided
@@ -2323,29 +2318,24 @@ exports.approve_reject_updateOt = async (req,id, payload, res) => {
 
 const formatTime = (timeValue, fieldName) => {
   if (timeValue) {
-    const timeMatch = timeValue.match(
-      /^((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
-    );
+    // Match only h and m (no s)
+    const timeMatch = timeValue.match(/^((\d+)h\s*)?((\d+)m\s*)?$/);
 
     if (!timeMatch) {
       return errorResponse(
         res,
         null,
-        `Invalid format for ${fieldName}. Use formats like "2h 30m", "45m 15s", or "1h".`,
+        `Invalid format for ${fieldName}. Use formats like "2h 30m", "45m", or "1h". Seconds (s) are not allowed.`,
         400
       );
     }
 
     const hours = parseInt(timeMatch[2] || "0", 10);
     const minutes = parseInt(timeMatch[4] || "0", 10);
-    const seconds = parseInt(timeMatch[6] || "0", 10);
 
     if (
       hours < 0 ||
-      minutes < 0 ||
-      seconds < 0 ||
-      minutes >= 60 ||
-      seconds >= 60
+      minutes < 0 || minutes >= 60
     ) {
       return errorResponse(
         res,
@@ -2355,15 +2345,16 @@ const formatTime = (timeValue, fieldName) => {
       );
     }
 
-    // Format as "HH:MM:SS"
+    // Format as "HH:MM:00" — seconds are always 00
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
       2,
       "0"
-    )}:${String(seconds).padStart(2, "0")}`;
+    )}:00`;
   }
 
   return null; // If timeValue is null/undefined, return null
 };
+
 
   // Apply the function to time, pmtime, and tltime
   payload.time = formatTime(time, "time");

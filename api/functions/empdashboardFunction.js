@@ -302,14 +302,13 @@ exports.fetchDailybreakdown = async (req, res) => {
 
 exports.fetchStatistics = async (req, res) => {
   try {
-    // const user_id = req.query.user_id;
     const date = req.query.date;
     const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
@@ -330,14 +329,9 @@ exports.fetchStatistics = async (req, res) => {
       }
 
       const dateParts = date.split(/[\s_]/);
-
-      if (isNaN(dateParts[0])) {
-        selectedMonth =
-          new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1;
-      } else {
-        selectedMonth = parseInt(dateParts[0], 10);
-      }
-
+      selectedMonth = isNaN(dateParts[0])
+        ? new Date(`${dateParts[0]} 1, ${dateParts[1]}`).getMonth() + 1
+        : parseInt(dateParts[0], 10);
       selectedYear = parseInt(dateParts[1], 10);
     } else {
       const currentDate = new Date();
@@ -345,132 +339,150 @@ exports.fetchStatistics = async (req, res) => {
       selectedYear = currentDate.getFullYear();
     }
 
-    const tasksQuery = `
-      SELECT id, name, status, active_status, reopen_status, created_at 
-      FROM tasks 
-      WHERE user_id = ? AND deleted_at IS NULL
-    `;
-    const [tasks] = await db.query(tasksQuery, [user_id]);
+    const totalDaysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const weekDays = [0, 0, 0, 0, 0];
+    let weekIndex = 0;
 
-    let totalTaskCount = 0;
-    let completedTaskCount = 0;
-    let inProgressTaskCount = 0;
-    let todoTaskCount = 0;
+    for (let day = 1; day <= totalDaysInMonth; day++) {
+      weekDays[weekIndex]++;
+      if (new Date(selectedYear, selectedMonth - 1, day).getDay() === 6) {
+        weekIndex++;
+      }
+    }
+
+    const weeksInMonth = weekDays.filter((w) => w > 0).length;
+
+    const weekTaskCounts = Array.from({ length: weeksInMonth }, () => ({
+      total_task_count: 0,
+      in_progress_task_count: 0,
+      completed_task_count: 0,
+      todo_task_count: 0,
+    }));
+
+    const [tasks] = await db.query(
+      `SELECT id, name, status, active_status, reopen_status, created_at 
+       FROM tasks 
+       WHERE user_id = ? AND deleted_at IS NULL`,
+      [user_id]
+    );
 
     for (const task of tasks) {
-      const allSubtasksQuery = `
-        SELECT id, status, active_status, reopen_status, created_at, user_id 
-        FROM sub_tasks 
-        WHERE task_id = ? AND deleted_at IS NULL
-      `;
-      const [allSubtasks] = await db.query(allSubtasksQuery, [task.id]);
+      const [allSubtasks] = await db.query(
+        `SELECT id, status, active_status, reopen_status, created_at, user_id 
+         FROM sub_tasks 
+         WHERE task_id = ? AND deleted_at IS NULL`,
+        [task.id]
+      );
 
       const userSubtasks = allSubtasks.filter(
-        (subtask) => subtask.user_id === parseInt(user_id)
+        (sub) => sub.user_id === parseInt(user_id)
       );
 
       if (allSubtasks.length > 0 && userSubtasks.length === 0) {
-        continue; // Skip if no matching user_id in subtasks
+        continue;
       }
 
       const taskDate = new Date(task.created_at);
-      const isTaskInMonthYear =
-        taskDate.getMonth() + 1 === selectedMonth &&
-        taskDate.getFullYear() === selectedYear;
+      if (
+        taskDate.getMonth() + 1 !== selectedMonth ||
+        taskDate.getFullYear() !== selectedYear
+      ) {
+        continue;
+      }
 
-      const subtasksInMonthYear = userSubtasks.filter((subtask) => {
-        const subtaskDate = new Date(subtask.created_at);
-        return (
-          subtaskDate.getMonth() + 1 === selectedMonth &&
-          subtaskDate.getFullYear() === selectedYear
-        );
-      });
+      const taskWeek = Math.floor((taskDate.getDate() - 1) / 7);
+      if (taskWeek >= weeksInMonth) continue;
 
       if (userSubtasks.length === 0) {
-        if (isTaskInMonthYear) {
-          if (
-            (task.status === 1 && task.active_status === 1) ||
-            task.status === 3 ||
-            (task.status === 0 &&
-              task.reopen_status === 0 &&
-              task.active_status === 0)
-          ) {
-            totalTaskCount++;
-          }
-
-          if (task.status === 1 && task.active_status === 1) {
-            inProgressTaskCount++;
-          } else if (task.status === 3) {
-            completedTaskCount++;
-          } else if (
-            task.status === 0 &&
+        const week = weekTaskCounts[taskWeek];
+        if (
+          (task.status === 1 && task.active_status === 1) ||
+          task.status === 3 ||
+          (task.status === 0 &&
             task.reopen_status === 0 &&
-            task.active_status === 0
-          ) {
-            todoTaskCount++;
-          }
+            task.active_status === 0)
+        ) {
+          week.total_task_count++;
+        }
+
+        if (task.status === 1 && task.active_status === 1) {
+          week.in_progress_task_count++;
+        } else if (task.status === 3) {
+          week.completed_task_count++;
+        } else if (
+          task.status === 0 &&
+          task.reopen_status === 0 &&
+          task.active_status === 0
+        ) {
+          week.todo_task_count++;
         }
       } else {
-        if (subtasksInMonthYear.length > 0) {
+        for (const sub of userSubtasks) {
+          const subDate = new Date(sub.created_at);
           if (
-            (task.status === 1 && task.active_status === 1) ||
-            task.status === 3 ||
-            (task.status === 0 &&
-              task.reopen_status === 0 &&
-              task.active_status === 0)
+            subDate.getMonth() + 1 !== selectedMonth ||
+            subDate.getFullYear() !== selectedYear
           ) {
-            totalTaskCount++;
+            continue;
           }
 
-          const allCompleted = subtasksInMonthYear.every(
-            (subtask) => subtask.status === 3
-          );
-          const allTodo = subtasksInMonthYear.every(
-            (subtask) =>
-              subtask.status === 0 &&
-              subtask.reopen_status === 0 &&
-              subtask.active_status === 0
-          );
-          const inProgress = subtasksInMonthYear.some(
-            (subtask) =>
-              subtask.status === 1 && subtask.active_status === 1
-          );
+          const subWeek = Math.floor((subDate.getDate() - 1) / 7);
+          if (subWeek >= weeksInMonth) continue;
 
-          if (allCompleted) {
-            completedTaskCount++;
-          } else if (allTodo) {
-            todoTaskCount++;
-          } else if (inProgress) {
-            inProgressTaskCount++;
+          const week = weekTaskCounts[subWeek];
+
+          if (
+            (sub.status === 1 && sub.active_status === 1) ||
+            sub.status === 3 ||
+            (sub.status === 0 &&
+              sub.reopen_status === 0 &&
+              sub.active_status === 0)
+          ) {
+            week.total_task_count++;
+          }
+
+          if (sub.status === 1 && sub.active_status === 1) {
+            week.in_progress_task_count++;
+          } else if (sub.status === 3) {
+            week.completed_task_count++;
+          } else if (
+            sub.status === 0 &&
+            sub.reopen_status === 0 &&
+            sub.active_status === 0
+          ) {
+            week.todo_task_count++;
           }
         }
       }
     }
 
-    const totalTaskCounts =
-      completedTaskCount + todoTaskCount + inProgressTaskCount;
+    // SUMMARIZE MONTH TOTALS FROM WEEKLY DATA
+    let total = 0,
+      inProgress = 0,
+      completed = 0,
+      todo = 0;
 
-    const completedPercentage =
-      totalTaskCounts > 0 ? (completedTaskCount / totalTaskCounts) * 100 : 0;
-    const todoPercentage =
-      totalTaskCounts > 0 ? (todoTaskCount / totalTaskCounts) * 100 : 0;
-    const inProgressPercentage =
-      totalTaskCounts > 0 ? (inProgressTaskCount / totalTaskCounts) * 100 : 0;
+    for (const week of weekTaskCounts) {
+      total += week.total_task_count;
+      inProgress += week.in_progress_task_count;
+      completed += week.completed_task_count;
+      todo += week.todo_task_count;
+    }
 
     const statisticsResult = {
-      total_task_count: totalTaskCounts,
-      completed_task_count: completedTaskCount,
-      completed_percentage: Math.round(completedPercentage),
-      todo_task_count: todoTaskCount,
-      todo_percentage: Math.round(todoPercentage),
-      in_progress_task_count: inProgressTaskCount,
-      in_progress_percentage: Math.round(inProgressPercentage),
+      total_task_count: total,
+      completed_task_count: completed,
+      completed_percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+      todo_task_count: todo,
+      todo_percentage: total > 0 ? Math.round((todo / total) * 100) : 0,
+      in_progress_task_count: inProgress,
+      in_progress_percentage: total > 0 ? Math.round((inProgress / total) * 100) : 0,
     };
 
     return successResponse(
       res,
       statisticsResult,
-      "Task statistics retrieved successfully",
+      "Monthly task statistics retrieved successfully",
       200
     );
   } catch (error) {
@@ -478,6 +490,7 @@ exports.fetchStatistics = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching statistics", 500);
   }
 };
+
 
 
 exports.fetchStatisticschart = async (req, res) => {
