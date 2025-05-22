@@ -252,7 +252,7 @@ ORDER BY h.id DESC;
         .tz("Asia/Kolkata")
         .format("YYYY-MM-DD HH:mm:ss"),
       time_utc: comment.updated_at,
-       time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow()
+      time: moment.utc(comment.updated_at).tz("Asia/Kolkata").fromNow(),
     }));
 
     // Final response
