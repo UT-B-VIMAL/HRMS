@@ -533,6 +533,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     description: 6,
     team_id: 10,
     priority: 11,
+    name:18,
   };
 
   const fieldMapping = {
