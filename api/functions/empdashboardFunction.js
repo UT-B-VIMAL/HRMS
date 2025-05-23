@@ -359,11 +359,11 @@ exports.fetchStatistics = async (req, res) => {
       todo_task_count: 0,
     }));
 
+    // Fetch all tasks, not just ones belonging to the user
     const [tasks] = await db.query(
-      `SELECT id, name, status, active_status, reopen_status, created_at 
+      `SELECT id, name, status, active_status, reopen_status, created_at, user_id 
        FROM tasks 
-       WHERE user_id = ? AND deleted_at IS NULL`,
-      [user_id]
+       WHERE deleted_at IS NULL`
     );
 
     for (const task of tasks) {
@@ -378,23 +378,26 @@ exports.fetchStatistics = async (req, res) => {
         (sub) => sub.user_id === parseInt(user_id)
       );
 
-      if (allSubtasks.length > 0 && userSubtasks.length === 0) {
+      // Skip if task doesn't belong to user and has no subtasks by user
+      if (task.user_id !== parseInt(user_id) && userSubtasks.length === 0) {
         continue;
       }
 
-      const taskDate = new Date(task.created_at);
-      if (
-        taskDate.getMonth() + 1 !== selectedMonth ||
-        taskDate.getFullYear() !== selectedYear
-      ) {
-        continue;
-      }
-
-      const taskWeek = Math.floor((taskDate.getDate() - 1) / 7);
-      if (taskWeek >= weeksInMonth) continue;
-
+      // Process the task if there are no user subtasks
       if (userSubtasks.length === 0) {
+        const taskDate = new Date(task.created_at);
+        if (
+          taskDate.getMonth() + 1 !== selectedMonth ||
+          taskDate.getFullYear() !== selectedYear
+        ) {
+          continue;
+        }
+
+        const taskWeek = Math.floor((taskDate.getDate() - 1) / 7);
+        if (taskWeek >= weeksInMonth) continue;
+
         const week = weekTaskCounts[taskWeek];
+
         if (
           (task.status === 1 && task.active_status === 1) ||
           task.status === 3 ||
@@ -417,6 +420,7 @@ exports.fetchStatistics = async (req, res) => {
           week.todo_task_count++;
         }
       } else {
+        // Process subtasks
         for (const sub of userSubtasks) {
           const subDate = new Date(sub.created_at);
           if (
@@ -493,16 +497,17 @@ exports.fetchStatistics = async (req, res) => {
 
 
 
+
 exports.fetchStatisticschart = async (req, res) => {
   try {
-    // const user_id = req.query.user_id;
     const date = req.query.date;
     const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
 
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
     }
@@ -521,7 +526,6 @@ exports.fetchStatisticschart = async (req, res) => {
           400
         );
       }
-      
 
       const dateParts = date.split(/[\s_]/);
 
@@ -549,7 +553,6 @@ exports.fetchStatisticschart = async (req, res) => {
     }
 
     const totalDaysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-
     const weekDays = [0, 0, 0, 0, 0];
     let weekIndex = 0;
 
@@ -573,12 +576,13 @@ exports.fetchStatisticschart = async (req, res) => {
       todo_percentage: 0,
     }));
 
+    // Fetch all tasks (not only user's tasks)
     const tasksQuery = `
-      SELECT id, name, status, active_status, reopen_status, created_at 
+      SELECT id, name, status, active_status, reopen_status, created_at, user_id 
       FROM tasks 
-      WHERE user_id = ? AND deleted_at IS NULL
+      WHERE deleted_at IS NULL
     `;
-    const [tasks] = await db.query(tasksQuery, [user_id]);
+    const [tasks] = await db.query(tasksQuery);
 
     for (const task of tasks) {
       const allSubtasksQuery = `
@@ -592,8 +596,9 @@ exports.fetchStatisticschart = async (req, res) => {
         (sub) => sub.user_id === parseInt(user_id)
       );
 
-      if (allSubtasks.length > 0 && userSubtasks.length === 0) {
-        continue; // Skip task if no user's subtasks
+      // Skip task if not user's and no user subtasks
+      if (task.user_id !== parseInt(user_id) && userSubtasks.length === 0) {
+        continue;
       }
 
       const taskDate = new Date(task.created_at);
@@ -671,6 +676,7 @@ exports.fetchStatisticschart = async (req, res) => {
       }
     }
 
+    // Calculate percentages
     weekTaskCounts.forEach((weekData) => {
       if (weekData.total_task_count > 0) {
         weekData.in_progress_percentage = Math.round(
@@ -696,6 +702,7 @@ exports.fetchStatisticschart = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching statistics", 500);
   }
 };
+
 
 
 exports.fetchRatings = async (req, res) => {
