@@ -1508,11 +1508,16 @@ exports.updateTaskData = async (id, payload, res, req) => {
 //   }
 // };
 
-exports.deleteTask = async (id, res) => {
+exports.deleteTask = async (req, res) => {
+   const id = req.params.id;
+
   try {
-    // Check if any subtasks exist
-    const subtaskQuery =
-      "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
+    // 1. Check if any subtasks exist
+    const subtaskQuery = `
+      SELECT COUNT(*) as subtaskCount 
+      FROM sub_tasks 
+      WHERE task_id = ? AND deleted_at IS NULL
+    `;
     const [subtaskResult] = await db.query(subtaskQuery, [id]);
 
     if (subtaskResult[0].subtaskCount > 0) {
@@ -1524,10 +1529,13 @@ exports.deleteTask = async (id, res) => {
       );
     }
 
-    // Get task status details
-    const statusQuery =
-      "SELECT status, reopen_status, active_status FROM tasks WHERE id = ? AND deleted_at IS NULL";
+    const statusQuery = `
+      SELECT status, reopen_status, active_status 
+      FROM tasks 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
     const [taskStatusResult] = await db.query(statusQuery, [id]);
+
 
     if (taskStatusResult.length === 0) {
       return errorResponse(res, null, "Task not found", 404);
@@ -1535,22 +1543,19 @@ exports.deleteTask = async (id, res) => {
 
     const { status, reopen_status, active_status } = taskStatusResult[0];
 
-    // Prevent deletion if task is "InProgress"
-    const currentGroup = commonStatusGroup(
-      status,
-      reopen_status,
-      active_status
-    );
+    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    console.log("Current Status Group:", currentGroup);
+
     if (currentGroup === "InProgress") {
       return errorResponse(
         res,
         null,
-        "Task is InProgress and cannot be deleted",
+        "Task is currently in progress and cannot be deleted",
         400
       );
     }
 
-    // Soft delete the task
+    // 3. Soft delete the task
     const deleteQuery = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
     const [deleteResult] = await db.query(deleteQuery, [id]);
 
@@ -1560,6 +1565,7 @@ exports.deleteTask = async (id, res) => {
 
     return successResponse(res, null, "Task deleted successfully");
   } catch (error) {
+    console.error("Delete task error:", error);
     return errorResponse(res, error.message, "Error deleting task", 500);
   }
 };
