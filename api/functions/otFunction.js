@@ -1519,8 +1519,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       SELECT COUNT(*) AS count
       FROM ot_details ot
       LEFT JOIN users u ON u.id = ot.user_id
-      WHERE ot.tl_status = 2
-        AND ot.pm_status = 0
+      WHERE ot.pm_status = 0
         AND ot.deleted_at IS NULL
     `;
 
