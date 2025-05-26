@@ -1336,7 +1336,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
       switch (status) {
         case "0": // Pending
           if ([1, 2, 3].includes(currentRoleId)) {
-            otConditions.push("ot.pm_status = 0");
+            otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
           } else if (currentRoleId === 4) {
             otConditions.push("ot.tl_status = 2 AND ot.pm_status = 0");
           }
@@ -1416,9 +1416,9 @@ exports.getAllpmemployeeOts = async (req, res) => {
 
     // Filter out role_id=2 if current user is role_id=2
     const filteredOts = ots.filter((row) => {
-      if (currentRoleId === 2 && row.role_id === 2) {
-        return false;
-      }
+      // if (currentRoleId === 2 && row.role_id === 2) {
+      //   return false;
+      // }
       return true;
     });
 
@@ -1525,7 +1525,7 @@ exports.getAllpmemployeeOts = async (req, res) => {
     `;
 
     if (currentRoleId === 2) {
-      countZeroQuery += ` AND u.role_id != 2`;
+      countZeroQuery += ` AND u.role_id != 1`;
     }
 
     const [countResult] = await db.query(countZeroQuery);
