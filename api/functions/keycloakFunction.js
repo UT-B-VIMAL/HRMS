@@ -538,35 +538,37 @@ async function assignGroupToUser(userId, groupName) {
 
 
 
-async function getUserByEmployeeId(employeeId) {
-
+async function getUserByEmployeeId(identifier) {
   const query = `
-  SELECT 
-    users.id, 
-    users.keycloak_id, 
-    users.role_id, 
-    users.employee_id, 
-    users.first_name, 
-    users.last_name, 
-    users.designation_id AS designation_name
-  FROM users
-  LEFT JOIN designations ON users.designation_id = designations.id
-  WHERE users.employee_id = ? AND users.deleted_at IS NULL`;
-  const params = [employeeId];
+    SELECT 
+      users.id, 
+      users.keycloak_id, 
+      users.role_id, 
+      users.employee_id, 
+      users.first_name, 
+      users.last_name, 
+      users.designation_id AS designation_name
+    FROM users
+    LEFT JOIN designations ON users.designation_id = designations.id
+    WHERE (users.employee_id = ? OR users.email = ?) AND users.deleted_at IS NULL
+  `;
+  
+  const params = [identifier, identifier];
 
   try {
-    const [rows] = await db.execute(query, params);  // Use your DB query method here (e.g., mysql2, sequelize)
+    const [rows] = await db.execute(query, params); // Use your DB query method here
 
     if (rows.length > 0) {
-      return rows[0];  // Return the first user that matches the employee_id
+      return rows[0]; // Return the first matched user
     } else {
-      return null;  // No user found with that employee_id
+      return null; // No user found
     }
   } catch (error) {
     console.error("Error querying database for user:", error.message);
     throw error;
   }
 }
+
 
 const getRoleName = async (roleId) => {
   const query = "SELECT role FROM roles WHERE id = ?"; // Select 'role' column

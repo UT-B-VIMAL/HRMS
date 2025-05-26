@@ -8,6 +8,9 @@ const commentsController = {
 addComments: async (req, res) => {
     try {
       const payload = req.body;
+    if (!payload.comments || !payload.comments.trim()) {
+      return errorResponse(res, null, "Comments cannot be empty", 400);
+    }
       await addComments(payload, res);
     } catch (error) {
       return errorResponse(res, error.message, 'Error retrieving task comments', 500);
@@ -23,6 +26,9 @@ addComments: async (req, res) => {
         if (idValidation.error) {
           return errorResponse(res, { id: 'Comments ID is required and must be valid' }, 'Validation Error', 403);
         }
+       if (!payload.comments || !payload.comments.trim()) {
+         return errorResponse(res, null, "Comments cannot be empty", 400);
+       }
       await updateComments(id,payload, res,req);
     } catch (error) {
       return errorResponse(res, error.message, 'Error updating task comments', 500);

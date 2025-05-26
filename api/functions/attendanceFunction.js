@@ -84,7 +84,7 @@ exports.getAttendance = async (req, res) => {
     if (user.role_id === 1 || user.role_id === 2) {
       query += ` AND u.role_id IN (2, 3) `;
     } else {
-      query += ` AND (t.reporting_user_id = ? OR u.team_id = ?) AND u.role_id NOT IN (2,3) AND u.id != ? `;
+      query += ` AND (t.reporting_user_id = ? OR u.team_id = ?) AND u.role_id NOT IN (1,2,3) AND u.id != ? `;
       queryParams.push(user_id, user.team_id, user_id);
     }
 
