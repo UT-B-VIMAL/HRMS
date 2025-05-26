@@ -238,8 +238,8 @@ exports.fetchUtilization = async (req, res) => {
       return {
         team_id: teamId,
         team_name: team.team_name,
-        total_strength: team.total_strength,
-        working_count: working.working_count,
+        total_strength: team.total_strength < 10 ? `0${team.total_strength}` : `${team.total_strength}`,
+        working_count: working.working_count < 10 ? `0${working.working_count}` : `${working.working_count}`,
         working_employees: working.working_employees,
       };
     });
@@ -321,7 +321,6 @@ exports.fetchAttendance = async (payload, res) => {
     AND (el.deleted_at IS NULL OR el.deleted_at IS NULL)
     `;
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
-    console.log(teamWiseAttendanceData);
     
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
@@ -384,13 +383,19 @@ exports.fetchAttendance = async (payload, res) => {
     
     
 
-    const teamWiseAttendanceArray = Object.values(teamWiseAttendance);
+    const pad = (num) => num.toString().padStart(2, '0');
+    const teamWiseAttendanceArray = Object.values(teamWiseAttendance).map(team => ({
+  ...team,
+  total_team_count: pad(team.total_team_count),
+  team_absent_count: pad(team.team_absent_count),
+  team_present_count: pad(team.team_present_count),
+}));
 
     // Step 4: Combine attendance results
     const result = {
-      total_strength: totalStrength,
-      total_present_employees: totalPresentEmployees,
-      total_absent_employees: totalAbsentEmployees,
+      total_strength: pad(totalStrength),
+      total_present_employees: pad(totalPresentEmployees),
+      total_absent_employees: pad(totalAbsentEmployees),
       total_present_percentage: totalPresentPercentage,
       total_absent_percentage: totalAbsentPercentage,
       team_wise_attendance: teamWiseAttendanceArray,
