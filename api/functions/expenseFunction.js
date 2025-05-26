@@ -924,7 +924,7 @@ exports.getAllpmemployeexpense = async (req, res) => {
     switch (status) {
       case "0": // Pending
         if ([1, 2, 3].includes(Number(currentRoleId))) {
-          otConditions.push("et.pm_status = 0");
+          otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
         } else if (Number(currentRoleId) === 4) {
           otConditions.push("et.tl_status = 2 AND et.pm_status = 0");
         }
@@ -1001,6 +1001,8 @@ exports.getAllpmemployeexpense = async (req, res) => {
         et.updated_at DESC
     `;
 
+    console.log(otQuery);
+    
     // Execute the query
     const [ots] = await db.query(otQuery, otValues);
 
@@ -1031,13 +1033,17 @@ exports.getAllpmemployeexpense = async (req, res) => {
       tlstatus: row.tl_status,
       pmstatus: row.pm_status,
     }));
-    const countZeroQuery = `
+    let countZeroQuery = `
     SELECT COUNT(*) AS count
     FROM expense_details et
+    LEFT JOIN users u ON u.id = et.user_id
     WHERE et.tl_status = 2
       AND et.pm_status = 0
       AND et.deleted_at IS NULL
   `;
+   if (currentRoleId === 2) {
+      countZeroQuery += ` AND u.role_id != 1`;
+    }
     const [countResult] = await db.query(countZeroQuery);
     const statusZeroCount = countResult[0]?.count || 0;
 
