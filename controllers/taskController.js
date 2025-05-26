@@ -84,7 +84,8 @@ const taskController = {
 
   deleteTask: async (req, res) => {
     try {
-      await deleteTask(req, res);
+      
+       await deleteTask(req, res);
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error deleting task', 500);
