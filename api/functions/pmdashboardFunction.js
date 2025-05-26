@@ -267,7 +267,7 @@ exports.fetchUtilization = async (req, res) => {
 exports.fetchAttendance = async (payload, res) => {
   try {
     // Step 1: Get total strength of all users
-    const totalStrengthQuery = `SELECT COUNT(*) AS total_strength FROM users WHERE deleted_at IS NULL`;
+    const totalStrengthQuery = `SELECT COUNT(*) AS total_strength FROM users WHERE deleted_at IS NULL AND role_id != 1`;
     const [[{ total_strength: totalStrength }]] = await db.query(
       totalStrengthQuery
     );
