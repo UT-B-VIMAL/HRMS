@@ -72,7 +72,7 @@ exports.createTeam = async (payload, res) => {
     if (checkResult[0].count > 0) {
       return errorResponse(res, "Team with this name already exists", "Duplicate Team Error", 400);
     }
-    const query = "INSERT INTO teams (name, created_by, updated_by) VALUES (?, ?, ?)";
+    const query = "INSERT INTO teams (name, created_by, updated_by,updated_at,created_at) VALUES (?, ?, ?, NOW(),NOW())";
     const values = [name, user_id, user_id];
     const [result] = await db.query(query, values);
 
@@ -112,7 +112,7 @@ exports.updateTeam = async (id, payload, res) => {
     if (checkTeam[0].count > 0) {
       return errorResponse(res, "Team with this name already exists", "Duplicate Team Error", 400);
     }
-    let query = "UPDATE teams SET name = ?, updated_by = ?";
+    let query = "UPDATE teams SET name = ?, updated_by = ?, updated_at = NOW()";
     const values = [name, user_id];
     if (reporting_user_id) {
       query += ", reporting_user_id = ?";
