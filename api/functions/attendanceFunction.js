@@ -149,8 +149,15 @@ exports.getAttendance = async (req, res) => {
 
 // Controller function
 exports.updateAttendanceData = async (req, res) => {
-  let { id, date, attendanceType, halfDay, status, updated_by } = req.body;
 
+  let { id, date, attendanceType, halfDay, status, updated_by , import_status } = req.body;
+  if( import_status == 1) {
+    const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [id]);
+    if (!empUsers.length) {
+      return errorResponse(res, "Employee Id Not Found", `Employee ID ${id} does not exist in the users table.`, 404);
+    }
+    id = empUsers[0].id; // Use the ID from the users table
+  }
   // Validate the request data
   const { error } = attendanceValidator.validate(
       { id, date, attendanceType, halfDay, status, updated_by },
