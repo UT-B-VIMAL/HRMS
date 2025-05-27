@@ -107,26 +107,26 @@ notificationSocket(io.of("/notifications"));
 chatSocket(io.of("/chat"));
 
 // Socket-----------------------------------------------------------------------------
-// const corsOptions = {
-//   origin: "*", // Allow all origins
-//   methods: ["GET", "POST", "PUT", "DELETE"],
-//   exposedHeaders: ['Content-Disposition']
-//   // allowedHeaders: ["Content-Type", "Authorization"]
-// };
+const corsOptions = {
+  origin: "*", // Allow all origins
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  exposedHeaders: ['Content-Disposition']
+  // allowedHeaders: ["Content-Type", "Authorization"]
+};
 
 // Load allowed origins from env
-const corsOptions = {
-  origin: (origin, callback) => {
+// const corsOptions = {
+//   origin: (origin, callback) => {
     
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Origin ${origin} is not allowed by CORS`));
-    }
-  },
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
+//     if (!origin || allowedOrigins.includes(origin)) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error(`Origin ${origin} is not allowed by CORS`));
+//     }
+//   },
+//   methods: ["GET", "POST", "PUT", "DELETE"],
+//   allowedHeaders: ["Content-Type", "Authorization"],
+// };
 
 
 app.use(cors(corsOptions));
