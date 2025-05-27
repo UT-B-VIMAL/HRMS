@@ -174,7 +174,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
 
 
 exports.ratingUpdation = async (payload, res, req) => {
-  const { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id, updated_by ,import_status} = payload;
+  let { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id, updated_by ,import_status} = payload;
   if( import_status == 1) {
     const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [user_id]);
     if (!empUsers.length) {
