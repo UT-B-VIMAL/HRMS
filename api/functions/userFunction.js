@@ -77,6 +77,7 @@ exports.createUser = async (payload, res, req) => {
       hashedPassword, team_id, role_id, designation_id,
       userId, keycloakId, deleted_at
     ];
+    console.log(values);
 
     const [result] = await db.query(insertQuery, values);
 
