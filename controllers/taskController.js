@@ -18,7 +18,7 @@ const taskController = {
         return errorResponse(res, errorMessages, "Validation Error", 403);
       }
 
-      await createTask(payload, res);
+      await createTask(payload, res,req);
 
     } catch (error) {
       console.error('Error creating task:', error.message);
@@ -46,7 +46,7 @@ const taskController = {
       }
   
       // Call the updateTask function
-      await updateTask(id, payload, res);
+      await updateTask(id, payload, res,req);
   
     } catch (error) {
       return errorResponse(res, error.message, 'Error updating task', 500);
@@ -84,7 +84,8 @@ const taskController = {
 
   deleteTask: async (req, res) => {
     try {
-      await deleteTask(req, res);
+      
+       await deleteTask(req, res);
 
     } catch (error) {
       return errorResponse(res, error.message, 'Error deleting task', 500);

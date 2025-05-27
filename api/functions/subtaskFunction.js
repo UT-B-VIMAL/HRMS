@@ -16,14 +16,21 @@ const {
   commonStatusGroup,
   checkUpdatePermission,
   addHistorydata,
+  getUserIdFromAccessToken,
 } = require("./commonFunction");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
-exports.createSubTask = async (payload, res) => {
+exports.createSubTask = async (payload, res,req) => {
   const { task_id, name, created_by } = payload;
 
   try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const userId = await getUserIdFromAccessToken(accessToken);
+
     // Retrieve `product_id` and `project_id` from the `tasks` table
     const selectQuery = `
           SELECT product_id, project_id ,status, active_status, reopen_status
@@ -55,17 +62,16 @@ exports.createSubTask = async (payload, res) => {
     // Insert into `sub_tasks` table
     const insertQuery = `
         INSERT INTO sub_tasks (
-            product_id, project_id, task_id, name, assigned_user_id, created_by,updated_by ,deleted_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?,?,?, NULL, NOW(), NOW())
+            product_id, project_id, task_id, name, created_by,updated_by ,deleted_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?,?,?, NULL, NOW(), NOW())
     `;
     const values = [
       product_id,
       project_id,
       task_id,
       name,
-      created_by,
-      created_by,
-      created_by,
+      userId,
+      userId,
     ];
 
     const [result] = await db.query(insertQuery, values);

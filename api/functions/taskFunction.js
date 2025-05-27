@@ -28,7 +28,7 @@ const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
-exports.createTask = async (payload, res) => {
+exports.createTask = async (payload, res, req) => {
   const {
     product_id,
     project_id,
@@ -50,14 +50,18 @@ exports.createTask = async (payload, res) => {
     description,
     team_id,
     priority,
-    created_by,
-    updated_by,
     deleted_at,
     created_at,
     updated_at,
   } = payload;
 
   try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const userId = await getUserIdFromAccessToken(accessToken);
+
     const [product] = await db.query(
       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
       [product_id]
@@ -231,8 +235,8 @@ exports.createTask = async (payload, res) => {
       description,
       team_id,
       priority,
-      created_by,
-      updated_by,
+      userId,
+      userId,
       deleted_at,
       created_at,
       updated_at,
@@ -512,60 +516,63 @@ exports.getTask = async (queryParams, res, req) => {
     const subtasksData =
       Array.isArray(subtasks) && subtasks[0].length > 0
         ? subtasks[0].map((subtask) => ({
-          subtask_id: subtask.id,
-          owner_id: subtask.user_id || "",
-          name: subtask.name || "",
-          status: subtask.status,
-          active_status: subtask.active_status,
-          reopen_status: subtask.reopen_status,
-          assignee: subtask.user_id,
-          assigneename: subtask.assignee_name || "",
-          short_name: (subtask.assignee_name || "").substr(0, 2),
-          // status_text: statusMap[subtask.status] || "Unknown",
-          status_text: commonStatusGroup(
-            subtask.status,
-            subtask.reopen_status,
-            subtask.active_status
-          ),
-        }))
+            subtask_id: subtask.id,
+            owner_id: subtask.user_id || "",
+            name: subtask.name || "",
+            status: subtask.status,
+            active_status: subtask.active_status,
+            reopen_status: subtask.reopen_status,
+            assignee: subtask.user_id,
+            assigneename: subtask.assignee_name || "",
+            short_name: (subtask.assignee_name || "").substr(0, 2),
+            // status_text: statusMap[subtask.status] || "Unknown",
+            status_text: commonStatusGroup(
+              subtask.status,
+              subtask.reopen_status,
+              subtask.active_status
+            ),
+          }))
         : [];
 
     const historiesData =
       Array.isArray(histories) && histories[0].length > 0
         ? await Promise.all(
-          histories[0].map(async (history) => ({
-            old_data: history.old_data,
-            new_data: history.new_data,
-            description: history.status_description || "Changed the status",
-            updated_by: history.updated_by,
-            shortName: history.short_name,
-            time_date: moment
-              .utc(history.updated_at)
-              .tz("Asia/Kolkata")
-              .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: history.updated_at,
-            time: moment(history.updated_at).fromNow(),
-            time1: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow()
-          }))
-        )
+            histories[0].map(async (history) => ({
+              old_data: history.old_data,
+              new_data: history.new_data,
+              description: history.status_description || "Changed the status",
+              updated_by: history.updated_by,
+              shortName: history.short_name,
+              time_date: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .format("YYYY-MM-DD HH:mm:ss"),
+              time_utc: history.updated_at,
+              time: moment(history.updated_at).fromNow(),
+              time1: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .fromNow(),
+            }))
+          )
         : [];
 
     const commentsData =
       Array.isArray(comments) && comments[0].length > 0
         ? comments[0].map((comment) => ({
-          comment_id: comment.id,
-          comments: comment.comments,
-          user_id: comment.user_id,
-          is_edited: comment.is_edited,
-          updated_by: comment.updated_by || "",
-          shortName: comment.updated_by.substr(0, 2),
-          time_date: moment
-            .utc(comment.updated_at)
-            .tz("Asia/Kolkata")
-            .format("YYYY-MM-DD HH:mm:ss"),
-          time_utc: comment.updated_at,
-          time: moment(comment.updated_at).fromNow()
-        }))
+            comment_id: comment.id,
+            comments: comment.comments,
+            user_id: comment.user_id,
+            is_edited: comment.is_edited,
+            updated_by: comment.updated_by || "",
+            shortName: comment.updated_by.substr(0, 2),
+            time_date: moment
+              .utc(comment.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: comment.updated_at,
+            time: moment(comment.updated_at).fromNow(),
+          }))
         : [];
 
     // Final response
@@ -605,25 +612,30 @@ exports.getAllTasks = async (res) => {
   }
 };
 
-exports.updateTask = async (id, payload, res) => {
+exports.updateTask = async (id, payload, res,req) => {
   try {
     const {
       product_id,
       project_id,
       user_id,
       assigned_user_id,
-      updated_by,
       estimated_hours,
       start_date,
       end_date,
       team_id,
     } = payload;
 
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const userId = await getUserIdFromAccessToken(accessToken);
+
     // Validate updated_by
-    if (updated_by) {
+    if (userId) {
       const [updatduser] = await db.query(
         "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-        [updated_by]
+        [userId]
       );
       if (updatduser.length === 0) {
         return errorResponse(
@@ -832,10 +844,7 @@ exports.updateTask = async (id, payload, res) => {
         description = ?,
         team_id = ?,
         priority = ?,
-        created_by = ?,
         updated_by = ?,
-        deleted_at = ?,
-        created_at = ?,
         updated_at = NOW()
       WHERE id = ?
     `;
@@ -859,10 +868,8 @@ exports.updateTask = async (id, payload, res) => {
       updatedData.description,
       updatedData.team_id,
       updatedData.priority,
-      updatedData.created_by,
-      updatedData.updated_by,
-      updatedData.deleted_at,
-      updatedData.created_at,
+      updatedData.userId,
+
       id,
     ];
 
@@ -1415,8 +1422,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     old_data, new_data, task_id, subtask_id, text,
     updated_by, status_flag, created_at, updated_at, deleted_at
   ) VALUES ${taskHistoryEntries
-          .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
-          .join(", ")}
+    .map(() => "(?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)")
+    .join(", ")}
 `;
 
       await db.query(historyQuery, taskHistoryEntries.flat());
@@ -1501,11 +1508,16 @@ exports.updateTaskData = async (id, payload, res, req) => {
 //   }
 // };
 
-exports.deleteTask = async (id, res) => {
+exports.deleteTask = async (req, res) => {
+   const id = req.params.id;
+
   try {
-    // Check if any subtasks exist
-    const subtaskQuery =
-      "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
+    // 1. Check if any subtasks exist
+    const subtaskQuery = `
+      SELECT COUNT(*) as subtaskCount 
+      FROM sub_tasks 
+      WHERE task_id = ? AND deleted_at IS NULL
+    `;
     const [subtaskResult] = await db.query(subtaskQuery, [id]);
 
     if (subtaskResult[0].subtaskCount > 0) {
@@ -1517,10 +1529,13 @@ exports.deleteTask = async (id, res) => {
       );
     }
 
-    // Get task status details
-    const statusQuery =
-      "SELECT status, reopen_status, active_status FROM tasks WHERE id = ? AND deleted_at IS NULL";
+    const statusQuery = `
+      SELECT status, reopen_status, active_status 
+      FROM tasks 
+      WHERE id = ? AND deleted_at IS NULL
+    `;
     const [taskStatusResult] = await db.query(statusQuery, [id]);
+
 
     if (taskStatusResult.length === 0) {
       return errorResponse(res, null, "Task not found", 404);
@@ -1528,22 +1543,19 @@ exports.deleteTask = async (id, res) => {
 
     const { status, reopen_status, active_status } = taskStatusResult[0];
 
-    // Prevent deletion if task is "InProgress"
-    const currentGroup = commonStatusGroup(
-      status,
-      reopen_status,
-      active_status
-    );
+    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    console.log("Current Status Group:", currentGroup);
+
     if (currentGroup === "InProgress") {
       return errorResponse(
         res,
         null,
-        "Task is InProgress and cannot be deleted",
+        "Task is currently in progress and cannot be deleted",
         400
       );
     }
 
-    // Soft delete the task
+    // 3. Soft delete the task
     const deleteQuery = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
     const [deleteResult] = await db.query(deleteQuery, [id]);
 
@@ -1553,6 +1565,7 @@ exports.deleteTask = async (id, res) => {
 
     return successResponse(res, null, "Task deleted successfully");
   } catch (error) {
+    console.error("Delete task error:", error);
     return errorResponse(res, error.message, "Error deleting task", 500);
   }
 };
@@ -1630,8 +1643,8 @@ const lastActiveTask = async (userId) => {
         ? true
         : false
       : task.task_total_hours_worked > task.estimated_hours
-        ? true
-        : false;
+      ? true
+      : false;
     task.assignedTo = task.subtask_id
       ? task.subtask_assigned_to
       : task.task_assigned_to;
@@ -2090,14 +2103,13 @@ exports.getTaskList = async (queryParams, res) => {
           const searchMatch = !isSearching
             ? true
             : [
-              st.subtask_name,
-              st.subtask_user_name,
-              task.task_name,
-              task.product_name,
-              task.project_name,
-              task.team_name,
-            ].some((f) => f?.toLowerCase().includes(search));
-
+                st.subtask_name,
+                st.subtask_user_name,
+                task.task_name,
+                task.product_name,
+                task.project_name,
+                task.team_name,
+              ].some((f) => f?.toLowerCase().includes(search));
 
           const priorityMatch = priorityFilter
             ? st.priority === priorityFilter
@@ -2154,12 +2166,12 @@ exports.getTaskList = async (queryParams, res) => {
         const searchMatch = !isSearching
           ? true
           : [
-            task.product_name,
-            task.project_name,
-            task.task_name,
-            task.team_name,
-            task.assignee_name,
-          ].some((f) => f?.toLowerCase().includes(search));
+              task.product_name,
+              task.project_name,
+              task.task_name,
+              task.team_name,
+              task.assignee_name,
+            ].some((f) => f?.toLowerCase().includes(search));
 
         const priorityMatch = priorityFilter
           ? task.priority === priorityFilter
