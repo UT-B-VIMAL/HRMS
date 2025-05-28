@@ -114,7 +114,7 @@ exports.updateTeam = async (id, payload, res) => {
     }
     let query = "UPDATE teams SET name = ?, updated_by = ?, updated_at = NOW()";
     const values = [name, user_id];
-    if (reporting_user_id) {
+    if (reporting_user_id && typeof reporting_user_id !== "boolean") {
       query += ", reporting_user_id = ?";
       values.push(reporting_user_id);
     }
