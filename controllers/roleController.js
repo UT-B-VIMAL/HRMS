@@ -42,6 +42,7 @@ const RoleController = {
                     }
                 );
                 //console.log("Groups Response:", groupsResponse.data);
+
                 if (!groupsResponse.data || groupsResponse.data.length === 0) {
                     return res.status(404).send({ message: "No groups found for this user" });
                 }
@@ -55,11 +56,13 @@ const RoleController = {
                     }
                 );
                // console.log("Group Roles Response:", groupsRolesResponse.data);
+
                 const clientMappings = groupsRolesResponse.data.clientMappings || {};
                 const realmManagementMapping = clientMappings[process.env.CLIENT_ID];
                 const exactRoles = realmManagementMapping
                     ? realmManagementMapping.mappings.map((mapping) => mapping.name)
                     : [];
+
                 const isPresent = exactRoles.includes(currentRequest+'{{'+method+'}}');
                 if (!isPresent) {
                     return res.status(403).send({ message: "Forbidden: Insufficient permissions" });
