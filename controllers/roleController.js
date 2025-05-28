@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 require('dotenv').config();
+const { getAdminToken } = require('../api/functions/keycloakFunction');
 
 const RoleController = {
     /**
@@ -36,19 +37,18 @@ const RoleController = {
                 }
 
                 const userId = decodedToken.sub; // Usually, the user ID is in the 'sub' field
-                // console.log(`${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`);
-
-
+                //console.log(`${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`);
+                 const adminTokens = await getAdminToken();
                 const groupsResponse = await axios.get(
                     `${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`,
                     {
                         headers: {
-                            Authorization: `Bearer ${tokenFromHeader}`,
+                            Authorization: `Bearer ${adminTokens}`,
                         },
                     }
                 );
 
-                // console.log("Groups Response:", groupsResponse.data);
+                //console.log("Groups Response:", groupsResponse.data);
 
                 if (!groupsResponse.data || groupsResponse.data.length === 0) {
                     return res.status(404).send({ message: "No groups found for this user" });
@@ -60,15 +60,15 @@ const RoleController = {
                     `${process.env.SERVER_URL}/admin/realms/${process.env.REALM}/groups/${groupid}/role-mappings`,
                     {
                         headers: {
-                            Authorization: `Bearer ${tokenFromHeader}`,
+                            Authorization: `Bearer ${adminTokens}`,
                         },
                     }
                 );
 
-                // console.log("Group Roles Response:", groupsRolesResponse.data);
+               // console.log("Group Roles Response:", groupsRolesResponse.data);
 
                 const clientMappings = groupsRolesResponse.data.clientMappings || {};
-                const realmManagementMapping = clientMappings["hrmsClient"];
+                const realmManagementMapping = clientMappings[process.env.CLIENT_ID];
                 const exactRoles = realmManagementMapping
                     ? realmManagementMapping.mappings.map((mapping) => mapping.name)
                     : [];
