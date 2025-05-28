@@ -16,7 +16,7 @@ const RoleController = {
                 const method = req.method;
 
                 if (match) {
-                    currentRequest = match[1]; // Outputs: "user"
+                    currentRequest = match[1];
                 } else {
                     return res.status(400).json({ 
                         success: false, 
@@ -36,7 +36,7 @@ const RoleController = {
                     return res.status(400).send({ message: "Invalid token, user ID not found" });
                 }
 
-                const userId = decodedToken.sub; // Usually, the user ID is in the 'sub' field
+                const userId = decodedToken.sub; 
                 //console.log(`${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`);
                  const adminTokens = await getAdminToken();
                 const groupsResponse = await axios.get(
