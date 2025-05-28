@@ -72,9 +72,6 @@ const RoleController = {
                 const exactRoles = realmManagementMapping
                     ? realmManagementMapping.mappings.map((mapping) => mapping.name)
                     : [];
-                     
-                 //console.log("Exact Roles:", exactRoles);
-                 //console.log("currentRequest----:", currentRequest+'{{'+method+'}}');
 
                 const isPresent = exactRoles.includes(currentRequest+'{{'+method+'}}');
                 if (!isPresent) {
