@@ -174,9 +174,14 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
 
 
 exports.ratingUpdation = async (payload, res, req) => {
-  const { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id, updated_by } = payload;
-
-  const { error } = UpdateRatingSchema.validate(
+  let { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id, updated_by ,import_status} = payload;
+  if( import_status == 1) {
+    const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [user_id]);
+    if (!empUsers.length) {
+      return errorResponse(res, "Employee Id Not Found", `Employee ID ${id} does not exist in the users table.`, 404);
+    }
+    user_id = empUsers[0].id; // Use the ID from the users table
+  }  const { error } = UpdateRatingSchema.validate(
     { status, month, rater, quality, timelines, agility, attitude, responsibility, user_id, updated_by, remarks },
     { abortEarly: false }
   );

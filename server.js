@@ -45,7 +45,7 @@ const dailyAttendanceNotificationCron = require("./cron/dailyAttendanceNotificat
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
 const DOMAIN = isProduction ? process.env.LIVE_URL : process.env.LOCAL_URL;
-const PORT = isProduction ? 8095 : 3000;
+const PORT = isProduction ? process.env.PORT : 3000;
 
 // Socket-----------------------------------------------------------------------------
 const socketIo = require("socket.io");
@@ -107,26 +107,26 @@ notificationSocket(io.of("/notifications"));
 chatSocket(io.of("/chat"));
 
 // Socket-----------------------------------------------------------------------------
-// const corsOptions = {
-//   origin: "*", // Allow all origins
-//   methods: ["GET", "POST", "PUT", "DELETE"],
-//   exposedHeaders: ['Content-Disposition']
-//   // allowedHeaders: ["Content-Type", "Authorization"]
-// };
+const corsOptions = {
+  origin: "*", // Allow all origins
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  exposedHeaders: ['Content-Disposition']
+  // allowedHeaders: ["Content-Type", "Authorization"]
+};
 
 // Load allowed origins from env
-const corsOptions = {
-  origin: (origin, callback) => {
+// const corsOptions = {
+//   origin: (origin, callback) => {
     
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Origin ${origin} is not allowed by CORS`));
-    }
-  },
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
+//     if (!origin || allowedOrigins.includes(origin)) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error(`Origin ${origin} is not allowed by CORS`));
+//     }
+//   },
+//   methods: ["GET", "POST", "PUT", "DELETE"],
+//   allowedHeaders: ["Content-Type", "Authorization"],
+// };
 
 
 app.use(cors(corsOptions));

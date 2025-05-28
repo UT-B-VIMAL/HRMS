@@ -18,7 +18,7 @@ exports.createSubTask = async (req, res) => {
             return errorResponse(res, errorMessages, "Validation Error", 403);
         }
 
-        await createSubTask(payload, res);
+        await createSubTask(payload, res,req);
 
     } catch (error) {
         console.error('Error creating task:', error.message);
