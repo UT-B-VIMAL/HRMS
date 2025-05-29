@@ -132,6 +132,7 @@ exports.logTaskTimeline = async (req, res) => {
     if (userRows.length === 0) return errorResponse(res, null, "User not found", 404);
 
     const user_id = userRows[0].user_id;
+    const formattedStart = moment(new Date(start_time)).format("YYYY-MM-DD");
 
     // Get task_id, product_id, project_id using task_name
    const [taskRows] = await db.query(
@@ -141,7 +142,7 @@ exports.logTaskTimeline = async (req, res) => {
      AND user_id = ? 
      AND deleted_at IS NULL 
      AND DATE(?) BETWEEN DATE(start_date) AND DATE(end_date)`,
-  [task_name, user_id, start_time]
+  [task_name, user_id, formattedStart]
 );
     if (taskRows.length === 0) return errorResponse(res, null, "Task not found", 404);
 
