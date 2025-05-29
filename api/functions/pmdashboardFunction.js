@@ -1152,3 +1152,274 @@ exports.fetchPmdatas = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching PM data", 500);
   }
 };
+
+exports.fetchUserTasksByProduct = async (req, res) => {
+  const accessToken = req.headers.authorization?.split(' ')[1];
+  if (!accessToken) {
+    return errorResponse(res, 'Access token is required', 401);
+  }
+
+  const userId = await getUserIdFromAccessToken(accessToken);
+
+  try {
+    const productIdString = req.body.product_id || "";
+    const productIds = productIdString
+      .split(",")
+      .map((id) => parseInt(id.trim(), 10))
+      .filter((id) => !isNaN(id));
+
+    // Enforce min/max limit for product IDs
+    if (productIds.length < 1 || productIds.length > 4) {
+      return errorResponse(
+        res,
+        null,
+        "Please provide minimum 1 product and maximum 4 product IDs",
+        400
+      );
+    }
+
+    const params = [userId, productIds, userId, productIds];
+    const productsQuery = `
+      SELECT DISTINCT p.id, p.name
+      FROM products p
+      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
+      JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
+      WHERE p.deleted_at IS NULL
+        AND st.assigned_user_id = ?
+        AND p.id IN (?)
+
+      UNION
+
+      SELECT DISTINCT p.id, p.name
+      FROM products p
+      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
+      LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
+      WHERE p.deleted_at IS NULL
+        AND st.id IS NULL
+        AND t.assigned_user_id = ?
+        AND p.id IN (?)
+    `;
+
+    const [products] = await db.query(productsQuery, params);
+
+    const result = await Promise.all(
+      products.map(async (product) => {
+        let inProgressCount = 0;
+        let completedCount = 0;
+        let pendingCount = 0;
+
+        // Tasks without subtasks
+        const [soloTasks] = await db.query(
+          `SELECT t.status, t.active_status, t.reopen_status FROM tasks t
+           LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
+           WHERE t.product_id = ?
+             AND t.deleted_at IS NULL
+             AND st.id IS NULL
+             AND t.assigned_user_id = ?`,
+          [product.id, userId]
+        );
+
+        soloTasks.forEach((task) => {
+          if (task.status === 3) {
+            completedCount++;
+          } else if (
+            (task.status === 1 && task.active_status === 1 && task.reopen_status === 0) ||
+            (task.status === 2 && task.reopen_status === 0)
+          ) {
+            inProgressCount++;
+          } else if (
+            (task.status === 0 && task.active_status === 0 && task.reopen_status === 0) ||
+            (task.status === 1 && task.active_status === 0 && task.reopen_status === 0) ||
+            task.reopen_status === 1
+          ) {
+            pendingCount++;
+          }
+        });
+
+        // Subtasks
+        const [userSubTasks] = await db.query(
+          `SELECT st.status, st.active_status, st.reopen_status FROM sub_tasks st
+           JOIN tasks t ON t.id = st.task_id AND t.deleted_at IS NULL
+           WHERE st.deleted_at IS NULL
+             AND st.assigned_user_id = ?
+             AND t.product_id = ?`,
+          [userId, product.id]
+        );
+
+        userSubTasks.forEach((subtask) => {
+          if (subtask.status === 3) {
+            completedCount++;
+          } else if (
+            (subtask.status === 1 && subtask.active_status === 1 && subtask.reopen_status === 0) ||
+            (subtask.status === 2 && subtask.reopen_status === 0)
+          ) {
+            inProgressCount++;
+          } else if (
+            (subtask.status === 0 && subtask.active_status === 0 && subtask.reopen_status === 0) ||
+            (subtask.status === 1 && subtask.active_status === 0 && subtask.reopen_status === 0) ||
+            subtask.reopen_status === 1
+          ) {
+            pendingCount++;
+          }
+        });
+
+        const total = inProgressCount + completedCount + pendingCount;
+        const inProgressPercent = total > 0 ? Math.round((inProgressCount / total) * 100) : 0;
+        const completedPercent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+        const pendingPercent = total > 0 ? Math.round((pendingCount / total) * 100) : 0;
+
+        return {
+          product_id: product.id,
+          product_name: product.name,
+          inprogress_count: inProgressCount,
+          inprogress_percentage: inProgressPercent,
+          completed_count: completedCount,
+          completed_percentage: completedPercent,
+          pending_count: pendingCount,
+          pending_percentage: pendingPercent,
+        };
+      })
+    );
+
+    return successResponse(res, result, "Task data retrieved successfully", 200);
+  } catch (error) {
+    console.error("Error fetching task data:", error);
+    return errorResponse(res, error.message, "Error fetching task data", 500);
+  }
+};
+
+
+
+exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
+  try {
+    const { team_id, date } = req.body;
+    const targetDate = date ? new Date(date) : new Date();
+    const formattedDate = targetDate.toISOString().split("T")[0];
+
+    // Step 1: Fetch relevant users
+    let usersQuery = `
+      SELECT u.id AS user_id, u.employee_id, u.team_id, t.name AS team_name,
+             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+      FROM users u
+      LEFT JOIN teams t ON u.team_id = t.id
+      WHERE u.deleted_at IS NULL AND t.deleted_at IS NULL
+        AND u.role_id NOT IN (1, 2)
+        ${team_id ? "AND u.team_id = ?" : ""}
+    `;
+
+    const [users] = await db.query(usersQuery, team_id ? [team_id] : []);
+
+    if (users.length === 0) {
+      return errorResponse(res, null, "No users found", 404);
+    }
+
+    const userIds = users.map((u) => u.user_id);
+
+    // Step 2: Fetch leave data
+    const [leaveRows] = await db.query(
+      `
+      SELECT user_id, day_type, half_type
+      FROM employee_leave
+      WHERE deleted_at IS NULL AND DATE(date) = ?
+        AND user_id IN (?)
+    `,
+      [formattedDate, userIds]
+    );
+
+    const leaveMap = {};
+    leaveRows.forEach(({ user_id, day_type, half_type }) => {
+      leaveMap[user_id] = { day_type, half_type };
+    });
+
+    // Step 3: Fetch working activity data
+    const [timelineRows] = await db.query(
+      `
+      SELECT user_id
+      FROM sub_tasks_user_timeline
+      WHERE DATE(start_time) = ?
+        AND user_id IN (?)
+      GROUP BY user_id
+    `,
+      [formattedDate, userIds]
+    );
+
+    const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
+    const currentTime = new Date();
+    const cutoffTime = new Date(targetDate);
+    cutoffTime.setHours(13, 0, 0);
+
+    // Step 4: Process each user
+    const resultMap = {};
+
+    users.forEach((user) => {
+      const teamId = user.team_id;
+      if (!resultMap[teamId]) {
+        resultMap[teamId] = {
+          team_id: teamId,
+          team_name: user.team_name || "Unknown Team",
+          total_strength: 0,
+          present_employees: [],
+          absent_employees: [],
+          active_employees: [],
+          idle_employees: [],
+        };
+      }
+
+      resultMap[teamId].total_strength++;
+
+      const leave = leaveMap[user.user_id];
+      const isAbsent =
+        leave &&
+        (leave.day_type === 1 ||
+          (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTime) ||
+          (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTime));
+
+      const employee = {
+        user_id: user.user_id,
+        employee_id: user.employee_id || "N/A",
+        employee_name: user.employee_name || "N/A",
+      };
+
+      if (isAbsent) {
+        resultMap[teamId].absent_employees.push(employee);
+      } else {
+        resultMap[teamId].present_employees.push(employee);
+        if (workingUserIds.has(user.user_id)) {
+          resultMap[teamId].active_employees.push(employee);
+        } else {
+          resultMap[teamId].idle_employees.push(employee);
+        }
+      }
+    });
+
+    // Step 5: Format output
+    const pad = (num) => num.toString().padStart(2, "0");
+
+    const finalOutput = Object.values(resultMap).map((team) => ({
+      team_id: team.team_id,
+      team_name: team.team_name,
+      total_strength: pad(team.total_strength),
+      total_present_count: pad(team.present_employees.length),
+      total_absent_count: pad(team.absent_employees.length),
+      total_active_count: pad(team.active_employees.length),
+      total_idle_count: pad(team.idle_employees.length),
+      present_employees: team.present_employees,
+      absent_employees: team.absent_employees,
+      active_employees: team.active_employees,
+      idle_employees: team.idle_employees,
+    }));
+
+    return successResponse(
+      res,
+      {
+        date: formattedDate,
+        teams: finalOutput,
+      },
+      "Team utilization and attendance data retrieved successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Error:", error);
+    return errorResponse(res, error.message, "Error fetching data", 500);
+  }
+};

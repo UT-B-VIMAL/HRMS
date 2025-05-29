@@ -383,6 +383,14 @@ apiRouter.get(
   RoleController.checkRole(),
   pmdashboardController.pmviewproductsection
 );
+apiRouter.get(
+  "/pmTasksByProduct",
+  pmdashboardController.pmfetchUserTasksByProduct
+);
+apiRouter.get(
+  "/pmUtilizationAndAttendance",
+  pmdashboardController.pmUtilizationAndAttendance
+);
 
 // TL Dashboard Routes
 apiRouter.get(
