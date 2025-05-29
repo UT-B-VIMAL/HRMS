@@ -73,18 +73,3 @@ const RoleController = {
     },
 };
 module.exports = RoleController;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
