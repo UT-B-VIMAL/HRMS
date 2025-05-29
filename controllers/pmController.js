@@ -1,4 +1,4 @@
-const { fetchProducts, fetchUtilization, fetchAttendance, fetchPmdatas, fetchPmviewproductdata } = require('../api/functions/pmdashboardFunction');
+const { fetchProducts, fetchUtilization, fetchAttendance, fetchPmdatas, fetchPmviewproductdata, fetchUserTasksByProduct,fetchTeamUtilizationAndAttendance } = require('../api/functions/pmdashboardFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 exports.pmproductsection = async (req, res) => {
@@ -50,6 +50,23 @@ exports.pmviewproductsection = async (req, res) => {
   }
 };
 
+
+exports.pmfetchUserTasksByProduct = async (req, res) => {
+  try {
+    return await fetchUserTasksByProduct(req, res);
+  } catch (error) {
+    console.error("Error during pmfetchUserTasksByProduct processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
+exports.pmUtilizationAndAttendance = async (req, res) => {
+  try {
+    return await fetchTeamUtilizationAndAttendance(req, res);
+  } catch (error) {
+    console.error("Error during pmfetchUserTasksByProduct processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
 
 
 // Add other sections as needed
