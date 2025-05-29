@@ -135,8 +135,8 @@ exports.logTaskTimeline = async (req, res) => {
 
     // Get task_id, product_id, project_id using task_name
     const [taskRows] = await db.query(
-      "SELECT id AS task_id, product_id, project_id FROM tasks WHERE name = ? AND deleted_at IS NULL",
-      [task_name]
+      "SELECT id AS task_id, product_id, project_id FROM tasks WHERE name = ? AND user_id = ? AND deleted_at IS NULL",
+      [task_name,user_id]
     );
     if (taskRows.length === 0) return errorResponse(res, null, "Task not found", 404);
 
