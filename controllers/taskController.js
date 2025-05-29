@@ -7,16 +7,16 @@ const taskController = {
   createTask: async (req, res) => {
     try {
       const payload = req.body;
-      // const { error } = createTaskSchema.validate(payload, { abortEarly: false });
+      const { error } = createTaskSchema.validate(payload, { abortEarly: false });
 
-      // if (error) {
-      //   const errorMessages = error.details.reduce((acc, err) => {
-      //     acc[err.path[0]] = err.message;
-      //     return acc;
-      //   }, {});
+      if (error) {
+        const errorMessages = error.details.reduce((acc, err) => {
+          acc[err.path[0]] = err.message;
+          return acc;
+        }, {});
 
-      //   return errorResponse(res, errorMessages, "Validation Error", 403);
-      // }
+        return errorResponse(res, errorMessages, "Validation Error", 403);
+      }
 
       await createTask(payload, res,req);
 
