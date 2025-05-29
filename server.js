@@ -145,12 +145,13 @@ apiRouter.put(
 );
 apiRouter.post("/forgot_password", loginController.forgotPassword);
 apiRouter.post("/verifyOtp", loginController.verifyOtp);
+apiRouter.post("/user_timeline", loginController.logTaskTimeline);
 apiRouter.post("/reset_password", loginController.reset_password);
 apiRouter.post("/profile", profileController.createOrUpdateProfile);
 apiRouter.get("/profile/:id", profileController.getProfile);
 
 // User Routes
-apiRouter.post("/user", RoleController.checkRole(), userController.createUser);
+apiRouter.post("/user", userController.createUser);
 apiRouter.put(
   "/user/:id",
   RoleController.checkRole(),

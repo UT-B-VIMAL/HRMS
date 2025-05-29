@@ -1,7 +1,8 @@
-const { signInUser, logoutUser, changePassword, forgotPassword,verifyOtp,resetPasswordWithKeycloak } = require("../api/functions/keycloakFunction");
+const { signInUser, logoutUser, changePassword, forgotPassword,resetPasswordWithKeycloak } = require("../api/functions/keycloakFunction");
 const { changePasswordSchema } = require("../validators/authValidator");
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const db = require("../config/db");
+const moment = require("moment");
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;
@@ -105,6 +106,182 @@ exports.verifyOtp = async (req, res) => {
   } catch (error) {
     console.error("OTP verification failed:", error);
     return errorResponse(res, error.message, 'Error verifying OTP', 500);
+  }
+};
+
+
+exports.logTaskTimeline = async (req, res) => {
+
+  try {
+    const payload = req.body;
+    const { employee_id, task_name, start_time, end_time, status, comment } = payload;
+
+
+    if (!employee_id || !task_name || !start_time || !end_time || !status) {
+      return errorResponse(res, null, "Missing required fields", 400);
+    }
+
+    const formattedStartTime = moment(new Date(start_time)).format("YYYY-MM-DD HH:mm:ss");
+    const formattedEndTime = moment(new Date(end_time)).format("YYYY-MM-DD HH:mm:ss");
+
+    // Get user_id from employee_id
+    const [userRows] = await db.query(
+      "SELECT id AS user_id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
+      [employee_id]
+    );
+    if (userRows.length === 0) return errorResponse(res, null, "User not found", 404);
+
+    const user_id = userRows[0].user_id;
+
+    // Get task_id, product_id, project_id using task_name
+    const [taskRows] = await db.query(
+      "SELECT id AS task_id, product_id, project_id FROM tasks WHERE name = ? AND user_id = ? AND deleted_at IS NULL",
+      [task_name,user_id]
+    );
+    if (taskRows.length === 0) return errorResponse(res, null, "Task not found", 404);
+
+    const { task_id, product_id, project_id } = taskRows[0];
+
+    // === Optional: Insert into sub_tasks_user_timeline (without created_by/updated_by) ===
+    
+   
+    
+
+ if (status === "On Hold") {
+  // Check if timeline entry exists for this task
+  const [timelineRows] = await db.query(
+    "SELECT id FROM sub_tasks_user_timeline WHERE task_id = ? LIMIT 1",
+    [task_id]
+  );
+
+  let firstOld = "To Do";
+  let firstNew = "In Progress";
+  // If timeline already has entry, switch first transition to On Hold → In Progress
+  if (timelineRows.length > 0) {
+    firstOld = "On Hold";
+    firstNew = "In Progress";
+  }
+
+  // First history entry
+  await db.query(`
+    INSERT INTO task_histories (
+      old_data, new_data, task_id, subtask_id, text,
+      updated_by, status_flag, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
+  `, [
+    firstOld,
+    firstNew,
+    task_id,
+    `Status changed from ${firstOld} to ${firstNew}`,
+    user_id,
+    1,
+    formattedStartTime,
+    formattedStartTime
+  ]);
+
+  // Second history entry: In Progress → On Hold
+  await db.query(`
+    INSERT INTO task_histories (
+      old_data, new_data, task_id, subtask_id, text,
+      updated_by, status_flag, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
+  `, [
+    "In Progress",
+    "On Hold",
+    task_id,
+    "Status changed from In Progress to On Hold",
+    user_id,
+    1,
+    formattedEndTime,
+    formattedEndTime
+  ]);
+}
+
+if (status === "In Review") {
+  // On Hold → In Progress (start_time)
+  await db.query(`
+    INSERT INTO task_histories (
+      old_data, new_data, task_id, subtask_id, text,
+      updated_by, status_flag, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
+  `, [
+    "On Hold",
+    "In Progress",
+    task_id,
+    "Status changed from On Hold to In Progress",
+    user_id,
+    1,
+    formattedStartTime,
+    formattedStartTime
+  ]);
+
+  // In Progress → In Review (end_time)
+  await db.query(`
+    INSERT INTO task_histories (
+      old_data, new_data, task_id, subtask_id, text,
+      updated_by, status_flag, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
+  `, [
+    "In Progress",
+    "In Review",
+    task_id,
+    "Status changed from In Progress to In Review",
+    user_id,
+    1,
+    formattedEndTime,
+    formattedEndTime
+  ]);
+}
+
+    // === Insert comment if available ===
+   if (comment) {
+  const updateTaskCommentQuery = `
+    UPDATE tasks
+    SET command = ?, updated_at = ?
+    WHERE id = ?
+  `;
+  await db.query(updateTaskCommentQuery, [
+    comment,
+    formattedEndTime, // make sure this is formatted as discussed
+    task_id
+  ]);
+}
+
+
+ const insertTimelineQuery = `
+      INSERT INTO sub_tasks_user_timeline (
+        user_id, task_id, product_id, project_id, subtask_id,
+        start_time, end_time, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)
+    `;
+    await db.query(insertTimelineQuery, [
+      user_id,
+      task_id,
+      product_id,
+      project_id,
+      formattedStartTime,
+      formattedEndTime,
+      formattedStartTime,
+      formattedEndTime
+    ]);
+
+
+    return successResponse(
+      res,
+      {
+        user_id,
+        task_id,
+        product_id,
+        project_id,
+        status,
+        comment
+      },
+      "Task history and comments logged successfully",
+      201
+    );
+  } catch (error) {
+    console.error("Error logging task timeline:", error.message);
+    return errorResponse(res, error.message, "Internal Server Error", 500);
   }
 };
 
