@@ -27,6 +27,7 @@ const { updateTimelineShema } = require("../../validators/taskValidator");
 const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
 
+
 // Insert Task
 // exports.createTask = async (payload, res, req) => {
 //   const {
@@ -261,7 +262,7 @@ exports.createTask = async (payload, res, req) => {
     product_name,
     project_name,
     emp_id,
-    name,
+    task_name,
     estimated_hours,
     start_date,
     end_date,
@@ -276,7 +277,6 @@ exports.createTask = async (payload, res, req) => {
     remark,
     reopen_status,
     description,
-    team_id,
     priority,
     deleted_at,
     created_at,
@@ -337,7 +337,7 @@ exports.createTask = async (payload, res, req) => {
 
     // Get employee ID
     const [employeeRows] = await db.query(
-      "SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
+      "SELECT id,team_id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
       [emp_id]
     );
     if (employeeRows.length === 0) {
@@ -348,7 +348,9 @@ exports.createTask = async (payload, res, req) => {
         404
       );
     }
-    const user_id = employeeRows[0].id;
+ const user_id = employeeRows[0].id;
+ const team_id = employeeRows[0].team_id;
+
 
     // Get team ID
     const [teamRows] = await db.query(
@@ -455,7 +457,7 @@ exports.createTask = async (payload, res, req) => {
       product_id,
       project_id,
       user_id,
-      name,
+      task_name,
       payload.estimated_hours,
       start_date,
       end_date,
@@ -849,7 +851,7 @@ exports.getAllTasks = async (res) => {
   }
 };
 
-exports.updateTask = async (id, payload, res,req) => {
+exports.updateTask = async (id, payload, res, req) => {
   try {
     const {
       product_id,
@@ -1746,7 +1748,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
 // };
 
 exports.deleteTask = async (req, res) => {
-   const id = req.params.id;
+  const id = req.params.id;
 
   try {
     // 1. Check if any subtasks exist
@@ -1773,14 +1775,17 @@ exports.deleteTask = async (req, res) => {
     `;
     const [taskStatusResult] = await db.query(statusQuery, [id]);
 
-
     if (taskStatusResult.length === 0) {
       return errorResponse(res, null, "Task not found", 404);
     }
 
     const { status, reopen_status, active_status } = taskStatusResult[0];
 
-    const currentGroup = commonStatusGroup(status, reopen_status, active_status);
+    const currentGroup = commonStatusGroup(
+      status,
+      reopen_status,
+      active_status
+    );
     console.log("Current Status Group:", currentGroup);
 
     if (currentGroup === "InProgress") {
