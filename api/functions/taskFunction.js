@@ -28,25 +28,253 @@ const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
+// exports.createTask = async (payload, res, req) => {
+//   const {
+//     product_id,
+//     project_id,
+//     user_id,
+//     name,
+//     estimated_hours,
+//     start_date,
+//     end_date,
+//     extended_status = "00:00:00",
+//     extended_hours = "00:00:00",
+//     active_status = 0,
+//     status = 0,
+//     total_hours_worked = "00:00:00",
+//     rating,
+//     command,
+//     assigned_user_id,
+//     remark,
+//     reopen_status = 0,
+//     description,
+//     team_id,
+//     priority,
+//     deleted_at,
+//     created_at,
+//     updated_at,
+//   } = payload;
+
+//   try {
+//     const accessToken = req.headers.authorization?.split(" ")[1];
+//     if (!accessToken) {
+//       return errorResponse(res, "Access token is required", 401);
+//     }
+//     const userId = await getUserIdFromAccessToken(accessToken);
+
+//     const [product] = await db.query(
+//       "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+//       [product_id]
+//     );
+//     if (product.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Product not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [project] = await db.query(
+//       "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
+//       [project_id]
+//     );
+//     if (project.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Project not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [assigned_user] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [assigned_user_id]
+//     );
+//     if (assigned_user.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Assigned User not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [user] = await db.query(
+//       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
+//       [user_id]
+//     );
+//     if (user.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "User not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     const [team] = await db.query(
+//       "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+//       [team_id]
+//     );
+//     if (team.length === 0) {
+//       return errorResponse(
+//         res,
+//         null,
+//         "Team not found or has been deleted",
+//         404
+//       );
+//     }
+
+//     if (estimated_hours) {
+//       const timeMatch = estimated_hours.match(
+//         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+//       );
+
+//       if (!timeMatch) {
+//         return errorResponse(
+//           res,
+//           null,
+//           'Invalid format for estimated_hours. Use formats like "1d 2h 30m", "2h 30m", or "45m".',
+//           400
+//         );
+//       }
+
+//       const days = parseInt(timeMatch[2] || "0", 10);
+//       const hours = parseInt(timeMatch[4] || "0", 10);
+//       const minutes = parseInt(timeMatch[6] || "0", 10);
+//       const seconds = parseInt(timeMatch[8] || "0", 10);
+
+//       if (
+//         days < 0 ||
+//         hours < 0 ||
+//         minutes < 0 ||
+//         seconds < 0 ||
+//         minutes >= 60 ||
+//         seconds >= 60
+//       ) {
+//         return errorResponse(
+//           res,
+//           null,
+//           "Invalid time values in estimated_hours",
+//           400
+//         );
+//       }
+
+//       // Validate date span for estimated days
+//       if (start_date && end_date) {
+//         const start = moment(start_date, "YYYY-MM-DD");
+//         const end = moment(end_date, "YYYY-MM-DD");
+
+//         if (!start.isValid() || !end.isValid()) {
+//           return errorResponse(
+//             res,
+//             null,
+//             "Invalid start_date or end_date format",
+//             400
+//           );
+//         }
+
+//         const diffDays = end.diff(start, "days") + 1;
+
+//         const totalEstimatedHours =
+//           days * 8 + hours + minutes / 60 + seconds / 3600;
+//         const effectiveDays = Math.ceil(totalEstimatedHours / 8);
+
+//         if (diffDays < effectiveDays) {
+//           return errorResponse(
+//             res,
+//             null,
+//             `Estimated duration is ${effectiveDays} day(s) based on total estimated time, but selected date range spans only ${diffDays} day(s). Please extend the end_date.`,
+//             400
+//           );
+//         }
+//       }
+
+//       // Convert total estimated time to HH:MM:SS
+//       const totalHours = days * 8 + hours;
+
+//       payload.estimated_hours = `${String(totalHours).padStart(
+//         2,
+//         "0"
+//       )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+//         2,
+//         "0"
+//       )}`;
+//     }
+
+//     const query = `
+//         INSERT INTO tasks (
+//           product_id, project_id, user_id, name, estimated_hours,
+//           start_date, end_date, extended_status, extended_hours,
+//           active_status, status, total_hours_worked, rating, command,
+//           assigned_user_id, remark, reopen_status, description,
+//           team_id, priority, created_by, updated_by, deleted_at, created_at, updated_at
+//         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(),NOW())
+//       `;
+
+//     const values = [
+//       product_id,
+//       project_id,
+//       user_id,
+//       name,
+//       payload.estimated_hours,
+//       start_date,
+//       end_date,
+//       extended_status,
+//       extended_hours,
+//       active_status,
+//       status,
+//       total_hours_worked,
+//       rating,
+//       command,
+//       assigned_user_id,
+//       remark,
+//       reopen_status,
+//       description,
+//       team_id,
+//       priority,
+//       userId,
+//       userId,
+//       deleted_at,
+//       created_at,
+//       updated_at,
+//     ];
+
+//     const [result] = await db.query(query, values);
+
+//     return successResponse(
+//       res,
+//       { id: result.insertId, ...payload },
+//       "Task added successfully",
+//       201
+//     );
+//   } catch (error) {
+//     console.error("Error inserting task:", error.message);
+//     return errorResponse(res, error.message, "Error inserting task", 500);
+//   }
+// };
+
 exports.createTask = async (payload, res, req) => {
   const {
-    product_id,
-    project_id,
-    user_id,
+    product_name,
+    project_name,
+    emp_id,
     name,
     estimated_hours,
     start_date,
     end_date,
     extended_status = "00:00:00",
     extended_hours = "00:00:00",
-    active_status = 0,
-    status = 0,
+    active_status,
+    status,
     total_hours_worked = "00:00:00",
     rating,
     command,
-    assigned_user_id,
+    manager_id,
     remark,
-    reopen_status = 0,
+    reopen_status,
     description,
     team_id,
     priority,
@@ -62,11 +290,12 @@ exports.createTask = async (payload, res, req) => {
     }
     const userId = await getUserIdFromAccessToken(accessToken);
 
-    const [product] = await db.query(
-      "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
-      [product_id]
+    // Get product ID
+    const [productRows] = await db.query(
+      "SELECT id FROM products WHERE name = ? AND deleted_at IS NULL",
+      [product_name]
     );
-    if (product.length === 0) {
+    if (productRows.length === 0) {
       return errorResponse(
         res,
         null,
@@ -74,12 +303,14 @@ exports.createTask = async (payload, res, req) => {
         404
       );
     }
+    const product_id = productRows[0].id;
 
-    const [project] = await db.query(
-      "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL",
-      [project_id]
+    // Get project ID
+    const [projectRows] = await db.query(
+      "SELECT id FROM projects WHERE name = ? AND deleted_at IS NULL",
+      [project_name]
     );
-    if (project.length === 0) {
+    if (projectRows.length === 0) {
       return errorResponse(
         res,
         null,
@@ -87,38 +318,44 @@ exports.createTask = async (payload, res, req) => {
         404
       );
     }
+    const project_id = projectRows[0].id;
 
-    const [assigned_user] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-      [assigned_user_id]
+    // Get manager ID
+    const [managerRows] = await db.query(
+      "SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
+      [manager_id]
     );
-    if (assigned_user.length === 0) {
+    if (managerRows.length === 0) {
       return errorResponse(
         res,
         null,
-        "Assigned User not found or has been deleted",
+        "Manager not found or has been deleted",
         404
       );
     }
+    const assigned_user_id = managerRows[0].id;
 
-    const [user] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-      [user_id]
+    // Get employee ID
+    const [employeeRows] = await db.query(
+      "SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
+      [emp_id]
     );
-    if (user.length === 0) {
+    if (employeeRows.length === 0) {
       return errorResponse(
         res,
         null,
-        "User not found or has been deleted",
+        "Employee not found or has been deleted",
         404
       );
     }
+    const user_id = employeeRows[0].id;
 
-    const [team] = await db.query(
+    // Get team ID
+    const [teamRows] = await db.query(
       "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
       [team_id]
     );
-    if (team.length === 0) {
+    if (teamRows.length === 0) {
       return errorResponse(
         res,
         null,
