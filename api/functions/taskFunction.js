@@ -454,7 +454,7 @@ exports.createTask = async (payload, res, req) => {
     const values = [
       product_id,
       project_id,
-      euser_id,
+      user_id,
       name,
       payload.estimated_hours,
       start_date,
