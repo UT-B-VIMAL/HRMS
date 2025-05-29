@@ -134,10 +134,15 @@ exports.logTaskTimeline = async (req, res) => {
     const user_id = userRows[0].user_id;
 
     // Get task_id, product_id, project_id using task_name
-    const [taskRows] = await db.query(
-      "SELECT id AS task_id, product_id, project_id FROM tasks WHERE name = ? AND user_id = ? AND deleted_at IS NULL",
-      [task_name,user_id]
-    );
+   const [taskRows] = await db.query(
+  `SELECT id AS task_id, product_id, project_id 
+   FROM tasks 
+   WHERE name = ? 
+     AND user_id = ? 
+     AND deleted_at IS NULL 
+     AND DATE(?) BETWEEN DATE(start_date) AND DATE(end_date)`,
+  [task_name, user_id, start_time]
+);
     if (taskRows.length === 0) return errorResponse(res, null, "Task not found", 404);
 
     const { task_id, product_id, project_id } = taskRows[0];
