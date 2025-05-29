@@ -351,20 +351,22 @@ exports.createTask = async (payload, res, req) => {
  const user_id = employeeRows[0].id;
  const team_id = employeeRows[0].team_id;
 
+ console.log("team_id", team_id);
+ 
 
     // Get team ID
-    const [teamRows] = await db.query(
-      "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
-      [team_id]
-    );
-    if (teamRows.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Team not found or has been deleted",
-        404
-      );
-    }
+    // const [teamRows] = await db.query(
+    //   "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+    //   [team_id]
+    // );
+    // if (teamRows.length === 0) {
+    //   return errorResponse(
+    //     res,
+    //     null,
+    //     "Team not found or has been deleted",
+    //     404
+    //   );
+    // }
 
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
