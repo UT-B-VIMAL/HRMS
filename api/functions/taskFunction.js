@@ -351,6 +351,8 @@ exports.createTask = async (payload, res, req) => {
  const user_id = employeeRows[0].id;
  const team_id = employeeRows[0].team_id;
 
+ console.log("team_id", team_id);
+ 
 
     // Get team ID
     // const [teamRows] = await db.query(
