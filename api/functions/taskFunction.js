@@ -29,7 +29,6 @@ const { userSockets } = require("../../helpers/notificationHelper");
 
 
 // Insert Task
-
 exports.createTask = async (payload, res, req) => {
   const {
     product_id,
@@ -598,7 +597,6 @@ exports.getTask = async (queryParams, res, req) => {
 };
 
 // Get All Tasks
-
 exports.getAllTasks = async (res) => {
   try {
     const query = "SELECT * FROM tasks ORDER BY id DESC";
