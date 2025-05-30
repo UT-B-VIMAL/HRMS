@@ -393,6 +393,11 @@ apiRouter.get(
   pmdashboardController.pmUtilizationAndAttendance
 );
 
+apiRouter.get(
+  "/getProjectCompletionPercentage",
+  pmdashboardController.getProjectCompletionPercentage
+);
+
 // TL Dashboard Routes
 apiRouter.get(
   "/tlattendance",
