@@ -1159,7 +1159,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     return errorResponse(res, 'Access token is required', 401);
   }
 
-  const userId = await getUserIdFromAccessToken(accessToken);
+  await getUserIdFromAccessToken(accessToken); // keeping it in case it's needed elsewhere
 
   try {
     const productIdString = req.body.product_id || "";
@@ -1168,7 +1168,6 @@ exports.fetchUserTasksByProduct = async (req, res) => {
       .map((id) => parseInt(id.trim(), 10))
       .filter((id) => !isNaN(id));
 
-    // Enforce min/max limit for product IDs
     if (productIds.length < 1 || productIds.length > 4) {
       return errorResponse(
         res,
@@ -1178,29 +1177,10 @@ exports.fetchUserTasksByProduct = async (req, res) => {
       );
     }
 
-    const params = [userId, productIds, userId, productIds];
-    const productsQuery = `
-      SELECT DISTINCT p.id, p.name
-      FROM products p
-      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-      WHERE p.deleted_at IS NULL
-        AND st.assigned_user_id = ?
-        AND p.id IN (?)
-
-      UNION
-
-      SELECT DISTINCT p.id, p.name
-      FROM products p
-      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-      WHERE p.deleted_at IS NULL
-        AND st.id IS NULL
-        AND t.assigned_user_id = ?
-        AND p.id IN (?)
-    `;
-
-    const [products] = await db.query(productsQuery, params);
+    const [products] = await db.query(
+      `SELECT DISTINCT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)`,
+      [productIds]
+    );
 
     const result = await Promise.all(
       products.map(async (product) => {
@@ -1210,13 +1190,13 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 
         // Tasks without subtasks
         const [soloTasks] = await db.query(
-          `SELECT t.status, t.active_status, t.reopen_status FROM tasks t
+          `SELECT t.status, t.active_status, t.reopen_status
+           FROM tasks t
            LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
            WHERE t.product_id = ?
              AND t.deleted_at IS NULL
-             AND st.id IS NULL
-             AND t.assigned_user_id = ?`,
-          [product.id, userId]
+             AND st.id IS NULL`,
+          [product.id]
         );
 
         soloTasks.forEach((task) => {
@@ -1237,16 +1217,16 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         });
 
         // Subtasks
-        const [userSubTasks] = await db.query(
-          `SELECT st.status, st.active_status, st.reopen_status FROM sub_tasks st
+        const [subTasks] = await db.query(
+          `SELECT st.status, st.active_status, st.reopen_status
+           FROM sub_tasks st
            JOIN tasks t ON t.id = st.task_id AND t.deleted_at IS NULL
            WHERE st.deleted_at IS NULL
-             AND st.assigned_user_id = ?
              AND t.product_id = ?`,
-          [userId, product.id]
+          [product.id]
         );
 
-        userSubTasks.forEach((subtask) => {
+        subTasks.forEach((subtask) => {
           if (subtask.status === 3) {
             completedCount++;
           } else if (
@@ -1287,6 +1267,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
+
 
 
 
@@ -1423,7 +1404,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 };
 
 
-const getProjectCompletion = async (req, res) => {
+exports.getProjectCompletion = async (req, res) => {
   try {
     const { product_id, project_id, team_id } = req.query;
 
@@ -1644,10 +1625,3 @@ const getProjectCompletion = async (req, res) => {
     return errorResponse(res, error.message || error);
   }
 };
-
-
-
-
-
-
-module.exports = { getProjectCompletion };
