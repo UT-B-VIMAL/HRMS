@@ -1377,6 +1377,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
         employee_name: user.employee_name || "N/A",
       };
 
+      
       if (isAbsent) {
         resultMap[teamId].absent_employees.push(employee);
       } else {
