@@ -1,75 +1,42 @@
-const jwt = require('jsonwebtoken');
-const axios = require('axios');
-require('dotenv').config();
-const { getAdminToken } = require('../api/functions/keycloakFunction');
+const jwt = require("jsonwebtoken");
+const axios = require("axios");
+
+const keycloakConfig = require('../config/keycloak');
+
 const RoleController = {
     /**
      * Middleware to Verify Token and Check Roles
+     * @param {string} requiredRole - The required role to access the API
      * @returns {function} - Middleware function for role-based access control
      */
-    checkRole() {
-        return async (req, res, next) => {
+    // Middleware to Verify Token and Group Permissions
+    checkRole(requiredRoles) {
+        return (req, res, next) => {
+            const token = req.headers.authorization?.split(' ')[1];
+            if (!token) {
+                return res.status(401).send({ message: "Unauthorized: No token provided" });
+            }
+
             try {
-                var currentRequest = req.originalUrl.slice(1);
-                const match = currentRequest.match(/\/([^\/?]+)/);
-                const method = req.method;
-                if (match) {
-                    currentRequest = match[1];
+                // Decode the JWT token
+                const decoded = jwt.decode(token);
+
+                // Check roles in `realm_access` or `resource_access`
+                const roles = decoded.realm_access?.roles || [];
+                const hasRole = requiredRoles.some(role => roles.includes(role));
+
+                if (hasRole) {
+                    return next();
                 } else {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Invalid request: No valid match found in the URL."
-                      });
+                    return res.status(403).send({ message: "Forbidden: Access denied" });
                 }
-                const tokenFromHeader = req.headers.authorization?.split(' ')[1];
-                console.log(currentRequest + "-"+method);
-                if (!tokenFromHeader) {
-                    return res.status(401).send({ message: "Unauthorized: No token provided" });
-                }
-                const decodedToken = jwt.decode(tokenFromHeader);
-                if (!decodedToken || !decodedToken.sub) {
-                    return res.status(400).send({ message: "Invalid token, user ID not found" });
-                }
-                const userId = decodedToken.sub;
-                //console.log(`${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`);
-                 const adminTokens = await getAdminToken();
-                const groupsResponse = await axios.get(
-                    `${process.env.SERVER_URL}admin/realms/${process.env.REALM}/users/${userId}/groups`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${adminTokens}`,
-                        },
-                    }
-                );
-                //console.log("Groups Response:", groupsResponse.data);
-                if (!groupsResponse.data || groupsResponse.data.length === 0) {
-                    return res.status(404).send({ message: "No groups found for this user" });
-                }
-                const groupid = groupsResponse.data[0].id;
-                const groupsRolesResponse = await axios.get(
-                    `${process.env.SERVER_URL}/admin/realms/${process.env.REALM}/groups/${groupid}/role-mappings`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${adminTokens}`,
-                        },
-                    }
-                );
-               // console.log("Group Roles Response:", groupsRolesResponse.data);
-                const clientMappings = groupsRolesResponse.data.clientMappings || {};
-                const realmManagementMapping = clientMappings[process.env.CLIENT_ID];
-                const exactRoles = realmManagementMapping
-                    ? realmManagementMapping.mappings.map((mapping) => mapping.name)
-                    : [];
-                const isPresent = exactRoles.includes(currentRequest+'{{'+method+'}}');
-                if (!isPresent) {
-                    return res.status(403).send({ message: "Forbidden: Insufficient permissions" });
-                }
-                return next();
-            } catch (error) {
-                console.error("Error fetching groups:", error.response?.data || error.message);
-                return res.status(500).send({ message: error.response?.data || error.message });
+            } catch (err) {
+                console.error("Error decoding token:", err);
+                return res.status(500).send({ message: "Internal Server Error" });
             }
         };
-    },
+    }
+
 };
+
 module.exports = RoleController;
