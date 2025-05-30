@@ -1325,18 +1325,36 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     );
 
     const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
+
+    // Step 4: Initialize result map
+    const resultMap = {};
+    const defaultGroupKey = team_id ? null : "overall";
+
+    if (!team_id) {
+      resultMap[defaultGroupKey] = {
+        team_id: null,
+        team_name: "All Teams",
+        total_strength: 0,
+        present_employees: [],
+        absent_employees: [],
+        active_employees: [],
+        idle_employees: [],
+      };
+    }
+
     const currentTime = new Date();
     const cutoffTimeStart = new Date(targetDate);
-    cutoffTimeStart.setHours(13, 30, 0); // 1:30 PM
+    cutoffTimeStart.setHours(13, 30, 0);
     const cutoffTimeEnd = new Date(targetDate);
-    cutoffTimeEnd.setHours(13, 31, 0); // 1:31 PM
-    // Step 4: Process each user
-    const resultMap = {};
+    cutoffTimeEnd.setHours(13, 31, 0);
+
+    // Step 5: Process each user
     users.forEach((user) => {
-      const teamId = user.team_id;
-      if (!resultMap[teamId]) {
-        resultMap[teamId] = {
-          team_id: teamId,
+      const groupKey = team_id ? user.team_id : defaultGroupKey;
+
+      if (!resultMap[groupKey]) {
+        resultMap[groupKey] = {
+          team_id: user.team_id,
           team_name: user.team_name || "Unknown Team",
           total_strength: 0,
           present_employees: [],
@@ -1345,47 +1363,50 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
           idle_employees: [],
         };
       }
-      resultMap[teamId].total_strength++;
+
+      const result = resultMap[groupKey];
+      result.total_strength++;
+
       const leave = leaveMap[user.user_id];
       const isAbsent =
         leave &&
         (leave.day_type === 1 ||
-        (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTimeStart) || // Morning leave, must apply before 1:30 PM
-        (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTimeEnd));   // Afternoon leave, must apply after 1:31 PM
+          (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTimeStart) ||
+          (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTimeEnd));
+
       const employee = {
         user_id: user.user_id,
         employee_id: user.employee_id || "N/A",
         employee_name: user.employee_name || "N/A",
       };
 
-      
       if (isAbsent) {
-        resultMap[teamId].absent_employees.push(employee);
+        result.absent_employees.push(employee);
       } else {
-        resultMap[teamId].present_employees.push(employee);
+        result.present_employees.push(employee);
         if (workingUserIds.has(user.user_id)) {
-          resultMap[teamId].active_employees.push(employee);
+          result.active_employees.push(employee);
         } else {
-          resultMap[teamId].idle_employees.push(employee);
+          result.idle_employees.push(employee);
         }
       }
     });
 
-    // Step 5: Format output
+    // Step 6: Format final output
     const pad = (num) => num.toString().padStart(2, "0");
 
-    const finalOutput = Object.values(resultMap).map((team) => ({
-      team_id: team.team_id,
-      team_name: team.team_name,
-      total_strength: pad(team.total_strength),
-      total_present_count: pad(team.present_employees.length),
-      total_absent_count: pad(team.absent_employees.length),
-      total_active_count: pad(team.active_employees.length),
-      total_idle_count: pad(team.idle_employees.length),
-      present_employees: team.present_employees,
-      absent_employees: team.absent_employees,
-      active_employees: team.active_employees,
-      idle_employees: team.idle_employees,
+    const finalOutput = Object.values(resultMap).map((group) => ({
+      team_id: group.team_id,
+      team_name: group.team_name,
+      total_strength: pad(group.total_strength),
+      total_present_count: pad(group.present_employees.length),
+      total_absent_count: pad(group.absent_employees.length),
+      total_active_count: pad(group.active_employees.length),
+      total_idle_count: pad(group.idle_employees.length),
+      present_employees: group.present_employees,
+      absent_employees: group.absent_employees,
+      active_employees: group.active_employees,
+      idle_employees: group.idle_employees,
     }));
 
     return successResponse(
@@ -1402,6 +1423,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching data", 500);
   }
 };
+
 
 
 exports.getProjectCompletion = async (req, res) => {
