@@ -1159,7 +1159,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     return errorResponse(res, 'Access token is required', 401);
   }
 
-  const userId = await getUserIdFromAccessToken(accessToken);
+  await getUserIdFromAccessToken(accessToken); // keeping it in case it's needed elsewhere
 
   try {
     const productIdString = req.body.product_id || "";
@@ -1168,7 +1168,6 @@ exports.fetchUserTasksByProduct = async (req, res) => {
       .map((id) => parseInt(id.trim(), 10))
       .filter((id) => !isNaN(id));
 
-    // Enforce min/max limit for product IDs
     if (productIds.length < 1 || productIds.length > 4) {
       return errorResponse(
         res,
@@ -1178,29 +1177,10 @@ exports.fetchUserTasksByProduct = async (req, res) => {
       );
     }
 
-    const params = [userId, productIds, userId, productIds];
-    const productsQuery = `
-      SELECT DISTINCT p.id, p.name
-      FROM products p
-      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-      WHERE p.deleted_at IS NULL
-        AND st.assigned_user_id = ?
-        AND p.id IN (?)
-
-      UNION
-
-      SELECT DISTINCT p.id, p.name
-      FROM products p
-      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-      WHERE p.deleted_at IS NULL
-        AND st.id IS NULL
-        AND t.assigned_user_id = ?
-        AND p.id IN (?)
-    `;
-
-    const [products] = await db.query(productsQuery, params);
+    const [products] = await db.query(
+      `SELECT DISTINCT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)`,
+      [productIds]
+    );
 
     const result = await Promise.all(
       products.map(async (product) => {
@@ -1210,13 +1190,13 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 
         // Tasks without subtasks
         const [soloTasks] = await db.query(
-          `SELECT t.status, t.active_status, t.reopen_status FROM tasks t
+          `SELECT t.status, t.active_status, t.reopen_status
+           FROM tasks t
            LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
            WHERE t.product_id = ?
              AND t.deleted_at IS NULL
-             AND st.id IS NULL
-             AND t.assigned_user_id = ?`,
-          [product.id, userId]
+             AND st.id IS NULL`,
+          [product.id]
         );
 
         soloTasks.forEach((task) => {
@@ -1237,16 +1217,16 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         });
 
         // Subtasks
-        const [userSubTasks] = await db.query(
-          `SELECT st.status, st.active_status, st.reopen_status FROM sub_tasks st
+        const [subTasks] = await db.query(
+          `SELECT st.status, st.active_status, st.reopen_status
+           FROM sub_tasks st
            JOIN tasks t ON t.id = st.task_id AND t.deleted_at IS NULL
            WHERE st.deleted_at IS NULL
-             AND st.assigned_user_id = ?
              AND t.product_id = ?`,
-          [userId, product.id]
+          [product.id]
         );
 
-        userSubTasks.forEach((subtask) => {
+        subTasks.forEach((subtask) => {
           if (subtask.status === 3) {
             completedCount++;
           } else if (
@@ -1287,6 +1267,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
+
 
 
 
@@ -1423,7 +1404,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 };
 
 
-const getProjectCompletion = async (req, res) => {
+exports.getProjectCompletion = async (req, res) => {
   try {
     const { product_id, project_id, team_id } = req.query;
 
@@ -1433,62 +1414,62 @@ const getProjectCompletion = async (req, res) => {
 
     // === 1) Task & Subtask Completion Data ===
     const completedTasksSql = `
-     WITH team_users AS (
-  SELECT id AS user_id FROM users WHERE (? IS NULL OR team_id = ?)
-),
-all_tasks AS (
-  SELECT t.id, t.project_id, t.status, t.reopen_status, t.active_status, t.user_id
-  FROM tasks t
-  WHERE t.product_id = ?
-),
-all_subtasks AS (
-  SELECT s.id, s.project_id, s.status, s.reopen_status, s.active_status, s.user_id, s.task_id
-  FROM sub_tasks s
-  WHERE s.product_id = ?
-),
-tasks_with_subtasks AS (
-  SELECT DISTINCT task_id FROM all_subtasks
-),
-filtered_tasks AS (
-  SELECT * FROM all_tasks
-  WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
-    AND id NOT IN (SELECT task_id FROM tasks_with_subtasks) -- Exclude tasks that have subtasks
-),
-filtered_subtasks AS (
-  SELECT * FROM all_subtasks
-  WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
-),
-combined AS (
-  SELECT project_id, status, reopen_status, active_status FROM filtered_subtasks
-  UNION ALL
-  SELECT project_id, status, reopen_status, active_status FROM filtered_tasks
-),
-filtered_combined AS (
-  SELECT * FROM combined WHERE (? IS NULL OR project_id = ?)
-)
-SELECT
-  fc.project_id,
-  p.name as project_name,
-  COUNT(*) AS total,
-  SUM(CASE 
-        WHEN fc.status = 0 AND fc.reopen_status = 0 AND fc.active_status = 0 THEN 1
-        WHEN fc.status = 1 AND fc.reopen_status = 0 AND fc.active_status = 0 THEN 1
-        WHEN fc.reopen_status = 1 AND fc.active_status = 0 THEN 1
-        ELSE 0
-      END) AS pending_count,
-  SUM(CASE 
-        WHEN fc.status = 1 AND fc.active_status = 1 THEN 1
-        WHEN fc.status = 2 AND fc.reopen_status = 0 THEN 1
-        ELSE 0
-      END) AS inprogress_count,
-  SUM(CASE 
-        WHEN fc.status = 3 THEN 1
-        ELSE 0
-      END) AS completed_count
-FROM filtered_combined fc
-JOIN projects p ON p.id = fc.project_id
-GROUP BY fc.project_id, p.name
-ORDER BY fc.project_id;
+      WITH team_users AS (
+        SELECT id AS user_id FROM users WHERE (? IS NULL OR team_id = ?)
+      ),
+      all_tasks AS (
+        SELECT t.id, t.project_id, t.status, t.reopen_status, t.active_status, t.user_id
+        FROM tasks t
+        WHERE t.product_id = ?
+      ),
+      all_subtasks AS (
+        SELECT s.id, s.project_id, s.status, s.reopen_status, s.active_status, s.user_id, s.task_id
+        FROM sub_tasks s
+        WHERE s.product_id = ?
+      ),
+      tasks_with_subtasks AS (
+        SELECT DISTINCT task_id FROM all_subtasks
+      ),
+      filtered_tasks AS (
+        SELECT * FROM all_tasks
+        WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
+          AND id NOT IN (SELECT task_id FROM tasks_with_subtasks)
+      ),
+      filtered_subtasks AS (
+        SELECT * FROM all_subtasks
+        WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
+      ),
+      combined AS (
+        SELECT project_id, status, reopen_status, active_status FROM filtered_subtasks
+        UNION ALL
+        SELECT project_id, status, reopen_status, active_status FROM filtered_tasks
+      ),
+      filtered_combined AS (
+        SELECT * FROM combined WHERE (? IS NULL OR project_id = ?)
+      )
+      SELECT
+        fc.project_id,
+        p.name as project_name,
+        COUNT(*) AS total,
+        SUM(CASE 
+              WHEN fc.status = 0 AND fc.reopen_status = 0 AND fc.active_status = 0 THEN 1
+              WHEN fc.status = 1 AND fc.reopen_status = 0 AND fc.active_status = 0 THEN 1
+              WHEN fc.reopen_status = 1 AND fc.active_status = 0 THEN 1
+              ELSE 0
+            END) AS pending_count,
+        SUM(CASE 
+              WHEN fc.status = 1 AND fc.active_status = 1 THEN 1
+              WHEN fc.status = 2 AND fc.reopen_status = 0 THEN 1
+              ELSE 0
+            END) AS inprogress_count,
+        SUM(CASE 
+              WHEN fc.status = 3 THEN 1
+              ELSE 0
+            END) AS completed_count
+      FROM filtered_combined fc
+      JOIN projects p ON p.id = fc.project_id
+      GROUP BY fc.project_id, p.name
+      ORDER BY fc.project_id;
     `;
 
     const completedTasksParams = [
@@ -1505,73 +1486,89 @@ ORDER BY fc.project_id;
     // === 2) Team Utilization SQL ===
     const teamUtilizationSql = `
       WITH tasks_with_subtasks AS (
-  SELECT DISTINCT task_id FROM sub_tasks WHERE product_id = ?
-),
-filtered_tasks AS (
-  SELECT estimated_hours, total_hours_worked, user_id, project_id
-  FROM tasks
-  WHERE product_id = ?
-    AND id NOT IN (SELECT task_id FROM tasks_with_subtasks)
-    AND (? IS NULL OR project_id = ?)
-),
-filtered_subtasks AS (
-  SELECT estimated_hours, total_hours_worked, user_id, project_id
-  FROM sub_tasks
-  WHERE product_id = ?
-    AND (? IS NULL OR project_id = ?)
-),
-combined AS (
-  SELECT estimated_hours, total_hours_worked, user_id FROM filtered_tasks
-  UNION ALL
-  SELECT estimated_hours, total_hours_worked, user_id FROM filtered_subtasks
-),
-user_data AS (
-  SELECT
-    u.id AS user_id,
-    u.first_name,
-    u.team_id,
-    t.name AS team_name,
-    SUM(TIME_TO_SEC(c.estimated_hours)) AS total_estimated_seconds,
-    SUM(TIME_TO_SEC(c.total_hours_worked)) AS total_worked_seconds
-  FROM users u
-  LEFT JOIN combined c ON c.user_id = u.id
-  LEFT JOIN teams t ON t.id = u.team_id
-  WHERE (? IS NULL OR u.team_id = ?)
-  GROUP BY u.id, u.first_name, u.team_id, t.name
-),
-filtered_user_data AS (
-  SELECT * FROM user_data
-  WHERE total_estimated_seconds > 0 OR total_worked_seconds > 0
-)
-
-SELECT
-  CASE WHEN ? IS NULL THEN team_name ELSE first_name END AS name,
-  CONCAT(
-    FLOOR(SUM(total_estimated_seconds) / 3600), ':',
-    LPAD(FLOOR((SUM(total_estimated_seconds) % 3600) / 60), 2, '0'), ':',
-    LPAD(SUM(total_estimated_seconds) % 60, 2, '0')
-  ) AS total_estimated_hours,
-  CONCAT(
-    FLOOR(SUM(total_worked_seconds) / 3600), ':',
-    LPAD(FLOOR((SUM(total_worked_seconds) % 3600) / 60), 2, '0'), ':',
-    LPAD(SUM(total_worked_seconds) % 60, 2, '0')
-  ) AS total_worked_hours
-FROM filtered_user_data
-GROUP BY name
-ORDER BY name;
-
+        SELECT DISTINCT task_id FROM sub_tasks WHERE product_id = ?
+      ),
+      filtered_tasks AS (
+        SELECT estimated_hours, total_hours_worked, user_id, project_id
+        FROM tasks
+        WHERE product_id = ?
+          AND id NOT IN (SELECT task_id FROM tasks_with_subtasks)
+          AND (? IS NULL OR project_id = ?)
+      ),
+      filtered_subtasks AS (
+        SELECT estimated_hours, total_hours_worked, user_id, project_id
+        FROM sub_tasks
+        WHERE product_id = ?
+          AND (? IS NULL OR project_id = ?)
+      ),
+      timeline_worked AS (
+        SELECT 
+          user_id, 
+          NULL AS estimated_hours, 
+          SEC_TO_TIME(SUM(TIMESTAMPDIFF(SECOND, start_time, end_time))) AS total_hours_worked
+        FROM sub_tasks_user_timeline
+        WHERE product_id = ?
+          AND (? IS NULL OR project_id = ?)
+          AND deleted_at IS NULL
+        GROUP BY user_id
+      ),
+      combined AS (
+        SELECT estimated_hours, total_hours_worked, user_id FROM filtered_tasks
+        UNION ALL
+        SELECT estimated_hours, total_hours_worked, user_id FROM filtered_subtasks
+        UNION ALL
+        SELECT estimated_hours, total_hours_worked, user_id FROM timeline_worked
+      ),
+      user_data AS (
+        SELECT
+          u.id AS user_id,
+          u.first_name,
+          u.team_id,
+          t.name AS team_name,
+          SUM(TIME_TO_SEC(c.estimated_hours)) AS total_estimated_seconds,
+          SUM(TIME_TO_SEC(c.total_hours_worked)) AS total_worked_seconds
+        FROM users u
+        LEFT JOIN combined c ON c.user_id = u.id
+        LEFT JOIN teams t ON t.id = u.team_id
+        WHERE (? IS NULL OR u.team_id = ?)
+        GROUP BY u.id, u.first_name, u.team_id, t.name
+      ),
+      filtered_user_data AS (
+        SELECT * FROM user_data
+        WHERE total_estimated_seconds > 0 OR total_worked_seconds > 0
+      )
+      SELECT
+        CASE WHEN ? IS NULL THEN team_name ELSE first_name END AS name,
+        CONCAT(
+          FLOOR(SUM(total_estimated_seconds) / 3600), ':',
+          LPAD(FLOOR((SUM(total_estimated_seconds) % 3600) / 60), 2, '0'), ':',
+          LPAD(SUM(total_estimated_seconds) % 60, 2, '0')
+        ) AS total_estimated_hours,
+        CONCAT(
+          FLOOR(SUM(total_worked_seconds) / 3600), ':',
+          LPAD(FLOOR((SUM(total_worked_seconds) % 3600) / 60), 2, '0'), ':',
+          LPAD(SUM(total_worked_seconds) % 60, 2, '0')
+        ) AS total_worked_hours
+      FROM filtered_user_data
+      GROUP BY name
+      ORDER BY SUM(total_estimated_seconds) DESC;
     `;
 
     const teamUtilizationParams = [
-  product_id,       // tasks_with_subtasks CTE
-  product_id,
-  project_id || null, project_id || null,
-  product_id,
-  project_id || null, project_id || null,
-  team_id || null, team_id || null,
-  team_id || null,
-];
-
+      product_id,
+      product_id,
+      project_id ?? null,
+      project_id ?? null,
+      product_id,
+      project_id ?? null,
+      project_id ?? null,
+      product_id,
+      project_id ?? null,
+      project_id ?? null,
+      team_id ?? null,
+      team_id ?? null,
+      team_id ?? null
+    ];
 
     const [teamUtilizationRows] = await db.execute(teamUtilizationSql, teamUtilizationParams);
 
@@ -1628,9 +1625,3 @@ ORDER BY name;
     return errorResponse(res, error.message || error);
   }
 };
-
-
-
-
-
-module.exports = { getProjectCompletion };
