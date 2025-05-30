@@ -321,7 +321,7 @@ exports.fetchAttendance = async (payload, res) => {
     AND (el.deleted_at IS NULL OR el.deleted_at IS NULL)
     `;
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
-    
+
 
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
       const {
@@ -333,8 +333,8 @@ exports.fetchAttendance = async (payload, res) => {
         day_type,
         half_type,
       } = row;
-    
-      
+
+
       if (!acc[team_id]) {
         acc[team_id] = {
           team_id,
@@ -346,21 +346,21 @@ exports.fetchAttendance = async (payload, res) => {
           present_employees: [],
         };
       }
-    
+
       // Check if the current row has no employee (user_id is null)
-      if (!user_id) { 
-        return acc; 
+      if (!user_id) {
+        return acc;
       }
-    
-      
+
+
       if (user_id) {
-        acc[team_id].total_team_count++; 
-    
+        acc[team_id].total_team_count++;
+
         const isAbsent =
           day_type === 1 ||
           (day_type === 2 && half_type === 1 && currentTime < cutoffTime) ||
           (day_type === 2 && half_type === 2 && currentTime >= cutoffTime);
-    
+
         if (isAbsent) {
           acc[team_id].team_absent_count++; // Increment absent count
           acc[team_id].absent_employees.push({
@@ -377,19 +377,19 @@ exports.fetchAttendance = async (payload, res) => {
           });
         }
       }
-    
+
       return acc;
     }, {});
-    
-    
+
+
 
     const pad = (num) => num.toString().padStart(2, '0');
     const teamWiseAttendanceArray = Object.values(teamWiseAttendance).map(team => ({
-  ...team,
-  total_team_count: pad(team.total_team_count),
-  team_absent_count: pad(team.team_absent_count),
-  team_present_count: pad(team.team_present_count),
-}));
+      ...team,
+      total_team_count: pad(team.total_team_count),
+      team_absent_count: pad(team.team_absent_count),
+      team_present_count: pad(team.team_present_count),
+    }));
 
     // Step 4: Combine attendance results
     const result = {
@@ -429,10 +429,10 @@ exports.fetchPmviewproductdata = async (req, res) => {
     } = req.query;
 
     const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     // Validate if product_id exists
     if (!product_id) {
@@ -562,7 +562,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
     const isValidSubtask = (item, status) => {
       // Determine if the item is a task or a subtask
       const isTask = !item.hasOwnProperty('subtask_id');
-      
+
       // Task or subtask validation
       if (isTask) {
         switch (status) {
@@ -617,7 +617,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         }
       }
     };
-    
+
 
     // Helper function to format tasks and subtasks
     const formatTask = (task, subtasks, status) => {
@@ -649,8 +649,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         totalSubtasks > 0
           ? Math.round((completedSubtasks / totalSubtasks) * 100)
           : task.status === 3
-          ? 100
-          : 0;
+            ? 100
+            : 0;
 
       // Return the formatted task object
       return {
@@ -717,15 +717,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
       // Create subtask if applicable
       const subtask = row.subtask_id
         ? {
-            id: row.subtask_id,
-            name: row.subtask_name,
-            status: row.subtask_status,
-            active_status: row.subtask_active_status,
-            reopen_status: row.subtask_reopen_status,
-            estimated_hours: row.subtask_estimation_hours,
-            description: row.subtask_description,
-            assigned_user_id: row.subtask_assigned_user_id,
-          }
+          id: row.subtask_id,
+          name: row.subtask_name,
+          status: row.subtask_status,
+          active_status: row.subtask_active_status,
+          reopen_status: row.subtask_reopen_status,
+          estimated_hours: row.subtask_estimation_hours,
+          description: row.subtask_description,
+          assigned_user_id: row.subtask_assigned_user_id,
+        }
         : null;
 
       // Find category based on task's subtask or status
@@ -769,10 +769,10 @@ exports.fetchPmviewproductdata = async (req, res) => {
           const completionPercentage =
             existingTask.TotalSubtaskCount > 0
               ? Math.round(
-                  (existingTask.CompletedSubtaskCount /
-                    existingTask.TotalSubtaskCount) *
-                    100
-                )
+                (existingTask.CompletedSubtaskCount /
+                  existingTask.TotalSubtaskCount) *
+                100
+              )
               : 0;
 
           existingTask.CompletionPercentage = completionPercentage;
@@ -784,7 +784,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
     // Track totals for tasks and subtasks
     let totalItems = 0;
     let completedItems = 0;
-    
+
     Object.keys(groupedTasks).forEach((status) => {
       groupedTasks[status].forEach((task) => {
         // If the task has subtasks, count the subtasks
@@ -804,7 +804,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
         }
       });
     });
-    
+
     // Calculate overall completion based on total task and subtask counts
     const overallCompletionPercentage = totalItems > 0
       ? Math.round((completedItems / totalItems) * 100)
@@ -1421,3 +1421,216 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching data", 500);
   }
 };
+
+
+const getProjectCompletion = async (req, res) => {
+  try {
+    const { product_id, project_id, team_id } = req.query;
+
+    if (!product_id) {
+      return errorResponse(res, null, "product_id is required", 400);
+    }
+
+    // === 1) Task & Subtask Completion Data ===
+    const completedTasksSql = `
+     WITH team_users AS (
+  SELECT id AS user_id FROM users WHERE (? IS NULL OR team_id = ?)
+),
+all_tasks AS (
+  SELECT t.id, t.project_id, t.status, t.reopen_status, t.active_status, t.user_id
+  FROM tasks t
+  WHERE t.product_id = ?
+),
+all_subtasks AS (
+  SELECT s.id, s.project_id, s.status, s.reopen_status, s.active_status, s.user_id, s.task_id
+  FROM sub_tasks s
+  WHERE s.product_id = ?
+),
+tasks_with_subtasks AS (
+  SELECT DISTINCT task_id FROM all_subtasks
+),
+filtered_tasks AS (
+  SELECT * FROM all_tasks
+  WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
+    AND id NOT IN (SELECT task_id FROM tasks_with_subtasks) -- Exclude tasks that have subtasks
+),
+filtered_subtasks AS (
+  SELECT * FROM all_subtasks
+  WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
+),
+combined AS (
+  SELECT project_id, status, reopen_status, active_status FROM filtered_subtasks
+  UNION ALL
+  SELECT project_id, status, reopen_status, active_status FROM filtered_tasks
+),
+filtered_combined AS (
+  SELECT * FROM combined WHERE (? IS NULL OR project_id = ?)
+)
+SELECT
+  fc.project_id,
+  p.name as project_name,
+  COUNT(*) AS total,
+  SUM(CASE 
+        WHEN fc.status = 0 AND fc.reopen_status = 0 AND fc.active_status = 0 THEN 1
+        WHEN fc.status = 1 AND fc.reopen_status = 0 AND fc.active_status = 0 THEN 1
+        WHEN fc.reopen_status = 1 AND fc.active_status = 0 THEN 1
+        ELSE 0
+      END) AS pending_count,
+  SUM(CASE 
+        WHEN fc.status = 1 AND fc.active_status = 1 THEN 1
+        WHEN fc.status = 2 AND fc.reopen_status = 0 THEN 1
+        ELSE 0
+      END) AS inprogress_count,
+  SUM(CASE 
+        WHEN fc.status = 3 THEN 1
+        ELSE 0
+      END) AS completed_count
+FROM filtered_combined fc
+JOIN projects p ON p.id = fc.project_id
+GROUP BY fc.project_id, p.name
+ORDER BY fc.project_id;
+    `;
+
+    const completedTasksParams = [
+      team_id || null, team_id || null,
+      product_id,
+      product_id,
+      team_id || null,
+      team_id || null,
+      project_id || null, project_id || null,
+    ];
+
+    const [completedTasksRows] = await db.execute(completedTasksSql, completedTasksParams);
+
+    // === 2) Team Utilization SQL ===
+    const teamUtilizationSql = `
+      WITH tasks_with_subtasks AS (
+  SELECT DISTINCT task_id FROM sub_tasks WHERE product_id = ?
+),
+filtered_tasks AS (
+  SELECT estimated_hours, total_hours_worked, user_id, project_id
+  FROM tasks
+  WHERE product_id = ?
+    AND id NOT IN (SELECT task_id FROM tasks_with_subtasks)
+    AND (? IS NULL OR project_id = ?)
+),
+filtered_subtasks AS (
+  SELECT estimated_hours, total_hours_worked, user_id, project_id
+  FROM sub_tasks
+  WHERE product_id = ?
+    AND (? IS NULL OR project_id = ?)
+),
+combined AS (
+  SELECT estimated_hours, total_hours_worked, user_id FROM filtered_tasks
+  UNION ALL
+  SELECT estimated_hours, total_hours_worked, user_id FROM filtered_subtasks
+),
+user_data AS (
+  SELECT
+    u.id AS user_id,
+    u.first_name,
+    u.team_id,
+    t.name AS team_name,
+    SUM(TIME_TO_SEC(c.estimated_hours)) AS total_estimated_seconds,
+    SUM(TIME_TO_SEC(c.total_hours_worked)) AS total_worked_seconds
+  FROM users u
+  LEFT JOIN combined c ON c.user_id = u.id
+  LEFT JOIN teams t ON t.id = u.team_id
+  WHERE (? IS NULL OR u.team_id = ?)
+  GROUP BY u.id, u.first_name, u.team_id, t.name
+),
+filtered_user_data AS (
+  SELECT * FROM user_data
+  WHERE total_estimated_seconds > 0 OR total_worked_seconds > 0
+)
+
+SELECT
+  CASE WHEN ? IS NULL THEN team_name ELSE first_name END AS name,
+  CONCAT(
+    FLOOR(SUM(total_estimated_seconds) / 3600), ':',
+    LPAD(FLOOR((SUM(total_estimated_seconds) % 3600) / 60), 2, '0'), ':',
+    LPAD(SUM(total_estimated_seconds) % 60, 2, '0')
+  ) AS total_estimated_hours,
+  CONCAT(
+    FLOOR(SUM(total_worked_seconds) / 3600), ':',
+    LPAD(FLOOR((SUM(total_worked_seconds) % 3600) / 60), 2, '0'), ':',
+    LPAD(SUM(total_worked_seconds) % 60, 2, '0')
+  ) AS total_worked_hours
+FROM filtered_user_data
+GROUP BY name
+ORDER BY name;
+
+    `;
+
+    const teamUtilizationParams = [
+  product_id,       // tasks_with_subtasks CTE
+  product_id,
+  project_id || null, project_id || null,
+  product_id,
+  project_id || null, project_id || null,
+  team_id || null, team_id || null,
+  team_id || null,
+];
+
+
+    const [teamUtilizationRows] = await db.execute(teamUtilizationSql, teamUtilizationParams);
+
+    // === 3) Format completed tasks result ===
+    let completed_tasks_result;
+
+    if (!completedTasksRows.length) {
+      completed_tasks_result = project_id
+        ? {
+            pending_percentage: "0.00",
+            inprogress_percentage: "0.00",
+            completed_percentage: "0.00",
+          }
+        : [];
+    } else if (!project_id) {
+      const projects = completedTasksRows.map((r) => ({
+        project_id: r.project_id,
+        project_name: r.project_name,
+        completed_percentage: r.total > 0 ? parseFloat(((r.completed_count / r.total) * 100).toFixed(2)) : 0,
+      })).sort((a, b) => b.completed_percentage - a.completed_percentage);
+
+      const top4 = projects.slice(0, 4);
+      const others = projects.slice(4);
+
+      const othersCompletedTotal = others.reduce((acc, curr) => acc + curr.completed_percentage, 0);
+
+      completed_tasks_result = [...top4];
+
+      if (others.length > 0) {
+        completed_tasks_result.push({
+          project_id: null,
+          project_name: "Others",
+          completed_percentage: parseFloat(othersCompletedTotal.toFixed(2)),
+          projects: others
+        });
+      }
+    } else {
+      const r = completedTasksRows[0];
+      const total = r.total || 0;
+      completed_tasks_result = {
+        pending_percentage: total ? ((r.pending_count / total) * 100).toFixed(2) : "0.00",
+        inprogress_percentage: total ? ((r.inprogress_count / total) * 100).toFixed(2) : "0.00",
+        completed_percentage: total ? ((r.completed_count / total) * 100).toFixed(2) : "0.00",
+      };
+    }
+
+    // === 4) Return combined result ===
+    return successResponse(res, {
+      completed_tasks: completed_tasks_result,
+      team_utilization: teamUtilizationRows
+    });
+
+  } catch (error) {
+    return errorResponse(res, error.message || error);
+  }
+};
+
+
+
+
+
+module.exports = { getProjectCompletion };
