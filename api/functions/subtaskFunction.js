@@ -1165,7 +1165,7 @@ const convertTasktoSubtask = async (task_id) => {
     const subtaskQuery = `
   SELECT 1 
   FROM sub_tasks 
-  WHERE subtask_id IS NOT NULL AND deleted_at IS NULL AND task_id = ?
+  WHERE task_id IS NOT NULL AND deleted_at IS NULL AND task_id = ?
   LIMIT 1
 `;
     const [subtaskResult] = await db.query(subtaskQuery, [task_id]);
