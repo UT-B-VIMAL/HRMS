@@ -1345,12 +1345,12 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 
     const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
     const currentTime = new Date();
-    const cutoffTime = new Date(targetDate);
-    cutoffTime.setHours(13, 0, 0);
-
+    const cutoffTimeStart = new Date(targetDate);
+    cutoffTimeStart.setHours(13, 30, 0); // 1:30 PM
+    const cutoffTimeEnd = new Date(targetDate);
+    cutoffTimeEnd.setHours(13, 31, 0); // 1:31 PM
     // Step 4: Process each user
     const resultMap = {};
-
     users.forEach((user) => {
       const teamId = user.team_id;
       if (!resultMap[teamId]) {
@@ -1364,16 +1364,13 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
           idle_employees: [],
         };
       }
-
       resultMap[teamId].total_strength++;
-
       const leave = leaveMap[user.user_id];
       const isAbsent =
         leave &&
         (leave.day_type === 1 ||
-          (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTime) ||
-          (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTime));
-
+        (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTimeStart) || // Morning leave, must apply before 1:30 PM
+        (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTimeEnd));   // Afternoon leave, must apply after 1:31 PM
       const employee = {
         user_id: user.user_id,
         employee_id: user.employee_id || "N/A",
