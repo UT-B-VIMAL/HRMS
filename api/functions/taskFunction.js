@@ -258,8 +258,6 @@ exports.createTask = async (payload, res, req) => {
   }
 };
 
-
-
 exports.getTask = async (queryParams, res, req) => {
   try {
     const { id } = queryParams;
