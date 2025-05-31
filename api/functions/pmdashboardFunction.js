@@ -1284,7 +1284,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       FROM users u
       LEFT JOIN teams t ON u.team_id = t.id
       WHERE u.deleted_at IS NULL AND t.deleted_at IS NULL
-        AND u.role_id NOT IN (1, 2)
+        AND u.role_id NOT IN (1)
         ${team_id ? "AND u.team_id = ?" : ""}
     `;
 
@@ -1389,13 +1389,13 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       } else {
         result.present_employees.push(employee);
 
-        if (user.role_id !== 3) {
+        // if (user.role_id !== 3) {
           if (workingUserIds.has(user.user_id)) {
             result.active_employees.push(employee);
           } else {
             result.idle_employees.push(employee);
           }
-        }
+        // }
       }
     });
 
