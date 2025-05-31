@@ -1521,14 +1521,14 @@ exports.getProjectCompletion = async (req, res) => {
         SELECT DISTINCT task_id FROM sub_tasks WHERE product_id = ?
       ),
       filtered_tasks AS (
-        SELECT estimated_hours, total_hours_worked, user_id, project_id
+        SELECT estimated_hours, user_id, project_id
         FROM tasks
         WHERE product_id = ?
           AND id NOT IN (SELECT task_id FROM tasks_with_subtasks)
           AND (? IS NULL OR project_id = ?)
       ),
       filtered_subtasks AS (
-        SELECT estimated_hours, total_hours_worked, user_id, project_id
+        SELECT estimated_hours, user_id, project_id
         FROM sub_tasks
         WHERE product_id = ?
           AND (? IS NULL OR project_id = ?)
@@ -1545,9 +1545,9 @@ exports.getProjectCompletion = async (req, res) => {
         GROUP BY user_id
       ),
       combined AS (
-        SELECT estimated_hours, total_hours_worked, user_id FROM filtered_tasks
+        SELECT estimated_hours,  NULL AS total_hours_worked, user_id FROM filtered_tasks
         UNION ALL
-        SELECT estimated_hours, total_hours_worked, user_id FROM filtered_subtasks
+        SELECT estimated_hours,  NULL AS total_hours_worked, user_id FROM filtered_subtasks
         UNION ALL
         SELECT estimated_hours, total_hours_worked, user_id FROM timeline_worked
       ),
