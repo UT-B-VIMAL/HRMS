@@ -1277,9 +1277,9 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     const targetDate = date ? new Date(date) : new Date();
     const formattedDate = targetDate.toISOString().split("T")[0];
 
-    // Step 1: Fetch relevant users
+    // Step 1: Fetch relevant users (include role_id)
     let usersQuery = `
-      SELECT u.id AS user_id, u.employee_id, u.team_id, t.name AS team_name,
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
              COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
       FROM users u
       LEFT JOIN teams t ON u.team_id = t.id
@@ -1339,6 +1339,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
         absent_employees: [],
         active_employees: [],
         idle_employees: [],
+        total_strength_employees: [],
       };
     }
 
@@ -1361,11 +1362,20 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
           absent_employees: [],
           active_employees: [],
           idle_employees: [],
+          total_strength_employees: [],
         };
       }
 
       const result = resultMap[groupKey];
       result.total_strength++;
+
+      const employee = {
+        user_id: user.user_id,
+        employee_id: user.employee_id || "N/A",
+        employee_name: user.employee_name || "N/A",
+      };
+
+      result.total_strength_employees.push(employee);
 
       const leave = leaveMap[user.user_id];
       const isAbsent =
@@ -1374,20 +1384,17 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
           (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTimeStart) ||
           (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTimeEnd));
 
-      const employee = {
-        user_id: user.user_id,
-        employee_id: user.employee_id || "N/A",
-        employee_name: user.employee_name || "N/A",
-      };
-
       if (isAbsent) {
         result.absent_employees.push(employee);
       } else {
         result.present_employees.push(employee);
-        if (workingUserIds.has(user.user_id)) {
-          result.active_employees.push(employee);
-        } else {
-          result.idle_employees.push(employee);
+
+        if (user.role_id !== 3) {
+          if (workingUserIds.has(user.user_id)) {
+            result.active_employees.push(employee);
+          } else {
+            result.idle_employees.push(employee);
+          }
         }
       }
     });
@@ -1403,6 +1410,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       total_absent_count: pad(group.absent_employees.length),
       total_active_count: pad(group.active_employees.length),
       total_idle_count: pad(group.idle_employees.length),
+      total_strength_employees: group.total_strength_employees,
       present_employees: group.present_employees,
       absent_employees: group.absent_employees,
       active_employees: group.active_employees,
@@ -1423,6 +1431,8 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching data", 500);
   }
 };
+
+
 
 
 
