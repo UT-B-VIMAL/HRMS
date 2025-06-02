@@ -1159,9 +1159,56 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     return errorResponse(res, 'Access token is required', 401);
   }
 
-  await getUserIdFromAccessToken(accessToken); // keeping it in case it's needed elsewhere
+  const login_id = await getUserIdFromAccessToken(accessToken);
 
   try {
+    // Get role and team of logged-in user
+    const [[loggedInUser]] = await db.query(
+      `SELECT id, role_id FROM users WHERE id = ? AND deleted_at IS NULL`,
+      [login_id]
+    );
+
+    if (!loggedInUser) {
+      return errorResponse(res, null, "User not found", 404);
+    }
+
+    let userIdsFilter = []; // filter list
+    if (loggedInUser.role_id === 3) {
+      // Get teams that report to this user
+      const [teamResult] = await db.query(
+        "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+        [login_id]
+      );
+
+      if (teamResult.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "You are not currently assigned a reporting TL for your team.",
+          404
+        );
+      }
+
+      const teamIds = teamResult.map((team) => team.id);
+
+      // Get team members of these teams
+      const [teamMembers] = await db.query(
+        `SELECT id FROM users 
+         WHERE team_id IN (?) AND role_id = 4 AND deleted_at IS NULL`,
+        [teamIds]
+      );
+
+      userIdsFilter = teamMembers.map((u) => u.id);
+
+      if (userIdsFilter.length === 0) {
+        return successResponse(res, [], "No team members found", 200);
+      }
+    }else if (loggedInUser.role_id === 4) {
+      
+      userIdsFilter = [login_id];
+    }
+
+    // --- Continue with Product ID Validation ---
     const productIdString = req.body.product_id || "";
     const productIds = productIdString
       .split(",")
@@ -1188,6 +1235,10 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         let completedCount = 0;
         let pendingCount = 0;
 
+        // Prepare user filter condition
+        const userFilterSql = userIdsFilter.length > 0 ? `AND t.user_id IN (${userIdsFilter.join(',')})` : '';
+        const subUserFilterSql = userIdsFilter.length > 0 ? `AND st.user_id IN (${userIdsFilter.join(',')})` : '';
+
         // Tasks without subtasks
         const [soloTasks] = await db.query(
           `SELECT t.status, t.active_status, t.reopen_status
@@ -1195,7 +1246,8 @@ exports.fetchUserTasksByProduct = async (req, res) => {
            LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
            WHERE t.product_id = ?
              AND t.deleted_at IS NULL
-             AND st.id IS NULL`,
+             AND st.id IS NULL
+             ${userFilterSql}`,
           [product.id]
         );
 
@@ -1222,7 +1274,8 @@ exports.fetchUserTasksByProduct = async (req, res) => {
            FROM sub_tasks st
            JOIN tasks t ON t.id = st.task_id AND t.deleted_at IS NULL
            WHERE st.deleted_at IS NULL
-             AND t.product_id = ?`,
+             AND t.product_id = ?
+             ${subUserFilterSql}`,
           [product.id]
         );
 
@@ -1267,6 +1320,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
+
 
 
 
