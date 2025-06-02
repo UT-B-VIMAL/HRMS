@@ -1159,16 +1159,62 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     return errorResponse(res, 'Access token is required', 401);
   }
 
-  const userId = await getUserIdFromAccessToken(accessToken);
+  const login_id = await getUserIdFromAccessToken(accessToken);
 
   try {
+    // Get role and team of logged-in user
+    const [[loggedInUser]] = await db.query(
+      `SELECT id, role_id FROM users WHERE id = ? AND deleted_at IS NULL`,
+      [login_id]
+    );
+
+    if (!loggedInUser) {
+      return errorResponse(res, null, "User not found", 404);
+    }
+
+    let userIdsFilter = []; // filter list
+    if (loggedInUser.role_id === 3) {
+      // Get teams that report to this user
+      const [teamResult] = await db.query(
+        "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+        [login_id]
+      );
+
+      if (teamResult.length === 0) {
+        return errorResponse(
+          res,
+          null,
+          "You are not currently assigned a reporting TL for your team.",
+          404
+        );
+      }
+
+      const teamIds = teamResult.map((team) => team.id);
+
+      // Get team members of these teams
+      const [teamMembers] = await db.query(
+        `SELECT id FROM users 
+         WHERE team_id IN (?) AND role_id = 4 AND deleted_at IS NULL`,
+        [teamIds]
+      );
+
+      userIdsFilter = teamMembers.map((u) => u.id);
+
+      if (userIdsFilter.length === 0) {
+        return successResponse(res, [], "No team members found", 200);
+      }
+    }else if (loggedInUser.role_id === 4) {
+      
+      userIdsFilter = [login_id];
+    }
+
+    // --- Continue with Product ID Validation ---
     const productIdString = req.body.product_id || "";
     const productIds = productIdString
       .split(",")
       .map((id) => parseInt(id.trim(), 10))
       .filter((id) => !isNaN(id));
 
-    // Enforce min/max limit for product IDs
     if (productIds.length < 1 || productIds.length > 4) {
       return errorResponse(
         res,
@@ -1178,29 +1224,10 @@ exports.fetchUserTasksByProduct = async (req, res) => {
       );
     }
 
-    const params = [userId, productIds, userId, productIds];
-    const productsQuery = `
-      SELECT DISTINCT p.id, p.name
-      FROM products p
-      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-      WHERE p.deleted_at IS NULL
-        AND st.assigned_user_id = ?
-        AND p.id IN (?)
-
-      UNION
-
-      SELECT DISTINCT p.id, p.name
-      FROM products p
-      JOIN tasks t ON t.product_id = p.id AND t.deleted_at IS NULL
-      LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
-      WHERE p.deleted_at IS NULL
-        AND st.id IS NULL
-        AND t.assigned_user_id = ?
-        AND p.id IN (?)
-    `;
-
-    const [products] = await db.query(productsQuery, params);
+    const [products] = await db.query(
+      `SELECT DISTINCT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)`,
+      [productIds]
+    );
 
     const result = await Promise.all(
       products.map(async (product) => {
@@ -1208,15 +1235,20 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         let completedCount = 0;
         let pendingCount = 0;
 
+        // Prepare user filter condition
+        const userFilterSql = userIdsFilter.length > 0 ? `AND t.user_id IN (${userIdsFilter.join(',')})` : '';
+        const subUserFilterSql = userIdsFilter.length > 0 ? `AND st.user_id IN (${userIdsFilter.join(',')})` : '';
+
         // Tasks without subtasks
         const [soloTasks] = await db.query(
-          `SELECT t.status, t.active_status, t.reopen_status FROM tasks t
+          `SELECT t.status, t.active_status, t.reopen_status
+           FROM tasks t
            LEFT JOIN sub_tasks st ON st.task_id = t.id AND st.deleted_at IS NULL
            WHERE t.product_id = ?
              AND t.deleted_at IS NULL
              AND st.id IS NULL
-             AND t.assigned_user_id = ?`,
-          [product.id, userId]
+             ${userFilterSql}`,
+          [product.id]
         );
 
         soloTasks.forEach((task) => {
@@ -1237,16 +1269,17 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         });
 
         // Subtasks
-        const [userSubTasks] = await db.query(
-          `SELECT st.status, st.active_status, st.reopen_status FROM sub_tasks st
+        const [subTasks] = await db.query(
+          `SELECT st.status, st.active_status, st.reopen_status
+           FROM sub_tasks st
            JOIN tasks t ON t.id = st.task_id AND t.deleted_at IS NULL
            WHERE st.deleted_at IS NULL
-             AND st.assigned_user_id = ?
-             AND t.product_id = ?`,
-          [userId, product.id]
+             AND t.product_id = ?
+             ${subUserFilterSql}`,
+          [product.id]
         );
 
-        userSubTasks.forEach((subtask) => {
+        subTasks.forEach((subtask) => {
           if (subtask.status === 3) {
             completedCount++;
           } else if (
@@ -1290,20 +1323,22 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 
 
 
+
+
 exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   try {
     const { team_id, date } = req.body;
     const targetDate = date ? new Date(date) : new Date();
     const formattedDate = targetDate.toISOString().split("T")[0];
 
-    // Step 1: Fetch relevant users
+    // Step 1: Fetch relevant users (include role_id)
     let usersQuery = `
-      SELECT u.id AS user_id, u.employee_id, u.team_id, t.name AS team_name,
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
              COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
       FROM users u
       LEFT JOIN teams t ON u.team_id = t.id
       WHERE u.deleted_at IS NULL AND t.deleted_at IS NULL
-        AND u.role_id NOT IN (1, 2)
+        AND u.role_id NOT IN (1)
         ${team_id ? "AND u.team_id = ?" : ""}
     `;
 
@@ -1344,67 +1379,96 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     );
 
     const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
+
+    // Step 4: Initialize result map
+    const resultMap = {};
+    const defaultGroupKey = team_id ? null : "overall";
+
+    if (!team_id) {
+      resultMap[defaultGroupKey] = {
+        team_id: null,
+        team_name: "All Teams",
+        total_strength: 0,
+        present_employees: [],
+        absent_employees: [],
+        active_employees: [],
+        idle_employees: [],
+        total_strength_employees: [],
+      };
+    }
+
     const currentTime = new Date();
     const cutoffTimeStart = new Date(targetDate);
-    cutoffTimeStart.setHours(13, 30, 0); // 1:30 PM
+    cutoffTimeStart.setHours(13, 30, 0);
     const cutoffTimeEnd = new Date(targetDate);
-    cutoffTimeEnd.setHours(13, 31, 0); // 1:31 PM
-    // Step 4: Process each user
-    const resultMap = {};
+    cutoffTimeEnd.setHours(13, 31, 0);
+
+    // Step 5: Process each user
     users.forEach((user) => {
-      const teamId = user.team_id;
-      if (!resultMap[teamId]) {
-        resultMap[teamId] = {
-          team_id: teamId,
+      const groupKey = team_id ? user.team_id : defaultGroupKey;
+
+      if (!resultMap[groupKey]) {
+        resultMap[groupKey] = {
+          team_id: user.team_id,
           team_name: user.team_name || "Unknown Team",
           total_strength: 0,
           present_employees: [],
           absent_employees: [],
           active_employees: [],
           idle_employees: [],
+          total_strength_employees: [],
         };
       }
-      resultMap[teamId].total_strength++;
-      const leave = leaveMap[user.user_id];
-      const isAbsent =
-        leave &&
-        (leave.day_type === 1 ||
-        (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTimeStart) || // Morning leave, must apply before 1:30 PM
-        (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTimeEnd));   // Afternoon leave, must apply after 1:31 PM
+
+      const result = resultMap[groupKey];
+      result.total_strength++;
+
       const employee = {
         user_id: user.user_id,
         employee_id: user.employee_id || "N/A",
         employee_name: user.employee_name || "N/A",
       };
 
-      
+      result.total_strength_employees.push(employee);
+
+      const leave = leaveMap[user.user_id];
+      const isAbsent =
+        leave &&
+        (leave.day_type === 1 ||
+          (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTimeStart) ||
+          (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTimeEnd));
+
       if (isAbsent) {
-        resultMap[teamId].absent_employees.push(employee);
+        result.absent_employees.push(employee);
       } else {
-        resultMap[teamId].present_employees.push(employee);
-        if (workingUserIds.has(user.user_id)) {
-          resultMap[teamId].active_employees.push(employee);
-        } else {
-          resultMap[teamId].idle_employees.push(employee);
-        }
+        result.present_employees.push(employee);
+
+        // if (user.role_id !== 3) {
+          if (workingUserIds.has(user.user_id)) {
+            result.active_employees.push(employee);
+          } else {
+            result.idle_employees.push(employee);
+          }
+        // }
       }
     });
 
-    // Step 5: Format output
+    // Step 6: Format final output
     const pad = (num) => num.toString().padStart(2, "0");
 
-    const finalOutput = Object.values(resultMap).map((team) => ({
-      team_id: team.team_id,
-      team_name: team.team_name,
-      total_strength: pad(team.total_strength),
-      total_present_count: pad(team.present_employees.length),
-      total_absent_count: pad(team.absent_employees.length),
-      total_active_count: pad(team.active_employees.length),
-      total_idle_count: pad(team.idle_employees.length),
-      present_employees: team.present_employees,
-      absent_employees: team.absent_employees,
-      active_employees: team.active_employees,
-      idle_employees: team.idle_employees,
+    const finalOutput = Object.values(resultMap).map((group) => ({
+      team_id: group.team_id,
+      team_name: group.team_name,
+      total_strength: pad(group.total_strength),
+      total_present_count: pad(group.present_employees.length),
+      total_absent_count: pad(group.absent_employees.length),
+      total_active_count: pad(group.active_employees.length),
+      total_idle_count: pad(group.idle_employees.length),
+      total_strength_employees: group.total_strength_employees,
+      present_employees: group.present_employees,
+      absent_employees: group.absent_employees,
+      active_employees: group.active_employees,
+      idle_employees: group.idle_employees,
     }));
 
     return successResponse(
@@ -1423,7 +1487,10 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 };
 
 
-const getProjectCompletion = async (req, res) => {
+
+
+
+exports.getProjectCompletion = async (req, res) => {
   try {
     const { product_id, project_id, team_id } = req.query;
 
@@ -1699,10 +1766,3 @@ ORDER BY total_worked_hours DESC;
     return errorResponse(res, error.message || error);
   }
 };
-
-
-
-
-
-
-module.exports = { getProjectCompletion };
