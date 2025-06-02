@@ -430,6 +430,11 @@ apiRouter.get(
   tldashboardController.tlviewproductsection
 );
 
+apiRouter.get(
+  "/tltaskpendinglist",
+  tldashboardController.tltaskpendinglist
+);
+
 // Employee Dashboard Routes
 apiRouter.get(
   "/emppendingtask",
