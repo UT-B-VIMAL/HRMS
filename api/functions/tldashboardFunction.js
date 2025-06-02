@@ -4,21 +4,24 @@ const {
   errorResponse,
 } = require("../../helpers/responseHelper");
 const {
-  getColorForProduct, getUserIdFromAccessToken
+  getColorForProduct,
+  getUserIdFromAccessToken,
 } = require("../../api/functions/commonFunction");
 
 exports.fetchAttendance = async (req, res) => {
   try {
     const currentTimeUTC = new Date();
-    const currentTime = new Date(currentTimeUTC.getTime() + 5.5 * 60 * 60 * 1000);
+    const currentTime = new Date(
+      currentTimeUTC.getTime() + 5.5 * 60 * 60 * 1000
+    );
     const cutoffTime = new Date();
-    cutoffTime.setHours(13, 30, 0, 0); 
+    cutoffTime.setHours(13, 30, 0, 0);
     const today = new Date().toISOString().split("T")[0];
     const { employee_id } = req.query;
 
-    const accessToken = req.headers.authorization?.split(' ')[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
-      return errorResponse(res, 'Access token is required', 401);
+      return errorResponse(res, "Access token is required", 401);
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
@@ -97,7 +100,8 @@ exports.fetchAttendance = async (req, res) => {
     }
 
     // Fetch present employees excluding absent ones
-    const leaveCondition = leaveEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
+    const leaveCondition =
+      leaveEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
     const [presentEmployees] = await db.query(
       `
@@ -192,15 +196,14 @@ exports.fetchAttendance = async (req, res) => {
   }
 };
 
-
 exports.fetchTlrating = async (req, res) => {
   try {
     // const { user_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -312,11 +315,11 @@ exports.fetchTlrating = async (req, res) => {
 exports.fetchTLproducts = async (req, res) => {
   try {
     const { product_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -497,11 +500,11 @@ exports.fetchTLproducts = async (req, res) => {
 exports.fetchTLresourceallotment = async (req, res) => {
   try {
     // const { user_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -683,11 +686,11 @@ exports.fetchTLresourceallotment = async (req, res) => {
 exports.fetchTLdatas = async (req, res) => {
   try {
     // const { user_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -1120,11 +1123,11 @@ exports.fetchTLdatas = async (req, res) => {
 exports.fetchTlviewproductdata = async (req, res) => {
   try {
     const { product_id, project_id, date, search } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!product_id) {
       return errorResponse(res, null, "Product ID is required", 400);
@@ -1501,5 +1504,189 @@ exports.fetchTlviewproductdata = async (req, res) => {
       error.message,
       500
     );
+  }
+};
+
+exports.tltaskpendinglist = async (req, res) => {
+  try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken)
+      return errorResponse(res, "Access token is required", 401);
+
+    const login_id = await getUserIdFromAccessToken(accessToken);
+    if (!login_id) return errorResponse(res, null, "User ID is required", 400);
+
+    // Fetch user role and team
+    const [[user]] = await db.query(
+      "SELECT id, role_id, team_id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [login_id]
+    );
+    if (!user) return errorResponse(res, null, "User Not Found", 400);
+
+    // Determine user IDs to filter by, based on role
+    let filterUserIds = [];
+
+    if (user.role_id === 3) {
+      // Team Leader - get team members
+      const [teamUsers] = await db.query(
+        "SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL",
+        [user.team_id]
+      );
+      const teamUserIds = teamUsers.map((u) => u.id);
+      if (teamUserIds.length === 0)
+        return successResponse(res, [], "No team members found", 200, null, 0);
+
+      const { user_id } = req.query;
+      if (user_id) {
+        if (!teamUserIds.includes(Number(user_id))) {
+          return errorResponse(res, "User is not part of your team", 403);
+        }
+        filterUserIds = [Number(user_id)];
+      } else {
+        filterUserIds = teamUserIds;
+      }
+    } else if (user.role_id === 4) {
+      // Regular User - only own data
+      filterUserIds = [login_id];
+    } else {
+      return errorResponse(
+        res,
+        "Only Team Leaders or regular users allowed",
+        403
+      );
+    }
+
+    if (filterUserIds.length === 0)
+      return successResponse(res, [], "No users found", 200, null, 0);
+
+    const placeholders = filterUserIds.map(() => "?").join(",");
+
+    const sql = `
+      SELECT 
+        project_id,
+        project_name,
+        user_id,
+        employee_id,
+        employee_name,
+        SUM(todo_count) AS todo_count,
+        SUM(onhold_count) AS onhold_count,
+        SUM(reopen_count) AS reopen_count
+      FROM (
+        SELECT 
+          t.project_id,
+          p.name AS project_name,
+          t.user_id,
+          u.employee_id,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) AS employee_name,
+          CASE WHEN t.status = 0 AND t.reopen_status = 0 AND t.active_status = 0 THEN 1 ELSE 0 END AS todo_count,
+          CASE WHEN t.status = 1 AND t.reopen_status = 0 AND t.active_status = 0 THEN 1 ELSE 0 END AS onhold_count,
+          CASE WHEN t.status = 0 AND t.reopen_status = 1 AND t.active_status = 0 THEN 1 ELSE 0 END AS reopen_count
+        FROM tasks t
+        INNER JOIN projects p ON p.id = t.project_id
+        LEFT JOIN users u ON u.id = t.user_id
+        WHERE t.deleted_at IS NULL
+          AND t.user_id IN (${placeholders})
+          AND NOT EXISTS (
+            SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL
+          )
+
+        UNION ALL
+
+        SELECT
+          t.project_id,
+          p.name AS project_name,
+          st.user_id,
+          u.employee_id,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) AS employee_name,
+          CASE WHEN st.status = 0 AND st.reopen_status = 0 AND st.active_status = 0 THEN 1 ELSE 0 END AS todo_count,
+          CASE WHEN st.status = 1 AND st.reopen_status = 0 AND st.active_status = 0 THEN 1 ELSE 0 END AS onhold_count,
+          CASE WHEN st.status = 0 AND st.reopen_status = 1 AND st.active_status = 0 THEN 1 ELSE 0 END AS reopen_count
+        FROM sub_tasks st
+        INNER JOIN tasks t ON t.id = st.task_id
+        INNER JOIN projects p ON p.id = t.project_id
+        LEFT JOIN users u ON u.id = st.user_id
+        WHERE st.deleted_at IS NULL
+          AND st.user_id IN (${placeholders})
+      ) AS combined
+      GROUP BY project_id, project_name, user_id, employee_id, employee_name
+      ORDER BY project_name ASC
+    `;
+
+    const [rows] = await db.query(sql, [...filterUserIds, ...filterUserIds]);
+
+    const projectsMap = new Map();
+
+    rows.forEach(
+      ({
+        project_id,
+        project_name,
+        user_id,
+        employee_id,
+        employee_name,
+        todo_count,
+        onhold_count,
+        reopen_count,
+      }) => {
+        if (!projectsMap.has(project_id)) {
+          projectsMap.set(project_id, {
+            project_id,
+            project_name,
+            todo_count: 0,
+            onhold_count: 0,
+            reopen_count: 0,
+            worked_project_users: [],
+          });
+        }
+
+        const project = projectsMap.get(project_id);
+
+        project.todo_count += Number(todo_count);
+        project.onhold_count += Number(onhold_count);
+        project.reopen_count += Number(reopen_count);
+
+        if (
+          Number(todo_count) + Number(onhold_count) + Number(reopen_count) >
+            0 &&
+          !project.worked_project_users.some((u) => u.user_id === user_id)
+        ) {
+          project.worked_project_users.push({
+            user_id,
+            employee_id,
+            employee_name,
+          });
+        }
+      }
+    );
+
+    const filteredProjects = [];
+    let total_pending_counts = 0;
+
+    for (const project of projectsMap.values()) {
+      const total =
+        project.todo_count + project.onhold_count + project.reopen_count;
+      if (total > 0) {
+        total_pending_counts += total;
+        filteredProjects.push({
+          project_id: project.project_id,
+          project_name: project.project_name,
+          todo_count: String(project.todo_count),
+          onhold_count: String(project.onhold_count),
+          reopen_count: String(project.reopen_count),
+          worked_project_users: project.worked_project_users,
+        });
+      }
+    }
+
+    return successResponse(
+      res,
+      filteredProjects,
+      "Status-wise task list fetched successfully",
+      200,
+      null,
+      total_pending_counts
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, null, "Something went wrong", 500);
   }
 };
