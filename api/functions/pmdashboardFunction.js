@@ -1327,7 +1327,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 
 exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   try {
-    const { team_id, date } = req.body;
+    const { team_id, date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
     const formattedDate = targetDate.toISOString().split("T")[0];
 
@@ -1427,6 +1427,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
         user_id: user.user_id,
         employee_id: user.employee_id || "N/A",
         employee_name: user.employee_name || "N/A",
+        team_name: user.team_name || "N/A",
       };
 
       result.total_strength_employees.push(employee);
