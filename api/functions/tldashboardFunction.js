@@ -6,6 +6,7 @@ const {
 const {
   getColorForProduct,
   getUserIdFromAccessToken,
+  getAuthUserDetails,
 } = require("../../api/functions/commonFunction");
 
 exports.fetchAttendance = async (req, res) => {
@@ -1690,3 +1691,145 @@ exports.tltaskpendinglist = async (req, res) => {
     return errorResponse(res, null, "Something went wrong", 500);
   }
 };
+
+function convertSecondsToReadableTime(totalSeconds) {
+  if (
+    totalSeconds === null ||
+    totalSeconds === undefined ||
+    isNaN(totalSeconds)
+  )
+    return "0h 0m 0s";
+
+  const absSeconds = Math.abs(totalSeconds); 
+
+  const secondsInDay = 8 * 3600; // 1 day = 8 hours
+  const days = Math.floor(absSeconds / secondsInDay);
+  const hours = Math.floor((absSeconds % secondsInDay) / 3600);
+  const minutes = Math.floor((absSeconds % 3600) / 60);
+  const seconds = Math.floor(absSeconds % 60);
+
+  return `${days > 0 ? days + "d " : ""}${hours}h ${minutes}m ${seconds}s`;
+}
+
+exports.getTeamWorkedHrs = async (req, res) => {
+  try {
+    const {  from_date, to_date } = req.query;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+      if (!accessToken) {
+        return errorResponse(res, "Access token is required", 401);
+      }
+     const user_id = await getUserIdFromAccessToken(accessToken);
+    const loggedInUser = await getAuthUserDetails(user_id, res);
+    const isTL = loggedInUser.role_id === 3;
+    const userId = loggedInUser.id;
+
+    let userIds = [];
+
+    if (isTL) {
+      const [teamRows] = await db.query(
+        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
+        [userId]
+      );
+
+      if (!teamRows.length) {
+       return errorResponse(
+          res,
+          null,
+          "You are not currently assigned a reporting TL for your team.",
+          404
+        );
+      }
+
+      const teamIds = teamRows.map(row => row.id);
+
+      const [userRows] = await db.query(
+        "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)",
+        [teamIds]
+      );
+
+      userIds = userRows.map(row => row.id);
+    } else {
+      userIds = [userId];
+    }
+
+    if (!userIds.length) {
+     return errorResponse(
+        res,
+        null,
+        "No users found for the team.",
+        404
+      );
+    }
+
+    let dateFilterSql = "";
+    const dateParams = [];
+
+    if (from_date && to_date) {
+      dateFilterSql = "AND DATE(start_time) BETWEEN ? AND ?";
+      dateParams.push(from_date, to_date);
+    } else if (from_date) {
+      dateFilterSql = "AND DATE(start_time) = ?";
+      dateParams.push(from_date);
+    }
+
+    const placeholders = userIds.map(() => "?").join(",");
+    const query = `
+      SELECT 
+        u.id,
+        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS name,
+        COALESCE(SUM(TIMESTAMPDIFF(SECOND, st.start_time, COALESCE(st.end_time, NOW()))), 0) AS total_worked_seconds
+      FROM users u
+      LEFT JOIN sub_tasks_user_timeline st ON st.user_id = u.id AND st.deleted_at IS NULL ${dateFilterSql}
+      WHERE u.deleted_at IS NULL AND u.id IN (${placeholders})
+      GROUP BY u.id, u.first_name, u.last_name
+      ORDER BY total_worked_seconds DESC
+    `;
+
+    const [rows] = await db.query(query, [...dateParams, ...userIds]);
+
+    let data = [];
+    if (isTL && rows.length > 5) {
+      const top5 = rows.slice(0, 5);
+      const others = rows.slice(5);
+
+      const totalOtherSeconds = others.reduce((sum, row) => {
+        return sum + (Number(row.total_worked_seconds) || 0);
+      }, 0);
+
+      data = [
+        ...top5.map(row => ({
+          id: row.id,
+          name: row.name,
+          total_worked_hrs: convertSecondsToReadableTime(row.total_worked_seconds),
+        })),
+        {
+          id: null,
+          name: "Others",
+          total_worked_hrs: convertSecondsToReadableTime(totalOtherSeconds),
+        }
+      ];
+    } else {
+      data = rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        total_worked_hrs: convertSecondsToReadableTime(row.total_worked_seconds),
+      }));
+    }
+
+    return successResponse(
+      res,
+      data,
+      "Team worked hours fetched successfully",
+      200
+    );
+  } catch (error) {
+    console.error("Error in getTeamWorkedHrs:", error);
+    return errorResponse(
+      res,
+      "Error fetching team worked hours",
+      error.message,
+      500
+    );
+  }
+};
+
