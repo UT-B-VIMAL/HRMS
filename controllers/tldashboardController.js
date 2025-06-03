@@ -1,4 +1,4 @@
-const { fetchAttendance, fetchTlrating, fetchTLproducts, fetchTLresourceallotment, fetchTLdatas, fetchTlviewproductdata } = require('../api/functions/tldashboardFunction');
+const { fetchAttendance, fetchTlrating, fetchTLproducts, fetchTLresourceallotment, fetchTLdatas, fetchTlviewproductdata,tltaskpendinglist } = require('../api/functions/tldashboardFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 
 exports.tlattendancesection = async (req, res) => {
@@ -60,3 +60,11 @@ exports.tlviewproductsection = async (req, res) => {
 
 // Add other sections as needed
 
+exports.tltaskpendinglist = async (req, res) => {
+  try {
+    return await tltaskpendinglist(req, res);
+  } catch (error) {
+    console.error("Error during tltaskpendinglist processing:", error.message);
+    return errorResponse(res, null, 'Internal Server Error', 500);
+  }
+};
