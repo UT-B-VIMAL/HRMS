@@ -1327,7 +1327,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 
 exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   try {
-    const { team_id, date } = req.body;
+    const { team_id, date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
     const formattedDate = targetDate.toISOString().split("T")[0];
 
