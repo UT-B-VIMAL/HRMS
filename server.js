@@ -434,7 +434,10 @@ apiRouter.get(
   "/tltaskpendinglist",
   tldashboardController.tltaskpendinglist
 );
-
+apiRouter.get(
+  "/getTeamWorkedHrs",
+  tldashboardController.getTeamWorkedHrsDetails
+);
 // Employee Dashboard Routes
 apiRouter.get(
   "/emppendingtask",
@@ -727,7 +730,7 @@ if (isProduction) {
 } else {
   // Development server (non-SSL)
   server.listen(PORT, () => {
-    console.log(`Development server is running on http://${DOMAIN}:${PORT}`);
+    console.log(`Development server is running on http://localhost:${PORT}`);
   });
 }
 
