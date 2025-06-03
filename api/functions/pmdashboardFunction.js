@@ -1498,40 +1498,90 @@ exports.getProjectCompletion = async (req, res) => {
       return errorResponse(res, null, "product_id is required", 400);
     }
 
-    // === 1) Task & Subtask Completion Data ===
+    const accessToken = req.headers.authorization?.split(' ')[1];
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
+
+    const [userRows] = await db.query(
+      'SELECT role_id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      [user_id]
+    );
+
+    if (!userRows || userRows.length === 0) {
+      return errorResponse(res, 'User not found', 404);
+    }
+
+    const role_id = userRows[0].role_id;
+
+    let teamIds = [];
+    if (role_id == 3) {
+      const [teamsRows] = await db.query(
+        `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
+        [user_id]
+      );
+      teamIds = teamsRows.map(row => row.id);
+      if (teamIds.length === 0) {
+        return successResponse(res, {
+          completed_tasks: project_id ? { pending_percentage: "0.00", inprogress_percentage: "0.00", completed_percentage: "0.00" } : [],
+          team_utilization: []
+        });
+      }
+    }
+
+    let teamFilterSql = '';
+    let teamFilterParams = [];
+
+    if (role_id === 3) {
+      const placeholders = teamIds.map(() => '?').join(',');
+      teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id IN (${placeholders}))`;
+      teamFilterParams = [...teamIds];
+    } else if (role_id === 1 || role_id === 2) {
+      if (team_id) {
+        teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id = ?)`;
+        teamFilterParams = [team_id];
+      }
+    } else if (role_id === 4) {
+      teamFilterSql = `AND user_id = ?`;
+      teamFilterParams = [user_id];
+    }
+
+    const projectFilterSql = project_id ? `AND project_id = ?` : '';
+    const projectFilterParams = project_id ? [project_id] : [];
+
     const completedTasksSql = `
-      WITH team_users AS (
-        SELECT id AS user_id FROM users WHERE (? IS NULL OR team_id = ?)
-      ),
-      all_tasks AS (
+      WITH all_tasks AS (
         SELECT t.id, t.project_id, t.status, t.reopen_status, t.active_status, t.user_id
         FROM tasks t
         WHERE t.product_id = ?
+        ${projectFilterSql}
       ),
       all_subtasks AS (
         SELECT s.id, s.project_id, s.status, s.reopen_status, s.active_status, s.user_id, s.task_id
         FROM sub_tasks s
         WHERE s.product_id = ?
+        ${projectFilterSql}
       ),
       tasks_with_subtasks AS (
         SELECT DISTINCT task_id FROM all_subtasks
       ),
       filtered_tasks AS (
         SELECT * FROM all_tasks
-        WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
+        WHERE 1=1
+          ${teamFilterSql}
           AND id NOT IN (SELECT task_id FROM tasks_with_subtasks)
       ),
       filtered_subtasks AS (
         SELECT * FROM all_subtasks
-        WHERE (? IS NULL OR user_id IN (SELECT user_id FROM team_users))
+        WHERE 1=1
+          ${teamFilterSql}
       ),
       combined AS (
         SELECT project_id, status, reopen_status, active_status FROM filtered_subtasks
         UNION ALL
         SELECT project_id, status, reopen_status, active_status FROM filtered_tasks
-      ),
-      filtered_combined AS (
-        SELECT * FROM combined WHERE (? IS NULL OR project_id = ?)
       )
       SELECT
         fc.project_id,
@@ -1552,217 +1602,303 @@ exports.getProjectCompletion = async (req, res) => {
               WHEN fc.status = 3 THEN 1
               ELSE 0
             END) AS completed_count
-      FROM filtered_combined fc
+      FROM combined fc
       JOIN projects p ON p.id = fc.project_id
       GROUP BY fc.project_id, p.name
-      ORDER BY fc.project_id;
+      ORDER BY fc.project_id
     `;
 
     const completedTasksParams = [
-      team_id || null, team_id || null,
       product_id,
+      ...projectFilterParams,
       product_id,
-      team_id || null,
-      team_id || null,
-      project_id || null, project_id || null,
+      ...projectFilterParams,
+      ...teamFilterParams,
+      ...teamFilterParams,
     ];
 
-    const [completedTasksRows] = await db.execute(completedTasksSql, completedTasksParams);
-const productId = parseInt(req.query.product_id); // required
-const projectId = req.query.project_id ? parseInt(req.query.project_id) : null;
-const teamId    = req.query.team_id    ? parseInt(req.query.team_id) : null;
+    const [resultsFromYourQuery] = await db.execute(completedTasksSql, completedTasksParams);
 
- if (teamId) {
-  teamUtilizationSql = `
-    WITH
-user_estimates AS (
-  SELECT
-    u.id AS user_id,
-    SUM(
-      CASE
-        WHEN EXISTS (
-          SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+    const completedTasksRows = resultsFromYourQuery.map(row => {
+      const total = parseInt(row.total, 10);
+      return {
+        project_id: row.project_id,
+        project_name: row.project_name,
+        pending_percent: total > 0 ? parseFloat(((parseInt(row.pending_count, 10) / total) * 100).toFixed(2)) : 0,
+        inprogress_percent: total > 0 ? parseFloat(((parseInt(row.inprogress_count, 10) / total) * 100).toFixed(2)) : 0,
+        completed_percent: total > 0 ? parseFloat(((parseInt(row.completed_count, 10) / total) * 100).toFixed(2)) : 0,
+      };
+    });
+
+    let teamUtilizationSql = '';
+    let teamUtilizationParams = [];
+    const productId = parseInt(product_id);
+    const projectId = project_id ? parseInt(project_id) : null;
+
+    if (role_id === 3) {
+      const placeholders = teamIds.map(() => '?').join(',');
+      teamUtilizationSql = `
+        WITH
+        user_estimates AS (
+          SELECT u.id AS user_id,
+            SUM(CASE
+              WHEN EXISTS (
+                SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+              )
+              THEN (
+                SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+                FROM sub_tasks s2
+                WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+              )
+              ELSE TIME_TO_SEC(t.estimated_hours)
+            END) AS total_est_seconds
+          FROM tasks t
+          JOIN users u ON u.id = t.user_id
+          WHERE t.deleted_at IS NULL
+            AND t.product_id = ?
+            AND (? IS NULL OR t.project_id = ?)
+            AND u.team_id IN (${placeholders})
+            AND u.role_id = 4
+          GROUP BY u.id
+        ),
+        worked_by_user AS (
+          SELECT u.id AS user_id,
+            SUM(TIMESTAMPDIFF(SECOND, st.start_time, IFNULL(st.end_time, CURRENT_TIMESTAMP))) AS total_work_seconds
+          FROM sub_tasks_user_timeline st
+          JOIN users u ON u.id = st.user_id
+          WHERE st.deleted_at IS NULL
+            AND st.product_id = ?
+            AND (? IS NULL OR st.project_id = ?)
+            AND u.team_id IN (${placeholders})
+            AND u.role_id = 4
+          GROUP BY u.id
         )
-        THEN (
-          SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
-          FROM sub_tasks s2
-          WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+        SELECT u.first_name AS name,
+          ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
+          ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
+        FROM users u
+        LEFT JOIN user_estimates ue ON ue.user_id = u.id
+        LEFT JOIN worked_by_user wu ON wu.user_id = u.id
+        WHERE u.team_id IN (${placeholders})
+          AND u.role_id = 4
+          AND u.deleted_at IS NULL
+          AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
+        ORDER BY total_worked_hours DESC;
+      `;
+
+      teamUtilizationParams = [
+        productId, projectId, projectId,
+        ...teamIds,
+        productId, projectId, projectId,
+        ...teamIds,
+        ...teamIds,
+      ];
+
+    } else if (role_id === 1 || role_id === 2) {
+       // Admin or PM - single optional team_id filter
+      if (team_id) {
+        // team_id filter present
+        teamUtilizationSql = `
+        WITH
+        user_estimates AS (
+          SELECT
+            u.id AS user_id,
+            SUM(
+              CASE
+                WHEN EXISTS (
+                  SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+                )
+                THEN (
+                  SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+                  FROM sub_tasks s2
+                  WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+                )
+                ELSE TIME_TO_SEC(t.estimated_hours)
+              END
+            ) AS total_est_seconds
+          FROM tasks t
+          JOIN users u ON u.id = t.user_id
+          WHERE
+            t.deleted_at IS NULL
+            AND t.product_id = ?
+            AND (? IS NULL OR t.project_id = ?)
+            AND u.team_id = ?
+            AND u.role_id = 4
+          GROUP BY u.id
+        ),
+        worked_by_user AS (
+          SELECT
+            u.id AS user_id,
+            SUM(
+              TIMESTAMPDIFF(
+                SECOND,
+                st.start_time,
+                IFNULL(st.end_time, CURRENT_TIMESTAMP)
+              )
+            ) AS total_work_seconds
+          FROM sub_tasks_user_timeline st
+          JOIN users u ON u.id = st.user_id
+          WHERE
+            st.deleted_at IS NULL
+            AND st.product_id = ?
+            AND (? IS NULL OR st.project_id = ?)
+            AND u.team_id = ?
+            AND u.role_id = 4
+          GROUP BY u.id
         )
-        ELSE TIME_TO_SEC(t.estimated_hours)
-      END
-    ) AS total_est_seconds
-  FROM tasks t
-  JOIN users u ON u.id = t.user_id
-  WHERE
-    t.deleted_at IS NULL
-    AND t.product_id = ?
-    AND (? IS NULL OR t.project_id = ?)
-    AND u.team_id = ?
-    AND u.role_id = 4      -- role filter
-  GROUP BY u.id
-),
-worked_by_user AS (
-  SELECT
-    u.id AS user_id,
-    SUM(
-      TIMESTAMPDIFF(
-        SECOND,
-        st.start_time,
-        IFNULL(st.end_time, CURRENT_TIMESTAMP)
-      )
-    ) AS total_work_seconds
-  FROM sub_tasks_user_timeline st
-  JOIN users u ON u.id = st.user_id
-  WHERE
-    st.deleted_at IS NULL
-    AND st.product_id = ?
-    AND (? IS NULL OR st.project_id = ?)
-    AND u.team_id = ?
-    AND u.role_id = 4      -- role filter
-  GROUP BY u.id
-)
-SELECT
-  u.first_name AS name,
-  ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
-  ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
-FROM users u
-LEFT JOIN user_estimates ue ON ue.user_id = u.id
-LEFT JOIN worked_by_user wu ON wu.user_id = u.id
-WHERE u.team_id = ?
+        SELECT
+          u.first_name AS name,
+          ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
+          ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
+        FROM users u
+        LEFT JOIN user_estimates ue ON ue.user_id = u.id
+        LEFT JOIN worked_by_user wu ON wu.user_id = u.id
+        WHERE u.team_id = ?
   AND u.role_id = 4
   AND u.deleted_at IS NULL
   AND (ue.total_est_seconds IS NOT NULL OR wu.total_work_seconds IS NOT NULL)
+  AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
 ORDER BY total_worked_hours DESC;
+        `;
 
+        const teamIdInt = parseInt(team_id);
 
-  `;
+        teamUtilizationParams = [
+          productId, projectId, projectId, teamIdInt,
+          productId, projectId, projectId, teamIdInt,
+          teamIdInt,
+        ];
 
-  teamUtilizationParams = [
-    productId, projectId, projectId, teamId, // user_estimates
-    productId, projectId, projectId, teamId, // worked_by_user
-    teamId // final WHERE
-  ];
-}else {
-  teamUtilizationSql = `
- WITH
-user_estimates AS (
-  SELECT
-    u.team_id,
-    SUM(
-      CASE
-        WHEN EXISTS (
-          SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+      } else {
+        // No team_id filter for admin/pm, aggregate by team
+        teamUtilizationSql = `
+        WITH
+        user_estimates AS (
+          SELECT
+            u.team_id,
+            SUM(
+              CASE
+                WHEN EXISTS (
+                  SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+                )
+                THEN (
+                  SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+                  FROM sub_tasks s2
+                  WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+                )
+                ELSE TIME_TO_SEC(t.estimated_hours)
+              END
+            ) AS total_est_seconds
+          FROM tasks t
+          JOIN users u ON u.id = t.user_id
+          WHERE
+            t.deleted_at IS NULL
+            AND t.product_id = ?
+            AND (? IS NULL OR t.project_id = ?)
+            AND u.role_id = 4
+          GROUP BY u.team_id
+        ),
+        worked_by_team AS (
+          SELECT
+            u.team_id,
+            SUM(
+              TIMESTAMPDIFF(
+                SECOND,
+                st.start_time,
+                IFNULL(st.end_time, CURRENT_TIMESTAMP)
+              )
+            ) AS total_work_seconds
+          FROM sub_tasks_user_timeline st
+          JOIN users u ON u.id = st.user_id
+          WHERE
+            st.deleted_at IS NULL
+            AND st.product_id = ?
+            AND (? IS NULL OR st.project_id = ?)
+            AND u.role_id = 4
+          GROUP BY u.team_id
         )
-        THEN (
-          SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
-          FROM sub_tasks s2
-          WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
-        )
-        ELSE TIME_TO_SEC(t.estimated_hours)
-      END
-    ) AS total_est_seconds
-  FROM tasks t
-  JOIN users u ON u.id = t.user_id
-  WHERE
-    t.deleted_at IS NULL
-    AND t.product_id = ?
-    AND (? IS NULL OR t.project_id = ?)
-    AND u.role_id = 4
-  GROUP BY u.team_id
-),
-worked_by_team AS (
-  SELECT
-    u.team_id,
-    SUM(
-      TIMESTAMPDIFF(
-        SECOND,
-        st.start_time,
-        IFNULL(st.end_time, CURRENT_TIMESTAMP)
-      )
-    ) AS total_work_seconds
-  FROM sub_tasks_user_timeline st
-  JOIN users u ON u.id = st.user_id
-  WHERE
-    st.deleted_at IS NULL
-    AND st.product_id = ?
-    AND (? IS NULL OR st.project_id = ?)
-    AND u.role_id = 4
-  GROUP BY u.team_id
-)
-SELECT
-  tm.name AS team_name,
+        SELECT
+  t.name AS team_name,
   ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
   ROUND(COALESCE(wt.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
-FROM teams tm
-LEFT JOIN user_estimates ue ON ue.team_id = tm.id
-LEFT JOIN worked_by_team wt ON wt.team_id = tm.id
-WHERE (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wt.total_work_seconds, 0) > 0)
+FROM teams t
+LEFT JOIN user_estimates ue ON ue.team_id = t.id
+LEFT JOIN worked_by_team wt ON wt.team_id = t.id
+WHERE t.deleted_at IS NULL
+HAVING total_estimated_hours > 0 OR total_worked_hours > 0
 ORDER BY total_worked_hours DESC;
 
+        `;
 
-
-  `;
-
-  teamUtilizationParams = [
-    productId, projectId, projectId, // user_estimates
-    productId, projectId, projectId  // worked_by_user
-  ];
-}
-
-
-
-    const [teamUtilizationRows] = await db.execute(teamUtilizationSql, teamUtilizationParams);
-
-    // === 3) Format completed tasks result ===
-    let completed_tasks_result;
-
-    if (!completedTasksRows.length) {
-      completed_tasks_result = project_id
-        ? {
-            pending_percentage: "0.00",
-            inprogress_percentage: "0.00",
-            completed_percentage: "0.00",
-          }
-        : [];
-    } else if (!project_id) {
-      const projects = completedTasksRows.map((r) => ({
-        project_id: r.project_id,
-        project_name: r.project_name,
-        completed_percentage: r.total > 0 ? parseFloat(((r.completed_count / r.total) * 100).toFixed(2)) : 0,
-      })).sort((a, b) => b.completed_percentage - a.completed_percentage);
-
-      const top4 = projects.slice(0, 4);
-      const others = projects.slice(4);
-
-      const othersCompletedTotal = others.reduce((acc, curr) => acc + curr.completed_percentage, 0);
-
-      completed_tasks_result = [...top4];
-
-      if (others.length > 0) {
-        completed_tasks_result.push({
-          project_id: null,
-          project_name: "Others",
-          completed_percentage: parseFloat(othersCompletedTotal.toFixed(2)),
-          projects: others
-        });
+        teamUtilizationParams = [
+          productId, projectId, projectId,
+          productId, projectId, projectId,
+        ];
       }
-    } else {
-      const r = completedTasksRows[0];
-      const total = r.total || 0;
-      completed_tasks_result = {
-        pending_percentage: total ? ((r.pending_count / total) * 100).toFixed(2) : "0.00",
-        inprogress_percentage: total ? ((r.inprogress_count / total) * 100).toFixed(2) : "0.00",
-        completed_percentage: total ? ((r.completed_count / total) * 100).toFixed(2) : "0.00",
-      };
+    } else if (role_id === 4) {
+      teamUtilizationSql = `
+        WITH
+        user_estimates AS (
+          SELECT u.id AS user_id,
+            SUM(CASE
+              WHEN EXISTS (
+                SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+              )
+              THEN (
+                SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+                FROM sub_tasks s2
+                WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+              )
+              ELSE TIME_TO_SEC(t.estimated_hours)
+            END) AS total_est_seconds
+          FROM tasks t
+          JOIN users u ON u.id = t.user_id
+          WHERE t.deleted_at IS NULL
+            AND t.product_id = ?
+            AND (? IS NULL OR t.project_id = ?)
+            AND u.id = ?
+          GROUP BY u.id
+        ),
+        worked_by_user AS (
+          SELECT u.id AS user_id,
+          pr.name AS project_name,
+            SUM(TIMESTAMPDIFF(SECOND, st.start_time, IFNULL(st.end_time, CURRENT_TIMESTAMP))) AS total_work_seconds
+          FROM sub_tasks_user_timeline st
+          JOIN users u ON u.id = st.user_id
+          JOIN projects pr ON pr.id = st.project_id
+          WHERE st.deleted_at IS NULL
+            AND st.product_id = ?
+            AND (? IS NULL OR st.project_id = ?)
+            AND u.id = ?
+          GROUP BY u.id
+        )
+        SELECT u.first_name AS name,
+          wu.project_name,
+          ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
+          ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
+        FROM users u
+        LEFT JOIN user_estimates ue ON ue.user_id = u.id
+        LEFT JOIN worked_by_user wu ON wu.user_id = u.id
+        WHERE u.id = ?
+          AND u.role_id = 4
+          AND u.deleted_at IS NULL
+      `;
+      teamUtilizationParams = [
+        productId, projectId, projectId, user_id,
+        productId, projectId, projectId, user_id,
+        user_id,
+      ];
     }
 
-    // === 4) Return combined result ===
+    const [utilizationResults] = await db.execute(teamUtilizationSql, teamUtilizationParams);
+
     return successResponse(res, {
-      completed_tasks: completed_tasks_result,
-      team_utilization: teamUtilizationRows
+      completed_tasks: completedTasksRows,
+      team_utilization: utilizationResults
     });
 
-  } catch (error) {
-    return errorResponse(res, error.message || error);
+  } catch (err) {
+    console.error(err);
+    return errorResponse(res, err.message, 'Something went wrong', 500);
   }
 };
