@@ -1209,7 +1209,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     }
 
     // --- Continue with Product ID Validation ---
-    const productIdString = req.body.product_id || "";
+    const productIdString = req.query.product_id || "";
     const productIds = productIdString
       .split(",")
       .map((id) => parseInt(id.trim(), 10))
