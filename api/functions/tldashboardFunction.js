@@ -6,8 +6,9 @@ const {
 const {
   getColorForProduct,
   getUserIdFromAccessToken,
+  getAuthUserDetails,
 } = require("../../api/functions/commonFunction");
-
+const moment = require("moment");
 exports.fetchAttendance = async (req, res) => {
   try {
     const currentTimeUTC = new Date();
@@ -1690,3 +1691,158 @@ exports.tltaskpendinglist = async (req, res) => {
     return errorResponse(res, null, "Something went wrong", 500);
   }
 };
+
+function convertSecondsToReadableTime(totalSeconds) {
+  if (totalSeconds === null || totalSeconds === undefined || isNaN(totalSeconds))
+    return "0 hrs";
+
+  const hours = totalSeconds / 3600;
+  return `${hours.toFixed(2)} hrs`;
+}
+
+exports.getTeamWorkedHrs = async (req, res) => {
+  try {
+    const { from_date, to_date, associative } = req.query;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
+    const loggedInUser = await getAuthUserDetails(user_id, res);
+    const isTL = loggedInUser.role_id === 3;
+    const userId = loggedInUser.id;
+
+    if (!from_date || !to_date) {
+      return errorResponse(res, "From date and To date are required", 422);
+    }
+
+    if (new Date(from_date) > new Date(to_date)) {
+      return errorResponse(res, "From date cannot be greater than To date", 422);
+    }
+
+    let userIds = [];
+
+    if (isTL) {
+      const [teamRows] = await db.query(
+        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
+        [userId]
+      );
+
+      if (!teamRows.length) {
+        return errorResponse(
+          res,
+          null,
+          "You are not currently assigned a reporting TL for your team.",
+          404
+        );
+      }
+
+      const teamIds = teamRows.map((row) => row.id);
+
+      const [userRows] = await db.query(
+        "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)",
+        [teamIds]
+      );
+
+      userIds = userRows.map((row) => row.id);
+    } else {
+      userIds = [userId];
+    }
+
+    if (!userIds.length) {
+      return errorResponse(res, null, "No users found for the team.", 404);
+    }
+
+    if (associative) {
+      const associativeId = parseInt(associative);
+      if (!userIds.includes(associativeId)) {
+        return errorResponse(res, "You are not authorized to view this user's data", 403);
+      }
+      userIds = [associativeId]; // override to show specific employee only
+    }
+
+    const placeholders = userIds.map(() => "?").join(",");
+    const query = `
+      SELECT 
+        u.id,
+        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS name,
+        DATE(st.start_time) AS work_date,
+        COALESCE(SUM(TIMESTAMPDIFF(SECOND, st.start_time, COALESCE(st.end_time, NOW()))), 0) AS total_worked_seconds
+      FROM users u
+      LEFT JOIN sub_tasks_user_timeline st 
+        ON st.user_id = u.id 
+        AND st.deleted_at IS NULL 
+        AND DATE(st.start_time) BETWEEN ? AND ?
+      WHERE u.deleted_at IS NULL 
+        AND u.id IN (${placeholders}) 
+        AND u.role_id NOT IN (1, 2,3)
+      GROUP BY u.id, u.first_name, u.last_name, work_date
+      ORDER BY work_date ASC, total_worked_seconds DESC
+    `;
+
+    const [rows] = await db.query(query, [from_date, to_date, ...userIds]);
+
+    let data = [];
+
+    if (!associative && isTL) {
+      // Group by date
+      const groupedByDate = {};
+
+      for (const row of rows) {
+        if (!groupedByDate[row.work_date]) {
+          groupedByDate[row.work_date] = [];
+        }
+        groupedByDate[row.work_date].push(row);
+      }
+
+      for (const [date, records] of Object.entries(groupedByDate)) {
+        if (records.length > 5) {
+          const top5 = records.slice(0, 5);
+          const others = records.slice(5);
+
+          const totalOtherSeconds = others.reduce((sum, r) => sum + (Number(r.total_worked_seconds) || 0), 0);
+
+          data.push(
+            ...top5.map((r) => ({
+              id: r.id,
+              name: r.name,
+               date: moment(date).format("ddd"),
+              total_worked_hrs: convertSecondsToReadableTime(r.total_worked_seconds),
+            })),
+            {
+              id: null,
+              name: "Others",
+               date: moment(date).format("ddd"),
+              total_worked_hrs: convertSecondsToReadableTime(totalOtherSeconds),
+            }
+          );
+        } else {
+          data.push(
+            ...records.map((r) => ({
+              id: r.id,
+              name: r.name,
+               date: moment(date).format("ddd"),
+              total_worked_hrs: convertSecondsToReadableTime(r.total_worked_seconds),
+            }))
+          );
+        }
+      }
+    } else {
+      // When associative is passed or user is not TL
+      data = rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        date: moment(r.work_date).format("DDD"),
+        total_worked_hrs: convertSecondsToReadableTime(r.total_worked_seconds),
+      }));
+    }
+
+    return successResponse(res, data, "Team worked hours fetched successfully", 200);
+  } catch (error) {
+    console.error("Error in getTeamWorkedHrs:", error);
+    return errorResponse(res, "Error fetching team worked hours", error.message, 500);
+  }
+};
+
+

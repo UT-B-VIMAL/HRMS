@@ -2,11 +2,18 @@ const db = require('../../config/db');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const jwt = require('jsonwebtoken')
 
-exports.getAllData = async (payload, res) => {
-    const { type, id, user_id, task_user_id } = payload;
+exports.getAllData = async (req, res) => {
+    const { type, id, task_user_id } = req.query;
 
     let query = "";
     let queryParams = [];
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    console.log(accessToken)
+
+    const user_id = await this.getUserIdFromAccessToken(accessToken);
 
     // try {
     // Initialize queries based on type
