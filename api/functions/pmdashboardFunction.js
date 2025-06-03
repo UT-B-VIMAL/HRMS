@@ -1203,8 +1203,8 @@ exports.fetchUserTasksByProduct = async (req, res) => {
       if (userIdsFilter.length === 0) {
         return successResponse(res, [], "No team members found", 200);
       }
-    }else if (loggedInUser.role_id === 4) {
-      
+    } else if (loggedInUser.role_id === 4) {
+
       userIdsFilter = [login_id];
     }
 
@@ -1444,11 +1444,11 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
         result.present_employees.push(employee);
 
         // if (user.role_id !== 3) {
-          if (workingUserIds.has(user.user_id)) {
-            result.active_employees.push(employee);
-          } else {
-            result.idle_employees.push(employee);
-          }
+        if (workingUserIds.has(user.user_id)) {
+          result.active_employees.push(employee);
+        } else {
+          result.idle_employees.push(employee);
+        }
         // }
       }
     });
@@ -1492,7 +1492,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 
 exports.getProjectCompletion = async (req, res) => {
   try {
-    const { product_id, project_id, team_id } = req.query;
+    const { product_id, project_id, team_id, associate_id } = req.query;
 
     if (!product_id) {
       return errorResponse(res, null, "product_id is required", 400);
@@ -1533,11 +1533,13 @@ exports.getProjectCompletion = async (req, res) => {
 
     let teamFilterSql = '';
     let teamFilterParams = [];
+    let associateFilter = parseInt(associate_id) || null;
 
     if (role_id === 3) {
       const placeholders = teamIds.map(() => '?').join(',');
       teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id IN (${placeholders}))`;
       teamFilterParams = [...teamIds];
+
     } else if (role_id === 1 || role_id === 2) {
       if (team_id) {
         teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id = ?)`;
@@ -1546,6 +1548,12 @@ exports.getProjectCompletion = async (req, res) => {
     } else if (role_id === 4) {
       teamFilterSql = `AND user_id = ?`;
       teamFilterParams = [user_id];
+    }
+
+    if (associate_id) {
+      teamFilterSql = `AND user_id = ?`;
+      teamFilterParams = [associate_id];
+      associateFilter = `AND u.id = ${associate_id}`;
     }
 
     const projectFilterSql = project_id ? `AND project_id = ?` : '';
@@ -1682,6 +1690,7 @@ exports.getProjectCompletion = async (req, res) => {
         WHERE u.team_id IN (${placeholders})
           AND u.role_id = 4
           AND u.deleted_at IS NULL
+          ${associateFilter || ''}
           AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
         ORDER BY total_worked_hours DESC;
       `;
@@ -1695,7 +1704,7 @@ exports.getProjectCompletion = async (req, res) => {
       ];
 
     } else if (role_id === 1 || role_id === 2) {
-       // Admin or PM - single optional team_id filter
+      // Admin or PM - single optional team_id filter
       if (team_id) {
         // team_id filter present
         teamUtilizationSql = `
