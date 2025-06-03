@@ -1713,16 +1713,21 @@ function convertSecondsToReadableTime(totalSeconds) {
 
 exports.getTeamWorkedHrs = async (req, res) => {
   try {
-    const {  from_date, to_date } = req.query;
+    const {  from_date, to_date ,associative } = req.query;
     const accessToken = req.headers.authorization?.split(" ")[1];
-      if (!accessToken) {
-        return errorResponse(res, "Access token is required", 401);
-      }
-     const user_id = await getUserIdFromAccessToken(accessToken);
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
     const loggedInUser = await getAuthUserDetails(user_id, res);
     const isTL = loggedInUser.role_id === 3;
     const userId = loggedInUser.id;
-
+    if (!from_date && !to_date) {
+      return errorResponse(res, "From date and To date is Required", 422);
+    }
+    if(  new Date(from_date) > new Date(to_date)){
+      return errorResponse(res, "From date cannot be greater than To date", 422);
+    }
     let userIds = [];
 
     if (isTL) {
@@ -1760,7 +1765,13 @@ exports.getTeamWorkedHrs = async (req, res) => {
         404
       );
     }
-
+    if (associative) {
+      const associativeId = parseInt(associative);
+      if (!userIds.includes(associativeId)) {
+        return errorResponse(res, "You are not authorized to view this user's data", 403);
+      }
+      userIds = [associativeId]; // override to show specific employee only
+    }
     let dateFilterSql = "";
     const dateParams = [];
 
@@ -1780,7 +1791,7 @@ exports.getTeamWorkedHrs = async (req, res) => {
         COALESCE(SUM(TIMESTAMPDIFF(SECOND, st.start_time, COALESCE(st.end_time, NOW()))), 0) AS total_worked_seconds
       FROM users u
       LEFT JOIN sub_tasks_user_timeline st ON st.user_id = u.id AND st.deleted_at IS NULL ${dateFilterSql}
-      WHERE u.deleted_at IS NULL AND u.id IN (${placeholders})
+      WHERE u.deleted_at IS NULL AND u.id IN (${placeholders}) AND u.role_id NOT IN (1, 2)
       GROUP BY u.id, u.first_name, u.last_name
       ORDER BY total_worked_seconds DESC
     `;
