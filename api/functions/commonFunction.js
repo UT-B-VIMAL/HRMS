@@ -3,7 +3,7 @@ const { successResponse, errorResponse } = require('../../helpers/responseHelper
 const jwt = require('jsonwebtoken')
 
 exports.getAllData = async (req, res) => {
-    const { type, id, task_user_id } = req.query;
+    const { type, id, task_user_id ,project_id,product_id } = req.query;
 
     let query = "";
     let queryParams = [];
@@ -14,11 +14,65 @@ exports.getAllData = async (req, res) => {
     console.log(accessToken)
 
     const user_id = await this.getUserIdFromAccessToken(accessToken);
-
     // try {
     // Initialize queries based on type
     if (type === "teams") {
-        query = "SELECT id, name FROM teams WHERE deleted_at IS NULL";
+          let teamIds = [];
+            let userIds = new Set();
+
+            const conditions = [];
+            const values = [];
+
+            if (req.query.project_id) {
+                conditions.push("project_id = ?");
+                values.push(req.query.project_id);
+            }
+
+            if (req.query.product_id) {
+                conditions.push("product_id = ?");
+                values.push(req.query.product_id);
+            }
+
+           if (conditions.length > 0) {
+                const whereClause = conditions.join(" OR ");
+
+                // Get user_ids from tasks
+                const [taskUsers] = await db.query(
+                    `SELECT DISTINCT user_id FROM tasks WHERE deleted_at IS NULL AND (${whereClause})`,
+                    values
+                );
+                taskUsers.forEach(row => userIds.add(row.user_id));
+
+                // Get user_ids from sub_tasks
+                const [subtaskUsers] = await db.query(
+                    `SELECT DISTINCT user_id FROM sub_tasks WHERE deleted_at IS NULL AND (${whereClause})`,
+                    values
+                );
+                subtaskUsers.forEach(row => userIds.add(row.user_id));
+                } else {
+                    // No filters provided, return all active team_ids
+                    const [teamRows] = await db.query(
+                        `SELECT DISTINCT team_id FROM users WHERE deleted_at IS NULL AND team_id IS NOT NULL`
+                    );
+                    teamIds = teamRows.map(t => t.team_id);
+                }
+
+
+        if (userIds.size > 0) {
+        const userIdList = [...userIds];
+        const [teamRows] = await db.query(
+            `SELECT DISTINCT team_id FROM users WHERE deleted_at IS NULL AND id IN (?)`,
+            [userIdList]
+        );
+        teamIds = teamRows.map(t => t.team_id);
+    } 
+
+    if (teamIds.length === 0) {
+        teamIds = [-1]; // fallback to avoid SQL error
+    }
+
+    query = `SELECT id, name FROM teams WHERE deleted_at IS NULL AND id IN (?)`;
+    queryParams.push(teamIds);
     } else if (type === "users") {
         query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
     }
