@@ -1711,6 +1711,18 @@ const othersSummary = {
 };
 
 // Final object
+const totalSum = completedTasksRows.reduce((acc, p) => {
+  acc.total += p.total;
+  acc.pending_count += p.pending_count;
+  acc.inprogress_count += p.inprogress_count;
+  acc.completed_count += p.completed_count;
+  return acc;
+}, { total: 0, pending_count: 0, inprogress_count: 0, completed_count: 0 });
+
+const total_completed_percent = totalSum.total > 0
+  ? parseFloat(((totalSum.completed_count / totalSum.total) * 100).toFixed(2))
+  : 0;
+
 const completed_tasks = {
   projects: othersProjects.length > 0 
     ? [...visibleProjects.map(({project_id, project_name, pending_percent, inprogress_percent, completed_percent}) => ({
@@ -1736,8 +1748,8 @@ const completed_tasks = {
         completed_percent,
     }))
     : [],
+  total_completed_percent
 };
-
     let teamUtilizationSql = "";
     let teamUtilizationParams = [];
     const productId = parseInt(product_id);
