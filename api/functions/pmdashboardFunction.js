@@ -1208,6 +1208,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         return successResponse(res, [], "No team members found", 200);
       }
     } else if (loggedInUser.role_id === 4) {
+      
       userIdsFilter = [login_id];
     }
 
@@ -1527,7 +1528,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 
 exports.getProjectCompletion = async (req, res) => {
   try {
-    const { product_id, project_id, team_id } = req.query;
+    const { product_id, project_id, team_id, associate_id } = req.query;
 
     if (!product_id) {
       return errorResponse(res, null, "product_id is required", 400);
@@ -1574,11 +1575,13 @@ exports.getProjectCompletion = async (req, res) => {
 
     let teamFilterSql = "";
     let teamFilterParams = [];
+    let associateFilter = parseInt(associate_id) || null;
 
     if (role_id === 3) {
       const placeholders = teamIds.map(() => "?").join(",");
       teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id IN (${placeholders}))`;
       teamFilterParams = [...teamIds];
+
     } else if (role_id === 1 || role_id === 2) {
       if (team_id) {
         teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id = ?)`;
@@ -1589,7 +1592,13 @@ exports.getProjectCompletion = async (req, res) => {
       teamFilterParams = [user_id];
     }
 
-    const projectFilterSql = project_id ? `AND project_id = ?` : "";
+    if (associate_id) {
+      teamFilterSql = `AND user_id = ?`;
+      teamFilterParams = [associate_id];
+      associateFilter = `AND u.id = ${associate_id}`;
+    }
+
+    const projectFilterSql = project_id ? `AND project_id = ?` : '';
     const projectFilterParams = project_id ? [project_id] : [];
 
     const completedTasksSql = `
@@ -1741,6 +1750,7 @@ exports.getProjectCompletion = async (req, res) => {
         WHERE u.team_id IN (${placeholders})
           AND u.role_id = 4
           AND u.deleted_at IS NULL
+          ${associateFilter || ''}
           AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
         ORDER BY total_worked_hours DESC;
       `;
