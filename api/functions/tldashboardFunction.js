@@ -1692,33 +1692,44 @@ exports.tltaskpendinglist = async (req, res) => {
   }
 };
 
-function convertSecondsToReadableTime(totalSeconds) {
-  if (totalSeconds === null || totalSeconds === undefined || isNaN(totalSeconds))
-    return "0 hrs";
-
-  const hours = totalSeconds / 3600;
-  return `${hours.toFixed(2)} hrs`;
+function convertSecondsToReadableTime(seconds) {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hrs}h ${mins}m`;
 }
 
 exports.getTeamWorkedHrs = async (req, res) => {
   try {
     const { from_date, to_date, associative } = req.query;
     const accessToken = req.headers.authorization?.split(" ")[1];
-    if (!accessToken) {
-      return errorResponse(res, "Access token is required", 401);
-    }
+    if (!accessToken) return errorResponse(res, "Access token is required", 401);
 
     const user_id = await getUserIdFromAccessToken(accessToken);
     const loggedInUser = await getAuthUserDetails(user_id, res);
     const isTL = loggedInUser.role_id === 3;
     const userId = loggedInUser.id;
 
-    if (!from_date || !to_date) {
-      return errorResponse(res, "From date and To date are required", 422);
+    const startDate = moment(from_date, "YYYY-MM-DD");
+    const endDate = moment(to_date, "YYYY-MM-DD");
+
+    if (!startDate.isValid() || !endDate.isValid()) {
+      return errorResponse(res, "Invalid date format. Use YYYY-MM-DD.", 422);
     }
 
-    if (new Date(from_date) > new Date(to_date)) {
+    if (startDate.isAfter(endDate)) {
       return errorResponse(res, "From date cannot be greater than To date", 422);
+    }
+
+    if (endDate.diff(startDate, "days") !== 5) {
+      return errorResponse(res, "The date range must be exactly 6 days (Monday to Saturday)", 422);
+    }
+
+    if (startDate.format("dddd") !== "Monday") {
+      return errorResponse(res, "From date must be a Monday", 422);
+    }
+
+    if (endDate.format("dddd") !== "Saturday") {
+      return errorResponse(res, "To date must be a Saturday", 422);
     }
 
     let userIds = [];
@@ -1730,28 +1741,21 @@ exports.getTeamWorkedHrs = async (req, res) => {
       );
 
       if (!teamRows.length) {
-        return errorResponse(
-          res,
-          null,
-          "You are not currently assigned a reporting TL for your team.",
-          404
-        );
+        return errorResponse(res, "You are not currently assigned a reporting TL for your team.", 404);
       }
 
       const teamIds = teamRows.map((row) => row.id);
-
       const [userRows] = await db.query(
         "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)",
         [teamIds]
       );
-
       userIds = userRows.map((row) => row.id);
     } else {
       userIds = [userId];
     }
 
     if (!userIds.length) {
-      return errorResponse(res, null, "No users found for the team.", 404);
+      return errorResponse(res, "No users found for the team.", 404);
     }
 
     if (associative) {
@@ -1759,83 +1763,84 @@ exports.getTeamWorkedHrs = async (req, res) => {
       if (!userIds.includes(associativeId)) {
         return errorResponse(res, "You are not authorized to view this user's data", 403);
       }
-      userIds = [associativeId]; // override to show specific employee only
+      userIds = [associativeId];
     }
 
     const placeholders = userIds.map(() => "?").join(",");
-    const query = `
-      SELECT 
-        u.id,
-        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS name,
-        DATE(st.start_time) AS work_date,
-        COALESCE(SUM(TIMESTAMPDIFF(SECOND, st.start_time, COALESCE(st.end_time, NOW()))), 0) AS total_worked_seconds
-      FROM users u
-      LEFT JOIN sub_tasks_user_timeline st 
-        ON st.user_id = u.id 
-        AND st.deleted_at IS NULL 
-        AND DATE(st.start_time) BETWEEN ? AND ?
-      WHERE u.deleted_at IS NULL 
-        AND u.id IN (${placeholders}) 
-        AND u.role_id NOT IN (1, 2,3)
-      GROUP BY u.id, u.first_name, u.last_name, work_date
-      ORDER BY work_date ASC, total_worked_seconds DESC
-    `;
 
-    const [rows] = await db.query(query, [from_date, to_date, ...userIds]);
+      // Fetch all users
+      const [users] = await db.query(
+        `SELECT id, CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) AS name
+        FROM users
+        WHERE deleted_at IS NULL AND id IN (${placeholders}) AND role_id NOT IN (1, 2, 3)`,
+        [...userIds]
+      );
 
-    let data = [];
-
-    if (!associative && isTL) {
-      // Group by date
-      const groupedByDate = {};
-
-      for (const row of rows) {
-        if (!groupedByDate[row.work_date]) {
-          groupedByDate[row.work_date] = [];
-        }
-        groupedByDate[row.work_date].push(row);
+      if (!users.length) {
+        return errorResponse(res, "No valid users found", 404);
       }
 
-      for (const [date, records] of Object.entries(groupedByDate)) {
-        if (records.length > 5) {
-          const top5 = records.slice(0, 5);
-          const others = records.slice(5);
-
-          const totalOtherSeconds = others.reduce((sum, r) => sum + (Number(r.total_worked_seconds) || 0), 0);
-
-          data.push(
-            ...top5.map((r) => ({
-              id: r.id,
-              name: r.name,
-               date: moment(date).format("ddd"),
-              total_worked_hrs: convertSecondsToReadableTime(r.total_worked_seconds),
-            })),
-            {
-              id: null,
-              name: "Others",
-               date: moment(date).format("ddd"),
-              total_worked_hrs: convertSecondsToReadableTime(totalOtherSeconds),
-            }
-          );
-        } else {
-          data.push(
-            ...records.map((r) => ({
-              id: r.id,
-              name: r.name,
-               date: moment(date).format("ddd"),
-              total_worked_hrs: convertSecondsToReadableTime(r.total_worked_seconds),
-            }))
-          );
+        // Fetch timeline data
+        const [timelineRows] = await db.query(
+          `SELECT 
+            user_id,
+            DATE(start_time) AS work_date,
+            SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, NOW()))) AS total_worked_seconds
+          FROM sub_tasks_user_timeline
+          WHERE deleted_at IS NULL 
+            AND DATE(start_time) BETWEEN ? AND ?
+            AND user_id IN (${placeholders})
+          GROUP BY user_id, work_date`,
+          [from_date, to_date, ...userIds]
+        );
+        // Prepare date range from Monday to Saturday
+        const dateRange = [];
+        for (let i = 0; i <= 5; i++) {
+          dateRange.push(moment(from_date).clone().add(i, "days").format("YYYY-MM-DD"));
         }
+
+        let data = {};
+
+        for (const date of dateRange) {
+          const dayKey = moment(date).format("ddd").toLowerCase(); // e.g., 'mon', 'tue'
+
+          const dailyUsers = users.map((user) => {
+            const record = timelineRows.find((r) => 
+      r.user_id === user.id && moment(r.work_date).format("YYYY-MM-DD") === date
+    );
+
+      const totalSeconds = record ? record.total_worked_seconds : 0;
+      return {
+        id: user.id,
+        name: user.name,
+        total_worked_hrs: convertSecondsToReadableTime(totalSeconds),
+      }});
+
+      if (isTL && !associative) {
+        const top5 = dailyUsers.slice(0, 5);
+        const others = dailyUsers.slice(5);
+
+        if (others.length) {
+          const totalOtherSeconds = others.reduce((sum, u) => {
+            const seconds = u.total_worked_hrs.split(" ").reduce((acc, part) => {
+              if (part.includes("h")) return acc + parseInt(part) * 3600;
+              if (part.includes("m")) return acc + parseInt(part) * 60;
+              return acc;
+            }, 0);
+            return sum + seconds;
+          }, 0);
+
+          top5.push({
+            id: null,
+            name: "Others",
+            total_worked_hrs: convertSecondsToReadableTime(totalOtherSeconds),
+          });
+        }
+
+        data[dayKey] = top5;
+      } else {
+        data[dayKey] = dailyUsers;
       }
-    } else {
-      // When associative is passed or user is not TL
-      data = rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        date: moment(r.work_date).format("DDD"),
-        total_worked_hrs: convertSecondsToReadableTime(r.total_worked_seconds),
-      }));
     }
 
     return successResponse(res, data, "Team worked hours fetched successfully", 200);
