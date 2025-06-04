@@ -5,7 +5,7 @@ const {
 } = require("../../helpers/responseHelper");
 const {
   getColorForProduct,
-  getUserIdFromAccessToken
+  getUserIdFromAccessToken,
 } = require("../../api/functions/commonFunction");
 
 exports.fetchProducts = async (payload, res) => {
@@ -132,7 +132,6 @@ exports.fetchProducts = async (payload, res) => {
   }
 };
 
-
 exports.fetchUtilization = async (req, res) => {
   try {
     const { team_id } = req.query;
@@ -204,7 +203,6 @@ exports.fetchUtilization = async (req, res) => {
     )
 `;
 
-
     const [workingEmployeesData] = await db.query(
       workingEmployeesQuery,
       team_id ? [team_id] : []
@@ -238,8 +236,14 @@ exports.fetchUtilization = async (req, res) => {
       return {
         team_id: teamId,
         team_name: team.team_name,
-        total_strength: team.total_strength < 10 ? `0${team.total_strength}` : `${team.total_strength}`,
-        working_count: working.working_count < 10 ? `0${working.working_count}` : `${working.working_count}`,
+        total_strength:
+          team.total_strength < 10
+            ? `0${team.total_strength}`
+            : `${team.total_strength}`,
+        working_count:
+          working.working_count < 10
+            ? `0${working.working_count}`
+            : `${working.working_count}`,
         working_employees: working.working_employees,
       };
     });
@@ -322,7 +326,6 @@ exports.fetchAttendance = async (payload, res) => {
     `;
     const [teamWiseAttendanceData] = await db.query(teamWiseAttendanceQuery);
 
-
     const teamWiseAttendance = teamWiseAttendanceData.reduce((acc, row) => {
       const {
         team_id,
@@ -333,7 +336,6 @@ exports.fetchAttendance = async (payload, res) => {
         day_type,
         half_type,
       } = row;
-
 
       if (!acc[team_id]) {
         acc[team_id] = {
@@ -351,7 +353,6 @@ exports.fetchAttendance = async (payload, res) => {
       if (!user_id) {
         return acc;
       }
-
 
       if (user_id) {
         acc[team_id].total_team_count++;
@@ -381,15 +382,15 @@ exports.fetchAttendance = async (payload, res) => {
       return acc;
     }, {});
 
-
-
-    const pad = (num) => num.toString().padStart(2, '0');
-    const teamWiseAttendanceArray = Object.values(teamWiseAttendance).map(team => ({
-      ...team,
-      total_team_count: pad(team.total_team_count),
-      team_absent_count: pad(team.team_absent_count),
-      team_present_count: pad(team.team_present_count),
-    }));
+    const pad = (num) => num.toString().padStart(2, "0");
+    const teamWiseAttendanceArray = Object.values(teamWiseAttendance).map(
+      (team) => ({
+        ...team,
+        total_team_count: pad(team.total_team_count),
+        team_absent_count: pad(team.team_absent_count),
+        team_present_count: pad(team.team_present_count),
+      })
+    );
 
     // Step 4: Combine attendance results
     const result = {
@@ -420,17 +421,11 @@ exports.fetchAttendance = async (payload, res) => {
 };
 exports.fetchPmviewproductdata = async (req, res) => {
   try {
-    const {
-      product_id,
-      project_id,
-      team_id,
-      date,
-      search,
-    } = req.query;
+    const { product_id, project_id, team_id, date, search } = req.query;
 
-    const accessToken = req.headers.authorization?.split(' ')[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
-      return errorResponse(res, 'Access token is required', 401);
+      return errorResponse(res, "Access token is required", 401);
     }
     const user_id = await getUserIdFromAccessToken(accessToken);
 
@@ -544,7 +539,14 @@ exports.fetchPmviewproductdata = async (req, res) => {
           s.name LIKE ?
         )
       `;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm
+      );
     }
 
     baseQuery += `
@@ -561,7 +563,7 @@ exports.fetchPmviewproductdata = async (req, res) => {
 
     const isValidSubtask = (item, status) => {
       // Determine if the item is a task or a subtask
-      const isTask = !item.hasOwnProperty('subtask_id');
+      const isTask = !item.hasOwnProperty("subtask_id");
 
       // Task or subtask validation
       if (isTask) {
@@ -618,7 +620,6 @@ exports.fetchPmviewproductdata = async (req, res) => {
       }
     };
 
-
     // Helper function to format tasks and subtasks
     const formatTask = (task, subtasks, status) => {
       const validSubtasks = [];
@@ -649,8 +650,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         totalSubtasks > 0
           ? Math.round((completedSubtasks / totalSubtasks) * 100)
           : task.status === 3
-            ? 100
-            : 0;
+          ? 100
+          : 0;
 
       // Return the formatted task object
       return {
@@ -717,15 +718,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
       // Create subtask if applicable
       const subtask = row.subtask_id
         ? {
-          id: row.subtask_id,
-          name: row.subtask_name,
-          status: row.subtask_status,
-          active_status: row.subtask_active_status,
-          reopen_status: row.subtask_reopen_status,
-          estimated_hours: row.subtask_estimation_hours,
-          description: row.subtask_description,
-          assigned_user_id: row.subtask_assigned_user_id,
-        }
+            id: row.subtask_id,
+            name: row.subtask_name,
+            status: row.subtask_status,
+            active_status: row.subtask_active_status,
+            reopen_status: row.subtask_reopen_status,
+            estimated_hours: row.subtask_estimation_hours,
+            description: row.subtask_description,
+            assigned_user_id: row.subtask_assigned_user_id,
+          }
         : null;
 
       // Find category based on task's subtask or status
@@ -769,10 +770,10 @@ exports.fetchPmviewproductdata = async (req, res) => {
           const completionPercentage =
             existingTask.TotalSubtaskCount > 0
               ? Math.round(
-                (existingTask.CompletedSubtaskCount /
-                  existingTask.TotalSubtaskCount) *
-                100
-              )
+                  (existingTask.CompletedSubtaskCount /
+                    existingTask.TotalSubtaskCount) *
+                    100
+                )
               : 0;
 
           existingTask.CompletionPercentage = completionPercentage;
@@ -791,7 +792,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         if (task.Subtasks.length > 0) {
           task.Subtasks.forEach((subtask) => {
             totalItems++;
-            if (subtask.SubtaskStatus === 3) { // Assuming 3 is the "Done" status
+            if (subtask.SubtaskStatus === 3) {
+              // Assuming 3 is the "Done" status
               completedItems++;
             }
           });
@@ -806,9 +808,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
     });
 
     // Calculate overall completion based on total task and subtask counts
-    const overallCompletionPercentage = totalItems > 0
-      ? Math.round((completedItems / totalItems) * 100)
-      : 0;
+    const overallCompletionPercentage =
+      totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
     const result = {
       PendingTasks: groupedTasks["Pending"],
@@ -830,10 +831,14 @@ exports.fetchPmviewproductdata = async (req, res) => {
     };
 
     // Send the success response with the result
-    return successResponse(res, result, "Product details retrieved successfully", 200);
+    return successResponse(
+      res,
+      result,
+      "Product details retrieved successfully",
+      200
+    );
     // Send response with grouped tasks
     // return successResponse(res, groupedTasks);
-
   } catch (error) {
     console.error(error);
     return errorResponse(
@@ -844,7 +849,6 @@ exports.fetchPmviewproductdata = async (req, res) => {
     );
   }
 };
-
 
 exports.fetchPmdatas = async (req, res) => {
   try {
@@ -1154,9 +1158,9 @@ exports.fetchPmdatas = async (req, res) => {
 };
 
 exports.fetchUserTasksByProduct = async (req, res) => {
-  const accessToken = req.headers.authorization?.split(' ')[1];
+  const accessToken = req.headers.authorization?.split(" ")[1];
   if (!accessToken) {
-    return errorResponse(res, 'Access token is required', 401);
+    return errorResponse(res, "Access token is required", 401);
   }
 
   const login_id = await getUserIdFromAccessToken(accessToken);
@@ -1204,7 +1208,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         return successResponse(res, [], "No team members found", 200);
       }
     } else if (loggedInUser.role_id === 4) {
-
+      
       userIdsFilter = [login_id];
     }
 
@@ -1236,8 +1240,14 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         let pendingCount = 0;
 
         // Prepare user filter condition
-        const userFilterSql = userIdsFilter.length > 0 ? `AND t.user_id IN (${userIdsFilter.join(',')})` : '';
-        const subUserFilterSql = userIdsFilter.length > 0 ? `AND st.user_id IN (${userIdsFilter.join(',')})` : '';
+        const userFilterSql =
+          userIdsFilter.length > 0
+            ? `AND t.user_id IN (${userIdsFilter.join(",")})`
+            : "";
+        const subUserFilterSql =
+          userIdsFilter.length > 0
+            ? `AND st.user_id IN (${userIdsFilter.join(",")})`
+            : "";
 
         // Tasks without subtasks
         const [soloTasks] = await db.query(
@@ -1255,13 +1265,19 @@ exports.fetchUserTasksByProduct = async (req, res) => {
           if (task.status === 3) {
             completedCount++;
           } else if (
-            (task.status === 1 && task.active_status === 1 && task.reopen_status === 0) ||
+            (task.status === 1 &&
+              task.active_status === 1 &&
+              task.reopen_status === 0) ||
             (task.status === 2 && task.reopen_status === 0)
           ) {
             inProgressCount++;
           } else if (
-            (task.status === 0 && task.active_status === 0 && task.reopen_status === 0) ||
-            (task.status === 1 && task.active_status === 0 && task.reopen_status === 0) ||
+            (task.status === 0 &&
+              task.active_status === 0 &&
+              task.reopen_status === 0) ||
+            (task.status === 1 &&
+              task.active_status === 0 &&
+              task.reopen_status === 0) ||
             task.reopen_status === 1
           ) {
             pendingCount++;
@@ -1283,13 +1299,19 @@ exports.fetchUserTasksByProduct = async (req, res) => {
           if (subtask.status === 3) {
             completedCount++;
           } else if (
-            (subtask.status === 1 && subtask.active_status === 1 && subtask.reopen_status === 0) ||
+            (subtask.status === 1 &&
+              subtask.active_status === 1 &&
+              subtask.reopen_status === 0) ||
             (subtask.status === 2 && subtask.reopen_status === 0)
           ) {
             inProgressCount++;
           } else if (
-            (subtask.status === 0 && subtask.active_status === 0 && subtask.reopen_status === 0) ||
-            (subtask.status === 1 && subtask.active_status === 0 && subtask.reopen_status === 0) ||
+            (subtask.status === 0 &&
+              subtask.active_status === 0 &&
+              subtask.reopen_status === 0) ||
+            (subtask.status === 1 &&
+              subtask.active_status === 0 &&
+              subtask.reopen_status === 0) ||
             subtask.reopen_status === 1
           ) {
             pendingCount++;
@@ -1297,9 +1319,12 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         });
 
         const total = inProgressCount + completedCount + pendingCount;
-        const inProgressPercent = total > 0 ? Math.round((inProgressCount / total) * 100) : 0;
-        const completedPercent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
-        const pendingPercent = total > 0 ? Math.round((pendingCount / total) * 100) : 0;
+        const inProgressPercent =
+          total > 0 ? Math.round((inProgressCount / total) * 100) : 0;
+        const completedPercent =
+          total > 0 ? Math.round((completedCount / total) * 100) : 0;
+        const pendingPercent =
+          total > 0 ? Math.round((pendingCount / total) * 100) : 0;
 
         return {
           product_id: product.id,
@@ -1314,22 +1339,32 @@ exports.fetchUserTasksByProduct = async (req, res) => {
       })
     );
 
-    return successResponse(res, result, "Task data retrieved successfully", 200);
+    return successResponse(
+      res,
+      result,
+      "Task data retrieved successfully",
+      200
+    );
   } catch (error) {
     console.error("Error fetching task data:", error);
     return errorResponse(res, error.message, "Error fetching task data", 500);
   }
 };
 
-
-
-
-
 exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   try {
     const { team_id, date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
     const formattedDate = targetDate.toISOString().split("T")[0];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(targetDate);
+    target.setHours(0, 0, 0, 0);
+
+    if (target > today) {
+      return errorResponse(res, null, "Future dates are not allowed", 400);
+    }
 
     // Step 1: Fetch relevant users (include role_id)
     let usersQuery = `
@@ -1436,8 +1471,12 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       const isAbsent =
         leave &&
         (leave.day_type === 1 ||
-          (leave.day_type === 2 && leave.half_type === 1 && currentTime < cutoffTimeStart) ||
-          (leave.day_type === 2 && leave.half_type === 2 && currentTime >= cutoffTimeEnd));
+          (leave.day_type === 2 &&
+            leave.half_type === 1 &&
+            currentTime < cutoffTimeStart) ||
+          (leave.day_type === 2 &&
+            leave.half_type === 2 &&
+            currentTime >= cutoffTimeEnd));
 
       if (isAbsent) {
         result.absent_employees.push(employee);
@@ -1487,10 +1526,6 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   }
 };
 
-
-
-
-
 exports.getProjectCompletion = async (req, res) => {
   try {
     const { product_id, project_id, team_id, associate_id } = req.query;
@@ -1499,20 +1534,20 @@ exports.getProjectCompletion = async (req, res) => {
       return errorResponse(res, null, "product_id is required", 400);
     }
 
-    const accessToken = req.headers.authorization?.split(' ')[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
-      return errorResponse(res, 'Access token is required', 401);
+      return errorResponse(res, "Access token is required", 401);
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
 
     const [userRows] = await db.query(
-      'SELECT role_id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      "SELECT role_id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1",
       [user_id]
     );
 
     if (!userRows || userRows.length === 0) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, "User not found", 404);
     }
 
     const role_id = userRows[0].role_id;
@@ -1523,21 +1558,27 @@ exports.getProjectCompletion = async (req, res) => {
         `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
         [user_id]
       );
-      teamIds = teamsRows.map(row => row.id);
+      teamIds = teamsRows.map((row) => row.id);
       if (teamIds.length === 0) {
         return successResponse(res, {
-          completed_tasks: project_id ? { pending_percentage: "0.00", inprogress_percentage: "0.00", completed_percentage: "0.00" } : [],
-          team_utilization: []
+          completed_tasks: project_id
+            ? {
+                pending_percentage: "0.00",
+                inprogress_percentage: "0.00",
+                completed_percentage: "0.00",
+              }
+            : [],
+          team_utilization: [],
         });
       }
     }
 
-    let teamFilterSql = '';
+    let teamFilterSql = "";
     let teamFilterParams = [];
     let associateFilter = parseInt(associate_id) || null;
 
     if (role_id === 3) {
-      const placeholders = teamIds.map(() => '?').join(',');
+      const placeholders = teamIds.map(() => "?").join(",");
       teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id IN (${placeholders}))`;
       teamFilterParams = [...teamIds];
 
@@ -1626,7 +1667,10 @@ exports.getProjectCompletion = async (req, res) => {
       ...teamFilterParams,
     ];
 
-    const [resultsFromYourQuery] = await db.execute(completedTasksSql, completedTasksParams);
+    const [resultsFromYourQuery] = await db.execute(
+      completedTasksSql,
+      completedTasksParams
+    );
 
    // Step 1: Map raw rows with counts and percents included
 const completedTasksRows = resultsFromYourQuery.map(row => {
@@ -1694,13 +1738,13 @@ const completed_tasks = {
     : [],
 };
 
-    let teamUtilizationSql = '';
+    let teamUtilizationSql = "";
     let teamUtilizationParams = [];
     const productId = parseInt(product_id);
     const projectId = project_id ? parseInt(project_id) : null;
 
     if (role_id === 3) {
-      const placeholders = teamIds.map(() => '?').join(',');
+      const placeholders = teamIds.map(() => "?").join(",");
       teamUtilizationSql = `
         WITH
         user_estimates AS (
@@ -1752,13 +1796,16 @@ const completed_tasks = {
       `;
 
       teamUtilizationParams = [
-        productId, projectId, projectId,
+        productId,
+        projectId,
+        projectId,
         ...teamIds,
-        productId, projectId, projectId,
+        productId,
+        projectId,
+        projectId,
         ...teamIds,
         ...teamIds,
       ];
-
     } else if (role_id === 1 || role_id === 2) {
       // Admin or PM - single optional team_id filter
       if (team_id) {
@@ -1829,11 +1876,16 @@ ORDER BY total_worked_hours DESC;
         const teamIdInt = parseInt(team_id);
 
         teamUtilizationParams = [
-          productId, projectId, projectId, teamIdInt,
-          productId, projectId, projectId, teamIdInt,
+          productId,
+          projectId,
+          projectId,
+          teamIdInt,
+          productId,
+          projectId,
+          projectId,
+          teamIdInt,
           teamIdInt,
         ];
-
       } else {
         // No team_id filter for admin/pm, aggregate by team
         teamUtilizationSql = `
@@ -1896,8 +1948,12 @@ ORDER BY total_worked_hours DESC;
         `;
 
         teamUtilizationParams = [
-          productId, projectId, projectId,
-          productId, projectId, projectId,
+          productId,
+          projectId,
+          projectId,
+          productId,
+          projectId,
+          projectId,
         ];
       }
     } else if (role_id === 4) {
@@ -1949,21 +2005,29 @@ ORDER BY total_worked_hours DESC;
           AND u.deleted_at IS NULL
       `;
       teamUtilizationParams = [
-        productId, projectId, projectId, user_id,
-        productId, projectId, projectId, user_id,
+        productId,
+        projectId,
+        projectId,
+        user_id,
+        productId,
+        projectId,
+        projectId,
+        user_id,
         user_id,
       ];
     }
 
-    const [utilizationResults] = await db.execute(teamUtilizationSql, teamUtilizationParams);
+    const [utilizationResults] = await db.execute(
+      teamUtilizationSql,
+      teamUtilizationParams
+    );
 
     return successResponse(res, {
       completed_tasks: completed_tasks,
       team_utilization: utilizationResults
     });
-
   } catch (err) {
     console.error(err);
-    return errorResponse(res, err.message, 'Something went wrong', 500);
+    return errorResponse(res, err.message, "Something went wrong", 500);
   }
 };
