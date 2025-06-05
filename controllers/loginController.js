@@ -1,4 +1,4 @@
-const { signInUser, logoutUser, changePassword, forgotPassword,resetPasswordWithKeycloak } = require("../api/functions/keycloakFunction");
+const { signInUser, logoutUser, changePassword, forgotPassword, resetPasswordWithKeycloak } = require("../api/functions/keycloakFunction");
 const { changePasswordSchema } = require("../validators/authValidator");
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const db = require("../config/db");
@@ -49,7 +49,7 @@ exports.changePassword = async (req, res) => {
         acc[key] = err.message;
         return acc;
       }, {});
-      
+
       return errorResponse(res, errorMessages, "Validation Error", 403);
     }
 
@@ -121,8 +121,20 @@ exports.logTaskTimeline = async (req, res) => {
       return errorResponse(res, null, "Missing required fields", 400);
     }
 
-    const formattedStartTime = moment(new Date(start_time)).format("YYYY-MM-DD HH:mm:ss");
-    const formattedEndTime = moment(new Date(end_time)).format("YYYY-MM-DD HH:mm:ss");
+    const formattedStartTime = moment(new Date("2025-04-28 09:05:43")).format("YYYY-MM-DD HH:mm:ss");
+    const formattedEndTime = moment(new Date("2025-04-28 17:45:43")).format("YYYY-MM-DD HH:mm:ss");
+
+    const workedDurationSec = moment(formattedEndTime).diff(moment(formattedStartTime), 'seconds');
+
+    // Step 2: Convert to HH:MM:SS format
+    const formatSecondsToHHMMSS = (totalSeconds) => {
+      const hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+      const secs = (totalSeconds % 60).toString().padStart(2, '0');
+      return `${hrs}:${mins}:${secs}`;
+    };
+
+    const total_worked_hours = formatSecondsToHHMMSS(workedDurationSec);
 
     // Get user_id from employee_id
     const [userRows] = await db.query(
@@ -135,126 +147,145 @@ exports.logTaskTimeline = async (req, res) => {
     const formattedStart = moment(new Date(start_time)).format("YYYY-MM-DD");
 
     // Get task_id, product_id, project_id using task_name
-   const [taskRows] = await db.query(
-  `SELECT id AS task_id, product_id, project_id 
+    const [taskRows] = await db.query(
+      `SELECT id AS task_id, product_id, project_id, estimated_hours
    FROM tasks 
    WHERE name = ? 
      AND user_id = ? 
      AND deleted_at IS NULL 
      AND DATE(?) BETWEEN DATE(start_date) AND DATE(end_date)`,
-  [task_name, user_id, formattedStart]
-);
+      [task_name, user_id, formattedStart]
+    );
     if (taskRows.length === 0) return errorResponse(res, null, "Task not found", 404);
 
     const { task_id, product_id, project_id } = taskRows[0];
 
     // === Optional: Insert into sub_tasks_user_timeline (without created_by/updated_by) ===
-    
-   
-    
 
- if (status === "On Hold") {
-  // Check if timeline entry exists for this task
-  const [timelineRows] = await db.query(
-    "SELECT id FROM sub_tasks_user_timeline WHERE task_id = ? LIMIT 1",
-    [task_id]
-  );
+    if (taskRows.length > 0) {
+      const task = taskRows[0];
 
-  let firstOld = "To Do";
-  let firstNew = "In Progress";
-  // If timeline already has entry, switch first transition to On Hold → In Progress
-  if (timelineRows.length > 0) {
-    firstOld = "On Hold";
-    firstNew = "In Progress";
-  }
+      const estimatedSeconds = parseFloat(task.estimated_hours) * 3600;
 
-  // First history entry
-  await db.query(`
+      let updateQuery = `UPDATE tasks SET total_worked_hours = ?`;
+      const updateParams = [total_worked_hours];
+
+      if (workedDurationSec > estimatedSeconds) {
+        const extendedSeconds = workedDurationSec - estimatedSeconds;
+        const extended_hours = formatSecondsToHHMMSS(extendedSeconds);
+        updateQuery += `, extended_hours = ?`;
+        updateParams.push(extended_hours);
+      }
+
+      updateQuery += ` WHERE id = ?`;
+      updateParams.push(task.task_id);
+
+      await db.query(updateQuery, updateParams);
+    }
+
+
+    if (status === "On Hold") {
+      // Check if timeline entry exists for this task
+      const [timelineRows] = await db.query(
+        "SELECT id FROM sub_tasks_user_timeline WHERE task_id = ? LIMIT 1",
+        [task_id]
+      );
+
+      let firstOld = "To Do";
+      let firstNew = "In Progress";
+      // If timeline already has entry, switch first transition to On Hold → In Progress
+      if (timelineRows.length > 0) {
+        firstOld = "On Hold";
+        firstNew = "In Progress";
+      }
+
+      // First history entry
+      await db.query(`
     INSERT INTO task_histories (
       old_data, new_data, task_id, subtask_id, text,
       updated_by, status_flag, created_at, updated_at, deleted_at
     ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
   `, [
-    firstOld,
-    firstNew,
-    task_id,
-    `Status changed from ${firstOld} to ${firstNew}`,
-    user_id,
-    1,
-    formattedStartTime,
-    formattedStartTime
-  ]);
+        firstOld,
+        firstNew,
+        task_id,
+        `Status changed from ${firstOld} to ${firstNew}`,
+        user_id,
+        1,
+        formattedStartTime,
+        formattedStartTime
+      ]);
 
-  // Second history entry: In Progress → On Hold
-  await db.query(`
+      // Second history entry: In Progress → On Hold
+      await db.query(`
     INSERT INTO task_histories (
       old_data, new_data, task_id, subtask_id, text,
       updated_by, status_flag, created_at, updated_at, deleted_at
     ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
   `, [
-    "In Progress",
-    "On Hold",
-    task_id,
-    "Status changed from In Progress to On Hold",
-    user_id,
-    1,
-    formattedEndTime,
-    formattedEndTime
-  ]);
-}
+        "In Progress",
+        "On Hold",
+        task_id,
+        "Status changed from In Progress to On Hold",
+        user_id,
+        1,
+        formattedEndTime,
+        formattedEndTime
+      ]);
+    }
 
-if (status === "In Review") {
-  // On Hold → In Progress (start_time)
-  await db.query(`
+    if (status === "In Review") {
+      // On Hold → In Progress (start_time)
+      await db.query(`
     INSERT INTO task_histories (
       old_data, new_data, task_id, subtask_id, text,
       updated_by, status_flag, created_at, updated_at, deleted_at
     ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
   `, [
-    "On Hold",
-    "In Progress",
-    task_id,
-    "Status changed from On Hold to In Progress",
-    user_id,
-    1,
-    formattedStartTime,
-    formattedStartTime
-  ]);
+        "On Hold",
+        "In Progress",
+        task_id,
+        "Status changed from On Hold to In Progress",
+        user_id,
+        1,
+        formattedStartTime,
+        formattedStartTime
+      ]);
 
-  // In Progress → In Review (end_time)
-  await db.query(`
+      // In Progress → In Review (end_time)
+      await db.query(`
     INSERT INTO task_histories (
       old_data, new_data, task_id, subtask_id, text,
       updated_by, status_flag, created_at, updated_at, deleted_at
     ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
   `, [
-    "In Progress",
-    "In Review",
-    task_id,
-    "Status changed from In Progress to In Review",
-    user_id,
-    1,
-    formattedEndTime,
-    formattedEndTime
-  ]);
-}
+        "In Progress",
+        "In Review",
+        task_id,
+        "Status changed from In Progress to In Review",
+        user_id,
+        1,
+        formattedEndTime,
+        formattedEndTime
+      ]);
+    }
 
     // === Insert comment if available ===
-   if (comment) {
-  const updateTaskCommentQuery = `
+    if (comment) {
+      const updateTaskCommentQuery = `
     UPDATE tasks
     SET command = ?, updated_at = ?
     WHERE id = ?
   `;
-  await db.query(updateTaskCommentQuery, [
-    comment,
-    formattedEndTime, // make sure this is formatted as discussed
-    task_id
-  ]);
-}
+      await db.query(updateTaskCommentQuery, [
+        comment,
+        formattedEndTime, // make sure this is formatted as discussed
+        task_id
+      ]);
+    }
 
 
- const insertTimelineQuery = `
+    const insertTimelineQuery = `
       INSERT INTO sub_tasks_user_timeline (
         user_id, task_id, product_id, project_id, subtask_id,
         start_time, end_time, created_at, updated_at
