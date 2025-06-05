@@ -263,7 +263,7 @@ exports.bulkimportTask = async (payload, res, req) => {
     product_name,
     project_name,
     emp_id,
-    name,
+    task_name,
     estimated_hours,
     start_date,
     end_date,
@@ -278,12 +278,12 @@ exports.bulkimportTask = async (payload, res, req) => {
     remark,
     reopen_status,
     description,
-    team_id,
     priority,
   } = payload;
 
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
+    
     if (!accessToken) return errorResponse(res, "Access token is required", 401);
     const created_by = await getUserIdFromAccessToken(accessToken);
 
@@ -313,9 +313,10 @@ exports.bulkimportTask = async (payload, res, req) => {
     }
 
     // 3. Get employee and manager IDs
-    const [[employee]] = await db.query("SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL", [emp_id]);
+    const [[employee]] = await db.query("SELECT id,team_id FROM users WHERE employee_id = ? AND deleted_at IS NULL", [emp_id]);
     if (!employee) return errorResponse(res, null, "Employee not found", 404);
     const user_id = employee.id;
+    const team_id = employee.team_id;
 
     const [[manager]] = await db.query("SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL", [manager_id]);
     if (!manager) return errorResponse(res, null, "Manager not found", 404);
@@ -381,7 +382,7 @@ exports.bulkimportTask = async (payload, res, req) => {
     `;
 
     const values = [
-      product_id, project_id, user_id, name, formattedEstimatedHours,
+      product_id, project_id, user_id, task_name, formattedEstimatedHours,
       start_date, end_date, extended_status, extended_hours,
       active_status, status, total_hours_worked, rating, command,
       assigned_user_id, remark, reopen_status, description,
@@ -392,7 +393,7 @@ exports.bulkimportTask = async (payload, res, req) => {
 
     return successResponse(
       res,
-      { id: result.insertId, task_name: name },
+      { id: result.insertId, task_name: task_name },
       "Task created successfully",
       201
     );
