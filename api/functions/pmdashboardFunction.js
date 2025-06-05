@@ -1208,7 +1208,6 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         return successResponse(res, [], "No team members found", 200);
       }
     } else if (loggedInUser.role_id === 4) {
-      
       userIdsFilter = [login_id];
     }
 
@@ -1368,16 +1367,20 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 
     // Step 1: Fetch relevant users (include role_id)
     let usersQuery = `
-      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
-             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
-      FROM users u
-      LEFT JOIN teams t ON u.team_id = t.id
-      WHERE u.deleted_at IS NULL AND t.deleted_at IS NULL
-        AND u.role_id NOT IN (1)
-        ${team_id ? "AND u.team_id = ?" : ""}
-    `;
+  SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
+         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+  FROM users u
+  LEFT JOIN teams t ON u.team_id = t.id
+  WHERE u.deleted_at IS NULL AND t.deleted_at IS NULL
+    AND u.role_id NOT IN (1)
+    AND DATE(u.created_at) <= ?
+    ${team_id ? "AND u.team_id = ?" : ""}
+`;
 
-    const [users] = await db.query(usersQuery, team_id ? [team_id] : []);
+    const userQueryParams = team_id
+      ? [formattedDate, team_id]
+      : [formattedDate];
+    const [users] = await db.query(usersQuery, userQueryParams);
 
     if (users.length === 0) {
       return errorResponse(res, null, "No users found", 404);
@@ -1581,7 +1584,6 @@ exports.getProjectCompletion = async (req, res) => {
       const placeholders = teamIds.map(() => "?").join(",");
       teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id IN (${placeholders}))`;
       teamFilterParams = [...teamIds];
-
     } else if (role_id === 1 || role_id === 2) {
       if (team_id) {
         teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE team_id = ?)`;
@@ -1598,7 +1600,7 @@ exports.getProjectCompletion = async (req, res) => {
       associateFilter = `AND u.id = ${associate_id}`;
     }
 
-    const projectFilterSql = project_id ? `AND project_id = ?` : '';
+    const projectFilterSql = project_id ? `AND project_id = ?` : "";
     const projectFilterParams = project_id ? [project_id] : [];
 
     const completedTasksSql = `
@@ -1750,7 +1752,7 @@ exports.getProjectCompletion = async (req, res) => {
         WHERE u.team_id IN (${placeholders})
           AND u.role_id = 4
           AND u.deleted_at IS NULL
-          ${associateFilter || ''}
+          ${associateFilter || ""}
           AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
         ORDER BY total_worked_hours DESC;
       `;
