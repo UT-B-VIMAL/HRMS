@@ -278,6 +278,7 @@ apiRouter.get(
 );
 
 // Task Routes
+apiRouter.post("/taskImport", taskController.bulkimportTask);
 apiRouter.post("/task", RoleController.checkRole(), taskController.createTask);
 apiRouter.put(
   "/task/:id",

@@ -1,4 +1,4 @@
-const { createTask, updateTask, deleteTask, getTask, getAllTasks,updateTaskData,getTaskList,updateTaskTimeLine,doneTaskList,deleteTaskList, restoreTasks, getWorkReportData } = require('../api/functions/taskFunction');
+const { createTask, updateTask, deleteTask, getTask, getAllTasks,updateTaskData,getTaskList,updateTaskTimeLine,doneTaskList,deleteTaskList, restoreTasks, getWorkReportData,bulkimportTask } = require('../api/functions/taskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const { createTaskSchema, updateTaskSchema,updateTaskDataSchema } = require("../validators/taskValidator");
 const Joi = require('joi');
@@ -7,22 +7,34 @@ const taskController = {
   createTask: async (req, res) => {
     try {
       const payload = req.body;
-      // const { error } = createTaskSchema.validate(payload, { abortEarly: false });
+      const { error } = createTaskSchema.validate(payload, { abortEarly: false });
 
-      // if (error) {
-      //   const errorMessages = error.details.reduce((acc, err) => {
-      //     acc[err.path[0]] = err.message;
-      //     return acc;
-      //   }, {});
+      if (error) {
+        const errorMessages = error.details.reduce((acc, err) => {
+          acc[err.path[0]] = err.message;
+          return acc;
+        }, {});
 
-      //   return errorResponse(res, errorMessages, "Validation Error", 403);
-      // }
+        return errorResponse(res, errorMessages, "Validation Error", 403);
+      }
 
       await createTask(payload, res,req);
 
     } catch (error) {
       console.error('Error creating task:', error.message);
       return errorResponse(res, error.message, 'Error creating task', 500);
+    }
+  },
+
+   bulkimportTask: async (req, res) => {
+    try {
+      const payload = req.body;
+      
+      await bulkimportTask(payload, res,req);
+
+    } catch (error) {
+      console.error('Error importing task:', error.message);
+      return errorResponse(res, error.message, 'Error importing task', 500);
     }
   },
 
