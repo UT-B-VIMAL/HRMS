@@ -121,8 +121,9 @@ exports.logTaskTimeline = async (req, res) => {
       return errorResponse(res, null, "Missing required fields", 400);
     }
 
-    const formattedStartTime = moment(new Date("2025-04-28 09:05:43")).format("YYYY-MM-DD HH:mm:ss");
-    const formattedEndTime = moment(new Date("2025-04-28 17:45:43")).format("YYYY-MM-DD HH:mm:ss");
+    const formattedStartTime = moment(new Date("2025-04-28 09:05:43")).utc().format("YYYY-MM-DD HH:mm:ss");
+    const formattedEndTime = moment(new Date("2025-04-28 17:45:43")).utc().format("YYYY-MM-DD HH:mm:ss");
+
 
     const workedDurationSec = moment(formattedEndTime).diff(moment(formattedStartTime), 'seconds');
 
