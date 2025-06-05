@@ -167,7 +167,7 @@ exports.logTaskTimeline = async (req, res) => {
 
       const estimatedSeconds = parseFloat(task.estimated_hours) * 3600;
 
-      let updateQuery = `UPDATE tasks SET total_worked_hours = ?`;
+      let updateQuery = `UPDATE tasks SET total_hours_worked = ?`;
       const updateParams = [total_worked_hours];
 
       if (workedDurationSec > estimatedSeconds) {
