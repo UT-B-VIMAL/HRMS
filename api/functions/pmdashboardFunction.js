@@ -1807,7 +1807,7 @@ exports.getProjectCompletion = async (req, res) => {
           AND u.deleted_at IS NULL
           ${associateFilter || ""}
           AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
-        ORDER BY total_worked_hours DESC;
+        ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
       `;
 
       teamUtilizationParams = [
@@ -1885,7 +1885,7 @@ exports.getProjectCompletion = async (req, res) => {
   AND u.deleted_at IS NULL
   AND (ue.total_est_seconds IS NOT NULL OR wu.total_work_seconds IS NOT NULL)
   AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
-ORDER BY total_worked_hours DESC;
+ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
         `;
 
         const teamIdInt = parseInt(team_id);
@@ -1958,7 +1958,7 @@ LEFT JOIN user_estimates ue ON ue.team_id = t.id
 LEFT JOIN worked_by_team wt ON wt.team_id = t.id
 WHERE t.deleted_at IS NULL
 HAVING total_estimated_hours > 0 OR total_worked_hours > 0
-ORDER BY total_worked_hours DESC;
+ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
 
         `;
 
