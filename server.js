@@ -386,15 +386,18 @@ apiRouter.get(
 );
 apiRouter.get(
   "/pmTasksByProduct",
+  RoleController.checkRole(),
   pmdashboardController.pmfetchUserTasksByProduct
 );
 apiRouter.get(
   "/pmUtilizationAndAttendance",
+  RoleController.checkRole(),
   pmdashboardController.pmUtilizationAndAttendance
 );
 
 apiRouter.get(
   "/getProjectCompletionPercentage",
+  RoleController.checkRole(),
   pmdashboardController.getProjectCompletionPercentage
 );
 
@@ -432,10 +435,12 @@ apiRouter.get(
 
 apiRouter.get(
   "/tltaskpendinglist",
+  RoleController.checkRole(),
   tldashboardController.tltaskpendinglist
 );
 apiRouter.get(
   "/getTeamWorkedHrs",
+  RoleController.checkRole(),
   tldashboardController.getTeamWorkedHrsDetails
 );
 // Employee Dashboard Routes
