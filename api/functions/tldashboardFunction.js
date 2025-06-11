@@ -4,21 +4,25 @@ const {
   errorResponse,
 } = require("../../helpers/responseHelper");
 const {
-  getColorForProduct, getUserIdFromAccessToken
+  getColorForProduct,
+  getUserIdFromAccessToken,
+  getAuthUserDetails,
 } = require("../../api/functions/commonFunction");
-
+const moment = require("moment");
 exports.fetchAttendance = async (req, res) => {
   try {
     const currentTimeUTC = new Date();
-    const currentTime = new Date(currentTimeUTC.getTime() + 5.5 * 60 * 60 * 1000);
+    const currentTime = new Date(
+      currentTimeUTC.getTime() + 5.5 * 60 * 60 * 1000
+    );
     const cutoffTime = new Date();
-    cutoffTime.setHours(13, 30, 0, 0); 
+    cutoffTime.setHours(13, 30, 0, 0);
     const today = new Date().toISOString().split("T")[0];
     const { employee_id } = req.query;
 
-    const accessToken = req.headers.authorization?.split(' ')[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
-      return errorResponse(res, 'Access token is required', 401);
+      return errorResponse(res, "Access token is required", 401);
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
@@ -97,7 +101,8 @@ exports.fetchAttendance = async (req, res) => {
     }
 
     // Fetch present employees excluding absent ones
-    const leaveCondition = leaveEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
+    const leaveCondition =
+      leaveEmployeeIds.length > 0 ? `AND id NOT IN (?)` : "";
 
     const [presentEmployees] = await db.query(
       `
@@ -192,15 +197,14 @@ exports.fetchAttendance = async (req, res) => {
   }
 };
 
-
 exports.fetchTlrating = async (req, res) => {
   try {
     // const { user_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -312,11 +316,11 @@ exports.fetchTlrating = async (req, res) => {
 exports.fetchTLproducts = async (req, res) => {
   try {
     const { product_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -497,11 +501,11 @@ exports.fetchTLproducts = async (req, res) => {
 exports.fetchTLresourceallotment = async (req, res) => {
   try {
     // const { user_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -683,11 +687,11 @@ exports.fetchTLresourceallotment = async (req, res) => {
 exports.fetchTLdatas = async (req, res) => {
   try {
     // const { user_id } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!user_id) {
       return errorResponse(res, null, "User ID is required", 400);
@@ -1120,11 +1124,11 @@ exports.fetchTLdatas = async (req, res) => {
 exports.fetchTlviewproductdata = async (req, res) => {
   try {
     const { product_id, project_id, date, search } = req.query;
-    const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
 
     if (!product_id) {
       return errorResponse(res, null, "Product ID is required", 400);
@@ -1503,3 +1507,347 @@ exports.fetchTlviewproductdata = async (req, res) => {
     );
   }
 };
+
+exports.tltaskpendinglist = async (req, res) => {
+  try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken)
+      return errorResponse(res, "Access token is required", 401);
+
+    const login_id = await getUserIdFromAccessToken(accessToken);
+    if (!login_id) return errorResponse(res, null, "User ID is required", 400);
+
+    // Fetch user role and team
+    const [[user]] = await db.query(
+      "SELECT id, role_id, team_id FROM users WHERE id = ? AND deleted_at IS NULL",
+      [login_id]
+    );
+    if (!user) return errorResponse(res, null, "User Not Found", 400);
+
+    // Determine user IDs to filter by, based on role
+    let filterUserIds = [];
+
+    if (user.role_id === 3) {
+      // Team Leader - get team members
+      const [teamUsers] = await db.query(
+        "SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL",
+        [user.team_id]
+      );
+      const teamUserIds = teamUsers.map((u) => u.id);
+      if (teamUserIds.length === 0)
+        return successResponse(res, [], "No team members found", 200, null, 0);
+
+      const { user_id } = req.query;
+      if (user_id) {
+        if (!teamUserIds.includes(Number(user_id))) {
+          return errorResponse(res, "User is not part of your team", 403);
+        }
+        filterUserIds = [Number(user_id)];
+      } else {
+        filterUserIds = teamUserIds;
+      }
+    } else if (user.role_id === 4) {
+      // Regular User - only own data
+      filterUserIds = [login_id];
+    } else {
+      return errorResponse(
+        res,
+        "Only Team Leaders or regular users allowed",
+        403
+      );
+    }
+
+    if (filterUserIds.length === 0)
+      return successResponse(res, [], "No users found", 200, null, 0);
+
+    const placeholders = filterUserIds.map(() => "?").join(",");
+
+    const sql = `
+      SELECT 
+        project_id,
+        project_name,
+        user_id,
+        employee_id,
+        employee_name,
+        SUM(todo_count) AS todo_count,
+        SUM(onhold_count) AS onhold_count,
+        SUM(reopen_count) AS reopen_count
+      FROM (
+        SELECT 
+          t.project_id,
+          p.name AS project_name,
+          t.user_id,
+          u.employee_id,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) AS employee_name,
+          CASE WHEN t.status = 0 AND t.reopen_status = 0 AND t.active_status = 0 THEN 1 ELSE 0 END AS todo_count,
+          CASE WHEN t.status = 1 AND t.reopen_status = 0 AND t.active_status = 0 THEN 1 ELSE 0 END AS onhold_count,
+          CASE WHEN t.status = 0 AND t.reopen_status = 1 AND t.active_status = 0 THEN 1 ELSE 0 END AS reopen_count
+        FROM tasks t
+        INNER JOIN projects p ON p.id = t.project_id
+        LEFT JOIN users u ON u.id = t.user_id
+        WHERE t.deleted_at IS NULL
+          AND t.user_id IN (${placeholders})
+          AND NOT EXISTS (
+            SELECT 1 FROM sub_tasks st WHERE st.task_id = t.id AND st.deleted_at IS NULL
+          )
+
+        UNION ALL
+
+        SELECT
+          t.project_id,
+          p.name AS project_name,
+          st.user_id,
+          u.employee_id,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) AS employee_name,
+          CASE WHEN st.status = 0 AND st.reopen_status = 0 AND st.active_status = 0 THEN 1 ELSE 0 END AS todo_count,
+          CASE WHEN st.status = 1 AND st.reopen_status = 0 AND st.active_status = 0 THEN 1 ELSE 0 END AS onhold_count,
+          CASE WHEN st.status = 0 AND st.reopen_status = 1 AND st.active_status = 0 THEN 1 ELSE 0 END AS reopen_count
+        FROM sub_tasks st
+        INNER JOIN tasks t ON t.id = st.task_id
+        INNER JOIN projects p ON p.id = t.project_id
+        LEFT JOIN users u ON u.id = st.user_id
+        WHERE st.deleted_at IS NULL
+          AND st.user_id IN (${placeholders})
+      ) AS combined
+      GROUP BY project_id, project_name, user_id, employee_id, employee_name
+      ORDER BY project_name ASC
+    `;
+
+    const [rows] = await db.query(sql, [...filterUserIds, ...filterUserIds]);
+
+    const projectsMap = new Map();
+
+    rows.forEach(
+      ({
+        project_id,
+        project_name,
+        user_id,
+        employee_id,
+        employee_name,
+        todo_count,
+        onhold_count,
+        reopen_count,
+      }) => {
+        if (!projectsMap.has(project_id)) {
+          projectsMap.set(project_id, {
+            project_id,
+            project_name,
+            todo_count: 0,
+            onhold_count: 0,
+            reopen_count: 0,
+            worked_project_users: [],
+          });
+        }
+
+        const project = projectsMap.get(project_id);
+
+        project.todo_count += Number(todo_count);
+        project.onhold_count += Number(onhold_count);
+        project.reopen_count += Number(reopen_count);
+
+        if (
+          Number(todo_count) + Number(onhold_count) + Number(reopen_count) >
+            0 &&
+          !project.worked_project_users.some((u) => u.user_id === user_id)
+        ) {
+          project.worked_project_users.push({
+            user_id,
+            employee_id,
+            employee_name,
+          });
+        }
+      }
+    );
+
+    const filteredProjects = [];
+    let total_pending_counts = 0;
+
+    for (const project of projectsMap.values()) {
+      const total =
+        project.todo_count + project.onhold_count + project.reopen_count;
+      if (total > 0) {
+        total_pending_counts += total;
+        filteredProjects.push({
+          project_id: project.project_id,
+          project_name: project.project_name,
+          todo_count: String(project.todo_count),
+          onhold_count: String(project.onhold_count),
+          reopen_count: String(project.reopen_count),
+          worked_project_users: project.worked_project_users,
+        });
+      }
+    }
+
+    return successResponse(
+      res,
+      filteredProjects,
+      "Status-wise task list fetched successfully",
+      200,
+      null,
+      total_pending_counts
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, null, "Something went wrong", 500);
+  }
+};
+
+function convertSecondsToReadableTime(seconds) {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hrs}h ${mins}m`;
+}
+
+exports.getTeamWorkedHrs = async (req, res) => {
+  try {
+    const { from_date, to_date, associative } = req.query;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) return errorResponse(res, "Access token is required", 401);
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
+    const loggedInUser = await getAuthUserDetails(user_id, res);
+    const isTL = loggedInUser.role_id === 3;
+    const userId = loggedInUser.id;
+
+    const startDate = moment(from_date, "YYYY-MM-DD");
+    const endDate = moment(to_date, "YYYY-MM-DD");
+
+    if (!startDate.isValid() || !endDate.isValid()) {
+      return errorResponse(res, "Invalid date format. Use YYYY-MM-DD.", 422);
+    }
+
+    if (startDate.isAfter(endDate)) {
+      return errorResponse(res, "From date cannot be greater than To date", 422);
+    }
+
+    if (endDate.diff(startDate, "days") !== 5) {
+      return errorResponse(res, "The date range must be exactly 6 days (Monday to Saturday)", 422);
+    }
+
+    if (startDate.format("dddd") !== "Monday") {
+      return errorResponse(res, "From date must be a Monday", 422);
+    }
+
+    if (endDate.format("dddd") !== "Saturday") {
+      return errorResponse(res, "To date must be a Saturday", 422);
+    }
+
+    let userIds = [];
+
+    if (isTL) {
+      const [teamRows] = await db.query(
+        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
+        [userId]
+      );
+
+      if (!teamRows.length) {
+        return errorResponse(res, "You are not currently assigned a reporting TL for your team.", 404);
+      }
+
+      const teamIds = teamRows.map((row) => row.id);
+      const [userRows] = await db.query(
+        "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)",
+        [teamIds]
+      );
+      userIds = userRows.map((row) => row.id);
+    } else {
+      userIds = [userId];
+    }
+
+    if (!userIds.length) {
+      return errorResponse(res, "No users found for the team.", 404);
+    }
+
+    if (associative) {
+      const associativeId = parseInt(associative);
+      if (!userIds.includes(associativeId)) {
+        return errorResponse(res, "You are not authorized to view this user's data", 403);
+      }
+      userIds = [associativeId];
+    }
+
+    const placeholders = userIds.map(() => "?").join(",");
+
+      // Fetch all users
+      const [users] = await db.query(
+        `SELECT id, CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) AS name
+        FROM users
+        WHERE deleted_at IS NULL AND id IN (${placeholders}) AND role_id NOT IN (1, 2, 3)`,
+        [...userIds]
+      );
+
+      if (!users.length) {
+        return errorResponse(res, "No valid users found", 404);
+      }
+
+        // Fetch timeline data
+        const [timelineRows] = await db.query(
+          `SELECT 
+            user_id,
+            DATE(start_time) AS work_date,
+            SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, NOW()))) AS total_worked_seconds
+          FROM sub_tasks_user_timeline
+          WHERE deleted_at IS NULL 
+            AND DATE(start_time) BETWEEN ? AND ?
+            AND user_id IN (${placeholders})
+          GROUP BY user_id, work_date`,
+          [from_date, to_date, ...userIds]
+        );
+        // Prepare date range from Monday to Saturday
+        const dateRange = [];
+        for (let i = 0; i <= 5; i++) {
+          dateRange.push(moment(from_date).clone().add(i, "days").format("YYYY-MM-DD"));
+        }
+
+        let data = {};
+
+        for (const date of dateRange) {
+          const dayKey = moment(date).format("ddd").toLowerCase(); // e.g., 'mon', 'tue'
+
+          const dailyUsers = users.map((user) => {
+            const record = timelineRows.find((r) => 
+      r.user_id === user.id && moment(r.work_date).format("YYYY-MM-DD") === date
+    );
+
+      const totalSeconds = record ? record.total_worked_seconds : 0;
+      return {
+        id: user.id,
+        name: user.name,
+        total_worked_hrs: convertSecondsToReadableTime(totalSeconds),
+      }});
+
+      if (isTL && !associative) {
+        const top5 = dailyUsers.slice(0, 5);
+        const others = dailyUsers.slice(5);
+
+        if (others.length) {
+          const totalOtherSeconds = others.reduce((sum, u) => {
+            const seconds = u.total_worked_hrs.split(" ").reduce((acc, part) => {
+              if (part.includes("h")) return acc + parseInt(part) * 3600;
+              if (part.includes("m")) return acc + parseInt(part) * 60;
+              return acc;
+            }, 0);
+            return sum + seconds;
+          }, 0);
+
+          top5.push({
+            id: null,
+            name: "Others",
+            total_worked_hrs: convertSecondsToReadableTime(totalOtherSeconds),
+          });
+        }
+
+        data[dayKey] = top5;
+      } else {
+        data[dayKey] = dailyUsers;
+      }
+    }
+
+    return successResponse(res, data, "Team worked hours fetched successfully", 200);
+  } catch (error) {
+    console.error("Error in getTeamWorkedHrs:", error);
+    return errorResponse(res, "Error fetching team worked hours", error.message, 500);
+  }
+};
+
+

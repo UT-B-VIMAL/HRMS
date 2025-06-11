@@ -231,7 +231,6 @@ apiRouter.get(
 );
 apiRouter.put(
   "/project_requestchange/:id",
-  RoleController.checkRole(),
   (req, res) => projectController.project_requestchange(req, res, req.io)
 );
 
@@ -278,6 +277,7 @@ apiRouter.get(
 );
 
 // Task Routes
+apiRouter.post("/taskImport", taskController.bulkimportTask);
 apiRouter.post("/task", RoleController.checkRole(), taskController.createTask);
 apiRouter.put(
   "/task/:id",
@@ -430,6 +430,14 @@ apiRouter.get(
   tldashboardController.tlviewproductsection
 );
 
+apiRouter.get(
+  "/tltaskpendinglist",
+  tldashboardController.tltaskpendinglist
+);
+apiRouter.get(
+  "/getTeamWorkedHrs",
+  tldashboardController.getTeamWorkedHrsDetails
+);
 // Employee Dashboard Routes
 apiRouter.get(
   "/emppendingtask",
@@ -722,7 +730,7 @@ if (isProduction) {
 } else {
   // Development server (non-SSL)
   server.listen(PORT, () => {
-    console.log(`Development server is running on http://${DOMAIN}:${PORT}`);
+    console.log(`Development server is running on http://localhost:${PORT}`);
   });
 }
 
