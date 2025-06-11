@@ -231,7 +231,6 @@ apiRouter.get(
 );
 apiRouter.put(
   "/project_requestchange/:id",
-  RoleController.checkRole(),
   (req, res) => projectController.project_requestchange(req, res, req.io)
 );
 
