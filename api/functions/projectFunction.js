@@ -1056,10 +1056,10 @@ exports.projectRequest = async (req, res) => {
     } = req.query;
 
     const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
+    const user_id = await getUserIdFromAccessToken(accessToken);
     const offset = (page - 1) * perPage;
 
     let effectiveUserIds = [];
@@ -1495,15 +1495,62 @@ exports.getRequestupdate = async (req, res) => {
 //   }
 // };
 
-exports.getRequestchange = async (id, payload, res, req) => {
-  const { type, remark, rating, action } = payload;
+exports.getRequestchange = async (_id, payload, res, req) => {
+  let id = _id;
+  let typeLocal = payload.type;
+  const { remark, rating, action, import_status, employee_id, project_name, task_name, subtask_name } = payload;
 
+  if (import_status === "1") {
+    if (!employee_id || !task_name || !project_name) {
+      return errorResponse(res, null, "Missing required fields", 400);
+    }
+
+    const [projectRows] = await db.query(
+      "SELECT id AS project_id FROM projects WHERE name = ? AND deleted_at IS NULL",
+      [project_name]
+    );
+
+    if (projectRows.length === 0) return errorResponse(res, null, "Project not found", 404);
+    const project_id = projectRows[0].project_id;
+
+    const [userRows] = await db.query(
+      "SELECT id AS user_id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
+      [employee_id]
+    );
+    if (userRows.length === 0) return errorResponse(res, null, "User not found", 404);
+    const emp_user_id = userRows[0].user_id;
+
+    if (!subtask_name) {
+      typeLocal = "task";
+      const [taskRows] = await db.query(
+        `SELECT id AS task_id FROM tasks 
+         WHERE name = ? AND user_id = ? AND deleted_at IS NULL AND project_id = ?`,
+        [task_name, emp_user_id, project_id]
+      );
+      if (taskRows.length === 0) return errorResponse(res, null, "Task not found", 404);
+      id = taskRows[0].task_id;
+    } else {
+      typeLocal = "subtask";
+      const [subtaskRows] = await db.query(
+        `SELECT id AS subtask_id FROM sub_tasks 
+         WHERE name = ? AND user_id = ? AND deleted_at IS NULL AND project_id = ?`,
+        [subtask_name, emp_user_id, project_id]
+      );
+      if (subtaskRows.length === 0) return errorResponse(res, null, "SubTask not found", 404);
+      id = subtaskRows[0].subtask_id;
+    }
+    payload.type = typeLocal;
+    payload.user_id = emp_user_id;
+    
+
+  }
 
   const accessToken = req.headers.authorization?.split(' ')[1];
-            if (!accessToken) {
-                return errorResponse(res, 'Access token is required', 401);
-            }
-        const user_id = await getUserIdFromAccessToken(accessToken);
+  if (!accessToken) {
+    return errorResponse(res, 'Access token is required', 401);
+  }
+  const auth_user_id = await getUserIdFromAccessToken(accessToken);
+
   const requiredFields = [
     { key: "type", message: "Type is required" },
     { key: "action", message: "Action is required" },
@@ -1516,64 +1563,44 @@ exports.getRequestchange = async (id, payload, res, req) => {
     }
   }
 
-  const [userRows] = await db.query(
+  const [authUserRows] = await db.query(
     "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-    [user_id]
+    [auth_user_id]
   );
-
-  if (userRows.length === 0) {
+  if (authUserRows.length === 0) {
     return errorResponse(res, null, "User Not Found", 400);
   }
 
   const validType = ["task", "subtask"];
-  if (!validType.includes(type)) {
-    return errorResponse(
-      res,
-      null,
-      "Invalid type. It should be either task or subtask.",
-      400
-    );
+  if (!validType.includes(typeLocal)) {
+    return errorResponse(res, null, "Invalid type. It should be either task or subtask.", 400);
   }
 
   const validActions = ["reopen", "close"];
   if (!validActions.includes(action)) {
-    return errorResponse(
-      res,
-      null,
-      "Invalid action. It should be either reopen or close.",
-      400
-    );
+    return errorResponse(res, null, "Invalid action. It should be either reopen or close.", 400);
   }
 
   try {
-    const table = type === "task" ? "tasks" : "sub_tasks";
+    const table = typeLocal === "task" ? "tasks" : "sub_tasks";
 
     const [oldDataRows] = await db.query(
       `SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`,
       [id]
     );
-
     if (oldDataRows.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
-        404
-      );
+      return errorResponse(res, null, `${typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)} not found or deleted`, 404);
     }
 
     const oldData = oldDataRows[0];
     const userId = oldData.user_id;
 
-    // Determine status values
     let statusToSet, reopenstatusToSet, notificationTitle, notificationBody;
-
     if (action === "reopen") {
       statusToSet = 0;
       reopenstatusToSet = 1;
       notificationTitle = "Task Reopened";
-      notificationBody =
-        "Your task has been reopened for further review. Please check the updates.";
+      notificationBody = "Your task has been reopened for further review. Please check the updates.";
     } else if (action === "close") {
       statusToSet = 3;
       reopenstatusToSet = 0;
@@ -1588,19 +1615,18 @@ exports.getRequestchange = async (id, payload, res, req) => {
       "updated_at = ?",
     ];
     const updatedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
-    const values = [statusToSet, reopenstatusToSet, user_id, updatedAt];
+    const values = [statusToSet, reopenstatusToSet, auth_user_id, updatedAt];
 
     if (remark !== undefined) {
       fieldsToUpdate.push("remark = ?");
       values.push(remark);
     }
-
     if (rating !== undefined) {
       fieldsToUpdate.push("rating = ?");
       values.push(rating);
     }
 
-    values.push(id); // for WHERE clause
+    values.push(id);
 
     const updateQuery = `
       UPDATE ${table}
@@ -1609,22 +1635,13 @@ exports.getRequestchange = async (id, payload, res, req) => {
     `;
 
     const [updateResult] = await db.query(updateQuery, values);
-
     if (updateResult.affectedRows === 0) {
-      return errorResponse(
-        res,
-        null,
-        `${type.charAt(0).toUpperCase() + type.slice(1)} not found or deleted`,
-        404
-      );
+      return errorResponse(res, null, `${typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)} not found or deleted`, 404);
     }
 
-    // Prepare status labels
     const getStatusLabel = (status, reopenStatus, activeStatus) => {
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0)
-        return "To Do";
-      if (status === 1 && reopenStatus === 0 && activeStatus === 0)
-        return "On Hold";
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0) return "To Do";
+      if (status === 1 && reopenStatus === 0 && activeStatus === 0) return "On Hold";
       if (status === 2 && reopenStatus === 0) return "Pending Approval";
       if (reopenStatus === 1 && activeStatus === 0) return "Reopen";
       if (status === 1 && activeStatus === 1) return "InProgress";
@@ -1632,41 +1649,29 @@ exports.getRequestchange = async (id, payload, res, req) => {
       return "";
     };
 
-    const oldStatusLabel = getStatusLabel(
-      oldData.status,
-      oldData.reopen_status,
-      oldData.active_status
-    );
-    const newStatusLabel = getStatusLabel(
-      statusToSet,
-      reopenstatusToSet,
-      oldData.active_status
-    );
+    const oldStatusLabel = getStatusLabel(oldData.status, oldData.reopen_status, oldData.active_status);
+    const newStatusLabel = getStatusLabel(statusToSet, reopenstatusToSet, oldData.active_status);
 
-    // Insert into task history
+    const taskId = typeLocal === "task" ? id : oldData.task_id;
+    const subtaskId = typeLocal === "subtask" ? id : null;
+
     const historyQuery = `
       INSERT INTO task_histories (
         old_data, new_data, task_id, subtask_id, text,
         updated_by, status_flag, created_at, updated_at, deleted_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
     `;
-
-    const taskId = type === "task" ? id : oldData.task_id;
-    const subtaskId = type === "subtask" ? id : null;
-
     const historyValues = [
       oldStatusLabel,
       newStatusLabel,
       taskId,
       subtaskId,
       "Change the status",
-      user_id,
-      1, // status_flag
+      auth_user_id,
+      1,
     ];
-
     await db.query(historyQuery, historyValues);
 
-    // Send notification
     const notificationPayload = {
       title: notificationTitle,
       body: notificationBody,
@@ -1690,7 +1695,7 @@ exports.getRequestchange = async (id, payload, res, req) => {
     return successResponse(
       res,
       { id },
-      `${type.charAt(0).toUpperCase() + type.slice(1)} updated successfully`,
+      `${typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)} updated successfully`,
       200
     );
   } catch (error) {
@@ -1698,3 +1703,4 @@ exports.getRequestchange = async (id, payload, res, req) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
+

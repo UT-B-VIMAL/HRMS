@@ -8,9 +8,8 @@ const {
   const commonController = {
   getDropDownList: async (req, res) => {
     try {
-      const payload = req.query;
 
-      await getAllData(payload, res);
+      await getAllData(req, res);
     } catch (error) {
       return errorResponse(res, error.message, 'Error  fetching Data', 500);
     }
