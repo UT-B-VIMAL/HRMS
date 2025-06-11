@@ -1464,7 +1464,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 
       const employee = {
         user_id: user.user_id,
-        employee_id: user.employee_id ? String(user.employee_id).padStart(3, '0') : "N/A",
+        employee_id: user.employee_id ? String(user.employee_id).padStart(3, '0') : "N/A",  // split
         employee_name: user.employee_name || "N/A",
         team_name: user.team_name || "N/A",
       };
