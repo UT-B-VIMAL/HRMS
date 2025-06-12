@@ -5,16 +5,22 @@ const {
   successResponse,
 } = require("../../helpers/responseHelper");
 const { userSockets } = require('../../helpers/notificationHelper');
-const { getAuthUserDetails } = require("./commonFunction");
+const { getAuthUserDetails, getUserIdFromAccessToken } = require("./commonFunction");
 const getPagination  = require("../../helpers/pagination");
 
 
 // phase 2
 
-exports.getAnnualRatings = async (queryParamsval, res) => {
-  const { search, year, page = 1, perPage = 10 ,user_id, team_id} = queryParamsval;
+exports.getAnnualRatings = async (req, res) => {
+  const { search, year, page = 1, perPage = 10 , team_id} = req.query;
   const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
+ const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    console.log(accessToken)
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
   // Define all 12 months
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -31,7 +37,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
   let query = `
     SELECT 
       users.id AS user_id,
-      users.first_name AS employee_name,
+      COALESCE(CONCAT(first_name, ' ', last_name)) AS employee_name,
       users.employee_id,
       users.team_id,
       teams.name AS team_name,
@@ -78,7 +84,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
     const searchWildcard = `%${search.trim()}%`;
     query += `
       AND (
-        users.first_name LIKE ? 
+        REPLACE(CONCAT(users.first_name, ' ', users.last_name), ' ', '') LIKE REPLACE(?, ' ', '')
         OR users.employee_id LIKE ? 
         OR teams.name LIKE ?
       )
@@ -122,7 +128,7 @@ exports.getAnnualRatings = async (queryParamsval, res) => {
     const searchWildcard = `%${search.trim()}%`;
     countQuery += `
       AND (
-        users.first_name LIKE ? 
+        REPLACE(CONCAT(users.first_name, ' ', users.last_name), ' ', '') LIKE REPLACE(?, ' ', '') 
         OR users.employee_id LIKE ? 
         OR teams.name LIKE ?
       )
@@ -467,7 +473,11 @@ exports.getRatings = async (req, res) => {
     }
 
     if (search) {
-      whereClause += ` AND (users.first_name LIKE ? OR users.employee_id LIKE ? OR teams.name LIKE ?)`;
+       whereClause += ` AND (
+        REPLACE(CONCAT(users.first_name, ' ', users.last_name), ' ', '') LIKE REPLACE(?, ' ', '') 
+        OR users.employee_id LIKE ? 
+        OR teams.name LIKE ?
+      )`;
       const searchPattern = `%${search}%`;
       values.push(searchPattern, searchPattern, searchPattern);
     }
@@ -484,7 +494,7 @@ exports.getRatings = async (req, res) => {
 
     // Get paginated users
     const userQuery = `
-      SELECT users.id as user_id, users.first_name, users.team_id, users.employee_id, teams.name AS team_name, users.created_at as joining_date, role_id
+      SELECT users.id as user_id, COALESCE(CONCAT(first_name, ' ', last_name)) as empname, users.team_id, users.employee_id, teams.name AS team_name, users.created_at as joining_date, role_id
       FROM users
       LEFT JOIN teams ON users.team_id = teams.id
       ${whereClause}
@@ -569,7 +579,7 @@ exports.getRatings = async (req, res) => {
         role_id: user.role_id,
         month: selectedMonth,
         joining_date: user.joining_date,
-        employee_name: user.first_name,
+        employee_name: user.empname,
         team: user.team_name,
         user_type: user.role_id === 4 ? "Employee" : user.role_id === 3 ? "TL" : "PM",
         raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
