@@ -323,6 +323,8 @@ apiRouter.post(
 );
 
 // Subtask Routes
+apiRouter.post("/subtaskImport", subtaskController.bulkimportSubTask);
+
 apiRouter.post(
   "/subtask",
   RoleController.checkRole(),
