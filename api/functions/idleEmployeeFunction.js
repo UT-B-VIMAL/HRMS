@@ -259,7 +259,7 @@ const getPendingTasksCount = async (userId) => {
 
     if (reopenedCount > 0) {
       return {
-        reason: "Re-opened",
+        reason: "Task Not Yet Started",
         count: reopenedCount,
       };
     }
