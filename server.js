@@ -151,7 +151,7 @@ apiRouter.post("/profile", profileController.createOrUpdateProfile);
 apiRouter.get("/profile/:id", profileController.getProfile);
 
 // User Routes
-apiRouter.post("/user", userController.createUser);
+apiRouter.post("/user", RoleController.checkRole(),userController.createUser);
 apiRouter.put(
   "/user/:id",
   RoleController.checkRole(),
@@ -231,6 +231,7 @@ apiRouter.get(
 );
 apiRouter.put(
   "/project_requestchange/:id",
+  RoleController.checkRole(),
   (req, res) => projectController.project_requestchange(req, res, req.io)
 );
 
@@ -386,18 +387,15 @@ apiRouter.get(
 );
 apiRouter.get(
   "/pmTasksByProduct",
-  RoleController.checkRole(),
   pmdashboardController.pmfetchUserTasksByProduct
 );
 apiRouter.get(
   "/pmUtilizationAndAttendance",
-  RoleController.checkRole(),
   pmdashboardController.pmUtilizationAndAttendance
 );
 
 apiRouter.get(
   "/getProjectCompletionPercentage",
-  RoleController.checkRole(),
   pmdashboardController.getProjectCompletionPercentage
 );
 
@@ -435,12 +433,10 @@ apiRouter.get(
 
 apiRouter.get(
   "/tltaskpendinglist",
-  RoleController.checkRole(),
   tldashboardController.tltaskpendinglist
 );
 apiRouter.get(
   "/getTeamWorkedHrs",
-  RoleController.checkRole(),
   tldashboardController.getTeamWorkedHrsDetails
 );
 // Employee Dashboard Routes
