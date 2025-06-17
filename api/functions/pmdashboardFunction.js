@@ -1951,6 +1951,7 @@ ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
         )
         SELECT
   t.name AS team_name,
+  t.short_name AS team_short_name,
   ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
   ROUND(COALESCE(wt.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
 FROM teams t
