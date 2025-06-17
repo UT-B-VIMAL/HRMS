@@ -74,10 +74,10 @@ exports.getAllData = async (req, res) => {
     query = `SELECT id, name FROM teams WHERE deleted_at IS NULL AND id IN (?)`;
     queryParams.push(teamIds);
     } else if (type === "users") {
-        query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
+        query = "SELECT id, role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
     }
     else if (type === "tl") {
-        query = "SELECT id,role_id, first_name AS name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
+        query = "SELECT id,role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
     } else if (type === "products") {
 
         const users = await this.getAuthUserDetails(user_id, res);
@@ -175,9 +175,9 @@ exports.getAllData = async (req, res) => {
     } else if (type === "roles") {
         query = "SELECT id, name FROM roles";
     } else if (type === "owners") {
-        query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 2";
+        query = "SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 2";
     } else if (type === "assignee") {
-        query = "SELECT id, first_name AS name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
+        query = "SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
     }
     else if (type === "ot_projects") {
         const users = await this.getAuthUserDetails(user_id, res);

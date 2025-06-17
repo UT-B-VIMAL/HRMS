@@ -245,27 +245,27 @@ const getPendingTasksCount = async (userId) => {
     // 5. Return based on priority logic
     if (onHoldCount > 0) {
       return {
-        reason: "On Hold",
+        reason: "On Break",
         count: onHoldCount,
       };
     }
 
     if (toDoCount > 0) {
       return {
-        reason: "Task Not Yet Started",
+        reason: "Inactive ",
         count: toDoCount,
       };
     }
 
     if (reopenedCount > 0) {
       return {
-        reason: "Task Not Yet Started",
+        reason: "Inactive ",
         count: reopenedCount,
       };
     }
 
     return {
-      reason: "Task Unassigned",
+      reason: "Work Unassigned",
       count: 0,
     };
   } catch (error) {

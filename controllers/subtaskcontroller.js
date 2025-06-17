@@ -1,4 +1,4 @@
-const { createSubTask, updateSubTask, deleteSubTask, getSubTask,getAllSubTasks,updatesubTaskData } = require('../api/functions/subtaskFunction');
+const { createSubTask, updateSubTask, deleteSubTask, getSubTask,getAllSubTasks,updatesubTaskData,bulkimportSubTask } = require('../api/functions/subtaskFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const Joi = require('joi');
 const { createSubTaskSchema ,updateSubTaskSchema } = require("../validators/subtaskValidator");
@@ -25,6 +25,18 @@ exports.createSubTask = async (req, res) => {
         return errorResponse(res, error.message, 'Error creating task', 500);
     }
 };
+
+exports.bulkimportSubTask = async (req, res) => {
+    try {
+      const payload = req.body;
+      
+      await bulkimportSubTask(payload, res,req);
+
+    } catch (error) {
+      console.error('Error importing task:', error.message);
+      return errorResponse(res, error.message, 'Error importing task', 500);
+    }
+}
 
 exports.updateSubTask = async (req, res) => {
     try {
