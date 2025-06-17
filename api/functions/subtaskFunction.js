@@ -89,6 +89,166 @@ exports.createSubTask = async (payload, res,req) => {
   }
 };
 
+//import SubTask
+
+exports.bulkimportSubTask = async (payload, res, req) => {
+  const {
+    product_name,
+    project_name,
+    emp_id,
+    task_name,
+    subtask_name,
+    estimated_hours,
+    start_date,
+    end_date,
+    extended_status = "00:00:00",
+    extended_hours = "00:00:00",
+    active_status,
+    status,
+    total_hours_worked = "00:00:00",
+    rating,
+    command,
+    manager_id,
+    remark,
+    reopen_status,
+    description,
+    priority,
+  } = payload;
+
+  try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    
+    if (!accessToken) return errorResponse(res, "Access token is required", 401);
+    const created_by = await getUserIdFromAccessToken(accessToken);
+
+    // 1. Get or create product
+    let [productRow] = await db.query("SELECT id FROM products WHERE name = ? AND deleted_at IS NULL", [product_name]);
+    let product_id = productRow[0]?.id;
+    if (!product_id) {
+      const [insertProduct] = await db.query(
+        "INSERT INTO products (name, created_at, updated_at) VALUES (?, NOW(), NOW())",
+        [product_name]
+      );
+      product_id = insertProduct.insertId;
+    }
+
+    // 2. Get or create project under that product
+    let [projectRow] = await db.query(
+      "SELECT id FROM projects WHERE name = ? AND product_id = ? AND deleted_at IS NULL",
+      [project_name, product_id]
+    );
+    let project_id = projectRow[0]?.id;
+    if (!project_id) {
+      const [insertProject] = await db.query(
+        "INSERT INTO projects (name, product_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW())",
+        [project_name, product_id]
+      );
+      project_id = insertProject.insertId;
+    }
+
+
+
+    // 3. Get employee and manager IDs
+    const [[employee]] = await db.query("SELECT id,team_id FROM users WHERE employee_id = ? AND deleted_at IS NULL", [emp_id]);
+    if (!employee) return errorResponse(res, null, "Employee not found", 404);
+    const user_id = employee.id;
+    const team_id = employee.team_id;
+
+   const [[task]] = await db.query(`SELECT id FROM tasks WHERE user_id = ? AND product_id = ? AND project_id = ? AND name= ? AND deleted_at IS NULL`, [user_id, product_id, project_id,task_name]);
+   if (!task) return errorResponse(res, null, "Task not found", 404);
+    const task_id = task.id;
+
+    const [[manager]] = await db.query("SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL", [manager_id]);
+    if (!manager) return errorResponse(res, null, "Manager not found", 404);
+    const assigned_user_id = manager.id;
+
+    // 4. Validate team
+    const [teamRow] = await db.query("SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL", [team_id]);
+    if (teamRow.length === 0) return errorResponse(res, null, "Team not found", 404);
+
+    // 5. Parse and validate estimated_hours
+    let formattedEstimatedHours = "00:00:00";
+    if (estimated_hours) {
+      const timeMatch = estimated_hours.match(/^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
+      if (!timeMatch) {
+        return errorResponse(res, null, 'Invalid estimated_hours format. Use "1d 2h 30m", etc.', 400);
+      }
+
+      const days = parseInt(timeMatch[2] || "0", 10);
+      const hours = parseInt(timeMatch[4] || "0", 10);
+      const minutes = parseInt(timeMatch[6] || "0", 10);
+      const seconds = parseInt(timeMatch[8] || "0", 10);
+
+      if (minutes >= 60 || seconds >= 60 || days < 0 || hours < 0 || minutes < 0 || seconds < 0) {
+        return errorResponse(res, null, "Invalid time values in estimated_hours", 400);
+      }
+
+      // Validate start/end date duration
+      const start = moment(start_date, "YYYY-MM-DD");
+      const end = moment(end_date, "YYYY-MM-DD");
+
+      if (!start.isValid() || !end.isValid()) {
+        return errorResponse(res, null, "Invalid start_date or end_date", 400);
+      }
+
+      const diffDays = end.diff(start, "days") + 1;
+      const totalEstimatedHours = days * 8 + hours + minutes / 60 + seconds / 3600;
+      const effectiveDays = Math.ceil(totalEstimatedHours / 8);
+
+      if (diffDays < effectiveDays) {
+        return errorResponse(
+          res,
+          null,
+          `Estimated duration requires ${effectiveDays} day(s) but only ${diffDays} day(s) selected.`,
+          400
+        );
+      }
+
+      // Format to HH:MM:SS
+      const totalHours = days * 8 + hours;
+      formattedEstimatedHours = `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    console.log("task_id", task_id);
+    
+    const isConverted = await convertTasktoSubtask(task_id);
+
+
+    // 6. Insert task
+    const insertQuery = `
+      INSERT INTO sub_tasks (
+        product_id, project_id, task_id, user_id, name, estimated_hours,
+        start_date, end_date, extended_status, extended_hours,
+        active_status, status, total_hours_worked, rating, command,
+        assigned_user_id, remark, reopen_status, description,
+        team_id, priority, created_by, updated_by,
+        deleted_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, NOW(), NOW())
+    `;
+
+    const values = [
+      product_id, project_id, task_id, user_id, subtask_name, formattedEstimatedHours,
+      start_date, end_date, extended_status, extended_hours,
+      active_status, status, total_hours_worked, rating, command,
+      assigned_user_id, remark, reopen_status, description,
+      team_id, priority, created_by, created_by,
+    ];
+
+    const [result] = await db.query(insertQuery, values);
+
+    return successResponse(
+      res,
+      { id: result.insertId, subtask_name: subtask_name },
+      "Task created successfully",
+      201
+    );
+  } catch (error) {
+    console.error("Create Task Error:", error);
+    return errorResponse(res, error.message, "Error creating task", 500);
+  }
+};
+
+
 // Show Task
 exports.getSubTask = async (id, res) => {
   try {

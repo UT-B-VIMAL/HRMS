@@ -44,7 +44,7 @@ exports.getAttendance = async (req, res) => {
     query = `
       SELECT 
           u.id AS user_id, 
-          u.first_name, 
+          COALESCE(CONCAT(u.first_name, ' ', u.last_name)) AS first_name, 
           u.employee_id,
           u.created_at AS joining_date,
           el.day_type, 
@@ -92,7 +92,7 @@ exports.getAttendance = async (req, res) => {
     if (search) {
       query += `
         AND (
-          u.first_name LIKE ? 
+          REPLACE(CONCAT(u.first_name, ' ', u.last_name), ' ', '') LIKE REPLACE(?, ' ', '')
           OR u.employee_id LIKE ?
           OR (CASE 
                 WHEN el.day_type = 1 THEN 'Absent'

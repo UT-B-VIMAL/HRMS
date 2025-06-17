@@ -37,8 +37,7 @@ exports.getAllUserRating = async (req, res) => {
 };
 exports.getAnnualRatings = async (req, res) => {
   try {
-    const queryParams = req.query;
-    await getAnnualRatings(queryParams,res);
+    await getAnnualRatings(req,res);
   } catch (error) {
     const statusCode = error.status || 500;
     return errorResponse(res, error.message, "Error fetching ratings", statusCode);

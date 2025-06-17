@@ -1730,7 +1730,15 @@ const lastActiveTask = async (userId) => {
                t.estimated_hours as task_estimated_hours, t.total_hours_worked as task_total_hours_worked,u1.first_name AS subtask_assigned_to,
                 u2.first_name AS subtask_assigned_by,
                 u3.first_name AS task_assigned_to,
-                u4.first_name AS task_assigned_by
+                u4.first_name AS task_assigned_by,
+                t.active_status as task_active_status,
+                t.status as task_status,
+                t.reopen_status as task_reopen_status,
+                s.active_status as subtask_active_status,
+                s.status as subtask_status,
+                s.reopen_status as subtask_reopen_status,
+                t.id as task_id
+                
         FROM sub_tasks_user_timeline stut
         LEFT JOIN sub_tasks s ON stut.subtask_id = s.id
         LEFT JOIN products pd ON stut.product_id = pd.id
@@ -1744,10 +1752,17 @@ const lastActiveTask = async (userId) => {
             users u3 ON t.user_id = u3.id
         LEFT JOIN 
             users u4 ON t.assigned_user_id = u4.id
-        WHERE stut.user_id = ? AND stut.end_time IS NULL
-        AND t.deleted_at IS NULL AND s.deleted_at IS NULL
-        ORDER BY stut.start_time DESC
-        LIMIT 1;
+          WHERE stut.user_id = ?
+        AND (
+            -- Valid task
+            (t.active_status = 1 OR (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0))
+            -- OR valid subtask
+            OR (s.active_status = 1 OR (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0))
+        )
+        AND t.deleted_at IS NULL 
+        AND s.deleted_at IS NULL
+      ORDER BY stut.start_time DESC
+      LIMIT 1;
     `;
 
     // Use db.query for mysql2 promises and destructure result
@@ -2198,10 +2213,8 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus) => {
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+      if ((status === 0 && reopenStatus === 0 && activeStatus === 0) || (status === 1 && reopenStatus === 0 && activeStatus === 0)) {
         return "To_Do";
-      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
-        return "On_Hold";
       } else if (status === 2 && reopenStatus === 0) {
         return "Pending_Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
@@ -2384,7 +2397,17 @@ exports.getTaskList = async (queryParams, res) => {
     });
 
     const lastActiveTaskData = await lastActiveTask(user_id);
-
+    if(role_id===4 && lastActiveTaskData) {
+      if (lastActiveTaskData.type === 'task') {
+        groups.To_Do = groups.To_Do.filter(item => item.task_details.task_id !== lastActiveTaskData.id);
+        } 
+      else if (lastActiveTaskData.type === 'subtask') {
+        groups.To_Do = groups.To_Do.map(item => ({
+          ...item,
+          subtask_details: item.subtask_details.filter(sub => sub.subtask_id !== lastActiveTaskData.id)
+        }))
+      }
+    }
     const data = {
       groups: groups,
       taskCounts: Object.values(groups).map((group) => group.length),
