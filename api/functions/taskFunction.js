@@ -622,6 +622,7 @@ exports.getTask = async (queryParams, res, req) => {
         status: task.status,
         active_status: task.active_status,
         reopen_status: task.reopen_status,
+        hold_status: task.hold_status,
         project_id: task.project_id || "",
         project: task.project_name || "",
         product_id: task.product_id || "",
@@ -672,6 +673,7 @@ exports.getTask = async (queryParams, res, req) => {
             status: subtask.status,
             active_status: subtask.active_status,
             reopen_status: subtask.reopen_status,
+            hold_status: subtask.hold_status,
             assignee: subtask.user_id,
             assigneename: subtask.assignee_name || "",
             short_name: (subtask.assignee_name || "").substr(0, 2),
@@ -1406,7 +1408,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
       
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
-      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+      } 
+      else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
         return "Paused";
       } 
       else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
