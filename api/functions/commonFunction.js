@@ -520,15 +520,19 @@ async function checkUpdatePermission({ id, type, status, active_status, reopen_s
 exports.checkUpdatePermission = checkUpdatePermission;
 
 
-exports.commonStatusGroup = (status, reopenStatus, activeStatus) => {
+exports.commonStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
     status = Number(status);
     reopenStatus = Number(reopenStatus);
     activeStatus = Number(activeStatus);
     if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
     } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+        return "Paused";
+    } 
+     else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
         return "On Hold";
-    } else if (status === 2 && reopenStatus === 0) {
+    } 
+    else if (status === 2 && reopenStatus === 0) {
         return "Pending Approval";
     } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
