@@ -1759,7 +1759,7 @@ const lastActiveTask = async (userId) => {
         )
         AND t.deleted_at IS NULL 
         AND s.deleted_at IS NULL
-      ORDER BY stut.start_time DESC
+      ORDER BY stut.updated_at DESC
       LIMIT 1;
     `;
 
@@ -2675,7 +2675,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     [type === "subtask" ? "sub_tasks" : "tasks", id]
   );
   await db.query(
-    "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time , updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [
       taskOrSubtask.user_id,
       taskOrSubtask.product_id,
@@ -2683,6 +2683,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
       type == "subtask" ? taskOrSubtask.task_id : taskOrSubtask.id,
       type == "subtask" ? taskOrSubtask.id : null,
       moment().format("YYYY-MM-DD HH:mm:ss"),
+      moment().format("YYYY-MM-DD HH:mm:ss")
     ]
   );
 };
@@ -2715,11 +2716,12 @@ exports.pauseTask = async (
     "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
-
-  await db.query(
-    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
-  );
+    await db.query(
+      `UPDATE sub_tasks_user_timeline 
+      SET end_time = ?, updated_at = ? 
+      WHERE id = ?`,
+      [moment().format("YYYY-MM-DD HH:mm:ss"), moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+    );
 };
 
 exports.endTask = async (
@@ -2779,10 +2781,11 @@ exports.endTask = async (
       id,
     ]
   );
-
   await db.query(
-    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+    `UPDATE sub_tasks_user_timeline 
+    SET end_time = ?, updated_at = ? 
+    WHERE id = ?`,
+    [moment().format("YYYY-MM-DD HH:mm:ss"), moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
   );
 };
 
