@@ -622,6 +622,7 @@ exports.getTask = async (queryParams, res, req) => {
         status: task.status,
         active_status: task.active_status,
         reopen_status: task.reopen_status,
+        hold_status: task.hold_status,
         project_id: task.project_id || "",
         project: task.project_name || "",
         product_id: task.product_id || "",
@@ -672,6 +673,7 @@ exports.getTask = async (queryParams, res, req) => {
             status: subtask.status,
             active_status: subtask.active_status,
             reopen_status: subtask.reopen_status,
+            hold_status: subtask.hold_status,
             assignee: subtask.user_id,
             assigneename: subtask.assignee_name || "",
             short_name: (subtask.assignee_name || "").substr(0, 2),
@@ -1052,6 +1054,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
     priority,
     updated_by,
     updated_at,
+
   } = payload;
 
   const statusFlagMapping = {
@@ -1251,26 +1254,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       );
     }
 
-    //   if(payload.status !== "NULL" && payload.status !== undefined) {
 
-    //  const currentStatusGroup = commonStatusGroup(
-    //     currentTask.status,
-    //     currentTask.reopen_status,
-    //     currentTask.active_status
-    //   );
-    //   // Block updates if current status is InProgress, Done, or InReview
-    //   if (
-    //     ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-    //     payload.status !== currentTask.status // only block if trying to change status
-    //   ) {
-    //     return errorResponse(
-    //       res,
-    //       null,
-    //       `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-    //       400
-    //     );
-    //   }
-    // }
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
@@ -1350,6 +1334,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
+
     if (payload.due_date) {
       const startDateToCheck = payload.start_date || currentTask.start_date;
       const dueDateToCheck = payload.due_date || currentTask.due_date;
@@ -1401,15 +1386,35 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const getStatusGroup = (status, reopenStatus, activeStatus) => {
+    let hold_status =  0;
+      if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0) {
+
+        if(role_id == 4) {
+        payload.hold_status = 0;
+        }
+        else{
+          payload.hold_status = 1;
+        }
+      }
+
+
+    const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
+      
       status = Number(status);
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
+      holdStatus = Number(holdStatus);
+     
+      
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
-      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+      } 
+      else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+        return "Paused";
+      } 
+      else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
         return "On Hold";
-      } else if (status === 2 && reopenStatus === 0) {
+     }  else if (status === 2 && reopenStatus === 0) {
         return "Pending Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -1468,10 +1473,11 @@ exports.updateTaskData = async (id, payload, res, req) => {
       const task = task_data[0][0];
 
       switch (statusFlag) {
+        
         case 0:
-          return getStatusGroup(data, task.reopen_status, task.active_status);
-        case 1:
-          return getStatusGroup(data, task.reopen_status, task.active_status);
+          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
+        case 1:          
+          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -1486,9 +1492,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
     async function processStatusData1(statusFlag, data) {
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(status, reopen_status, active_status);
+          return getStatusGroup(status, reopen_status, active_status,hold_status);
         case 1:
-          return getStatusGroup(status, reopen_status, active_status);
+          return getStatusGroup(status, reopen_status, active_status,hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -1500,7 +1506,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const fieldsToRemove = ["updated_by", "reopen_status", "active_status"];
+    const fieldsToRemove = ["updated_by", "reopen_status", "active_status","hold_status"];
     const cleanedPayload = Object.fromEntries(
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
@@ -1559,13 +1565,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
     // Insert task history entries into the task_histories table
     if (taskHistoryEntries.length > 0) {
-      // const historyQuery = `
-      //   INSERT INTO task_histories (
-      //     old_data, new_data, task_id, subtask_id, text,
-      //     updated_by, status_flag, created_at, updated_at, deleted_at
-      //   ) VALUES ?;
-      // `;
-      // await db.query(historyQuery, [taskHistoryEntries]);
       const historyQuery = `
   INSERT INTO task_histories (
     old_data, new_data, task_id, subtask_id, text,
@@ -1755,13 +1754,13 @@ const lastActiveTask = async (userId) => {
           WHERE stut.user_id = ?
         AND (
             -- Valid task
-            (t.active_status = 1 OR (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0))
+            (t.active_status = 1 OR (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0 AND t.hold_status = 0))
             -- OR valid subtask
-            OR (s.active_status = 1 OR (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0))
+            OR (s.active_status = 1 OR (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0 AND s.hold_status = 0))
         )
         AND t.deleted_at IS NULL 
         AND s.deleted_at IS NULL
-      ORDER BY stut.start_time DESC
+      ORDER BY stut.updated_at DESC
       LIMIT 1;
     `;
 
@@ -1908,7 +1907,8 @@ exports.getTaskList = async (queryParams, res) => {
         products.name AS product_name,
         u.first_name AS assignee_name,
         teams.name AS team_name,
-        teams.id AS team_id
+        teams.id AS team_id,
+        tasks.hold_status
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
@@ -2145,7 +2145,8 @@ exports.getTaskList = async (queryParams, res) => {
           subtask_user.first_name AS subtask_user_name,
           subtask_user.team_id AS subtask_user_team_id,
           sub_tasks.updated_at,
-          sub_tasks.priority
+          sub_tasks.priority,
+          sub_tasks.hold_status
         FROM sub_tasks
         LEFT JOIN users AS assigned_u ON sub_tasks.assigned_user_id = assigned_u.id
         LEFT JOIN teams AS subtask_user_team ON assigned_u.team_id = subtask_user_team.id
@@ -2212,10 +2213,15 @@ exports.getTaskList = async (queryParams, res) => {
     };
 
     // Helper function to determine the status group
-    const getStatusGroup = (status, reopenStatus, activeStatus) => {
-      if ((status === 0 && reopenStatus === 0 && activeStatus === 0) || (status === 1 && reopenStatus === 0 && activeStatus === 0)) {
+    const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
+      console.log(holdStatus)
+      if ((status === 0 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0) || (status === 1 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0)) {
         return "To_Do";
-      } else if (status === 2 && reopenStatus === 0) {
+      }
+      else if(holdStatus === 1 && status === 1 && activeStatus === 0 && reopenStatus === 0) {
+        return "On_Hold"
+      }
+       else if (status === 2 && reopenStatus === 0) {
         return "Pending_Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -2295,7 +2301,8 @@ exports.getTaskList = async (queryParams, res) => {
           const grp = getStatusGroup(
             st.status,
             st.reopen_status,
-            st.active_status
+            st.active_status,
+            st.hold_status
           );
           if (!grp) return;
           if (!groupedSubtasks[grp]) groupedSubtasks[grp] = [];
@@ -2353,7 +2360,8 @@ exports.getTaskList = async (queryParams, res) => {
         const grp = getStatusGroup(
           task.task_status,
           task.reopen_status,
-          task.active_status
+          task.active_status,
+          task.hold_status
         );
         if (!grp) return;
 
@@ -2671,7 +2679,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     [type === "subtask" ? "sub_tasks" : "tasks", id]
   );
   await db.query(
-    "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time , updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [
       taskOrSubtask.user_id,
       taskOrSubtask.product_id,
@@ -2679,6 +2687,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
       type == "subtask" ? taskOrSubtask.task_id : taskOrSubtask.id,
       type == "subtask" ? taskOrSubtask.id : null,
       moment().format("YYYY-MM-DD HH:mm:ss"),
+      moment().format("YYYY-MM-DD HH:mm:ss")
     ]
   );
 };
@@ -2711,11 +2720,12 @@ exports.pauseTask = async (
     "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
-
-  await db.query(
-    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
-  );
+    await db.query(
+      `UPDATE sub_tasks_user_timeline 
+      SET end_time = ?, updated_at = ? 
+      WHERE id = ?`,
+      [moment().format("YYYY-MM-DD HH:mm:ss"), moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+    );
 };
 
 exports.endTask = async (
@@ -2775,10 +2785,11 @@ exports.endTask = async (
       id,
     ]
   );
-
   await db.query(
-    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+    `UPDATE sub_tasks_user_timeline 
+    SET end_time = ?, updated_at = ? 
+    WHERE id = ?`,
+    [moment().format("YYYY-MM-DD HH:mm:ss"), moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
   );
 };
 
@@ -2877,7 +2888,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?,NOW(), NOW())";
       const values = [
         old_data,
-        "On Hold",
+        "Paused",
         taskId,
         subtaskId,
         "Changed Status",

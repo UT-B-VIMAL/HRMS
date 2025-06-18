@@ -1373,7 +1373,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   FROM users u
   LEFT JOIN teams t ON u.team_id = t.id
   WHERE u.deleted_at IS NULL AND t.deleted_at IS NULL
-    AND u.role_id NOT IN (1)
+    AND u.role_id NOT IN (1, 2)
     AND DATE(u.created_at) <= ?
     ${team_id ? "AND u.team_id = ?" : ""}
 `;
