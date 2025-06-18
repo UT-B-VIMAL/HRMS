@@ -1052,6 +1052,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
     priority,
     updated_by,
     updated_at,
+
   } = payload;
 
   const statusFlagMapping = {
@@ -1332,7 +1333,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
     }
 
 
-
     if (payload.due_date) {
       const startDateToCheck = payload.start_date || currentTask.start_date;
       const dueDateToCheck = payload.due_date || currentTask.due_date;
@@ -1384,7 +1384,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-      let hold_status = 0;
+    let hold_status =  0;
       if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0) {
 
         if(role_id == 4) {
@@ -1395,11 +1395,15 @@ exports.updateTaskData = async (id, payload, res, req) => {
         }
       }
 
+
     const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
+      
       status = Number(status);
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
-      holdStatus = Number(activeStatus);
+      holdStatus = Number(holdStatus);
+     
+      
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
       } else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
@@ -1466,9 +1470,10 @@ exports.updateTaskData = async (id, payload, res, req) => {
       const task = task_data[0][0];
 
       switch (statusFlag) {
+        
         case 0:
           return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
-        case 1:
+        case 1:          
           return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
         case 2:
           return getUsername(data);
@@ -1498,7 +1503,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const fieldsToRemove = ["updated_by", "reopen_status", "active_status"];
+    const fieldsToRemove = ["updated_by", "reopen_status", "active_status","hold_status"];
     const cleanedPayload = Object.fromEntries(
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
@@ -1557,13 +1562,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
     // Insert task history entries into the task_histories table
     if (taskHistoryEntries.length > 0) {
-      // const historyQuery = `
-      //   INSERT INTO task_histories (
-      //     old_data, new_data, task_id, subtask_id, text,
-      //     updated_by, status_flag, created_at, updated_at, deleted_at
-      //   ) VALUES ?;
-      // `;
-      // await db.query(historyQuery, [taskHistoryEntries]);
       const historyQuery = `
   INSERT INTO task_histories (
     old_data, new_data, task_id, subtask_id, text,
