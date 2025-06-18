@@ -1251,26 +1251,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       );
     }
 
-    //   if(payload.status !== "NULL" && payload.status !== undefined) {
 
-    //  const currentStatusGroup = commonStatusGroup(
-    //     currentTask.status,
-    //     currentTask.reopen_status,
-    //     currentTask.active_status
-    //   );
-    //   // Block updates if current status is InProgress, Done, or InReview
-    //   if (
-    //     ["InProgress", "Done","Pending Approval"].includes(currentStatusGroup) &&
-    //     payload.status !== currentTask.status // only block if trying to change status
-    //   ) {
-    //     return errorResponse(
-    //       res,
-    //       null,
-    //       `Status change is not allowed when the task status in '${currentStatusGroup}'.`,
-    //       400
-    //     );
-    //   }
-    // }
     if (estimated_hours) {
       const timeMatch = estimated_hours.match(
         /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
@@ -1350,6 +1331,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
+
+
     if (payload.due_date) {
       const startDateToCheck = payload.start_date || currentTask.start_date;
       const dueDateToCheck = payload.due_date || currentTask.due_date;
@@ -1401,15 +1384,30 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const getStatusGroup = (status, reopenStatus, activeStatus) => {
+      let hold_status = 0;
+      if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0) {
+
+        if(role_id == 4) {
+        payload.hold_status = 0;
+        }
+        else{
+          payload.hold_status = 1;
+        }
+      }
+
+    const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
       status = Number(status);
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
+      holdStatus = Number(activeStatus);
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
-      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+        return "Paused";
+      } 
+      else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
         return "On Hold";
-      } else if (status === 2 && reopenStatus === 0) {
+     }  else if (status === 2 && reopenStatus === 0) {
         return "Pending Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -1469,9 +1467,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(data, task.reopen_status, task.active_status);
+          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
         case 1:
-          return getStatusGroup(data, task.reopen_status, task.active_status);
+          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -1486,9 +1484,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
     async function processStatusData1(statusFlag, data) {
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(status, reopen_status, active_status);
+          return getStatusGroup(status, reopen_status, active_status,hold_status);
         case 1:
-          return getStatusGroup(status, reopen_status, active_status);
+          return getStatusGroup(status, reopen_status, active_status,hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -2353,7 +2351,8 @@ exports.getTaskList = async (queryParams, res) => {
         const grp = getStatusGroup(
           task.task_status,
           task.reopen_status,
-          task.active_status
+          task.active_status,
+          task.hold_status
         );
         if (!grp) return;
 
