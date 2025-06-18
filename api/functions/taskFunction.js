@@ -1751,9 +1751,9 @@ const lastActiveTask = async (userId) => {
           WHERE stut.user_id = ?
         AND (
             -- Valid task
-            (t.active_status = 1 OR (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0))
+            (t.active_status = 1 OR (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0 AND t.hold_status = 0))
             -- OR valid subtask
-            OR (s.active_status = 1 OR (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0))
+            OR (s.active_status = 1 OR (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0 AND s.hold_status = 0))
         )
         AND t.deleted_at IS NULL 
         AND s.deleted_at IS NULL
@@ -2208,10 +2208,14 @@ exports.getTaskList = async (queryParams, res) => {
     };
 
     // Helper function to determine the status group
-    const getStatusGroup = (status, reopenStatus, activeStatus) => {
-      if ((status === 0 && reopenStatus === 0 && activeStatus === 0) || (status === 1 && reopenStatus === 0 && activeStatus === 0)) {
+    const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
+      if ((status === 0 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0) || (status === 1 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0)) {
         return "To_Do";
-      } else if (status === 2 && reopenStatus === 0) {
+      }
+      else if(holdStatus === 1 && status === 1 && activeStatus === 0 && reopenStatus === 0) {
+        return "On_Hold"
+      }
+       else if (status === 2 && reopenStatus === 0) {
         return "Pending_Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -2291,7 +2295,8 @@ exports.getTaskList = async (queryParams, res) => {
           const grp = getStatusGroup(
             st.status,
             st.reopen_status,
-            st.active_status
+            st.active_status,
+            st.hold_status
           );
           if (!grp) return;
           if (!groupedSubtasks[grp]) groupedSubtasks[grp] = [];
