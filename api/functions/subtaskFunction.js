@@ -369,6 +369,7 @@ ORDER BY h.id DESC;
         status: subtask.status,
         active_status: subtask.active_status,
         reopen_status: subtask.reopen_status,
+        hold_status: subtask.hold_status,
         status_text: commonStatusGroup(
           subtask.status,
           subtask.reopen_status,
@@ -1072,16 +1073,30 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         }
       }
     }
+      let hold_status = 0;
+      if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0) {
 
-    const getStatusGroup = (status, reopenStatus, activeStatus) => {
+        if(role_id == 4) {
+        payload.hold_status = 0;
+        }
+        else{
+          payload.hold_status = 1;
+        }
+      }
+    
+    const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
       status = Number(status);
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
+      holdStatus = Number(activeStatus);
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
-      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+        return "Paused";
+      } 
+      else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
         return "On Hold";
-      } else if (status === 2 && reopenStatus === 0) {
+     }  else if (status === 2 && reopenStatus === 0) {
         return "Pending Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -1092,6 +1107,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
       return "";
     };
+
 
     const getUsername = async (userId) => {
       try {
@@ -1141,9 +1157,9 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
 
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(data, task.reopen_status, task.active_status);
+          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
         case 1:
-          return getStatusGroup(data, task.reopen_status, task.active_status);
+          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -1157,9 +1173,9 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     async function processStatusData1(statusFlag, data) {
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(status, reopen_status, active_status);
+          return getStatusGroup(status, reopen_status, active_status,hold_status);
         case 1:
-          return getStatusGroup(status, reopen_status, active_status);
+          return getStatusGroup(status, reopen_status, active_status,hold_status);
         case 2:
           return getUsername(data);
         case 9:

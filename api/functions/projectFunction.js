@@ -100,6 +100,23 @@ exports.updateProject = async (id, payload, res) => {
     if (checkProductResults[0].count == 0) {
       return errorResponse(res, "Product Not Found", "Product Not Found", 404);
     }
+    const findProject = 'SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL';
+    const [projectResult] = await db.query(findProject, [id]);
+    if(projectResult[0].product_id !== product) {
+      const checkProductInTasksQuery = `
+      SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND product_id = ? AND deleted_at IS NULL`;
+      const [checkProductInTasks] = await db.query(checkProductInTasksQuery, [id, projectResult[0].product_id]);
+      const checkProductInSubTasksQuery = `SELECT COUNT(*) as count FROM sub_tasks WHERE project_id = ? AND product_id = ? AND deleted_at IS NULL`;
+      const [checkProductInSubTasks] = await db.query(checkProductInSubTasksQuery, [id, projectResult[0].product_id]);
+      if (checkProductInTasks[0].count > 0 || checkProductInSubTasks[0].count > 0) {
+        return errorResponse(
+          res,
+          "This project is referenced in the Tasks or Sub-Tasks and cannot be updated",
+          "Reference Error",
+          400
+        );
+      }
+    }
     const checkProjectQuery =
       "SELECT COUNT(*) as count FROM projects WHERE name = ? AND id != ? AND deleted_at IS NULL";
     const [checkProject] = await db.query(checkProjectQuery, [name, id]);
