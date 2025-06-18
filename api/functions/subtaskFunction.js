@@ -1074,7 +1074,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
       let hold_status = 0;
-      if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0) {
+      if ((payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0 )||(payload.reopen_status == 1 ) ){
 
         if(role_id == 4) {
         payload.hold_status = 0;
@@ -1082,6 +1082,8 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         else{
           payload.hold_status = 1;
         }
+      }else{
+        payload.hold_status = 0;
       }
     
     const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
