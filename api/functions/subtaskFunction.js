@@ -1082,6 +1082,8 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         else{
           payload.hold_status = 1;
         }
+      }else{
+        payload.hold_status = 0;
       }
     
     const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
