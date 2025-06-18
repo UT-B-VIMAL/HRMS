@@ -1904,7 +1904,8 @@ exports.getTaskList = async (queryParams, res) => {
         products.name AS product_name,
         u.first_name AS assignee_name,
         teams.name AS team_name,
-        teams.id AS team_id
+        teams.id AS team_id,
+        tasks.hold_status
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
@@ -2141,7 +2142,8 @@ exports.getTaskList = async (queryParams, res) => {
           subtask_user.first_name AS subtask_user_name,
           subtask_user.team_id AS subtask_user_team_id,
           sub_tasks.updated_at,
-          sub_tasks.priority
+          sub_tasks.priority,
+          sub_tasks.hold_status
         FROM sub_tasks
         LEFT JOIN users AS assigned_u ON sub_tasks.assigned_user_id = assigned_u.id
         LEFT JOIN teams AS subtask_user_team ON assigned_u.team_id = subtask_user_team.id
@@ -2209,6 +2211,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
+      console.log(holdStatus)
       if ((status === 0 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0) || (status === 1 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0)) {
         return "To_Do";
       }
