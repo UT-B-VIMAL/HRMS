@@ -369,6 +369,7 @@ ORDER BY h.id DESC;
         status: subtask.status,
         active_status: subtask.active_status,
         reopen_status: subtask.reopen_status,
+        hold_status: subtask.hold_status,
         status_text: commonStatusGroup(
           subtask.status,
           subtask.reopen_status,
