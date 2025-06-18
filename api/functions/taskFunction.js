@@ -1760,7 +1760,7 @@ const lastActiveTask = async (userId) => {
         )
         AND t.deleted_at IS NULL 
         AND s.deleted_at IS NULL
-      ORDER BY stut.start_time DESC
+      ORDER BY stut.updated_at DESC
       LIMIT 1;
     `;
 
@@ -1907,7 +1907,8 @@ exports.getTaskList = async (queryParams, res) => {
         products.name AS product_name,
         u.first_name AS assignee_name,
         teams.name AS team_name,
-        teams.id AS team_id
+        teams.id AS team_id,
+        tasks.hold_status
       FROM tasks
       LEFT JOIN projects ON tasks.project_id = projects.id
       LEFT JOIN products ON tasks.product_id = products.id
@@ -2144,7 +2145,8 @@ exports.getTaskList = async (queryParams, res) => {
           subtask_user.first_name AS subtask_user_name,
           subtask_user.team_id AS subtask_user_team_id,
           sub_tasks.updated_at,
-          sub_tasks.priority
+          sub_tasks.priority,
+          sub_tasks.hold_status
         FROM sub_tasks
         LEFT JOIN users AS assigned_u ON sub_tasks.assigned_user_id = assigned_u.id
         LEFT JOIN teams AS subtask_user_team ON assigned_u.team_id = subtask_user_team.id
@@ -2212,6 +2214,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
+      console.log(holdStatus)
       if ((status === 0 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0) || (status === 1 && reopenStatus === 0 && activeStatus === 0  && holdStatus === 0)) {
         return "To_Do";
       }
@@ -2676,7 +2679,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
     [type === "subtask" ? "sub_tasks" : "tasks", id]
   );
   await db.query(
-    "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO sub_tasks_user_timeline (user_id, product_id, project_id, task_id, subtask_id, start_time , updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [
       taskOrSubtask.user_id,
       taskOrSubtask.product_id,
@@ -2684,6 +2687,7 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
       type == "subtask" ? taskOrSubtask.task_id : taskOrSubtask.id,
       type == "subtask" ? taskOrSubtask.id : null,
       moment().format("YYYY-MM-DD HH:mm:ss"),
+      moment().format("YYYY-MM-DD HH:mm:ss")
     ]
   );
 };
@@ -2716,11 +2720,12 @@ exports.pauseTask = async (
     "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
-
-  await db.query(
-    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
-  );
+    await db.query(
+      `UPDATE sub_tasks_user_timeline 
+      SET end_time = ?, updated_at = ? 
+      WHERE id = ?`,
+      [moment().format("YYYY-MM-DD HH:mm:ss"), moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+    );
 };
 
 exports.endTask = async (
@@ -2780,10 +2785,11 @@ exports.endTask = async (
       id,
     ]
   );
-
   await db.query(
-    "UPDATE sub_tasks_user_timeline SET end_time = ? WHERE id = ?",
-    [moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
+    `UPDATE sub_tasks_user_timeline 
+    SET end_time = ?, updated_at = ? 
+    WHERE id = ?`,
+    [moment().format("YYYY-MM-DD HH:mm:ss"), moment().format("YYYY-MM-DD HH:mm:ss"), timeline_id]
   );
 };
 
@@ -2882,7 +2888,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?,NOW(), NOW())";
       const values = [
         old_data,
-        "On Hold",
+        "Paused",
         taskId,
         subtaskId,
         "Changed Status",
