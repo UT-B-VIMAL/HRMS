@@ -2885,7 +2885,7 @@ exports.updateTaskTimeLine = async (req, res) => {
         "INSERT INTO task_histories (old_data, new_data, task_id, subtask_id,text,updated_by,status_flag,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, ?,NOW(), NOW())";
       const values = [
         old_data,
-        "On Hold",
+        "Paused",
         taskId,
         subtaskId,
         "Changed Status",
