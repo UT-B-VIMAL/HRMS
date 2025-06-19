@@ -1096,31 +1096,21 @@ exports.projectRequest = async (req, res) => {
 
       const { role_id } = roleResult[0];
 
+      if (employee_id) {
+      effectiveUserIds = [employee_id]; // ✅ Always use only this employee’s data
+    } else {
       if (role_id === 3) {
-        // Get all team IDs where the user is the reporting user
         const teamQuery = `SELECT id FROM teams WHERE reporting_user_id = ?`;
         const [teamResults] = await db.query(teamQuery, [user_id]);
 
-        if (teamResults.length > 0) {
-          const teamIds = teamResults.map((team) => team.id); // Extract all team IDs
-
-          // Get all users belonging to these teams
-          const teamUsersQuery = `SELECT id FROM users WHERE team_id IN (${teamIds
-            .map(() => "?")
-            .join(",")})`;
-          const [teamUsers] = await db.query(teamUsersQuery, teamIds);
-
-          if (teamUsers.length > 0) {
-            effectiveUserIds = teamUsers.map((user) => user.id); // Extract all user IDs
-          }
-        } else {
-          return errorResponse(
-            res,
-            null,
-            "You are not currently assigned a reporting TL for your team.",
-            404
-          );
+        if (teamResults.length === 0) {
+          return errorResponse(res, null, "You are not assigned as TL to any team.", 404);
         }
+
+        const teamIds = teamResults.map(team => team.id);
+        const teamUsersQuery = `SELECT id FROM users WHERE team_id IN (${teamIds.map(() => '?').join(',')})`;
+        const [teamUsers] = await db.query(teamUsersQuery, teamIds);
+        effectiveUserIds = teamUsers.map(user => user.id);
       } else if (role_id === 2) {
         taskConditions.push("t.assigned_user_id = ?");
         subtaskConditions.push("st.assigned_user_id = ?");
@@ -1128,12 +1118,8 @@ exports.projectRequest = async (req, res) => {
         subtaskValues.push(user_id);
       }
     }
-
-    if (!user_id || effectiveUserIds.length === 0) {
-      if (employee_id) {
-        effectiveUserIds.push(employee_id);
-      }
     }
+    
 
     // Apply user filter only if necessary
     if (effectiveUserIds.length > 0) {
