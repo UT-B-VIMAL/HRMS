@@ -113,8 +113,8 @@ exports.getAttendance = async (req, res) => {
       `;
       queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
-
-    // Pagination
+    query += ' AND (u.created_at <= ? OR u.created_at LIKE ?)';
+    queryParams.push(dynamicDate, `${dynamicDate}%`);
     const offset = (Number(page) - 1) * Number(perPage);
     query += ` LIMIT ?, ? `;
     queryParams.push(offset, Number(perPage));
