@@ -1175,9 +1175,9 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     async function processStatusData1(statusFlag, data) {
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(status, reopen_status, active_status,hold_status);
+          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
         case 1:
-          return getStatusGroup(status, reopen_status, active_status,hold_status);
+          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
         case 2:
           return getUsername(data);
         case 9:
