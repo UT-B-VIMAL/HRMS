@@ -1818,8 +1818,11 @@ exports.getTeamWorkedHrs = async (req, res) => {
       }
 
       for (const [date, seconds] of Object.entries(dateChunks)) {
-        userDateSecondsMap[user_id][date] =
-          (userDateSecondsMap[user_id][date] || 0) + seconds;
+        const current = userDateSecondsMap[user_id][date] || 0;
+        const total = current + seconds;
+
+        // Cap daily work time at 24 hours (86400 seconds)
+        userDateSecondsMap[user_id][date] = Math.min(total, 86340);
       }
     }
 
@@ -1877,6 +1880,7 @@ exports.getTeamWorkedHrs = async (req, res) => {
     return errorResponse(res, "Error fetching team worked hours", error.message, 500);
   }
 };
+
 
 
 
