@@ -1768,53 +1768,83 @@ exports.getTeamWorkedHrs = async (req, res) => {
 
     const placeholders = userIds.map(() => "?").join(",");
 
-      // Fetch all users
-      const [users] = await db.query(
-        `SELECT id, CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) AS name
-        FROM users
-        WHERE deleted_at IS NULL AND id IN (${placeholders}) AND role_id NOT IN (1, 2, 3)`,
-        [...userIds]
-      );
-
-      if (!users.length) {
-        return errorResponse(res, "No valid users found", 404);
-      }
-
-        // Fetch timeline data
-        const [timelineRows] = await db.query(
-          `SELECT 
-            user_id,
-            DATE(start_time) AS work_date,
-            SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, NOW()))) AS total_worked_seconds
-          FROM sub_tasks_user_timeline
-          WHERE deleted_at IS NULL 
-            AND DATE(start_time) BETWEEN ? AND ?
-            AND user_id IN (${placeholders})
-          GROUP BY user_id, work_date`,
-          [from_date, to_date, ...userIds]
-        );
-        // Prepare date range from Monday to Saturday
-        const dateRange = [];
-        for (let i = 0; i <= 5; i++) {
-          dateRange.push(moment(from_date).clone().add(i, "days").format("YYYY-MM-DD"));
-        }
-
-        let data = {};
-
-        for (const date of dateRange) {
-          const dayKey = moment(date).format("ddd").toLowerCase(); // e.g., 'mon', 'tue'
-
-          const dailyUsers = users.map((user) => {
-            const record = timelineRows.find((r) => 
-      r.user_id === user.id && moment(r.work_date).format("YYYY-MM-DD") === date
+    const [users] = await db.query(
+      `SELECT id, CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) AS name
+       FROM users
+       WHERE deleted_at IS NULL AND id IN (${placeholders}) AND role_id NOT IN (1, 2, 3)`,
+      [...userIds]
     );
 
-      const totalSeconds = record ? record.total_worked_seconds : 0;
-      return {
-        id: user.id,
-        name: user.name,
-        total_worked_hrs: convertSecondsToReadableTime(totalSeconds),
-      }});
+    if (!users.length) {
+      return errorResponse(res, "No valid users found", 404);
+    }
+
+    const [timelineRows] = await db.query(
+      `SELECT user_id, start_time, end_time
+       FROM sub_tasks_user_timeline
+       WHERE deleted_at IS NULL
+         AND DATE(start_time) BETWEEN ? AND ?
+         AND user_id IN (${placeholders})`,
+      [from_date, to_date, ...userIds]
+    );
+
+    // Step: Split time per day
+    function splitTimeByDay(startTime, endTime) {
+      const result = {};
+      let start = moment(startTime);
+      const end = endTime ? moment(endTime) : moment();
+
+      while (start.isBefore(end)) {
+        const dayEnd = start.clone().endOf("day");
+        const chunkEnd = moment.min(dayEnd, end);
+        const duration = moment.duration(chunkEnd.diff(start)).asSeconds();
+        const dateKey = start.format("YYYY-MM-DD");
+
+        result[dateKey] = (result[dateKey] || 0) + duration;
+        start = chunkEnd.clone().add(1, "second");
+      }
+
+      return result;
+    }
+
+    const userDateSecondsMap = {}; // { user_id: { date: seconds } }
+
+    for (const row of timelineRows) {
+      const { user_id, start_time, end_time } = row;
+      const dateChunks = splitTimeByDay(start_time, end_time);
+
+      if (!userDateSecondsMap[user_id]) {
+        userDateSecondsMap[user_id] = {};
+      }
+
+      for (const [date, seconds] of Object.entries(dateChunks)) {
+        const current = userDateSecondsMap[user_id][date] || 0;
+        const total = current + seconds;
+
+        // Cap daily work time at 24 hours (86400 seconds)
+        userDateSecondsMap[user_id][date] = Math.min(total, 86340);
+      }
+    }
+
+    // Generate the date range (Monday to Saturday)
+    const dateRange = [];
+    for (let i = 0; i <= 5; i++) {
+      dateRange.push(moment(from_date).clone().add(i, "days").format("YYYY-MM-DD"));
+    }
+
+    let data = {};
+
+    for (const date of dateRange) {
+      const dayKey = moment(date).format("ddd").toLowerCase(); // 'mon', 'tue', etc.
+
+      const dailyUsers = users.map((user) => {
+        const seconds = userDateSecondsMap[user.id]?.[date] || 0;
+        return {
+          id: user.id,
+          name: user.name,
+          total_worked_hrs: convertSecondsToReadableTime(seconds),
+        };
+      });
 
       if (isTL && !associative) {
         const top5 = dailyUsers.slice(0, 5);
@@ -1822,7 +1852,8 @@ exports.getTeamWorkedHrs = async (req, res) => {
 
         if (others.length) {
           const totalOtherSeconds = others.reduce((sum, u) => {
-            const seconds = u.total_worked_hrs.split(" ").reduce((acc, part) => {
+            const parts = u.total_worked_hrs.split(" ");
+            const seconds = parts.reduce((acc, part) => {
               if (part.includes("h")) return acc + parseInt(part) * 3600;
               if (part.includes("m")) return acc + parseInt(part) * 60;
               return acc;
@@ -1849,5 +1880,7 @@ exports.getTeamWorkedHrs = async (req, res) => {
     return errorResponse(res, "Error fetching team worked hours", error.message, 500);
   }
 };
+
+
 
 
