@@ -2662,6 +2662,29 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
       };
     }
   }
+  let exitingtasks;
+  if (type === "task") {
+     exitingtasks = await db.query(
+      "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
+  } else if( type === "subtask") {
+    exitingtasks = await db.query(
+      "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
+  }
+  const taskOrSubtaskExists = exitingtasks[0];
+  console.log("taskOrSubtaskExists", taskOrSubtaskExists[0].hold_status);
+  if(taskOrSubtaskExists[0].hold_status === 1) {
+    throw { 
+      status: 500,
+      success: false,
+      message: "This task is on hold and cannot be started.",
+      error: "This task is on hold and cannot be started.",
+    };
+  }
+
   const [existingSubtaskSublime] = await db.query(
     "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
     [taskOrSubtask.user_id]
