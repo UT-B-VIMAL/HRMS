@@ -1189,7 +1189,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const fieldsToRemove = ["updated_by", "reopen_status", "active_status"];
+    const fieldsToRemove = ["updated_by", "reopen_status", "active_status","hold_status"];
     const cleanedPayload = Object.fromEntries(
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
