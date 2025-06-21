@@ -1387,7 +1387,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
     }
 
       let hold_status = 0;
-      if ((payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0 )||(payload.reopen_status == 1 ) ){
+      if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0  ){
 
         if(role_id == 4) {
         payload.hold_status = 0;
@@ -1399,7 +1399,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
         payload.hold_status = 0;
       }
     
-
     const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
       
       status = Number(status);
@@ -1494,9 +1493,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
     async function processStatusData1(statusFlag, data) {
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(status, reopen_status, active_status,hold_status);
+          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
         case 1:
-          return getStatusGroup(status, reopen_status, active_status,hold_status);
+          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -2663,6 +2662,29 @@ exports.startTask = async (taskOrSubtask, type, id, res) => {
       };
     }
   }
+  let exitingtasks;
+  if (type === "task") {
+     exitingtasks = await db.query(
+      "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
+  } else if( type === "subtask") {
+    exitingtasks = await db.query(
+      "SELECT * FROM sub_tasks WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
+  }
+  const taskOrSubtaskExists = exitingtasks[0];
+  console.log("taskOrSubtaskExists", taskOrSubtaskExists[0].hold_status);
+  if(taskOrSubtaskExists[0].hold_status === 1) {
+    throw { 
+      status: 500,
+      success: false,
+      message: "This task is on hold and cannot be started.",
+      error: "This task is on hold and cannot be started.",
+    };
+  }
+
   const [existingSubtaskSublime] = await db.query(
     "SELECT * FROM sub_tasks_user_timeline WHERE end_time IS NULL AND user_id = ?",
     [taskOrSubtask.user_id]

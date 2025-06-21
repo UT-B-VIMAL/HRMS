@@ -1074,7 +1074,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
       let hold_status = 0;
-      if ((payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0 )||(payload.reopen_status == 1 ) ){
+      if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0 ){
 
         if(role_id == 4) {
         payload.hold_status = 0;
@@ -1175,9 +1175,9 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     async function processStatusData1(statusFlag, data) {
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(status, reopen_status, active_status,hold_status);
+          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
         case 1:
-          return getStatusGroup(status, reopen_status, active_status,hold_status);
+          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -1189,7 +1189,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const fieldsToRemove = ["updated_by", "reopen_status", "active_status"];
+    const fieldsToRemove = ["updated_by", "reopen_status", "active_status","hold_status"];
     const cleanedPayload = Object.fromEntries(
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
@@ -1325,6 +1325,7 @@ const convertTasktoSubtask = async (task_id) => {
       active_status = 0 AND reopen_status = 0 AND (
         status = 1 OR status = 2 OR status = 3
       )
+
     )
   )
   AND deleted_at IS NULL 
@@ -1353,7 +1354,7 @@ const convertTasktoSubtask = async (task_id) => {
       const insertQuery = `
       INSERT INTO sub_tasks (
         product_id, project_id, task_id, user_id, name, estimated_hours, start_date, end_date,
-        extended_status, extended_hours, active_status, status, total_hours_worked,
+        extended_status, extended_hours, active_status, status,hold_status, total_hours_worked,
         command, assigned_user_id, remark, reopen_status, description, team_id,
         priority, created_by, updated_by, deleted_at, created_at, updated_at
       ) VALUES (
@@ -1373,6 +1374,7 @@ const convertTasktoSubtask = async (task_id) => {
         task.extended_hours,
         task.active_status,
         task.status,
+        task.hold_status , 
         task.total_hours_worked,
         task.command,
         task.assigned_user_id,
