@@ -1627,7 +1627,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
     // if (updateFields.length === 0) {
     //   return errorResponse(res, null, "No fields to update", 400);
     // }
-
+    
     updateFields.push(`updated_at = NOW()`);
 
     const updateQuery = `UPDATE tasks SET ${updateFields.join(
