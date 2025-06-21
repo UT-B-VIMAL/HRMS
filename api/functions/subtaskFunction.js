@@ -1350,6 +1350,8 @@ const convertTasktoSubtask = async (task_id) => {
     const [subtaskResult] = await db.query(subtaskQuery, [task_id]);
 
     if (subtaskResult.length === 0) {
+      console.log("task id", task_id);
+      
       // Insert as new subtask
       const insertQuery = `
       INSERT INTO sub_tasks (
@@ -1358,7 +1360,7 @@ const convertTasktoSubtask = async (task_id) => {
         command, assigned_user_id, remark, reopen_status, description, team_id,
         priority, created_by, updated_by, deleted_at, created_at, updated_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NOW()
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NOW()
       )
     `;
       const values = [
