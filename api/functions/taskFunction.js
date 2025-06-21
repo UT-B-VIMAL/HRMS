@@ -1456,6 +1456,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
       holdStatus = Number(holdStatus);
+console.log(`getStatusGroup called with status: ${status}, reopenStatus: ${reopenStatus}, activeStatus: ${activeStatus}, holdStatus: ${holdStatus}`);
 
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
@@ -1530,6 +1531,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
 
       const task = task_data[0][0];
+console.log(task," task data fetched for processing status");
+console.log(data," data for processing status");
+
       switch (statusFlag) {
         case 0:
           return getStatusGroup(
@@ -1627,7 +1631,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
     // if (updateFields.length === 0) {
     //   return errorResponse(res, null, "No fields to update", 400);
     // }
-    
+
     updateFields.push(`updated_at = NOW()`);
 
     const updateQuery = `UPDATE tasks SET ${updateFields.join(
@@ -2292,6 +2296,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
+      console.log(holdStatus);
       if (
         (status === 0 &&
           reopenStatus === 0 &&
