@@ -1779,7 +1779,12 @@ const lastActiveTask = async (userId) => {
     const totalWorkedTime = task.subtask_id
       ? moment.duration(task.subtask_total_hours_worked).asSeconds()
       : moment.duration(task.task_total_hours_worked).asSeconds();
-    const totaltimeTaken = totalWorkedTime + timeDifference;
+      let totaltimeTaken = 0;
+        if(task.end_time) {
+            totaltimeTaken = totalWorkedTime;
+        }else{
+           totaltimeTaken = totalWorkedTime + timeDifference;
+        }
     const timeTaken = convertSecondsToHHMMSS(totaltimeTaken);
     // Calculate the time left based on whether it's a subtask or task
     const timeLeft = calculateTimeLeft(
