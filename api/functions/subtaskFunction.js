@@ -692,6 +692,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     status: 1,
     active_status: 1,
     reopen_status: 1,
+    hold_status: 1,
     assigned_user_id: 2,
     user_id: 9,
     estimated_hours: 3,
@@ -1159,9 +1160,9 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
 
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
+          return getStatusGroup(task.status, task.reopen_status, task.active_status,task.hold_status);
         case 1:
-          return getStatusGroup(data, task.reopen_status, task.active_status,task.hold_status);
+          return getStatusGroup(task.status, task.reopen_status, task.active_status,task.hold_status);
         case 2:
           return getUsername(data);
         case 9:
@@ -1189,7 +1190,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const fieldsToRemove = ["updated_by", "reopen_status", "active_status","hold_status"];
+    const fieldsToRemove = ["updated_by", "reopen_status", "active_status"];
     const cleanedPayload = Object.fromEntries(
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
