@@ -1456,7 +1456,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
       holdStatus = Number(holdStatus);
-console.log(`getStatusGroup called with status: ${status}, reopenStatus: ${reopenStatus}, activeStatus: ${activeStatus}, holdStatus: ${holdStatus}`);
 
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
@@ -1531,9 +1530,6 @@ console.log(`getStatusGroup called with status: ${status}, reopenStatus: ${reope
       }
 
       const task = task_data[0][0];
-console.log(task," task data fetched for processing status");
-console.log(data," data for processing status");
-
       switch (statusFlag) {
         case 0:
           return getStatusGroup(
