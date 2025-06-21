@@ -1507,7 +1507,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const fieldsToRemove = ["updated_by", "reopen_status", "active_status","hold_status"];
+    const fieldsToRemove = ["updated_by", "reopen_status", "active_status"];
     const cleanedPayload = Object.fromEntries(
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
@@ -1779,12 +1779,7 @@ const lastActiveTask = async (userId) => {
     const totalWorkedTime = task.subtask_id
       ? moment.duration(task.subtask_total_hours_worked).asSeconds()
       : moment.duration(task.task_total_hours_worked).asSeconds();
-      let totaltimeTaken = 0;
-        if(task.end_time) {
-            totaltimeTaken = totalWorkedTime;
-        }else{
-           totaltimeTaken = totalWorkedTime + timeDifference;
-        }
+    const totaltimeTaken = totalWorkedTime + timeDifference;
     const timeTaken = convertSecondsToHHMMSS(totaltimeTaken);
     // Calculate the time left based on whether it's a subtask or task
     const timeLeft = calculateTimeLeft(
