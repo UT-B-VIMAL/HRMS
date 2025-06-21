@@ -1366,30 +1366,58 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       return errorResponse(res, null, "Future dates are not allowed", 400);
     }
 
-    // Step 1: Fetch relevant users (include role_id)
-    let usersQuery = `
-  SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
-         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
-  FROM users u
-  LEFT JOIN teams t ON u.team_id = t.id
-  WHERE u.deleted_at IS NULL AND t.deleted_at IS NULL
-    AND u.role_id NOT IN (1, 2)
-    AND DATE(u.created_at) <= ?
-    ${team_id ? "AND u.team_id = ?" : ""}
-`;
+    // Base WHERE condition
+    const baseWhere = `
+      u.deleted_at IS NULL AND t.deleted_at IS NULL
+      AND DATE(u.created_at) <= ?
+      ${team_id ? "AND u.team_id = ?" : ""}
+    `;
+    const queryParams = team_id ? [formattedDate, team_id] : [formattedDate];
 
-    const userQueryParams = team_id
-      ? [formattedDate, team_id]
-      : [formattedDate];
-    const [users] = await db.query(usersQuery, userQueryParams);
+    // Query 1: Total Strength (All except Admin)
+    const [totalUsers] = await db.query(
+      `
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
+             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+      FROM users u
+      LEFT JOIN teams t ON u.team_id = t.id
+      WHERE ${baseWhere} AND u.role_id NOT IN (1)
+    `,
+      queryParams
+    );
 
-    if (users.length === 0) {
+    // Query 2: Associates Only (Not Admin, PM, TL)
+    const [associateUsers] = await db.query(
+      `
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
+             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+      FROM users u
+      LEFT JOIN teams t ON u.team_id = t.id
+      WHERE ${baseWhere} AND u.role_id NOT IN (1, 2, 3)
+    `,
+      queryParams
+    );
+
+    // Query 3: Attendance check (All except Admin)
+    const [attendanceUsers] = await db.query(
+      `
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
+             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+      FROM users u
+      LEFT JOIN teams t ON u.team_id = t.id
+      WHERE ${baseWhere} AND u.role_id NOT IN (1)
+    `,
+      queryParams
+    );
+
+    if (associateUsers.length === 0 || totalUsers.length === 0 || attendanceUsers.length === 0) {
       return errorResponse(res, null, "No users found", 404);
     }
 
-    const userIds = users.map((u) => u.user_id);
+    const associateIds = associateUsers.map((u) => u.user_id);
+    const attendanceIds = attendanceUsers.map((u) => u.user_id);
 
-    // Step 2: Fetch leave data
+    // Step 2: Fetch Leave Data
     const [leaveRows] = await db.query(
       `
       SELECT user_id, day_type, half_type
@@ -1397,15 +1425,14 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       WHERE deleted_at IS NULL AND DATE(date) = ?
         AND user_id IN (?)
     `,
-      [formattedDate, userIds]
+      [formattedDate, attendanceIds]
     );
-
     const leaveMap = {};
     leaveRows.forEach(({ user_id, day_type, half_type }) => {
       leaveMap[user_id] = { day_type, half_type };
     });
 
-    // Step 3: Fetch working activity data
+    // Step 3: Working activity data
     const [timelineRows] = await db.query(
       `
       SELECT user_id
@@ -1414,9 +1441,8 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
         AND user_id IN (?)
       GROUP BY user_id
     `,
-      [formattedDate, userIds]
+      [formattedDate, associateIds]
     );
-
     const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
 
     // Step 4: Initialize result map
@@ -1436,16 +1462,9 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       };
     }
 
-    const currentTime = new Date();
-    const cutoffTimeStart = new Date(targetDate);
-    cutoffTimeStart.setHours(13, 30, 0);
-    const cutoffTimeEnd = new Date(targetDate);
-    cutoffTimeEnd.setHours(13, 31, 0);
-
-    // Step 5: Process each user
-    users.forEach((user) => {
+    // Fill total strength first
+    totalUsers.forEach((user) => {
       const groupKey = team_id ? user.team_id : defaultGroupKey;
-
       if (!resultMap[groupKey]) {
         resultMap[groupKey] = {
           team_id: user.team_id,
@@ -1460,16 +1479,35 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       }
 
       const result = resultMap[groupKey];
-      result.total_strength++;
-
       const employee = {
         user_id: user.user_id,
-        employee_id: user.employee_id ? String(user.employee_id).padStart(3, '0') : "N/A",  // split
+        employee_id: user.employee_id ? String(user.employee_id).padStart(3, '0') : "N/A",
         employee_name: user.employee_name || "N/A",
         team_name: user.team_name || "N/A",
       };
 
       result.total_strength_employees.push(employee);
+      result.total_strength++;
+    });
+
+    // Attendance check (only for associate users)
+    const currentTime = new Date();
+    const cutoffTimeStart = new Date(targetDate);
+    cutoffTimeStart.setHours(13, 30, 0);
+    const cutoffTimeEnd = new Date(targetDate);
+    cutoffTimeEnd.setHours(13, 31, 0);
+
+    associateUsers.forEach((user) => {
+      const groupKey = team_id ? user.team_id : defaultGroupKey;
+      if (!resultMap[groupKey]) return;
+
+      const result = resultMap[groupKey];
+      const employee = {
+        user_id: user.user_id,
+        employee_id: user.employee_id ? String(user.employee_id).padStart(3, '0') : "N/A",
+        employee_name: user.employee_name || "N/A",
+        team_name: user.team_name || "N/A",
+      };
 
       const leave = leaveMap[user.user_id];
       const isAbsent =
@@ -1486,18 +1524,15 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
         result.absent_employees.push(employee);
       } else {
         result.present_employees.push(employee);
-
-        // if (user.role_id !== 3) {
         if (workingUserIds.has(user.user_id)) {
           result.active_employees.push(employee);
         } else {
           result.idle_employees.push(employee);
         }
-        // }
       }
     });
 
-    // Step 6: Format final output
+    // Step 5: Format response
     const pad = (num) => num.toString().padStart(2, "0");
 
     const finalOutput = Object.values(resultMap).map((group) => ({
