@@ -1736,7 +1736,21 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
 exports.deleteTask = async (req, res) => {
   const id = req.params.id;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
+
+    if (!user_id) {
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Missing user_id in query parameters",
+        400
+      );
+    }
   try {
     // 1. Check if any subtasks exist
     const subtaskQuery = `
@@ -1785,8 +1799,8 @@ exports.deleteTask = async (req, res) => {
     }
 
     // 3. Soft delete the task
-    const deleteQuery = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
-    const [deleteResult] = await db.query(deleteQuery, [id]);
+    const deleteQuery = "UPDATE tasks SET deleted_at = NOW(), updated_by = ? WHERE id = ?";
+    const [deleteResult] = await db.query(deleteQuery, [user_id, id]);
 
     if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "Task not found", 404);
