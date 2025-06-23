@@ -1738,7 +1738,21 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
 exports.deleteTask = async (req, res) => {
   const id = req.params.id;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
+
+    if (!user_id) {
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Missing user_id in query parameters",
+        400
+      );
+    }
   try {
     // 1. Check if any subtasks exist
     const subtaskQuery = `
@@ -1787,8 +1801,8 @@ exports.deleteTask = async (req, res) => {
     }
 
     // 3. Soft delete the task
-    const deleteQuery = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
-    const [deleteResult] = await db.query(deleteQuery, [id]);
+    const deleteQuery = "UPDATE tasks SET deleted_at = NOW(), updated_by = ? WHERE id = ?";
+    const [deleteResult] = await db.query(deleteQuery, [user_id, id]);
 
     if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "Task not found", 404);
@@ -1831,15 +1845,22 @@ const lastActiveTask = async (userId) => {
             users u3 ON t.user_id = u3.id
         LEFT JOIN 
             users u4 ON t.assigned_user_id = u4.id
-          WHERE stut.user_id = ?
+            WHERE stut.user_id = ?
         AND (
-            -- Valid task
-            (t.active_status = 1 OR (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0 AND t.hold_status = 0))
-            -- OR valid subtask
-            OR (s.active_status = 1 OR (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0 AND s.hold_status = 0))
+          -- If subtask exists, check subtask status only
+          (s.id IS NOT NULL AND (
+            s.active_status = 1 OR 
+            (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0 AND s.hold_status = 0)
+          ))
+          -- If no subtask, check task status only
+          OR (s.id IS NULL AND (
+            t.active_status = 1 OR 
+            (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0 AND t.hold_status = 0)
+          ))
         )
         AND t.deleted_at IS NULL 
-        AND s.deleted_at IS NULL
+        AND (s.deleted_at IS NULL OR s.id IS NULL)
+
       ORDER BY stut.updated_at DESC
       LIMIT 1;
     `;
