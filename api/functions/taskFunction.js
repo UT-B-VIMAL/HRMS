@@ -1831,15 +1831,22 @@ const lastActiveTask = async (userId) => {
             users u3 ON t.user_id = u3.id
         LEFT JOIN 
             users u4 ON t.assigned_user_id = u4.id
-          WHERE stut.user_id = ?
+            WHERE stut.user_id = ?
         AND (
-            -- Valid task
-            (t.active_status = 1 OR (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0 AND t.hold_status = 0))
-            -- OR valid subtask
-            OR (s.active_status = 1 OR (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0 AND s.hold_status = 0))
+          -- If subtask exists, check subtask status only
+          (s.id IS NOT NULL AND (
+            s.active_status = 1 OR 
+            (s.active_status = 0 AND s.status = 1 AND s.reopen_status = 0 AND s.hold_status = 0)
+          ))
+          -- If no subtask, check task status only
+          OR (s.id IS NULL AND (
+            t.active_status = 1 OR 
+            (t.active_status = 0 AND t.status = 1 AND t.reopen_status = 0 AND t.hold_status = 0)
+          ))
         )
         AND t.deleted_at IS NULL 
-        AND s.deleted_at IS NULL
+        AND (s.deleted_at IS NULL OR s.id IS NULL)
+
       ORDER BY stut.updated_at DESC
       LIMIT 1;
     `;
