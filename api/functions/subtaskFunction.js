@@ -607,6 +607,22 @@ exports.updateSubTask = async (id, payload, res) => {
 exports.deleteSubTask = async (req, res) => {
   const id = req.params.id;
 
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
+
+    if (!user_id) {
+      return errorResponse(
+        res,
+        "User ID is required",
+        "Missing user_id in query parameters",
+        400
+      );
+    }
+
   const updated_by = req.body.updated_by;
   try {
     // Fetch subtask status
@@ -636,8 +652,8 @@ exports.deleteSubTask = async (req, res) => {
     }
 
     // Soft delete the subtask
-    const deleteQuery = "UPDATE sub_tasks SET deleted_at = NOW() WHERE id = ?";
-    const [deleteResult] = await db.query(deleteQuery, [id]);
+    const deleteQuery = "UPDATE sub_tasks SET deleted_at = NOW(), updated_by = ? WHERE id = ?";
+    const [deleteResult] = await db.query(deleteQuery, [user_id, id]);
 
     if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "SubTask not found", 204);
