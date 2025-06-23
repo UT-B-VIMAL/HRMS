@@ -708,7 +708,8 @@ exports.getTask = async (queryParams, res, req) => {
         status_text: commonStatusGroup(
           task.status,
           task.reopen_status,
-          task.active_status
+          task.active_status,
+          task.hold_status
         ),
 
         is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
@@ -733,7 +734,8 @@ exports.getTask = async (queryParams, res, req) => {
             status_text: commonStatusGroup(
               subtask.status,
               subtask.reopen_status,
-              subtask.active_status
+              subtask.active_status,
+              subtask.hold_status
             ),
           }))
         : [];
@@ -1856,7 +1858,12 @@ const lastActiveTask = async (userId) => {
     const totalWorkedTime = task.subtask_id
       ? moment.duration(task.subtask_total_hours_worked).asSeconds()
       : moment.duration(task.task_total_hours_worked).asSeconds();
-    const totaltimeTaken = totalWorkedTime + timeDifference;
+      let totaltimeTaken = 0;
+        if(task.end_time) {
+            totaltimeTaken = totalWorkedTime;
+        }else{
+           totaltimeTaken = totalWorkedTime + timeDifference;
+        }
     const timeTaken = convertSecondsToHHMMSS(totaltimeTaken);
     // Calculate the time left based on whether it's a subtask or task
     const timeLeft = calculateTimeLeft(
@@ -2292,6 +2299,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
+      console.log(holdStatus);
       if (
         (status === 0 &&
           reopenStatus === 0 &&
