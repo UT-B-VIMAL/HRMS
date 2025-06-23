@@ -524,9 +524,9 @@ exports.commonStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
     status = Number(status);
     reopenStatus = Number(reopenStatus);
     activeStatus = Number(activeStatus);
-    if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
+    if (status === 0 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
         return "To Do";
-    } else if (status === 1 && reopenStatus === 0 && activeStatus === 0) {
+    } else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
         return "Paused";
     } 
      else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
