@@ -28,8 +28,8 @@ exports.createProject = async (payload, res) => {
     const user = await getAuthUserDetails(user_id, res);
     if (!user) return;
     const checkQuery =
-      "SELECT COUNT(*) as count FROM projects WHERE name = ? AND deleted_at IS NULL";
-    const [checkResult] = await db.query(checkQuery, [name]);
+      "SELECT COUNT(*) as count FROM projects WHERE name = ? AND product_id = ? AND deleted_at IS NULL";
+    const [checkResult] = await db.query(checkQuery, [name, product]);
 
     if (checkResult[0].count > 0) {
       return errorResponse(
@@ -94,6 +94,18 @@ exports.updateProject = async (id, payload, res) => {
         404
       );
     }
+    const checkQuery1 =
+      "SELECT COUNT(*) as count FROM projects WHERE name = ? AND product_id = ? AND deleted_at IS NULL AND id != ?";
+    const [checkResult1] = await db.query(checkQuery1, [name, product, id]);
+
+    if (checkResult1[0].count > 0) {
+      return errorResponse(
+        res,
+        "Project with this name already exists",
+        "Duplicate Project Error",
+        400
+      );
+    }
     const checkProduct =
       "SELECT COUNT(*) as count FROM products WHERE id = ? and deleted_at IS NULL";
     const [checkProductResults] = await db.query(checkProduct, [product]);
@@ -112,7 +124,7 @@ exports.updateProject = async (id, payload, res) => {
         return errorResponse(
           res,
           "This project is referenced in the Tasks or Sub-Tasks and cannot be updated",
-          "Reference Error",
+          "This project is referenced in the Tasks or Sub-Tasks and cannot be updated",
           400
         );
       }
