@@ -245,7 +245,7 @@ const getPendingTasksCount = async (userId) => {
     // 5. Return priority reason
     if (pausedCount > 0) {
       return {
-        reason: "Paused",
+        reason: "On Break",
         count: pausedCount,
       };
     }
