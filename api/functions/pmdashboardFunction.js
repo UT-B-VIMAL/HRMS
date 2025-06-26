@@ -650,8 +650,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         totalSubtasks > 0
           ? Math.round((completedSubtasks / totalSubtasks) * 100)
           : task.status === 3
-            ? 100
-            : 0;
+          ? 100
+          : 0;
 
       // Return the formatted task object
       return {
@@ -718,15 +718,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
       // Create subtask if applicable
       const subtask = row.subtask_id
         ? {
-          id: row.subtask_id,
-          name: row.subtask_name,
-          status: row.subtask_status,
-          active_status: row.subtask_active_status,
-          reopen_status: row.subtask_reopen_status,
-          estimated_hours: row.subtask_estimation_hours,
-          description: row.subtask_description,
-          assigned_user_id: row.subtask_assigned_user_id,
-        }
+            id: row.subtask_id,
+            name: row.subtask_name,
+            status: row.subtask_status,
+            active_status: row.subtask_active_status,
+            reopen_status: row.subtask_reopen_status,
+            estimated_hours: row.subtask_estimation_hours,
+            description: row.subtask_description,
+            assigned_user_id: row.subtask_assigned_user_id,
+          }
         : null;
 
       // Find category based on task's subtask or status
@@ -770,10 +770,10 @@ exports.fetchPmviewproductdata = async (req, res) => {
           const completionPercentage =
             existingTask.TotalSubtaskCount > 0
               ? Math.round(
-                (existingTask.CompletedSubtaskCount /
-                  existingTask.TotalSubtaskCount) *
-                100
-              )
+                  (existingTask.CompletedSubtaskCount /
+                    existingTask.TotalSubtaskCount) *
+                    100
+                )
               : 0;
 
           existingTask.CompletionPercentage = completionPercentage;
@@ -1208,7 +1208,6 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         return successResponse(res, [], "No team members found", 200);
       }
     } else if (loggedInUser.role_id === 4) {
-
       userIdsFilter = [login_id];
     }
 
@@ -1410,7 +1409,11 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       queryParams
     );
 
-    if (associateUsers.length === 0 || totalUsers.length === 0 || attendanceUsers.length === 0) {
+    if (
+      associateUsers.length === 0 ||
+      totalUsers.length === 0 ||
+      attendanceUsers.length === 0
+    ) {
       return errorResponse(res, null, "No users found", 404);
     }
 
@@ -1433,16 +1436,26 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     });
 
     // Step 3: Working activity data
-    const [timelineRows] = await db.query(
-      `
-      SELECT user_id
-      FROM sub_tasks_user_timeline
-      WHERE DATE(start_time) = ?
-        AND user_id IN (?)
-      GROUP BY user_id
-    `,
-      [formattedDate, associateIds]
-    );
+    let timelineQuery = `
+  SELECT user_id
+  FROM sub_tasks_user_timeline
+  WHERE DATE(start_time) = ?
+    AND user_id IN (?)
+`;
+    const isToday = formattedDate === new Date().toISOString().split("T")[0];
+    
+    if (isToday) {
+      timelineQuery += ` AND end_time IS NULL`;
+    }
+
+    timelineQuery += ` GROUP BY user_id`;
+
+    console.log("Timeline Query:", timelineQuery);
+    
+    const [timelineRows] = await db.query(timelineQuery, [
+      formattedDate,
+      associateIds,
+    ]);
     const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
 
     // Step 4: Initialize result map
@@ -1481,7 +1494,9 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       const result = resultMap[groupKey];
       const employee = {
         user_id: user.user_id,
-        employee_id: user.employee_id ? String(user.employee_id).padStart(3, '0') : "N/A",
+        employee_id: user.employee_id
+          ? String(user.employee_id).padStart(3, "0")
+          : "N/A",
         employee_name: user.employee_name || "N/A",
         team_name: user.team_name || "N/A",
       };
@@ -1504,7 +1519,9 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       const result = resultMap[groupKey];
       const employee = {
         user_id: user.user_id,
-        employee_id: user.employee_id ? String(user.employee_id).padStart(3, '0') : "N/A",
+        employee_id: user.employee_id
+          ? String(user.employee_id).padStart(3, "0")
+          : "N/A",
         employee_name: user.employee_name || "N/A",
         team_name: user.team_name || "N/A",
       };
@@ -1602,10 +1619,10 @@ exports.getProjectCompletion = async (req, res) => {
         return successResponse(res, {
           completed_tasks: project_id
             ? {
-              pending_percentage: "0.00",
-              inprogress_percentage: "0.00",
-              completed_percentage: "0.00",
-            }
+                pending_percentage: "0.00",
+                inprogress_percentage: "0.00",
+                completed_percentage: "0.00",
+              }
             : [],
           team_utilization: [],
         });
@@ -1711,7 +1728,7 @@ exports.getProjectCompletion = async (req, res) => {
     );
 
     // Step 1: Map raw rows with counts and percents included
-    const completedTasksRows = resultsFromYourQuery.map(row => {
+    const completedTasksRows = resultsFromYourQuery.map((row) => {
       const total = parseInt(row.total, 10);
       const pending_count = parseInt(row.pending_count, 10);
       const inprogress_count = parseInt(row.inprogress_count, 10);
@@ -1724,9 +1741,18 @@ exports.getProjectCompletion = async (req, res) => {
         pending_count,
         inprogress_count,
         completed_count,
-        pending_percent: total > 0 ? parseFloat(((pending_count / total) * 100).toFixed(2)) : 0,
-        inprogress_percent: total > 0 ? parseFloat(((inprogress_count / total) * 100).toFixed(2)) : 0,
-        completed_percent: total > 0 ? parseFloat(((completed_count / total) * 100).toFixed(2)) : 0,
+        pending_percent:
+          total > 0
+            ? parseFloat(((pending_count / total) * 100).toFixed(2))
+            : 0,
+        inprogress_percent:
+          total > 0
+            ? parseFloat(((inprogress_count / total) * 100).toFixed(2))
+            : 0,
+        completed_percent:
+          total > 0
+            ? parseFloat(((completed_count / total) * 100).toFixed(2))
+            : 0,
       };
     });
 
@@ -1736,57 +1762,110 @@ exports.getProjectCompletion = async (req, res) => {
 
     // Aggregate for "Others" summary
     const othersTotal = othersProjects.reduce((sum, p) => sum + p.total, 0);
-    const othersPendingCount = othersProjects.reduce((sum, p) => sum + p.pending_count, 0);
-    const othersInprogressCount = othersProjects.reduce((sum, p) => sum + p.inprogress_count, 0);
-    const othersCompletedCount = othersProjects.reduce((sum, p) => sum + p.completed_count, 0);
+    const othersPendingCount = othersProjects.reduce(
+      (sum, p) => sum + p.pending_count,
+      0
+    );
+    const othersInprogressCount = othersProjects.reduce(
+      (sum, p) => sum + p.inprogress_count,
+      0
+    );
+    const othersCompletedCount = othersProjects.reduce(
+      (sum, p) => sum + p.completed_count,
+      0
+    );
 
     const othersSummary = {
       project_id: 0,
       project_name: "Others",
-      pending_percent: othersTotal > 0 ? parseFloat(((othersPendingCount / othersTotal) * 100).toFixed(2)) : 0,
-      inprogress_percent: othersTotal > 0 ? parseFloat(((othersInprogressCount / othersTotal) * 100).toFixed(2)) : 0,
-      completed_percent: othersTotal > 0 ? parseFloat(((othersCompletedCount / othersTotal) * 100).toFixed(2)) : 0,
+      pending_percent:
+        othersTotal > 0
+          ? parseFloat(((othersPendingCount / othersTotal) * 100).toFixed(2))
+          : 0,
+      inprogress_percent:
+        othersTotal > 0
+          ? parseFloat(((othersInprogressCount / othersTotal) * 100).toFixed(2))
+          : 0,
+      completed_percent:
+        othersTotal > 0
+          ? parseFloat(((othersCompletedCount / othersTotal) * 100).toFixed(2))
+          : 0,
     };
 
     // Final object
-    const totalSum = completedTasksRows.reduce((acc, p) => {
-      acc.total += p.total;
-      acc.pending_count += p.pending_count;
-      acc.inprogress_count += p.inprogress_count;
-      acc.completed_count += p.completed_count;
-      return acc;
-    }, { total: 0, pending_count: 0, inprogress_count: 0, completed_count: 0 });
+    const totalSum = completedTasksRows.reduce(
+      (acc, p) => {
+        acc.total += p.total;
+        acc.pending_count += p.pending_count;
+        acc.inprogress_count += p.inprogress_count;
+        acc.completed_count += p.completed_count;
+        return acc;
+      },
+      { total: 0, pending_count: 0, inprogress_count: 0, completed_count: 0 }
+    );
 
-    const total_completed_percent = totalSum.total > 0
-      ? parseFloat(((totalSum.completed_count / totalSum.total) * 100).toFixed(2))
-      : 0;
+    const total_completed_percent =
+      totalSum.total > 0
+        ? parseFloat(
+            ((totalSum.completed_count / totalSum.total) * 100).toFixed(2)
+          )
+        : 0;
 
     const completed_tasks = {
-      projects: othersProjects.length > 0
-        ? [...visibleProjects.map(({ project_id, project_name, pending_percent, inprogress_percent, completed_percent }) => ({
-          project_id,
-          project_name,
-          pending_percent,
-          inprogress_percent,
-          completed_percent,
-        })), othersSummary]
-        : visibleProjects.map(({ project_id, project_name, pending_percent, inprogress_percent, completed_percent }) => ({
-          project_id,
-          project_name,
-          pending_percent,
-          inprogress_percent,
-          completed_percent,
-        })),
-      others_list: othersProjects.length > 0
-        ? othersProjects.map(({ project_id, project_name, pending_percent, inprogress_percent, completed_percent }) => ({
-          project_id,
-          project_name,
-          pending_percent,
-          inprogress_percent,
-          completed_percent,
-        }))
-        : [],
-      total_completed_percent
+      projects:
+        othersProjects.length > 0
+          ? [
+              ...visibleProjects.map(
+                ({
+                  project_id,
+                  project_name,
+                  pending_percent,
+                  inprogress_percent,
+                  completed_percent,
+                }) => ({
+                  project_id,
+                  project_name,
+                  pending_percent,
+                  inprogress_percent,
+                  completed_percent,
+                })
+              ),
+              othersSummary,
+            ]
+          : visibleProjects.map(
+              ({
+                project_id,
+                project_name,
+                pending_percent,
+                inprogress_percent,
+                completed_percent,
+              }) => ({
+                project_id,
+                project_name,
+                pending_percent,
+                inprogress_percent,
+                completed_percent,
+              })
+            ),
+      others_list:
+        othersProjects.length > 0
+          ? othersProjects.map(
+              ({
+                project_id,
+                project_name,
+                pending_percent,
+                inprogress_percent,
+                completed_percent,
+              }) => ({
+                project_id,
+                project_name,
+                pending_percent,
+                inprogress_percent,
+                completed_percent,
+              })
+            )
+          : [],
+      total_completed_percent,
     };
     let teamUtilizationSql = "";
     let teamUtilizationParams = [];
@@ -2075,7 +2154,7 @@ ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
 
     return successResponse(res, {
       completed_tasks: completed_tasks,
-      team_utilization: utilizationResults
+      team_utilization: utilizationResults,
     });
   } catch (err) {
     console.error(err);
