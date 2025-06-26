@@ -115,22 +115,20 @@ exports.getAttendance = async (req, res) => {
     }
     query += ' AND (u.created_at <= ? OR u.created_at LIKE ?)';
     queryParams.push(dynamicDate, `${dynamicDate}%`);
-    const offset = (Number(page) - 1) * Number(perPage);
-    query += ` LIMIT ?, ? `;
-    queryParams.push(offset, Number(perPage));
 
     // Execute query
     const [result] = await db.query(query, queryParams);
     const totalRecords = result.length;
 
-    // Add Serial Numbers
-    const rowsWithSerialNo = result.map((row, index) => ({
+    const pagination = getPagination(page, perPage, totalRecords);
+    const offset = (Number(page) - 1) * Number(perPage);
+    query += ` LIMIT ?, ? `;
+    queryParams.push(offset, Number(perPage));
+    const [result1] = await db.query(query, queryParams);
+     const rowsWithSerialNo = result1.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
     }));
-
-    const pagination = getPagination(page, perPage, totalRecords);
-
     // Return Response
     return successResponse(
       res,
