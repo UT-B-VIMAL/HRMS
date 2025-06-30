@@ -21,7 +21,7 @@ const {
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
-exports.createSubTask = async (payload, res,req) => {
+exports.createSubTask = async (payload, res, req) => {
   const { task_id, name, created_by } = payload;
 
   try {
@@ -65,14 +65,7 @@ exports.createSubTask = async (payload, res,req) => {
             product_id, project_id, task_id, name, created_by,updated_by ,deleted_at, created_at, updated_at
         ) VALUES (?, ?, ?, ?,?,?, NULL, NOW(), NOW())
     `;
-    const values = [
-      product_id,
-      project_id,
-      task_id,
-      name,
-      userId,
-      userId,
-    ];
+    const values = [product_id, project_id, task_id, name, userId, userId];
 
     const [result] = await db.query(insertQuery, values);
 
@@ -117,12 +110,16 @@ exports.bulkimportSubTask = async (payload, res, req) => {
 
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
-    
-    if (!accessToken) return errorResponse(res, "Access token is required", 401);
+
+    if (!accessToken)
+      return errorResponse(res, "Access token is required", 401);
     const created_by = await getUserIdFromAccessToken(accessToken);
 
     // 1. Get or create product
-    let [productRow] = await db.query("SELECT id FROM products WHERE name = ? AND deleted_at IS NULL", [product_name]);
+    let [productRow] = await db.query(
+      "SELECT id FROM products WHERE name = ? AND deleted_at IS NULL",
+      [product_name]
+    );
     let product_id = productRow[0]?.id;
     if (!product_id) {
       const [insertProduct] = await db.query(
@@ -146,32 +143,50 @@ exports.bulkimportSubTask = async (payload, res, req) => {
       project_id = insertProject.insertId;
     }
 
-
-
     // 3. Get employee and manager IDs
-    const [[employee]] = await db.query("SELECT id,team_id FROM users WHERE employee_id = ? AND deleted_at IS NULL", [emp_id]);
+    const [[employee]] = await db.query(
+      "SELECT id,team_id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
+      [emp_id]
+    );
     if (!employee) return errorResponse(res, null, "Employee not found", 404);
     const user_id = employee.id;
     const team_id = employee.team_id;
 
-   const [[task]] = await db.query(`SELECT id FROM tasks WHERE user_id = ? AND product_id = ? AND project_id = ? AND name= ? AND deleted_at IS NULL`, [user_id, product_id, project_id,task_name]);
-   if (!task) return errorResponse(res, null, "Task not found", 404);
+    const [[task]] = await db.query(
+      `SELECT id FROM tasks WHERE user_id = ? AND product_id = ? AND project_id = ? AND name= ? AND deleted_at IS NULL`,
+      [user_id, product_id, project_id, task_name]
+    );
+    if (!task) return errorResponse(res, null, "Task not found", 404);
     const task_id = task.id;
 
-    const [[manager]] = await db.query("SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL", [manager_id]);
+    const [[manager]] = await db.query(
+      "SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
+      [manager_id]
+    );
     if (!manager) return errorResponse(res, null, "Manager not found", 404);
     const assigned_user_id = manager.id;
 
     // 4. Validate team
-    const [teamRow] = await db.query("SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL", [team_id]);
-    if (teamRow.length === 0) return errorResponse(res, null, "Team not found", 404);
+    const [teamRow] = await db.query(
+      "SELECT id FROM teams WHERE id = ? AND deleted_at IS NULL",
+      [team_id]
+    );
+    if (teamRow.length === 0)
+      return errorResponse(res, null, "Team not found", 404);
 
     // 5. Parse and validate estimated_hours
     let formattedEstimatedHours = "00:00:00";
     if (estimated_hours) {
-      const timeMatch = estimated_hours.match(/^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/);
+      const timeMatch = estimated_hours.match(
+        /^((\d+)d\s*)?((\d+)h\s*)?((\d+)m\s*)?((\d+)s)?$/
+      );
       if (!timeMatch) {
-        return errorResponse(res, null, 'Invalid estimated_hours format. Use "1d 2h 30m", etc.', 400);
+        return errorResponse(
+          res,
+          null,
+          'Invalid estimated_hours format. Use "1d 2h 30m", etc.',
+          400
+        );
       }
 
       const days = parseInt(timeMatch[2] || "0", 10);
@@ -179,8 +194,20 @@ exports.bulkimportSubTask = async (payload, res, req) => {
       const minutes = parseInt(timeMatch[6] || "0", 10);
       const seconds = parseInt(timeMatch[8] || "0", 10);
 
-      if (minutes >= 60 || seconds >= 60 || days < 0 || hours < 0 || minutes < 0 || seconds < 0) {
-        return errorResponse(res, null, "Invalid time values in estimated_hours", 400);
+      if (
+        minutes >= 60 ||
+        seconds >= 60 ||
+        days < 0 ||
+        hours < 0 ||
+        minutes < 0 ||
+        seconds < 0
+      ) {
+        return errorResponse(
+          res,
+          null,
+          "Invalid time values in estimated_hours",
+          400
+        );
       }
 
       // Validate start/end date duration
@@ -192,7 +219,8 @@ exports.bulkimportSubTask = async (payload, res, req) => {
       }
 
       const diffDays = end.diff(start, "days") + 1;
-      const totalEstimatedHours = days * 8 + hours + minutes / 60 + seconds / 3600;
+      const totalEstimatedHours =
+        days * 8 + hours + minutes / 60 + seconds / 3600;
       const effectiveDays = Math.ceil(totalEstimatedHours / 8);
 
       if (diffDays < effectiveDays) {
@@ -206,13 +234,18 @@ exports.bulkimportSubTask = async (payload, res, req) => {
 
       // Format to HH:MM:SS
       const totalHours = days * 8 + hours;
-      formattedEstimatedHours = `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      formattedEstimatedHours = `${String(totalHours).padStart(
+        2,
+        "0"
+      )}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+        2,
+        "0"
+      )}`;
     }
 
     console.log("task_id", task_id);
-    
-    const isConverted = await convertTasktoSubtask(task_id);
 
+    const isConverted = await convertTasktoSubtask(task_id);
 
     // 6. Insert task
     const insertQuery = `
@@ -227,11 +260,29 @@ exports.bulkimportSubTask = async (payload, res, req) => {
     `;
 
     const values = [
-      product_id, project_id, task_id, user_id, subtask_name, formattedEstimatedHours,
-      start_date, end_date, extended_status, extended_hours,
-      active_status, status, total_hours_worked, rating, command,
-      assigned_user_id, remark, reopen_status, description,
-      team_id, priority, created_by, created_by,
+      product_id,
+      project_id,
+      task_id,
+      user_id,
+      subtask_name,
+      formattedEstimatedHours,
+      start_date,
+      end_date,
+      extended_status,
+      extended_hours,
+      active_status,
+      status,
+      total_hours_worked,
+      rating,
+      command,
+      assigned_user_id,
+      remark,
+      reopen_status,
+      description,
+      team_id,
+      priority,
+      created_by,
+      created_by,
     ];
 
     const [result] = await db.query(insertQuery, values);
@@ -247,7 +298,6 @@ exports.bulkimportSubTask = async (payload, res, req) => {
     return errorResponse(res, error.message, "Error creating task", 500);
   }
 };
-
 
 // Show Task
 exports.getSubTask = async (id, res) => {
@@ -309,12 +359,17 @@ ORDER BY h.id DESC;
 
     // // Comments query
     const commentsQuery = `
-      SELECT c.*, COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
-      FROM task_comments c
-      LEFT JOIN users u ON c.updated_by = u.id
-      WHERE c.subtask_id = ? 
-      AND c.deleted_at IS NULL
-      ORDER BY c.id DESC;
+    SELECT 
+      c.*, 
+      COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown User') AS updated_by,
+      f.file_url,
+      f.file_type
+    FROM task_comments c
+    LEFT JOIN users u ON c.updated_by = u.id
+    LEFT JOIN task_comment_files f ON f.comment_id = c.id
+    WHERE c.subtask_id = ?
+    AND c.deleted_at IS NULL
+   ORDER BY c.updated_at DESC;
     `;
     const comments = await db.query(commentsQuery, [id]);
 
@@ -398,28 +453,50 @@ ORDER BY h.id DESC;
                 .tz("Asia/Kolkata")
                 .format("YYYY-MM-DD HH:mm:ss"),
               time_utc: history.updated_at,
-               time: moment(history.updated_at).fromNow(),
-                time1: moment.utc(history.updated_at).tz("Asia/Kolkata").fromNow()
+              time: moment(history.updated_at).fromNow(),
+              time1: moment
+                .utc(history.updated_at)
+                .tz("Asia/Kolkata")
+                .fromNow(),
             }))
           )
         : [];
     // Prepare comments data
-    const validComments =
-      Array.isArray(comments) && Array.isArray(comments[0]) ? comments[0] : [];
-    const commentsData = validComments.map((comment) => ({
-      comments_id: comment.id || "",
-      comments: comment.comments || "",
-      user_id: comment.user_id || "",
-      is_edited: comment.is_edited,
-      updated_by: comment.updated_by || "",
-      shortName: comment.updated_by.substr(0, 2),
-      time_date: moment
-        .utc(comment.updated_at)
-        .tz("Asia/Kolkata")
-        .format("YYYY-MM-DD HH:mm:ss"),
-      time_utc: comment.updated_at,
-      time: moment(comment.updated_at).fromNow()
-    }));
+    const commentsData = [];
+
+    if (Array.isArray(comments) && Array.isArray(comments[0])) {
+      const grouped = new Map();
+
+      for (const row of comments[0]) {
+        if (!grouped.has(row.id)) {
+          grouped.set(row.id, {
+            comments_id: row.id || "",
+            comments: row.comments || "",
+            user_id: row.user_id || "",
+            is_edited: row.is_edited,
+            updated_by: row.updated_by || "",
+            shortName: (row.updated_by || "").substr(0, 2),
+            time_date: moment
+              .utc(row.updated_at)
+              .tz("Asia/Kolkata")
+              .format("YYYY-MM-DD HH:mm:ss"),
+            time_utc: row.updated_at,
+            time: moment(row.updated_at).fromNow(),
+            files: [],
+          });
+        }
+
+        if (row.file_url && row.file_type) {
+          grouped.get(row.id).files.push({
+            url: row.file_url,
+            type: row.file_type,
+          });
+        }
+      }
+
+      // ✅ preserve SQL order
+      commentsData.push(...grouped.values());
+    }
 
     // Final response
     const data = {
@@ -607,21 +684,21 @@ exports.updateSubTask = async (id, payload, res) => {
 exports.deleteSubTask = async (req, res) => {
   const id = req.params.id;
 
-    const accessToken = req.headers.authorization?.split(" ")[1];
-    if (!accessToken) {
-      return errorResponse(res, "Access token is required", 401);
-    }
+  const accessToken = req.headers.authorization?.split(" ")[1];
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
 
-    const user_id = await getUserIdFromAccessToken(accessToken);
+  const user_id = await getUserIdFromAccessToken(accessToken);
 
-    if (!user_id) {
-      return errorResponse(
-        res,
-        "User ID is required",
-        "Missing user_id in query parameters",
-        400
-      );
-    }
+  if (!user_id) {
+    return errorResponse(
+      res,
+      "User ID is required",
+      "Missing user_id in query parameters",
+      400
+    );
+  }
 
   const updated_by = req.body.updated_by;
   try {
@@ -652,7 +729,8 @@ exports.deleteSubTask = async (req, res) => {
     }
 
     // Soft delete the subtask
-    const deleteQuery = "UPDATE sub_tasks SET deleted_at = NOW(), updated_by = ? WHERE id = ?";
+    const deleteQuery =
+      "UPDATE sub_tasks SET deleted_at = NOW(), updated_by = ? WHERE id = ?";
     const [deleteResult] = await db.query(deleteQuery, [user_id, id]);
 
     if (deleteResult.affectedRows === 0) {
@@ -717,7 +795,7 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     description: 6,
     team_id: 10,
     priority: 11,
-    name:18,
+    name: 18,
   };
 
   const fieldMapping = {
@@ -1005,31 +1083,31 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
 
     if (payload.start_date) {
       const dueDateToCheck = payload.due_date || currentTask.end_date;
-    if(dueDateToCheck !=null){
-      const newStart = new Date(payload.start_date);
-      const existingDue = new Date(dueDateToCheck);
+      if (dueDateToCheck != null) {
+        const newStart = new Date(payload.start_date);
+        const existingDue = new Date(dueDateToCheck);
 
-      // Normalize both dates (remove time & timezone)
-      const localNewStart = new Date(
-        newStart.getFullYear(),
-        newStart.getMonth(),
-        newStart.getDate()
-      );
-      const localDue = new Date(
-        existingDue.getFullYear(),
-        existingDue.getMonth(),
-        existingDue.getDate()
-      );
-
-      if (localNewStart > localDue) {
-        return errorResponse(
-          res,
-          null,
-          "Start date cannot be after the due date.",
-          400
+        // Normalize both dates (remove time & timezone)
+        const localNewStart = new Date(
+          newStart.getFullYear(),
+          newStart.getMonth(),
+          newStart.getDate()
         );
+        const localDue = new Date(
+          existingDue.getFullYear(),
+          existingDue.getMonth(),
+          existingDue.getDate()
+        );
+
+        if (localNewStart > localDue) {
+          return errorResponse(
+            res,
+            null,
+            "Start date cannot be after the due date.",
+            400
+          );
+        }
       }
-    }
     }
 
     if (payload.due_date) {
@@ -1090,32 +1168,43 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         }
       }
     }
-      let hold_status = 0;
-      if (payload.status == 1 && payload.active_status == 0 && payload.reopen_status == 0 ){
-
-        if(role_id == 4) {
+    let hold_status = 0;
+    if (
+      payload.status == 1 &&
+      payload.active_status == 0 &&
+      payload.reopen_status == 0
+    ) {
+      if (role_id == 4) {
         payload.hold_status = 0;
-        }
-        else{
-          payload.hold_status = 1;
-        }
-      }else{
-        payload.hold_status = 0;
+      } else {
+        payload.hold_status = 1;
       }
-    
-    const getStatusGroup = (status, reopenStatus, activeStatus,holdStatus) => {
+    } else {
+      payload.hold_status = 0;
+    }
+
+    const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
       status = Number(status);
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
       holdStatus = Number(activeStatus);
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
-      } else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+      } else if (
+        status === 1 &&
+        reopenStatus === 0 &&
+        activeStatus === 0 &&
+        holdStatus === 0
+      ) {
         return "Paused";
-      } 
-      else if (status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
+      } else if (
+        status === 1 &&
+        reopenStatus === 0 &&
+        activeStatus === 0 &&
+        holdStatus === 1
+      ) {
         return "On Hold";
-     }  else if (status === 2 && reopenStatus === 0) {
+      } else if (status === 2 && reopenStatus === 0) {
         return "Pending Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -1126,7 +1215,6 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
       }
       return "";
     };
-
 
     const getUsername = async (userId) => {
       try {
@@ -1176,9 +1264,19 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
 
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(task.status, task.reopen_status, task.active_status,task.hold_status);
+          return getStatusGroup(
+            task.status,
+            task.reopen_status,
+            task.active_status,
+            task.hold_status
+          );
         case 1:
-          return getStatusGroup(task.status, task.reopen_status, task.active_status,task.hold_status);
+          return getStatusGroup(
+            task.status,
+            task.reopen_status,
+            task.active_status,
+            task.hold_status
+          );
         case 2:
           return getUsername(data);
         case 9:
@@ -1192,9 +1290,19 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
     async function processStatusData1(statusFlag, data) {
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
+          return getStatusGroup(
+            status,
+            reopen_status,
+            active_status,
+            payload.hold_status
+          );
         case 1:
-          return getStatusGroup(status, reopen_status, active_status,payload.hold_status);
+          return getStatusGroup(
+            status,
+            reopen_status,
+            active_status,
+            payload.hold_status
+          );
         case 2:
           return getUsername(data);
         case 9:
@@ -1321,7 +1429,6 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
   }
 };
 
-
 const convertTasktoSubtask = async (task_id) => {
   try {
     if (!task_id) return false;
@@ -1369,7 +1476,7 @@ const convertTasktoSubtask = async (task_id) => {
 
     if (subtaskResult.length === 0) {
       console.log("task id", task_id);
-      
+
       // Insert as new subtask
       const insertQuery = `
       INSERT INTO sub_tasks (
@@ -1394,7 +1501,7 @@ const convertTasktoSubtask = async (task_id) => {
         task.extended_hours,
         task.active_status,
         task.status,
-        task.hold_status , 
+        task.hold_status,
         task.total_hours_worked,
         task.command,
         task.assigned_user_id,
