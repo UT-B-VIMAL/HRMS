@@ -5,18 +5,6 @@ const Joi = require('joi');
 
 const commentsController = {
 
-// addComments: async (req, res) => {
-//     try {
-//       const payload = req.body;
-//     if (!payload.comments || !payload.comments.trim()) {
-//       return errorResponse(res, null, "Comments cannot be empty", 400);
-//     }
-//       await addComments(payload, res,req);
-//     } catch (error) {
-//       return errorResponse(res, error.message, 'Error retrieving task comments', 500);
-//     }
-//   },
-
 addComments: async (req, res) => {
   try {
     const payload = req.body;
