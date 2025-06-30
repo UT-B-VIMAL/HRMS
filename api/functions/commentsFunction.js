@@ -4,10 +4,9 @@ const {
   errorResponse,
 } = require("../../helpers/responseHelper");
 const { getUserIdFromAccessToken } = require("./commonFunction");
-const { uploadcommentsFileToS3 , s3Client } = require("../../config/s3");
+const { uploadcommentsFileToS3 , deleteFileFromS3} = require("../../config/s3");
 const path = require("path");
 
-const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 // add task and subtask Comments
 exports.addComments = async (payload, res, req) => {
   const { task_id, subtask_id, user_id, comments } = payload;
@@ -269,27 +268,17 @@ exports.deleteComments = async (id, payload, res, req) => {
     const task_id = comment.task_id;
     const subtask_id = comment.subtask_id;
 
-    // 2. Get associated files
+        // 2. Get all file URLs
     const [files] = await db.query(`SELECT file_url FROM task_comment_files WHERE comment_id = ?`, [id]);
 
-    // 3. Delete files from S3
+    // 3. Delete files from S3 using your common function
     for (const file of files) {
-      const fileUrl = file.file_url;
-      const fileKey = fileUrl.split("/comments/")[1]; // extract the filename
-
-      if (fileKey) {
-        const command = new DeleteObjectCommand({
-          Bucket: process.env.S3_BUCKET_NAME,
-          Key: `comments/${fileKey}`,
-        });
-        try {
-          await s3Client.send(command);
-        } catch (s3Err) {
-          console.warn("S3 file delete error:", s3Err.message); // Don't stop on S3 delete error
-        }
+      try {
+        await deleteFileFromS3(file.file_url);
+      } catch (err) {
+        console.warn("S3 deletion warning:", err.message); // Don't fail the whole operation
       }
     }
-
     // 4. Delete files from DB
     await db.query(`DELETE FROM task_comment_files WHERE comment_id = ?`, [id]);
 
