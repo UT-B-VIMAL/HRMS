@@ -140,6 +140,8 @@ console.log("File extension:", fileExtension);
       contentType = 'video/quicktime';
     } else if (fileExtension === ".avi") {
       contentType = 'video/x-msvideo';
+    }else if (fileExtension === ".webm") {
+    contentType = 'video/webm'; 
     } else {
       throw new Error("Unsupported file type");
     }
