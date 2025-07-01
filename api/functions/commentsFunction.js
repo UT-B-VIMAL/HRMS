@@ -93,7 +93,7 @@ exports.addComments = async (payload, res, req) => {
 
     let uploadedFiles = [];
     for (const file of files) {
-      const fileBuffer = file.buffer;
+      const fileBuffer = file.data;
       const fileName = `${Date.now()}_${file.name}`;
       console.log("Uploading file:", fileName);
 
@@ -279,7 +279,7 @@ exports.updateComments = async (id, payload, res, req) => {
     let uploadedFiles = [];
 
     for (const file of files) {
-      const buffer = file.buffer;
+      const buffer = file.data;
       const fileName = `${Date.now()}_${file.name}`;
       const fileUrl = await uploadcommentsFileToS3(buffer, fileName);
 

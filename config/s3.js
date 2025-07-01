@@ -128,14 +128,6 @@ console.log("File extension:", fileExtension);
 
   let contentType;
 
-  // if ([".jpg", ".jpeg", ".png", ".pdf",".docx"].includes(fileExtension)) {
-  //   contentType = `image/${fileExtension.slice(1)}`; // image/jpeg or image/png
-  // } else if ([".mp4", ".mov", ".avi"].includes(fileExtension)) {
-  //   contentType = `video/${fileExtension.slice(1)}`; // video/mp4 etc.
-  // } else {
-  //   throw new Error("Unsupported file type");
-  // }
-
     if ([".jpg", ".jpeg", ".png"].includes(fileExtension)) {
       contentType = `image/${fileExtension === ".jpg" ? "jpeg" : fileExtension.slice(1)}`;
     } else if (fileExtension === ".pdf") {
