@@ -183,69 +183,101 @@ exports.addComments = async (payload, res, req) => {
 exports.updateComments = async (id, payload, res, req) => {
   const { comments } = payload;
 
-  const accessToken = req.headers.authorization?.split(" ")[1];
-  if (!accessToken) return errorResponse(res, "Access token is required", 401);
-
-  const userId = await getUserIdFromAccessToken(accessToken);
-
-  // 📌 Validate existing comment
-  const [existing] = await db.query(`SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`, [id]);
-  if (!existing.length) return errorResponse(res, null, "Comment not found", 404);
-
-  // 📁 Handle new file uploads
+  // Parse new files
   let files = [];
   if (req.files?.files) {
     files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
   }
 
-  const uploadedFiles = [];
+  try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    const updated_by = await getUserIdFromAccessToken(accessToken);
 
-  for (const file of files) {
-    const fileBuffer = file.buffer;
-    const fileName = `${Date.now()}_${file.name}`;
-    const fileUrl = await uploadcommentsFileToS3(fileBuffer, fileName);
+    // 1. Get old comment
+    const [existing] = await db.query(`SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`, [id]);
+    if (!existing.length) {
+      return errorResponse(res, null, "Comment not found", 404);
+    }
+    const comment = existing[0];
 
-    const ext = path.extname(file.name).toLowerCase();
-    let fileType = "other";
-    if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
-    else if ([".mp4", ".mov", ".avi"].includes(ext)) fileType = "video";
-    else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
+    // 2. Delete old files from DB & S3
+    const [oldFiles] = await db.query(`SELECT file_url FROM task_comment_files WHERE comment_id = ?`, [id]);
 
-    if (fileType === "other") continue;
+    for (const file of oldFiles) {
+      try {
+        await deleteFileFromS3(file.file_url);
+      } catch (err) {
+        console.warn("S3 delete failed:", err.message);
+      }
+    }
 
+    await db.query(`DELETE FROM task_comment_files WHERE comment_id = ?`, [id]);
+
+    // 3. Update the comment text and time
     await db.query(
-      `INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)`,
-      [id, fileUrl, fileType]
+      `UPDATE task_comments SET comments = ?, is_edited = 1, updated_by = ?, updated_at = NOW() WHERE id = ?`,
+      [comments?.trim() || null, updated_by, id]
     );
-    uploadedFiles.push({ url: fileUrl, type: fileType });
+
+    // 4. Upload new files and insert
+    let uploadedFiles = [];
+
+    for (const file of files) {
+      const buffer = file.buffer;
+      const fileName = `${Date.now()}_${file.name}`;
+      const fileUrl = await uploadcommentsFileToS3(buffer, fileName);
+
+      const ext = path.extname(file.name).toLowerCase();
+
+      let fileType = "other";
+      if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
+      else if ([".mp4", ".mov", ".avi"].includes(ext)) fileType = "video";
+      else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
+
+      if (fileType === "other") continue;
+
+      await db.query(
+        `INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)`,
+        [id, fileUrl, fileType]
+      );
+
+      uploadedFiles.push({ url: fileUrl, type: fileType });
+    }
+
+    // 5. History entry
+    await db.query(
+      `INSERT INTO task_histories (old_data, new_data, task_id, subtask_id, text, updated_by, status_flag, created_at, updated_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
+      [
+        comment.comments,
+        comments?.trim() || "[Files Only]",
+        comment.task_id,
+        comment.subtask_id,
+        "Comment Updated",
+        updated_by,
+        8, // status_flag for updated
+      ]
+    );
+
+    return successResponse(
+      res,
+      {
+        id: comment.id,
+        comments: comments,
+        task_id: comment.task_id,
+        subtask_id: comment.subtask_id,
+        user_id: comment.user_id,
+        files: uploadedFiles,
+      },
+      "Comment updated successfully"
+    );
+  } catch (error) {
+    console.error("Error in updateComments:", error);
+    return errorResponse(res, error.message, "Failed to update comment", 500);
   }
-
-  // ✏️ Update comment text
-  await db.query(`UPDATE task_comments SET comments = ?, is_edited = 1, updated_at = NOW() WHERE id = ?`, [
-    comments.trim(),
-    id,
-  ]);
-
-  // 📜 Log history
-  await db.query(
-    `INSERT INTO task_histories (old_data, new_data, task_id, subtask_id, text, updated_by, status_flag, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
-    [
-      existing[0].comments,
-      comments.trim(),
-      existing[0].task_id,
-      existing[0].subtask_id,
-      "Comment Updated",
-      userId,
-      7,
-    ]
-  );
-
-  return successResponse(res, {
-    comment_id: id,
-    updated_comment: comments,
-    new_files: uploadedFiles,
-  }, "Comment updated successfully");
 };
 
 
