@@ -4,14 +4,13 @@ const {
   errorResponse,
 } = require("../../helpers/responseHelper");
 const { getUserIdFromAccessToken } = require("./commonFunction");
-const { uploadcommentsFileToS3 , deleteFileFromS3} = require("../../config/s3");
+const { uploadcommentsFileToS3, deleteFileFromS3 } = require("../../config/s3");
 const path = require("path");
 const moment = require("moment");
 
-
 // add task and subtask Comments
 exports.addComments = async (payload, res, req) => {
-  const { task_id, subtask_id, user_id, comments } = payload;
+  const { task_id, subtask_id, user_id, comments, html_content } = payload;
 
   const validSubtaskId =
     subtask_id && subtask_id.trim() !== "" ? subtask_id : null;
@@ -21,7 +20,7 @@ exports.addComments = async (payload, res, req) => {
   if (req.files?.files) {
     files = Array.isArray(req.files.files)
       ? req.files.files
-      : [req.files.files]; 
+      : [req.files.files];
   }
 
   try {
@@ -31,7 +30,6 @@ exports.addComments = async (payload, res, req) => {
     }
 
     const userId = await getUserIdFromAccessToken(accessToken);
-    console.log("User ID from access token:", userId);
 
     // ✅ Validate user
     const [user] = await db.query(
@@ -77,57 +75,55 @@ exports.addComments = async (payload, res, req) => {
       }
     }
 
-    // ✅ Insert comment (even if comment is null but files are present)
+    // ✅ Insert comment first (with html_content as NULL for now)
     const insertCommentQuery = `
-      INSERT INTO task_comments (task_id, subtask_id, user_id, comments, updated_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-    `;
+  INSERT INTO task_comments (
+    task_id, subtask_id, user_id, comments, html_content, updated_by, created_at, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+`;
     const commentValues = [
       task_id,
       validSubtaskId,
       user_id,
       comments?.trim() || null,
+      null, // temp html_content, will update later
       userId,
     ];
-    const [commentResult] = await db.query(insertCommentQuery, commentValues);
 
+    const [commentResult] = await db.query(insertCommentQuery, commentValues);
     const commentId = commentResult.insertId;
 
     let uploadedFiles = [];
+    let updatedHtmlContent = html_content || "";
+
     for (const file of files) {
       const fileBuffer = file.data;
       const fileName = `${Date.now()}_${file.name}`;
-      console.log("Uploading file:", fileName);
-
       const fileUrl = await uploadcommentsFileToS3(fileBuffer, fileName);
-
       const ext = path.extname(file.name).toLowerCase();
 
       let fileType = "other";
-
-      if ([".jpg", ".jpeg", ".png"].includes(ext)) {
-        fileType = "image";
-      } else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext)) {
+      if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
+      else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext))
         fileType = "video";
-      } else if ([".pdf", ".docx"].includes(ext)) {
-        fileType = "document";
-      }
-
+      else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
       if (fileType === "other") continue;
-
-      // const fileType = file.mimetype.startsWith("image/")
-      //   ? "image"
-      //   : file.mimetype.startsWith("video/")
-      //   ? "video"
-      //   : "other";
-
-      // if (fileType === "other") continue;
 
       await db.query(
         `INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)`,
         [commentId, fileUrl, fileType]
       );
+
       uploadedFiles.push({ url: fileUrl, type: fileType });
+
+      // ✅ Replace src="blob:*filename*" with actual URL in HTML content
+      const escapedName = file.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"); // Escape special characters
+      const regex = new RegExp(`src=["']?blob:[^"'>]*${escapedName}["']?`, "g");
+
+      updatedHtmlContent = updatedHtmlContent.replace(
+        regex,
+        `src="${fileUrl}"`
+      );
     }
 
     // ✅ Add to history
@@ -165,9 +161,9 @@ exports.addComments = async (payload, res, req) => {
         subtask_id,
         user_id,
         comments,
+        html_content: updatedHtmlContent,
         files: uploadedFiles,
       },
-
       "Task comment added successfully"
     );
   } catch (error) {
@@ -181,10 +177,8 @@ exports.addComments = async (payload, res, req) => {
   }
 };
 
-
-exports.getCommentById = async (id,res) => {
+exports.getCommentById = async (id, res) => {
   try {
-
     if (!id || isNaN(id)) {
       return errorResponse(res, null, "Invalid comment ID", 400);
     }
@@ -240,7 +234,9 @@ exports.updateComments = async (id, payload, res, req) => {
   // Parse new files
   let files = [];
   if (req.files?.files) {
-    files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
+    files = Array.isArray(req.files.files)
+      ? req.files.files
+      : [req.files.files];
   }
 
   try {
@@ -251,14 +247,20 @@ exports.updateComments = async (id, payload, res, req) => {
     const updated_by = await getUserIdFromAccessToken(accessToken);
 
     // 1. Get old comment
-    const [existing] = await db.query(`SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`, [id]);
+    const [existing] = await db.query(
+      `SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`,
+      [id]
+    );
     if (!existing.length) {
       return errorResponse(res, null, "Comment not found", 404);
     }
     const comment = existing[0];
 
     // 2. Delete old files from DB & S3
-    const [oldFiles] = await db.query(`SELECT file_url FROM task_comment_files WHERE comment_id = ?`, [id]);
+    const [oldFiles] = await db.query(
+      `SELECT file_url FROM task_comment_files WHERE comment_id = ?`,
+      [id]
+    );
 
     for (const file of oldFiles) {
       try {
@@ -288,7 +290,8 @@ exports.updateComments = async (id, payload, res, req) => {
 
       let fileType = "other";
       if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
-      else if ([".mp4", ".mov", ".avi",".webm"].includes(ext)) fileType = "video";
+      else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext))
+        fileType = "video";
       else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
 
       if (fileType === "other") continue;
@@ -334,8 +337,6 @@ exports.updateComments = async (id, payload, res, req) => {
   }
 };
 
-
-
 exports.deleteComments = async (id, payload, res, req) => {
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
@@ -345,17 +346,28 @@ exports.deleteComments = async (id, payload, res, req) => {
     const updated_by = await getUserIdFromAccessToken(accessToken);
 
     // 1. Check if comment exists
-    const [commentRows] = await db.query(`SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`, [id]);
+    const [commentRows] = await db.query(
+      `SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`,
+      [id]
+    );
     if (!commentRows.length) {
-      return errorResponse(res, null, "Comment not found or already deleted", 404);
+      return errorResponse(
+        res,
+        null,
+        "Comment not found or already deleted",
+        404
+      );
     }
 
     const comment = commentRows[0];
     const task_id = comment.task_id;
     const subtask_id = comment.subtask_id;
 
-        // 2. Get all file URLs
-    const [files] = await db.query(`SELECT file_url FROM task_comment_files WHERE comment_id = ?`, [id]);
+    // 2. Get all file URLs
+    const [files] = await db.query(
+      `SELECT file_url FROM task_comment_files WHERE comment_id = ?`,
+      [id]
+    );
 
     // 3. Delete files from S3 using your common function
     for (const file of files) {
@@ -369,9 +381,11 @@ exports.deleteComments = async (id, payload, res, req) => {
     await db.query(`DELETE FROM task_comment_files WHERE comment_id = ?`, [id]);
 
     // 5. Soft delete comment
-    await db.query(`UPDATE task_comments SET deleted_at = NOW() WHERE id = ?`, [id]);
+    await db.query(`UPDATE task_comments SET deleted_at = NOW() WHERE id = ?`, [
+      id,
+    ]);
 
- // 6. Add task history
+    // 6. Add task history
     const historyQuery = `
       INSERT INTO task_histories (
         old_data, new_data, task_id, subtask_id, text,
@@ -390,9 +404,13 @@ exports.deleteComments = async (id, payload, res, req) => {
 
     const [historyResult] = await db.query(historyQuery, historyValues);
     if (historyResult.affectedRows === 0) {
-      return errorResponse(res, null, "Failed to log history for task comment", 500);
+      return errorResponse(
+        res,
+        null,
+        "Failed to log history for task comment",
+        500
+      );
     }
-
 
     return successResponse(res, null, "Comment deleted successfully");
   } catch (error) {
