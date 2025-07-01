@@ -159,7 +159,7 @@ console.log("File extension:", fileExtension);
     await s3Client.send(command);
 
     // Return the public URL
-    return `${S3_BUCKET_URL}/comments/${fileName}`;
+    return `https://${S3_BUCKET_URL}/comments/${fileName}`;
   } catch (err) {
     console.error("Error uploading file to S3:", err);
     throw new Error("Error uploading file to S3");
