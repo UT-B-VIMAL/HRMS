@@ -135,7 +135,7 @@ exports.addComments = async (payload, res, req) => {
         }
       );
     }
-  
+
     // ✅ Update html_content in the DB
     if (updatedHtmlContent) {
       await db.query(`UPDATE task_comments SET html_content = ? WHERE id = ?`, [
@@ -229,6 +229,7 @@ exports.getCommentById = async (id, res) => {
       subtask_id: comment.subtask_id,
       user_id: comment.user_id,
       comments: comment.comments || "",
+      html_content: comment.html_content || "",
       is_edited: comment.is_edited,
       updated_by: comment.updated_by || "",
       time_date: moment
@@ -246,9 +247,11 @@ exports.getCommentById = async (id, res) => {
 };
 
 exports.updateComments = async (id, payload, res, req) => {
-  const { comments } = payload;
+  const { task_id, subtask_id, user_id, comments, html_content } = payload;
 
-  // Parse new files
+  const validSubtaskId =
+    subtask_id && subtask_id.trim() !== "" ? subtask_id : null;
+
   let files = [];
   if (req.files?.files) {
     files = Array.isArray(req.files.files)
@@ -261,50 +264,27 @@ exports.updateComments = async (id, payload, res, req) => {
     if (!accessToken) {
       return errorResponse(res, "Access token is required", 401);
     }
-    const updated_by = await getUserIdFromAccessToken(accessToken);
 
-    // 1. Get old comment
+    const userId = await getUserIdFromAccessToken(accessToken);
+
+    // Validate existence of comment
     const [existing] = await db.query(
-      `SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`,
+      "SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL",
       [id]
     );
-    if (!existing.length) {
+    if (existing.length === 0) {
       return errorResponse(res, null, "Comment not found", 404);
     }
-    const comment = existing[0];
 
-    // 2. Delete old files from DB & S3
-    const [oldFiles] = await db.query(
-      `SELECT file_url FROM task_comment_files WHERE comment_id = ?`,
-      [id]
-    );
-
-    for (const file of oldFiles) {
-      try {
-        await deleteFileFromS3(file.file_url);
-      } catch (err) {
-        console.warn("S3 delete failed:", err.message);
-      }
-    }
-
-    await db.query(`DELETE FROM task_comment_files WHERE comment_id = ?`, [id]);
-
-    // 3. Update the comment text and time
-    await db.query(
-      `UPDATE task_comments SET comments = ?, is_edited = 1, updated_by = ?, updated_at = NOW() WHERE id = ?`,
-      [comments?.trim() || null, updated_by, id]
-    );
-
-    // 4. Upload new files and insert
     let uploadedFiles = [];
+    let updatedHtmlContent = html_content || "";
 
     for (const file of files) {
-      const buffer = file.data;
+      const fileBuffer = file.data;
       const fileName = `${Date.now()}_${file.name}`;
-      const fileUrl = await uploadcommentsFileToS3(buffer, fileName);
+      const fileUrl = await uploadcommentsFileToS3(fileBuffer, fileName);
 
       const ext = path.extname(file.name).toLowerCase();
-
       let fileType = "other";
       if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
       else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext))
@@ -317,42 +297,91 @@ exports.updateComments = async (id, payload, res, req) => {
         `INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)`,
         [id, fileUrl, fileType]
       );
-
       uploadedFiles.push({ url: fileUrl, type: fileType });
+
+      // ✅ Replace only the src="..." for matching data-name="filename"
+      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&");
+      const escapedFileName = escapeRegExp(file.name);
+
+      // Match both <img> or <video> with src="..." AND data-name="filename" in any order
+      const regex = new RegExp(
+        `<(img|video)([^>]*?)src=["'][^"']*["']([^>]*?)data-name=["']${escapedFileName}["']([^>]*?)>`,
+        "gi"
+      );
+
+      // Replace src value only
+      updatedHtmlContent = updatedHtmlContent.replace(
+        regex,
+        (match, tag, beforeSrc, between, after) => {
+          // Extract all parts but replace src with the new fileUrl
+          return `<${tag}${beforeSrc}src="${fileUrl}"${between}data-name="${file.name}"${after}>`;
+        }
+      );
     }
 
-    // 5. History entry
-    await db.query(
-      `INSERT INTO task_histories (old_data, new_data, task_id, subtask_id, text, updated_by, status_flag, created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
-      [
-        comment.comments,
-        comments?.trim() || "[Files Only]",
-        comment.task_id,
-        comment.subtask_id,
-        "Comment Updated",
-        updated_by,
-        8, // status_flag for updated
-      ]
-    );
+    // Update the comment
+    const updateQuery = `
+      UPDATE task_comments
+      SET comments = ?, html_content = ?, updated_by = ?, updated_at = NOW()
+      WHERE id = ?
+    `;
+    await db.query(updateQuery, [
+      comments?.trim() || null,
+      updatedHtmlContent || null,
+      userId,
+      id,
+    ]);
+
+    // Add to history
+    const historyQuery = `
+      INSERT INTO task_histories (
+        old_data, new_data, task_id, subtask_id, text,
+        updated_by, status_flag, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+    `;
+    const historyValues = [
+      existing[0].comments,
+      comments?.trim() || "[Files Only]",
+      task_id,
+      validSubtaskId,
+      "Comment Updated",
+      userId,
+      8,
+    ];
+    const [historyResult] = await db.query(historyQuery, historyValues);
+    if (historyResult.affectedRows === 0) {
+      return errorResponse(
+        res,
+        null,
+        "Failed to log history for comment update",
+        500
+      );
+    }
 
     return successResponse(
       res,
       {
-        id: comment.id,
-        comments: comments,
-        task_id: comment.task_id,
-        subtask_id: comment.subtask_id,
-        user_id: comment.user_id,
+        id,
+        task_id,
+        subtask_id,
+        user_id,
+        comments,
+        html_content: updatedHtmlContent,
         files: uploadedFiles,
       },
-      "Comment updated successfully"
+      "Task comment updated successfully"
     );
   } catch (error) {
     console.error("Error in updateComments:", error);
-    return errorResponse(res, error.message, "Failed to update comment", 500);
+    return errorResponse(
+      res,
+      error.message,
+      "Error updating task comment",
+      500
+    );
   }
 };
+
 
 exports.deleteComments = async (id, payload, res, req) => {
   try {

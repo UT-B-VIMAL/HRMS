@@ -472,6 +472,7 @@ ORDER BY h.id DESC;
           grouped.set(row.id, {
             comments_id: row.id || "",
             comments: row.comments || "",
+            html_content: row.html_content || "",
             user_id: row.user_id || "",
             is_edited: row.is_edited,
             updated_by: row.updated_by || "",
