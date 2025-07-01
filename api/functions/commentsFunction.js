@@ -6,6 +6,8 @@ const {
 const { getUserIdFromAccessToken } = require("./commonFunction");
 const { uploadcommentsFileToS3 , deleteFileFromS3} = require("../../config/s3");
 const path = require("path");
+const moment = require("moment");
+
 
 // add task and subtask Comments
 exports.addComments = async (payload, res, req) => {
@@ -180,9 +182,8 @@ exports.addComments = async (payload, res, req) => {
 };
 
 
-exports.getCommentById = async (req, res) => {
+exports.getCommentById = async (id,res) => {
   try {
-    const { id } = req.params;
 
     if (!id || isNaN(id)) {
       return errorResponse(res, null, "Invalid comment ID", 400);
@@ -287,7 +288,7 @@ exports.updateComments = async (id, payload, res, req) => {
 
       let fileType = "other";
       if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
-      else if ([".mp4", ".mov", ".avi"].includes(ext)) fileType = "video";
+      else if ([".mp4", ".mov", ".avi",".webm"].includes(ext)) fileType = "video";
       else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
 
       if (fileType === "other") continue;

@@ -1,5 +1,5 @@
 
-const { addComments,updateComments,deleteComments} = require('../api/functions/commentsFunction');
+const { addComments,updateComments,deleteComments,getCommentById} = require('../api/functions/commentsFunction');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const Joi = require('joi');
 
