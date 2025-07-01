@@ -13,7 +13,6 @@ exports.addComments = async (payload, res, req) => {
 
   const validSubtaskId =
     subtask_id && subtask_id.trim() !== "" ? subtask_id : null;
-  console.log(req.files, "req.files in addComments function");
 
   let files = [];
 
@@ -177,6 +176,60 @@ exports.addComments = async (payload, res, req) => {
       "Error inserting task comment",
       500
     );
+  }
+};
+
+
+exports.getCommentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return errorResponse(res, null, "Invalid comment ID", 400);
+    }
+
+    const [comments] = await db.query(
+      `SELECT c.*, 
+              COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown User') AS updated_by
+       FROM task_comments c
+       LEFT JOIN users u ON c.updated_by = u.id
+       WHERE c.id = ? AND c.deleted_at IS NULL`,
+      [id]
+    );
+
+    if (!comments.length) {
+      return errorResponse(res, null, "Comment not found", 404);
+    }
+
+    const comment = comments[0];
+
+    // Fetch attached files
+    const [files] = await db.query(
+      `SELECT file_url AS url, file_type AS type
+       FROM task_comment_files
+       WHERE comment_id = ?`,
+      [id]
+    );
+
+    const response = {
+      comment_id: comment.id,
+      task_id: comment.task_id,
+      subtask_id: comment.subtask_id,
+      user_id: comment.user_id,
+      comments: comment.comments || "",
+      is_edited: comment.is_edited,
+      updated_by: comment.updated_by || "",
+      time_date: moment
+        .utc(comment.updated_at)
+        .tz("Asia/Kolkata")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      files: files || [],
+    };
+
+    return successResponse(res, response, "Comment fetched successfully");
+  } catch (error) {
+    console.error("Error fetching comment by ID:", error);
+    return errorResponse(res, error.message, "Error fetching comment", 500);
   }
 };
 
