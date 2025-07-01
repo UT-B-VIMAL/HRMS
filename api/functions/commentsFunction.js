@@ -16,7 +16,6 @@ exports.addComments = async (payload, res, req) => {
     subtask_id && subtask_id.trim() !== "" ? subtask_id : null;
 
   let files = [];
-
   if (req.files?.files) {
     files = Array.isArray(req.files.files)
       ? req.files.files
@@ -75,21 +74,20 @@ exports.addComments = async (payload, res, req) => {
       }
     }
 
-    // ✅ Insert comment first (with html_content as NULL for now)
+    // ✅ Insert comment first (html_content will be updated after file upload)
     const insertCommentQuery = `
-  INSERT INTO task_comments (
-    task_id, subtask_id, user_id, comments, html_content, updated_by, created_at, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-`;
+      INSERT INTO task_comments (
+        task_id, subtask_id, user_id, comments, html_content, updated_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
     const commentValues = [
       task_id,
       validSubtaskId,
       user_id,
       comments?.trim() || null,
-      null, // temp html_content, will update later
+      null,
       userId,
     ];
-
     const [commentResult] = await db.query(insertCommentQuery, commentValues);
     const commentId = commentResult.insertId;
 
@@ -100,30 +98,50 @@ exports.addComments = async (payload, res, req) => {
       const fileBuffer = file.data;
       const fileName = `${Date.now()}_${file.name}`;
       const fileUrl = await uploadcommentsFileToS3(fileBuffer, fileName);
-      const ext = path.extname(file.name).toLowerCase();
 
+      const ext = path.extname(file.name).toLowerCase();
       let fileType = "other";
+
       if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
       else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext))
         fileType = "video";
       else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
+
       if (fileType === "other") continue;
 
+      // ✅ Insert file into DB
       await db.query(
         `INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)`,
         [commentId, fileUrl, fileType]
       );
-
       uploadedFiles.push({ url: fileUrl, type: fileType });
 
-      // ✅ Replace src="blob:*filename*" with actual URL in HTML content
-      const escapedName = file.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"); // Escape special characters
-      const regex = new RegExp(`src=["']?blob:[^"'>]*${escapedName}["']?`, "g");
+      // ✅ Replace only the src="..." for matching data-name="filename"
+      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&");
+      const escapedFileName = escapeRegExp(file.name);
 
+      // Match both <img> or <video> with src="..." AND data-name="filename" in any order
+      const regex = new RegExp(
+        `<(img|video)([^>]*?)src=["'][^"']*["']([^>]*?)data-name=["']${escapedFileName}["']([^>]*?)>`,
+        "gi"
+      );
+
+      // Replace src value only
       updatedHtmlContent = updatedHtmlContent.replace(
         regex,
-        `src="${fileUrl}"`
+        (match, tag, beforeSrc, between, after) => {
+          // Extract all parts but replace src with the new fileUrl
+          return `<${tag}${beforeSrc}src="${fileUrl}"${between}data-name="${file.name}"${after}>`;
+        }
       );
+    }
+  
+    // ✅ Update html_content in the DB
+    if (updatedHtmlContent) {
+      await db.query(`UPDATE task_comments SET html_content = ? WHERE id = ?`, [
+        updatedHtmlContent,
+        commentId,
+      ]);
     }
 
     // ✅ Add to history
@@ -143,7 +161,6 @@ exports.addComments = async (payload, res, req) => {
       7,
     ];
     const [historyResult] = await db.query(historyQuery, historyValues);
-
     if (historyResult.affectedRows === 0) {
       return errorResponse(
         res,
