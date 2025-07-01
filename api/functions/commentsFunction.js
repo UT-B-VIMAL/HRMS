@@ -105,7 +105,7 @@ exports.addComments = async (payload, res, req) => {
 
       if ([".jpg", ".jpeg", ".png"].includes(ext)) {
         fileType = "image";
-      } else if ([".mp4", ".mov", ".avi"].includes(ext)) {
+      } else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext)) {
         fileType = "video";
       } else if ([".pdf", ".docx"].includes(ext)) {
         fileType = "document";
