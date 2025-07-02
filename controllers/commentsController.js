@@ -82,14 +82,6 @@ updateComments: async (req, res) => {
           : req.files.files !== undefined
       );
 
-    if (!hasComment && !hasFiles) {
-      return errorResponse(
-        res,
-        null,
-        "Either a comment or at least one file is required",
-        400
-      );
-    }
 
     // Proceed to actual update function
     await updateComments(id, payload, res, req);
