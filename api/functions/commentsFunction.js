@@ -7,6 +7,7 @@ const { getUserIdFromAccessToken } = require("./commonFunction");
 const { uploadcommentsFileToS3, deleteFileFromS3 } = require("../../config/s3");
 const path = require("path");
 const moment = require("moment");
+const { log } = require("console");
 
 // add task and subtask Comments
 exports.addComments = async (payload, res, req) => {
@@ -261,24 +262,88 @@ exports.updateComments = async (id, payload, res, req) => {
 
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
-    if (!accessToken) {
+    if (!accessToken)
       return errorResponse(res, "Access token is required", 401);
-    }
 
     const userId = await getUserIdFromAccessToken(accessToken);
 
-    // Validate existence of comment
     const [existing] = await db.query(
       "SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL",
       [id]
     );
-    if (existing.length === 0) {
+    if (existing.length === 0)
       return errorResponse(res, null, "Comment not found", 404);
+
+    const [existingFiles] = await db.query(
+      "SELECT id, file_url, file_type FROM task_comment_files WHERE comment_id = ?",
+      [id]
+    );
+
+    let updatedHtmlContent = payload.html_content || "";
+    console.log("📝 Initial HTML content for update:", updatedHtmlContent);
+
+    // Step 1: Replace all escaped quotes (\\\" or \") with real quotes
+    updatedHtmlContent = updatedHtmlContent
+      .replace(/\\+"/g, '"')
+      .replace(/\\"/g, '"');
+    console.log("🔧 Cleaned HTML content for regex:", updatedHtmlContent);
+
+    // Step 2: Extract URLs from <img> and <video> tags
+    const usedUrls = [];
+    const srcRegex = /<(img|video)[^>]+src=["']([^"']+)["']/gi;
+    let match;
+
+    while ((match = srcRegex.exec(updatedHtmlContent)) !== null) {
+      let url = match[2].trim();
+
+      // Fix missing protocol
+      if (!url.startsWith("http")) {
+        url = "https://" + url.replace(/^https?:\/\//, "");
+      }
+
+      try {
+        usedUrls.push(decodeURIComponent(url));
+      } catch {
+        usedUrls.push(url);
+      }
+    }
+
+    console.log("🔍 Normalized used file URLs:", usedUrls);
+
+    const getFileName = (url) => {
+      try {
+        return decodeURIComponent(url).split("/").pop().trim();
+      } catch {
+        return url.split("/").pop().trim();
+      }
+    };
+
+    const usedFileNames = usedUrls.map(getFileName);
+
+    for (const file of existingFiles) {
+      const dbFileName = getFileName(file.file_url);
+      const isUsed = usedFileNames.includes(dbFileName);
+
+      console.log(`🔍 Checking file: ${file.file_url} - Used: ${isUsed}`);
+
+      if (!isUsed) {
+        console.log(`🗑️ Deleting unused file: ${file.file_url}`);
+        try {
+          await db.query("DELETE FROM task_comment_files WHERE id = ?", [
+            file.id,
+          ]);
+          // Optional: await deleteFileFromS3(file.file_url);
+        } catch (err) {
+          console.warn("⚠️ Failed to delete file record:", err.message);
+        }
+      } else {
+        console.log(`✅ Keeping file in use: ${file.file_url}`);
+      }
     }
 
     let uploadedFiles = [];
-    let updatedHtmlContent = html_content || "";
 
+    // 🟡 Step 2: Upload new files and replace blob src
     for (const file of files) {
       const fileBuffer = file.data;
       const fileName = `${Date.now()}_${file.name}`;
@@ -290,73 +355,60 @@ exports.updateComments = async (id, payload, res, req) => {
       else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext))
         fileType = "video";
       else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
-
       if (fileType === "other") continue;
 
       await db.query(
-        `INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)`,
+        "INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)",
         [id, fileUrl, fileType]
       );
+
       uploadedFiles.push({ url: fileUrl, type: fileType });
 
-      // ✅ Replace only the src="..." for matching data-name="filename"
-      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&");
-      const escapedFileName = escapeRegExp(file.name);
-
-      // Match both <img> or <video> with src="..." AND data-name="filename" in any order
-      const regex = new RegExp(
+      // Replace the blob or temp src with the final URL
+      const escapedFileName = file.name.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&");
+      const blobRegex = new RegExp(
         `<(img|video)([^>]*?)src=["'][^"']*["']([^>]*?)data-name=["']${escapedFileName}["']([^>]*?)>`,
         "gi"
       );
-
-      // Replace src value only
       updatedHtmlContent = updatedHtmlContent.replace(
-        regex,
-        (match, tag, beforeSrc, between, after) => {
-          // Extract all parts but replace src with the new fileUrl
-          return `<${tag}${beforeSrc}src="${fileUrl}"${between}data-name="${file.name}"${after}>`;
-        }
+        blobRegex,
+        `<$1$2src="${fileUrl}"$3data-name="${file.name}"$4>`
       );
     }
 
-    // Update the comment
-    const updateQuery = `
-      UPDATE task_comments
-      SET comments = ?, html_content = ?, updated_by = ?, updated_at = NOW()
-      WHERE id = ?
-    `;
-    await db.query(updateQuery, [
-      comments?.trim() || null,
-      updatedHtmlContent || null,
-      userId,
-      id,
-    ]);
+    // 🟡 Step 3: Update the comment
+    await db.query(
+      `UPDATE task_comments
+       SET comments = ?, html_content = ?, updated_by = ?, updated_at = NOW(), is_edited = 1
+       WHERE id = ?`,
+      [comments?.trim() || null, updatedHtmlContent, userId, id]
+    );
 
-    // Add to history
-    const historyQuery = `
-      INSERT INTO task_histories (
+    // 🟡 Step 4: History
+    await db.query(
+      `INSERT INTO task_histories (
         old_data, new_data, task_id, subtask_id, text,
         updated_by, status_flag, created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
-    `;
-    const historyValues = [
-      existing[0].comments,
-      comments?.trim() || "[Files Only]",
-      task_id,
-      validSubtaskId,
-      "Comment Updated",
-      userId,
-      8,
-    ];
-    const [historyResult] = await db.query(historyQuery, historyValues);
-    if (historyResult.affectedRows === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Failed to log history for comment update",
-        500
-      );
-    }
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
+      [
+        existing[0].comments,
+        comments?.trim() || "[Files Only]",
+        task_id,
+        validSubtaskId,
+        "Comment Updated",
+        userId,
+        8,
+      ]
+    );
+
+    // 🟡 Step 5: Final files for response
+    const finalFiles = existingFiles
+      .filter((f) => usedUrls.includes(f.file_url))
+      .map((f) => ({
+        url: f.file_url,
+        type: f.file_type,
+      }))
+      .concat(uploadedFiles);
 
     return successResponse(
       res,
@@ -367,12 +419,12 @@ exports.updateComments = async (id, payload, res, req) => {
         user_id,
         comments,
         html_content: updatedHtmlContent,
-        files: uploadedFiles,
+        files: finalFiles,
       },
       "Task comment updated successfully"
     );
   } catch (error) {
-    console.error("Error in updateComments:", error);
+    console.error("❌ Error in updateComments:", error);
     return errorResponse(
       res,
       error.message,
@@ -381,7 +433,6 @@ exports.updateComments = async (id, payload, res, req) => {
     );
   }
 };
-
 
 exports.deleteComments = async (id, payload, res, req) => {
   try {
