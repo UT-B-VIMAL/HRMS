@@ -18,16 +18,12 @@ exports.addComments = async (payload, res, req) => {
 
   let files = [];
   if (req.files?.files) {
-    files = Array.isArray(req.files.files)
-      ? req.files.files
-      : [req.files.files];
+    files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
   }
 
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
-    if (!accessToken) {
-      return errorResponse(res, "Access token is required", 401);
-    }
+    if (!accessToken) return errorResponse(res, "Access token is required", 401);
 
     const userId = await getUserIdFromAccessToken(accessToken);
 
@@ -37,12 +33,7 @@ exports.addComments = async (payload, res, req) => {
       [user_id]
     );
     if (user.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "User not found or has been deleted",
-        404
-      );
+      return errorResponse(res, null, "User not found or has been deleted", 404);
     }
 
     // ✅ Validate task
@@ -51,12 +42,7 @@ exports.addComments = async (payload, res, req) => {
       [task_id]
     );
     if (task.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Task not found or has been deleted",
-        404
-      );
+      return errorResponse(res, null, "Task not found or has been deleted", 404);
     }
 
     // ✅ Validate subtask
@@ -66,35 +52,30 @@ exports.addComments = async (payload, res, req) => {
         [validSubtaskId]
       );
       if (subtask.length === 0) {
-        return errorResponse(
-          res,
-          null,
-          "SubTask not found or has been deleted",
-          404
-        );
+        return errorResponse(res, null, "SubTask not found or has been deleted", 404);
       }
     }
 
-    // ✅ Insert comment first (html_content will be updated after file upload)
+    // ✅ Insert base comment (html_content will be updated after file uploads)
     const insertCommentQuery = `
       INSERT INTO task_comments (
         task_id, subtask_id, user_id, comments, html_content, updated_by, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
-    const commentValues = [
+    const [commentResult] = await db.query(insertCommentQuery, [
       task_id,
       validSubtaskId,
       user_id,
       comments?.trim() || null,
       null,
       userId,
-    ];
-    const [commentResult] = await db.query(insertCommentQuery, commentValues);
+    ]);
     const commentId = commentResult.insertId;
 
     let uploadedFiles = [];
     let updatedHtmlContent = html_content || "";
 
+    // ✅ Upload each file and replace blob: URLs in html_content
     for (const file of files) {
       const fileBuffer = file.data;
       const fileName = `${Date.now()}_${file.name}`;
@@ -102,12 +83,9 @@ exports.addComments = async (payload, res, req) => {
 
       const ext = path.extname(file.name).toLowerCase();
       let fileType = "other";
-
       if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
-      else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext))
-        fileType = "video";
+      else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext)) fileType = "video";
       else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
-
       if (fileType === "other") continue;
 
       // ✅ Insert file into DB
@@ -117,27 +95,29 @@ exports.addComments = async (payload, res, req) => {
       );
       uploadedFiles.push({ url: fileUrl, type: fileType });
 
-      // ✅ Replace only the src="..." for matching data-name="filename"
+      // ✅ Escape special characters in file name (e.g., %, spaces)
       const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&");
-      const escapedFileName = escapeRegExp(file.name);
+      const baseNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+      const escapedBaseName = escapeRegExp(baseNameWithoutExt);
 
-      // Match both <img> or <video> with src="..." AND data-name="filename" in any order
+      // ✅ RegEx to match <img> or <video> tag with matching data-name
       const regex = new RegExp(
-        `<(img|video)([^>]*?)src=["'][^"']*["']([^>]*?)data-name=["']${escapedFileName}["']([^>]*?)>`,
+        `<(img|video)([^>]*?)data-name=["']${escapedBaseName}[^"']*["']([^>]*)>`,
         "gi"
       );
 
-      // Replace src value only
+      // ✅ Replace `src` inside matched tag with uploaded file URL
       updatedHtmlContent = updatedHtmlContent.replace(
         regex,
-        (match, tag, beforeSrc, between, after) => {
-          // Extract all parts but replace src with the new fileUrl
-          return `<${tag}${beforeSrc}src="${fileUrl}"${between}data-name="${file.name}"${after}>`;
+        (match, tag, before, after) => {
+          // Clean existing src attributes
+          const cleanedBefore = before.replace(/src=["'][^"']*["']\s*/gi, "");
+          return `<${tag}${cleanedBefore} src="${fileUrl}" data-name="${file.name}"${after}>`;
         }
       );
     }
 
-    // ✅ Update html_content in the DB
+    // ✅ Save updated HTML
     if (updatedHtmlContent) {
       await db.query(`UPDATE task_comments SET html_content = ? WHERE id = ?`, [
         updatedHtmlContent,
@@ -145,31 +125,22 @@ exports.addComments = async (payload, res, req) => {
       ]);
     }
 
-    // ✅ Add to history
-    const historyQuery = `
-      INSERT INTO task_histories (
+    // ✅ Insert into history
+    await db.query(
+      `INSERT INTO task_histories (
         old_data, new_data, task_id, subtask_id, text,
         updated_by, status_flag, created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
-    `;
-    const historyValues = [
-      null,
-      comments?.trim() || "[Files Only]",
-      task_id,
-      validSubtaskId,
-      "Comment Added",
-      userId,
-      7,
-    ];
-    const [historyResult] = await db.query(historyQuery, historyValues);
-    if (historyResult.affectedRows === 0) {
-      return errorResponse(
-        res,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
+      [
         null,
-        "Failed to log history for task comment",
-        500
-      );
-    }
+        comments?.trim() || "[Files Only]",
+        task_id,
+        validSubtaskId,
+        "Comment Added",
+        userId,
+        7,
+      ]
+    );
 
     return successResponse(
       res,
@@ -185,15 +156,11 @@ exports.addComments = async (payload, res, req) => {
       "Task comment added successfully"
     );
   } catch (error) {
-    console.error("Error in addComments:", error);
-    return errorResponse(
-      res,
-      error.message,
-      "Error inserting task comment",
-      500
-    );
+    console.error("❌ Error in addComments:", error);
+    return errorResponse(res, error.message, "Error inserting task comment", 500);
   }
 };
+
 
 exports.getCommentById = async (id, res) => {
   try {
