@@ -361,7 +361,15 @@ ORDER BY h.id DESC;
     const commentsQuery = `
     SELECT 
       c.*, 
-      COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown User') AS updated_by,
+      c.updated_by AS updated_by,
+         COALESCE(
+        CONCAT(
+            COALESCE(u.first_name, ''), 
+            ' ', 
+            COALESCE(NULLIF(u.last_name, ''), '')
+        ), 
+        'Unknown User'
+    ) AS updated_by_name,
       f.file_url,
       f.file_type
     FROM task_comments c
@@ -475,8 +483,8 @@ ORDER BY h.id DESC;
             html_content: row.html_content || "",
             user_id: row.user_id || "",
             is_edited: row.is_edited,
-            updated_by: row.updated_by || "",
-            shortName: (row.updated_by || "").substr(0, 2),
+            updated_by: row.updated_by_name || "",
+            shortName: (row.updated_by_name || "").substr(0, 2),
             time_date: moment
               .utc(row.updated_at)
               .tz("Asia/Kolkata")
