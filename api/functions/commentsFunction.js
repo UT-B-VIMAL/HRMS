@@ -133,7 +133,7 @@ exports.addComments = async (payload, res, req) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
       [
         null,
-        comments?.trim() || "[Files Only]",
+        comments?.trim() || "Files Uploaded",
         task_id,
         validSubtaskId,
         "Comment Added",
@@ -359,7 +359,7 @@ exports.updateComments = async (id, payload, res, req) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
       [
         existing[0].comments,
-        comments?.trim() || "[Files Only]",
+        comments?.trim() || "Files Uploaded",
         task_id,
         validSubtaskId,
         "Comment Updated",
