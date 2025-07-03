@@ -526,11 +526,18 @@ apiRouter.post(
   RoleController.checkRole(),
   commentsController.addComments
 );
+apiRouter.get(
+  "/comments/:id",
+  RoleController.checkRole(),
+  commentsController.getComments
+);
+
 apiRouter.put(
   "/comments/:id",
   RoleController.checkRole(),
   commentsController.updateComments
 );
+
 apiRouter.delete(
   "/comments",
   RoleController.checkRole(),
