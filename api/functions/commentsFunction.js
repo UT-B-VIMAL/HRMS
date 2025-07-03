@@ -4,216 +4,394 @@ const {
   errorResponse,
 } = require("../../helpers/responseHelper");
 const { getUserIdFromAccessToken } = require("./commonFunction");
+const { uploadcommentsFileToS3, deleteFileFromS3 } = require("../../config/s3");
+const path = require("path");
+const moment = require("moment");
+const { log } = require("console");
+
 // add task and subtask Comments
-exports.addComments = async (payload, res) => {
-  const { task_id, subtask_id, user_id, comments, updated_by } = payload;
+exports.addComments = async (payload, res, req) => {
+  const { task_id, subtask_id, user_id, comments, html_content } = payload;
+
+  const validSubtaskId =
+    subtask_id && subtask_id.trim() !== "" ? subtask_id : null;
+
+  let files = [];
+  if (req.files?.files) {
+    files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
+  }
 
   try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) return errorResponse(res, "Access token is required", 401);
+
+    const userId = await getUserIdFromAccessToken(accessToken);
+
+    // ✅ Validate user
     const [user] = await db.query(
       "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
       [user_id]
     );
     if (user.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "User not found or has been deleted",
-        404
-      );
+      return errorResponse(res, null, "User not found or has been deleted", 404);
     }
 
+    // ✅ Validate task
     const [task] = await db.query(
       "SELECT id FROM tasks WHERE id = ? AND deleted_at IS NULL",
       [task_id]
     );
     if (task.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Task not found or has been deleted",
-        404
-      );
+      return errorResponse(res, null, "Task not found or has been deleted", 404);
     }
 
-    if (subtask_id) {
+    // ✅ Validate subtask
+    if (validSubtaskId) {
       const [subtask] = await db.query(
         "SELECT id FROM sub_tasks WHERE id = ? AND deleted_at IS NULL",
-        [subtask_id]
+        [validSubtaskId]
       );
       if (subtask.length === 0) {
-        return errorResponse(
-          res,
-          null,
-          "SubTask not found or has been deleted",
-          404
-        );
+        return errorResponse(res, null, "SubTask not found or has been deleted", 404);
       }
     }
 
-    const validSubtaskId = subtask_id || null;
-
-
-    // Insert the new comment
+    // ✅ Insert base comment (html_content will be updated after file uploads)
     const insertCommentQuery = `
-        INSERT INTO task_comments (task_id, subtask_id, user_id, comments, updated_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-      `;
-    const commentValues = [
+      INSERT INTO task_comments (
+        task_id, subtask_id, user_id, comments, html_content, updated_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+    const [commentResult] = await db.query(insertCommentQuery, [
       task_id,
       validSubtaskId,
       user_id,
-      comments,
-      updated_by,
-
-    ];
-
-    const [commentResult] = await db.query(insertCommentQuery, commentValues);
-
-    if (commentResult.affectedRows === 0) {
-      return errorResponse(res, null, "Failed to add task comment", 500);
-    }
-
-    const historyQuery = `
-        INSERT INTO task_histories (
-          old_data, new_data, task_id, subtask_id, text,
-          updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(),  NULL)
-      `;
-    const historyValues = [
+      comments?.trim() || null,
       null,
-      comments,
-      task_id,
-      validSubtaskId,
-      "Comment Added",
-      updated_by,
-      7,
+      userId,
+    ]);
+    const commentId = commentResult.insertId;
 
-    ];
+    let uploadedFiles = [];
+    let updatedHtmlContent = html_content || "";
 
-    const [historyResult] = await db.query(historyQuery, historyValues);
+    // ✅ Upload each file and replace blob: URLs in html_content
+    for (const file of files) {
+      const fileBuffer = file.data;
+      const fileName = `${Date.now()}_${file.name}`;
+      const fileUrl = await uploadcommentsFileToS3(fileBuffer, fileName);
 
-    if (historyResult.affectedRows === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Failed to log history for task comment",
-        500
+      const ext = path.extname(file.name).toLowerCase();
+      let fileType = "other";
+      if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
+      else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext)) fileType = "video";
+      else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
+      if (fileType === "other") continue;
+
+      // ✅ Insert file into DB
+      await db.query(
+        `INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)`,
+        [commentId, fileUrl, fileType]
+      );
+      uploadedFiles.push({ url: fileUrl, type: fileType });
+
+      // ✅ Escape special characters in file name (e.g., %, spaces)
+      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&");
+      const baseNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+      const escapedBaseName = escapeRegExp(baseNameWithoutExt);
+
+      // ✅ RegEx to match <img> or <video> tag with matching data-name
+      const regex = new RegExp(
+        `<(img|video)([^>]*?)data-name=["']${escapedBaseName}[^"']*["']([^>]*)>`,
+        "gi"
+      );
+
+      // ✅ Replace `src` inside matched tag with uploaded file URL
+      updatedHtmlContent = updatedHtmlContent.replace(
+        regex,
+        (match, tag, before, after) => {
+          // Clean existing src attributes
+          const cleanedBefore = before.replace(/src=["'][^"']*["']\s*/gi, "");
+          return `<${tag}${cleanedBefore} src="${fileUrl}" data-name="${file.name}"${after}>`;
+        }
       );
     }
 
+    // ✅ Save updated HTML
+    if (updatedHtmlContent) {
+      await db.query(`UPDATE task_comments SET html_content = ? WHERE id = ?`, [
+        updatedHtmlContent,
+        commentId,
+      ]);
+    }
+
+    // ✅ Insert into history
+    await db.query(
+      `INSERT INTO task_histories (
+        old_data, new_data, task_id, subtask_id, text,
+        updated_by, status_flag, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
+      [
+        null,
+        comments?.trim() || "[Files Only]",
+        task_id,
+        validSubtaskId,
+        "Comment Added",
+        userId,
+        7,
+      ]
+    );
+
     return successResponse(
       res,
-      { id: commentResult.insertId, ...payload },
+      {
+        id: commentId,
+        task_id,
+        subtask_id,
+        user_id,
+        comments,
+        html_content: updatedHtmlContent,
+        files: uploadedFiles,
+      },
       "Task comment added successfully"
     );
   } catch (error) {
-    return errorResponse(
-      res,
-      error.message,
-      "Error inserting task comment",
-      500
-    );
+    console.error("❌ Error in addComments:", error);
+    return errorResponse(res, error.message, "Error inserting task comment", 500);
   }
 };
 
-exports.updateComments = async (id, payload, res,req) => {
-  const { comments,  updated_by } = payload;
 
-    const accessToken = req.headers.authorization?.split(" ")[1];
-    if (!accessToken) {
-      return errorResponse(res, "Access token is required", 401);
-    }
-
-    const user_id = await getUserIdFromAccessToken(accessToken);
-
-    if (user_id) {
-      const [user] = await db.query(
-        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-        [user_id]
-      );
-      if (user.length === 0) {
-        return errorResponse(
-          res,
-          null,
-          "User not found or has been deleted",
-          404
-        );
-      }
-    }
-
+exports.getCommentById = async (id, res) => {
   try {
-    const [existingComment] = await db.query(
-      "SELECT id, comments AS old_comments, task_id, subtask_id,user_id AS owner_id FROM task_comments WHERE id = ? AND deleted_at IS NULL",
+    if (!id || isNaN(id)) {
+      return errorResponse(res, null, "Invalid comment ID", 400);
+    }
+
+    const [comments] = await db.query(
+      `SELECT c.*, 
+              COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''))), 'Unknown User') AS updated_by
+       FROM task_comments c
+       LEFT JOIN users u ON c.updated_by = u.id
+       WHERE c.id = ? AND c.deleted_at IS NULL`,
       [id]
     );
 
-    if (existingComment.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Comment not found or has been deleted",
-        404
+    if (!comments.length) {
+      return errorResponse(res, null, "Comment not found", 404);
+    }
+
+    const comment = comments[0];
+
+    // Fetch attached files
+    const [files] = await db.query(
+      `SELECT file_url AS url, file_type AS type
+       FROM task_comment_files
+       WHERE comment_id = ?`,
+      [id]
+    );
+
+    const response = {
+      comment_id: comment.id,
+      task_id: comment.task_id,
+      subtask_id: comment.subtask_id,
+      user_id: comment.user_id,
+      comments: comment.comments || "",
+      html_content: comment.html_content || "",
+      is_edited: comment.is_edited,
+      updated_by: comment.updated_by || "",
+      time_date: moment
+        .utc(comment.updated_at)
+        .tz("Asia/Kolkata")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      files: files || [],
+    };
+
+    return successResponse(res, response, "Comment fetched successfully");
+  } catch (error) {
+    console.error("Error fetching comment by ID:", error);
+    return errorResponse(res, error.message, "Error fetching comment", 500);
+  }
+};
+
+exports.updateComments = async (id, payload, res, req) => {
+  const { task_id, subtask_id, user_id, comments, html_content } = payload;
+
+  const validSubtaskId =
+    subtask_id && subtask_id.trim() !== "" ? subtask_id : null;
+
+  let files = [];
+  if (req.files?.files) {
+    files = Array.isArray(req.files.files)
+      ? req.files.files
+      : [req.files.files];
+  }
+
+  try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken)
+      return errorResponse(res, "Access token is required", 401);
+
+    const userId = await getUserIdFromAccessToken(accessToken);
+
+    const [existing] = await db.query(
+      "SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
+    if (existing.length === 0)
+      return errorResponse(res, null, "Comment not found", 404);
+
+    const [existingFiles] = await db.query(
+      "SELECT id, file_url, file_type FROM task_comment_files WHERE comment_id = ?",
+      [id]
+    );
+
+    let updatedHtmlContent = payload.html_content || "";
+    console.log("📝 Initial HTML content for update:", updatedHtmlContent);
+
+    // Step 1: Replace all escaped quotes (\\\" or \") with real quotes
+    updatedHtmlContent = updatedHtmlContent
+      .replace(/\\+"/g, '"')
+      .replace(/\\"/g, '"');
+    console.log("🔧 Cleaned HTML content for regex:", updatedHtmlContent);
+
+    // Step 2: Extract URLs from <img> and <video> tags
+    const usedUrls = [];
+    const srcRegex = /<(img|video)[^>]+src=["']([^"']+)["']/gi;
+    let match;
+
+    while ((match = srcRegex.exec(updatedHtmlContent)) !== null) {
+      let url = match[2].trim();
+
+      // Fix missing protocol
+      if (!url.startsWith("http")) {
+        url = "https://" + url.replace(/^https?:\/\//, "");
+      }
+
+      try {
+        usedUrls.push(decodeURIComponent(url));
+      } catch {
+        usedUrls.push(url);
+      }
+    }
+
+    console.log("🔍 Normalized used file URLs:", usedUrls);
+
+    const getFileName = (url) => {
+      try {
+        return decodeURIComponent(url).split("/").pop().trim();
+      } catch {
+        return url.split("/").pop().trim();
+      }
+    };
+
+    const usedFileNames = usedUrls.map(getFileName);
+
+    for (const file of existingFiles) {
+      const dbFileName = getFileName(file.file_url);
+      const isUsed = usedFileNames.includes(dbFileName);
+
+      console.log(`🔍 Checking file: ${file.file_url} - Used: ${isUsed}`);
+
+      if (!isUsed) {
+        console.log(`🗑️ Deleting unused file: ${file.file_url}`);
+        try {
+          await db.query("DELETE FROM task_comment_files WHERE id = ?", [
+            file.id,
+          ]);
+          // Optional: await deleteFileFromS3(file.file_url);
+        } catch (err) {
+          console.warn("⚠️ Failed to delete file record:", err.message);
+        }
+      } else {
+        console.log(`✅ Keeping file in use: ${file.file_url}`);
+      }
+    }
+
+    let uploadedFiles = [];
+
+    // 🟡 Step 2: Upload new files and replace blob src
+    for (const file of files) {
+      const fileBuffer = file.data;
+      const fileName = `${Date.now()}_${file.name}`;
+      const fileUrl = await uploadcommentsFileToS3(fileBuffer, fileName);
+
+      const ext = path.extname(file.name).toLowerCase();
+      let fileType = "other";
+      if ([".jpg", ".jpeg", ".png"].includes(ext)) fileType = "image";
+      else if ([".mp4", ".mov", ".avi", ".webm"].includes(ext))
+        fileType = "video";
+      else if ([".pdf", ".docx"].includes(ext)) fileType = "document";
+      if (fileType === "other") continue;
+
+      await db.query(
+        "INSERT INTO task_comment_files (comment_id, file_url, file_type) VALUES (?, ?, ?)",
+        [id, fileUrl, fileType]
+      );
+
+      uploadedFiles.push({ url: fileUrl, type: fileType });
+
+      // Replace the blob or temp src with the final URL
+      const escapedFileName = file.name.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&");
+      const blobRegex = new RegExp(
+        `<(img|video)([^>]*?)src=["'][^"']*["']([^>]*?)data-name=["']${escapedFileName}["']([^>]*?)>`,
+        "gi"
+      );
+      updatedHtmlContent = updatedHtmlContent.replace(
+        blobRegex,
+        `<$1$2src="${fileUrl}"$3data-name="${file.name}"$4>`
       );
     }
-    const { old_comments, task_id, subtask_id, owner_id } = existingComment[0];
 
-    if (Number(owner_id) !== Number(user_id)) {
-      return errorResponse(
-        res,
-        null,
-        "You are not authorized to update this comment",
-        403
-      );
-    }
+    // 🟡 Step 3: Update the comment
+    await db.query(
+      `UPDATE task_comments
+       SET comments = ?, html_content = ?, updated_by = ?, updated_at = NOW(), is_edited = 1
+       WHERE id = ?`,
+      [comments?.trim() || null, updatedHtmlContent, userId, id]
+    );
 
+    // 🟡 Step 4: History
+    await db.query(
+      `INSERT INTO task_histories (
+        old_data, new_data, task_id, subtask_id, text,
+        updated_by, status_flag, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)`,
+      [
+        existing[0].comments,
+        comments?.trim() || "[Files Only]",
+        task_id,
+        validSubtaskId,
+        "Comment Updated",
+        userId,
+        8,
+      ]
+    );
 
-
-const query = `
-  UPDATE task_comments
-  SET comments = ?, updated_by = ?, updated_at = NOW(), is_edited = 1
-  WHERE id = ? AND deleted_at IS NULL
-`;
-const values = [comments, updated_by, id]; 
-
-    const [result] = await db.query(query, values);
-
-    if (result.affectedRows === 0) {
-      return errorResponse(res, null, "Comment update failed", 400);
-    }
-
-    const historyQuery = `
-        INSERT INTO task_histories (
-          old_data, new_data, task_id, subtask_id, text,
-          updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
-      `;
-    const historyValues = [
-      old_comments,
-      comments,
-      task_id,
-      subtask_id,
-      "Comment Updated",
-      updated_by,
-      12,
-    ];
-
-    const [historyResult] = await db.query(historyQuery, historyValues);
-
-    if (historyResult.affectedRows === 0) {
-      return errorResponse(
-        res,
-        null,
-        "Failed to log history for task comment",
-        500
-      );
-    }
+    // 🟡 Step 5: Final files for response
+    const finalFiles = existingFiles
+      .filter((f) => usedUrls.includes(f.file_url))
+      .map((f) => ({
+        url: f.file_url,
+        type: f.file_type,
+      }))
+      .concat(uploadedFiles);
 
     return successResponse(
       res,
-      { id, ...payload },
+      {
+        id,
+        task_id,
+        subtask_id,
+        user_id,
+        comments,
+        html_content: updatedHtmlContent,
+        files: finalFiles,
+      },
       "Task comment updated successfully"
     );
   } catch (error) {
+    console.error("❌ Error in updateComments:", error);
     return errorResponse(
       res,
       error.message,
@@ -223,92 +401,61 @@ const values = [comments, updated_by, id];
   }
 };
 
-exports.deleteComments = async (id, payload, res,req) => {
-  const  { updated_by} = payload;
+exports.deleteComments = async (id, payload, res, req) => {
+  try {
     const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
       return errorResponse(res, "Access token is required", 401);
     }
+    const updated_by = await getUserIdFromAccessToken(accessToken);
 
-    const user_id = await getUserIdFromAccessToken(accessToken);
-
-    if (user_id) {
-      const [user] = await db.query(
-        "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-        [user_id]
-      );
-      if (user.length === 0) {
-        return errorResponse(
-          res,
-          null,
-          "User not found or has been deleted",
-          404
-        );
-      }
-    }
-  
-  try {
-    if (!updated_by) {
-      return errorResponse(
-        res,
-        "Updated_by is required",
-        "Missing Updated_by in query parameters",
-        400
-      );
-    }
-
-    const [rows] = await db.query(
-      "SELECT id FROM users WHERE id = ? AND deleted_at IS NULL",
-      [updated_by]
-    );
-
-    // Check if no rows are returned
-    if (rows.length === 0) {
-      return errorResponse(res, null, "User Not Found", 400);
-    }
-    const [existingComment] = await db.query(
-      "SELECT id, comments AS old_comments, task_id, subtask_id,user_id AS owner_id  FROM task_comments WHERE id = ? AND deleted_at IS NULL",
+    // 1. Check if comment exists
+    const [commentRows] = await db.query(
+      `SELECT * FROM task_comments WHERE id = ? AND deleted_at IS NULL`,
       [id]
     );
-
-    if (existingComment.length === 0) {
+    if (!commentRows.length) {
       return errorResponse(
         res,
         null,
-        "Comment not found or has been deleted",
+        "Comment not found or already deleted",
         404
       );
     }
-    const { task_id, subtask_id, owner_id } = existingComment[0];
 
-    if (Number(owner_id) !== Number(user_id)) {
-      return errorResponse(
-        res,
-        null,
-        "You are not authorized to update this comment",
-        403
-      );
+    const comment = commentRows[0];
+    const task_id = comment.task_id;
+    const subtask_id = comment.subtask_id;
+
+    // 2. Get all file URLs
+    const [files] = await db.query(
+      `SELECT file_url FROM task_comment_files WHERE comment_id = ?`,
+      [id]
+    );
+
+    // 3. Delete files from S3 using your common function
+    for (const file of files) {
+      try {
+        await deleteFileFromS3(file.file_url);
+      } catch (err) {
+        console.warn("S3 deletion warning:", err.message); // Don't fail the whole operation
+      }
     }
+    // 4. Delete files from DB
+    await db.query(`DELETE FROM task_comment_files WHERE comment_id = ?`, [id]);
 
-    const query = `
-        UPDATE task_comments
-        SET deleted_at = NOW(), updated_at = NOW()
-        WHERE id = ? AND deleted_at IS NULL
-      `;
-    const values = [id];
+    // 5. Soft delete comment
+    await db.query(`UPDATE task_comments SET deleted_at = NOW() WHERE id = ?`, [
+      id,
+    ]);
 
-    const [result] = await db.query(query, values);
-
-    if (result.affectedRows === 0) {
-      return errorResponse(res, null, "Comment deletion failed", 400);
-    }
-
+    // 6. Add task history
     const historyQuery = `
-        INSERT INTO task_histories (
-          old_data, new_data, task_id, subtask_id, text,
-          updated_by, status_flag, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
-      `;
+      INSERT INTO task_histories (
+        old_data, new_data, task_id, subtask_id, text,
+        updated_by, status_flag, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+    `;
     const historyValues = [
       null,
       null,
@@ -320,7 +467,6 @@ exports.deleteComments = async (id, payload, res,req) => {
     ];
 
     const [historyResult] = await db.query(historyQuery, historyValues);
-
     if (historyResult.affectedRows === 0) {
       return errorResponse(
         res,
@@ -330,13 +476,9 @@ exports.deleteComments = async (id, payload, res,req) => {
       );
     }
 
-    return successResponse(res, null, "Task comment deleted successfully");
+    return successResponse(res, null, "Comment deleted successfully");
   } catch (error) {
-    return errorResponse(
-      res,
-      error.message,
-      "Error deleting task comment",
-      500
-    );
+    console.error("Error deleting comment:", error);
+    return errorResponse(res, error.message, "Failed to delete comment", 500);
   }
 };

@@ -121,3 +121,47 @@ exports.uploadProfileFileToS3 = async (fileContent, fileName) => {
     throw new Error("Error uploading profile file to S3");
   }
 };
+
+exports.uploadcommentsFileToS3 = async (fileContent, fileName) => {
+  const fileExtension = path.extname(fileName).toLowerCase();
+console.log("File extension:", fileExtension);
+
+  let contentType;
+
+    if ([".jpg", ".jpeg", ".png"].includes(fileExtension)) {
+      contentType = `image/${fileExtension === ".jpg" ? "jpeg" : fileExtension.slice(1)}`;
+    } else if (fileExtension === ".pdf") {
+      contentType = 'application/pdf';
+    } else if (fileExtension === ".docx") {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (fileExtension === ".mp4") {
+      contentType = 'video/mp4';
+    } else if (fileExtension === ".mov") {
+      contentType = 'video/quicktime';
+    } else if (fileExtension === ".avi") {
+      contentType = 'video/x-msvideo';
+    }else if (fileExtension === ".webm") {
+    contentType = 'video/webm'; 
+    } else {
+      throw new Error("Unsupported file type");
+    }
+
+  const params = {
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: `comments/${fileName}`, // uploaded to comments/ folder
+    Body: fileContent,
+    ContentType: contentType,
+    ACL: "public-read",
+  };
+
+  try {
+    const command = new PutObjectCommand(params);
+    await s3Client.send(command);
+
+    // Return the public URL
+    return `https://${S3_BUCKET_URL}/comments/${fileName}`;
+  } catch (err) {
+    console.error("Error uploading file to S3:", err);
+    throw new Error("Error uploading file to S3");
+  }
+};

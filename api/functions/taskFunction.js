@@ -632,15 +632,19 @@ exports.getTask = async (queryParams, res, req) => {
 
     // // Comments query
     const commentsQuery = `
-  SELECT 
-    c.*,  
-    COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by
-  FROM task_comments c
-  LEFT JOIN users u ON c.updated_by = u.id
-  WHERE c.task_id = ? AND c.subtask_id IS NULL
-    AND c.deleted_at IS NULL
-  ORDER BY c.id DESC;
-`;
+    SELECT 
+      c.*,  
+      COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown User') AS updated_by,
+      f.id AS file_id,
+      f.file_url,
+      f.file_type
+    FROM task_comments c
+    LEFT JOIN users u ON c.updated_by = u.id
+    LEFT JOIN task_comment_files f ON f.comment_id = c.id
+    WHERE c.task_id = ? AND c.subtask_id IS NULL
+      AND c.deleted_at IS NULL
+      ORDER BY c.updated_at DESC;  
+    `;
 
     const comments = await db.query(commentsQuery, [id]);
 
@@ -763,23 +767,42 @@ exports.getTask = async (queryParams, res, req) => {
           )
         : [];
 
-    const commentsData =
-      Array.isArray(comments) && comments[0].length > 0
-        ? comments[0].map((comment) => ({
-            comment_id: comment.id,
-            comments: comment.comments,
-            user_id: comment.user_id,
-            is_edited: comment.is_edited,
-            updated_by: comment.updated_by || "",
-            shortName: comment.updated_by.substr(0, 2),
+    const commentsData = [];
+
+    if (Array.isArray(comments) && comments[0].length > 0) {
+      const grouped = new Map(); // Use Map to preserve SQL order
+
+      comments[0].forEach((row) => {
+        if (!grouped.has(row.id)) {
+          grouped.set(row.id, {
+            comment_id: row.id,
+            comments: row.comments,
+            html_content: row.html_content,
+            task_id: row.task_id,
+            user_id: row.user_id,
+            is_edited: row.is_edited,
+            updated_by: row.updated_by || "",
+            shortName: (row.updated_by || "").substr(0, 2),
             time_date: moment
-              .utc(comment.updated_at)
+              .utc(row.updated_at)
               .tz("Asia/Kolkata")
               .format("YYYY-MM-DD HH:mm:ss"),
-            time_utc: comment.updated_at,
-            time: moment(comment.updated_at).fromNow(),
-          }))
-        : [];
+            time_utc: row.updated_at,
+            time: moment(row.updated_at).fromNow(),
+            files: [],
+          });
+        }
+
+        if (row.file_url && row.file_type) {
+          grouped.get(row.id).files.push({
+            url: row.file_url,
+            type: row.file_type,
+          });
+        }
+      });
+
+      commentsData.push(...grouped.values());
+    }
 
     // Final response
     const data = {
@@ -1738,21 +1761,21 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
 exports.deleteTask = async (req, res) => {
   const id = req.params.id;
-    const accessToken = req.headers.authorization?.split(" ")[1];
-    if (!accessToken) {
-      return errorResponse(res, "Access token is required", 401);
-    }
+  const accessToken = req.headers.authorization?.split(" ")[1];
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
 
-    const user_id = await getUserIdFromAccessToken(accessToken);
+  const user_id = await getUserIdFromAccessToken(accessToken);
 
-    if (!user_id) {
-      return errorResponse(
-        res,
-        "User ID is required",
-        "Missing user_id in query parameters",
-        400
-      );
-    }
+  if (!user_id) {
+    return errorResponse(
+      res,
+      "User ID is required",
+      "Missing user_id in query parameters",
+      400
+    );
+  }
   try {
     // 1. Check if any subtasks exist
     const subtaskQuery = `
@@ -1801,7 +1824,8 @@ exports.deleteTask = async (req, res) => {
     }
 
     // 3. Soft delete the task
-    const deleteQuery = "UPDATE tasks SET deleted_at = NOW(), updated_by = ? WHERE id = ?";
+    const deleteQuery =
+      "UPDATE tasks SET deleted_at = NOW(), updated_by = ? WHERE id = ?";
     const [deleteResult] = await db.query(deleteQuery, [user_id, id]);
 
     if (deleteResult.affectedRows === 0) {
@@ -1879,12 +1903,12 @@ const lastActiveTask = async (userId) => {
     const totalWorkedTime = task.subtask_id
       ? moment.duration(task.subtask_total_hours_worked).asSeconds()
       : moment.duration(task.task_total_hours_worked).asSeconds();
-      let totaltimeTaken = 0;
-        if(task.end_time) {
-            totaltimeTaken = totalWorkedTime;
-        }else{
-           totaltimeTaken = totalWorkedTime + timeDifference;
-        }
+    let totaltimeTaken = 0;
+    if (task.end_time) {
+      totaltimeTaken = totalWorkedTime;
+    } else {
+      totaltimeTaken = totalWorkedTime + timeDifference;
+    }
     const timeTaken = convertSecondsToHHMMSS(totaltimeTaken);
     // Calculate the time left based on whether it's a subtask or task
     const timeLeft = calculateTimeLeft(
