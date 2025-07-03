@@ -364,7 +364,7 @@ exports.updateComments = async (id, payload, res, req) => {
         validSubtaskId,
         "Comment Updated",
         userId,
-        8,
+        12,
       ]
     );
 
