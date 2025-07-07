@@ -1,5 +1,5 @@
-const db = require('../../config/db');
-const { successResponse, errorResponse } = require('../../helpers/responseHelper');
+const db = require('../config/db');
+const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const { assignClientRoleToGroup, createClientRoleInKeycloak, getAdminToken } = require('../api/functions/keycloakFunction');
 
 const createPermission = async (req, res) => {
