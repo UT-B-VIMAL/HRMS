@@ -19,7 +19,7 @@ const createPermission = async (req, res) => {
         // Insert the permission
         const [result] = await db.execute(
             `INSERT INTO permissions (name, display_name, description, created_by, created_at)
-             VALUES (?, ?, ?, NOW())`,
+             VALUES (?, ?, ?, ?, NOW())`,
             [name, display_name, description, created_by]
         );
 
