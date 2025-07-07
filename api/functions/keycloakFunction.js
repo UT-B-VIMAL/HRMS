@@ -687,6 +687,35 @@ async function createClientRoleInKeycloak(roleName) {
     }
 }
 
+async function deleteClientRoleFromKeycloak(roleName) {
+    try {
+        const token = await getAdminToken();
+
+        // Fetch the client ID from Keycloak
+        const clientsResponse = await axios.get(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/clients`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const client = clientsResponse.data.find(client => client.clientId === keycloakConfig.clientId);
+        if (!client) {
+            throw new Error('Client not found in Keycloak');
+        }
+
+        // Delete the client role in Keycloak
+        await axios.delete(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/clients/${client.id}/roles/${roleName}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        return { message: 'Client role deleted successfully from Keycloak' };
+    } catch (error) {
+        console.error("Error deleting client role in Keycloak:", error.message);
+        throw new Error('Error deleting client role in Keycloak: ' + error.message);
+    }
+}
+
+
 
 module.exports = {
   createUserInKeycloak,
@@ -701,7 +730,8 @@ module.exports = {
   resetPasswordWithKeycloak,
   getAdminToken,
   assignClientRoleToGroup,
-  createClientRoleInKeycloak
+  createClientRoleInKeycloak,
+  deleteClientRoleFromKeycloak
 };
 
 

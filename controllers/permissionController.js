@@ -1,10 +1,10 @@
 const db = require('../config/db');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
-const { assignClientRoleToGroup, createClientRoleInKeycloak, getAdminToken } = require('../api/functions/keycloakFunction');
+const { assignClientRoleToGroup, createClientRoleInKeycloak, deleteClientRoleFromKeycloak, getAdminToken } = require('../api/functions/keycloakFunction');
 
 const createPermission = async (req, res) => {
     try {
-        const { name, description, created_by } = req.body;
+        const { name, display_name, description, created_by } = req.body;
 
         // Check if a permission with the same name already exists
         const [existingRows] = await db.execute(
@@ -18,14 +18,15 @@ const createPermission = async (req, res) => {
 
         // Insert the permission
         const [result] = await db.execute(
-            `INSERT INTO permissions (name, description, created_by, created_at)
+            `INSERT INTO permissions (name, display_name, description, created_by, created_at)
              VALUES (?, ?, ?, NOW())`,
-            [name, description, created_by]
+            [name, display_name, description, created_by]
         );
 
         const newPermission = {
             id: result.insertId,
             name,
+            display_name,
             description,
             created_by
         };
@@ -39,6 +40,40 @@ const createPermission = async (req, res) => {
         return errorResponse(res, error.message || "Internal Server Error");
     }
 };
+
+const deletePermission = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check if the permission exists
+        const [rows] = await db.execute(
+            'SELECT * FROM permissions WHERE id = ? AND deleted_at IS NULL',
+            [id]
+        );
+
+        if (rows.length === 0) {
+            return errorResponse(res, null, 'Permission not found or already deleted', 404);
+        }
+
+        const permission = rows[0]; // ✅ Extract the permission details
+
+        // Soft delete: update the deleted_at column
+        await db.execute(
+            'UPDATE permissions SET deleted_at = NOW() WHERE id = ?',
+            [id]
+        );
+
+        // Now delete the Keycloak role
+        await deleteClientRoleFromKeycloak(permission.name);
+
+        return successResponse(res, null, 'Permission deleted successfully');
+    } catch (error) {
+        console.error(error);
+        return errorResponse(res, error.message || 'Internal Server Error');
+    }
+};
+
+
 
 const assignPermissionsToRole = async (req, res) => {
     try {
@@ -154,5 +189,6 @@ const hasPermission = async (permissionName, accessToken) => {
 module.exports = {
     assignPermissionsToRole,
     createPermission,
-    hasPermission
+    hasPermission,
+    deletePermission
 };
