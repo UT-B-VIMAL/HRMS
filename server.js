@@ -34,6 +34,7 @@ const expensedetailController = require("./controllers/expensedetailController")
 const reportController = require("./controllers/reportController");
 const notificationRoutes = require("./routes/notificationRoutes");
 const permissionRoutes = require("./routes/permissionRoutes");
+const roleRoutes = require("./routes/roleRoutes");
 
 const {
   registerSocket,
@@ -706,6 +707,7 @@ apiRouter.get(
 app.use("/api", apiRouter);
 app.use("/api", notificationRoutes);
 app.use("/api", permissionRoutes);
+app.use("/api", roleRoutes);
 
 app.use(globalErrorHandler);
 
