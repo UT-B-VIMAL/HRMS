@@ -715,7 +715,99 @@ async function deleteClientRoleFromKeycloak(roleName) {
     }
 }
 
+async function createGroupInKeycloak(groupName) {
+    try {
+        const token = await getAdminToken();
 
+        // Check if the group already exists
+        const existingGroups = await axios.get(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups`,
+            {
+                headers: { Authorization: `Bearer ${token}` }
+            }
+        );
+
+        const existing = existingGroups.data.find(group => group.name === groupName);
+        if (existing) {
+            throw {
+                response: {
+                    status: 409,
+                    data: `Group "${groupName}" already exists in Keycloak`
+                }
+            };
+        }
+
+        // Create the group
+        const response = await axios.post(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups`,
+            { name: groupName },
+            {
+                headers: { Authorization: `Bearer ${token}` }
+            }
+        );
+
+        return response.data;
+
+    } catch (error) {
+        const status = error.response?.status || 500;
+        const kcMessage = typeof error.response?.data === 'string'
+            ? error.response.data
+            : error.response?.data?.errorMessage || error.message || 'Unknown error from Keycloak';
+
+        throw new Error(`Keycloak Error (${status}): ${kcMessage}`);
+    }
+}
+
+
+
+async function updateGroupInKeycloak(groupId, newGroupName) {
+    try {
+        const token = await getAdminToken();
+
+        await axios.put(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups/${groupId}`,
+            { name: newGroupName },
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        return { message: 'Group updated successfully' };
+    } catch (error) {
+        console.error("Error updating group in Keycloak:", error.message);
+        throw new Error('Error updating group in Keycloak: ' + error.message);
+    }
+}
+
+async function deleteGroupInKeycloak(groupId) {
+    try {
+        const token = await getAdminToken();
+
+        await axios.delete(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups/${groupId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        return { message: 'Group deleted successfully' };
+    } catch (error) {
+        console.error("Error deleting group in Keycloak:", error.message);
+        throw new Error('Error deleting group in Keycloak: ' + error.message);
+    }
+}
+
+async function findGroupInKeycloak(groupName) {
+    try {
+        const token = await getAdminToken();
+
+        const response = await axios.get(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        return response.data.find(group => group.name === groupName);
+    } catch (error) {
+        console.error("Error finding group in Keycloak:", error.message);
+        throw new Error('Error finding group in Keycloak: ' + error.message);
+    }
+}
 
 module.exports = {
   createUserInKeycloak,
@@ -731,7 +823,11 @@ module.exports = {
   getAdminToken,
   assignClientRoleToGroup,
   createClientRoleInKeycloak,
-  deleteClientRoleFromKeycloak
+  deleteClientRoleFromKeycloak,
+  createGroupInKeycloak,
+  updateGroupInKeycloak,
+  deleteGroupInKeycloak,
+  findGroupInKeycloak,
 };
 
 
