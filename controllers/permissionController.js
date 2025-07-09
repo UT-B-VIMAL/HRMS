@@ -1,5 +1,9 @@
 const db = require('../config/db');
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
+const {
+  getAuthUserDetails,
+  getUserIdFromAccessToken,
+} = require("../api/functions/commonFunction");
 const { assignClientRoleToGroup, createClientRoleInKeycloak, deleteClientRoleFromKeycloak, getAdminToken } = require('../api/functions/keycloakFunction');
 
 const createPermission = async (req, res) => {
@@ -77,7 +81,14 @@ const deletePermission = async (req, res) => {
 
 const assignPermissionsToRole = async (req, res) => {
     try {
-        const { role_id, permissions, updated_by } = req.body;
+        const { role_id, permissions } = req.body;
+
+        const accessToken = req.headers.authorization?.split(' ')[1];
+        if (!accessToken) {
+            return errorResponse(res, 'Access token is required', 401);
+        }
+
+        const userId = await getUserIdFromAccessToken(accessToken);
 
         // 1. Check if role exists
         const [roleRows] = await db.execute(
@@ -110,10 +121,10 @@ const assignPermissionsToRole = async (req, res) => {
                 INSERT INTO role_has_permissions (role_id, permission_id, updated_by)
                 VALUES (?, ?, ?)
                 ON DUPLICATE KEY UPDATE updated_by = ?
-            `, [role_id, permissionId, updated_by, updated_by]);
-
+            `, [role_id, permissionId, userId, userId]);
+console.log('group', role.group_name);
             // 4. Assign role in Keycloak
-            await assignClientRoleToGroup(role.group, permission.name);
+            await assignClientRoleToGroup(role.group_name, permission.name);
         }
 
         return successResponse(res, null, "Permissions assigned to role successfully");
@@ -187,29 +198,29 @@ const hasPermission = async (permissionName, accessToken) => {
 };
 
 const getGroupedPermissions = async (req, res) => {
-  try {
-    const [rows] = await db.query(`
+    try {
+        const [rows] = await db.query(`
       SELECT id, name, display_name 
       FROM permissions 
       WHERE deleted_at IS NULL
       ORDER BY id
     `);
 
-    const grouped = {};
+        const grouped = {};
 
-    rows.forEach((permission) => {
-      const [module] = permission.name.split('.');
-      if (!grouped[module]) {
-        grouped[module] = [];
-      }
-      grouped[module].push(permission);
-    });
+        rows.forEach((permission) => {
+            const [module] = permission.name.split('.');
+            if (!grouped[module]) {
+                grouped[module] = [];
+            }
+            grouped[module].push(permission);
+        });
 
-    return successResponse(res, grouped, "Permissions grouped successfully", 200);
-  } catch (error) {
-    console.error("Error grouping permissions:", error.message);
-    return errorResponse(res, error.message, "Error fetching grouped permissions", 500);
-  }
+        return successResponse(res, grouped, "Permissions grouped successfully", 200);
+    } catch (error) {
+        console.error("Error grouping permissions:", error.message);
+        return errorResponse(res, error.message, "Error fetching grouped permissions", 500);
+    }
 };
 
 
