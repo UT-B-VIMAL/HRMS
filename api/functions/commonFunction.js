@@ -173,7 +173,7 @@ exports.getAllData = async (req, res) => {
     } else if (type === "designations") {
         query = "SELECT id, name FROM designations WHERE deleted_at IS NULL";
     } else if (type === "roles") {
-        query = "SELECT id, name FROM roles";
+        query = "SELECT id, name ,short_name FROM roles";
     } else if (type === "owners") {
         query = "SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 2";
     } else if (type === "assignee") {
