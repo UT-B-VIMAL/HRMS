@@ -4,8 +4,7 @@ const {
     getAllRoles,
     getRole,
     updateRole,
-    deleteRole,
-    assignPermissionsToRole
+    deleteRole
 } = require('../controllers/roleController');
 
 const router = express.Router();
@@ -24,7 +23,5 @@ router.put('/update-role/:id', updateRole);
 
 // Delete (soft delete) a role
 router.delete('/delete-role/:id', deleteRole);
-
-router.post('/roles/assign-permissions', assignPermissionsToRole);
 
 module.exports = router;

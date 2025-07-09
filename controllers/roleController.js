@@ -215,46 +215,8 @@ const deleteRole = async (req, res) => {
     }
 };
 
-const assignPermissionsToRole = async (req, res) => {
-    try {
-        const { role_id, permissions, updated_by } = req.body;
 
-        const [roleRows] = await db.execute(
-            'SELECT * FROM roles WHERE id = ? AND deleted_at IS NULL',
-            [role_id]
-        );
 
-        if (!roleRows.length) return errorResponse(res, null, 'Role not found', 404);
-
-        const role = roleRows[0];
-
-        for (const permission_id of permissions) {
-            const [permRows] = await db.execute(
-                'SELECT * FROM permissions WHERE id = ? AND deleted_at IS NULL',
-                [permission_id]
-            );
-
-            if (!permRows.length) {
-                return errorResponse(res, null, `Permission ID ${permission_id} not found`, 404);
-            }
-
-            const permission = permRows[0];
-
-            await db.execute(
-                `INSERT INTO role_has_permissions (role_id, permission_id, updated_by)
-                 VALUES (?, ?, ?)
-                 ON DUPLICATE KEY UPDATE updated_by = VALUES(updated_by), updated_at = NOW()`,
-                [role_id, permission_id, updated_by]
-            );
-
-            await assignClientRoleToGroup(role.group_name, permission.name);
-        }
-
-        return successResponse(res, null, "Permissions assigned to role successfully");
-    } catch (error) {
-        return errorResponse(res, error.message);
-    }
-};
 
 module.exports = {
     checkRole,
@@ -262,6 +224,5 @@ module.exports = {
     getRole,
     getAllRoles,
     updateRole,
-    deleteRole,
-    assignPermissionsToRole
+    deleteRole
 };
