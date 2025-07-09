@@ -102,7 +102,20 @@ const assignPermissionsToRole = async (req, res) => {
 
         const role = roleRows[0];
 
-        // 2. Loop through each permission
+        // 2. If permissions is empty or not sent, return assigned permissions
+        if (!permissions || permissions.length === 0) {
+            const [assignedPermissions] = await db.execute(
+                `SELECT p.id, p.display_name 
+                 FROM permissions p
+                 JOIN role_has_permissions rp ON p.id = rp.permission_id
+                 WHERE rp.role_id = ?`,
+                [role_id]
+            );
+
+            return successResponse(res, assignedPermissions, "Assigned permissions retrieved successfully");
+        }
+
+        // 3. Assign permissions
         for (const permissionId of permissions) {
             // Check if permission exists
             const [permRows] = await db.execute(
@@ -116,14 +129,14 @@ const assignPermissionsToRole = async (req, res) => {
 
             const permission = permRows[0];
 
-            // 3. Insert or update role_has_permissions
+            // Insert or update role_has_permissions
             await db.execute(`
                 INSERT INTO role_has_permissions (role_id, permission_id, updated_by)
                 VALUES (?, ?, ?)
-                ON DUPLICATE KEY UPDATE updated_by = ?
+                ON DUPLICATE KEY UPDATE updated_by = ?, updated_at = NOW()
             `, [role_id, permissionId, userId, userId]);
-console.log('group', role.group_name);
-            // 4. Assign role in Keycloak
+
+            // Assign in Keycloak (or similar)
             await assignClientRoleToGroup(role.group_name, permission.name);
         }
 
@@ -133,6 +146,7 @@ console.log('group', role.group_name);
         return errorResponse(res, error.message || "Internal Server Error");
     }
 };
+
 
 const hasPermission = async (permissionName, accessToken) => {
     try {
