@@ -186,9 +186,37 @@ const hasPermission = async (permissionName, accessToken) => {
     }
 };
 
+const getGroupedPermissions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT id, name, display_name 
+      FROM permissions 
+      WHERE deleted_at IS NULL
+      ORDER BY id
+    `);
+
+    const grouped = {};
+
+    rows.forEach((permission) => {
+      const [module] = permission.name.split('.');
+      if (!grouped[module]) {
+        grouped[module] = [];
+      }
+      grouped[module].push(permission);
+    });
+
+    return successResponse(res, grouped, "Permissions grouped successfully", 200);
+  } catch (error) {
+    console.error("Error grouping permissions:", error.message);
+    return errorResponse(res, error.message, "Error fetching grouped permissions", 500);
+  }
+};
+
+
 module.exports = {
     assignPermissionsToRole,
     createPermission,
     hasPermission,
-    deletePermission
+    deletePermission,
+    getGroupedPermissions
 };
