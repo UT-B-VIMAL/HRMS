@@ -173,7 +173,7 @@ exports.getAllData = async (req, res) => {
     } else if (type === "designations") {
         query = "SELECT id, name FROM designations WHERE deleted_at IS NULL";
     } else if (type === "roles") {
-        query = "SELECT id, name FROM roles";
+        query = "SELECT id, name ,short_name FROM roles";
     } else if (type === "owners") {
         query = "SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 2";
     } else if (type === "assignee") {
@@ -645,6 +645,35 @@ exports.getColorForProduct = (productIdOrName) => {
     return color;
 };
 
+exports.getTeamuserids = async (user_id) => {
+  try {
+    const [teamResult] = await db.query(
+      `SELECT team_id FROM users WHERE id = ?`,
+      [user_id]
+    );
+
+    if (!teamResult.length || !teamResult[0].team_id) return [];
+
+    const teamIds = teamResult[0].team_id
+      .split(',')
+      .map(id => parseInt(id.trim()))
+      .filter(id => !isNaN(id));
+    if (!teamIds.length) return [];
+    const teamUsersQuery = `
+      SELECT id FROM users 
+      WHERE team_id IN (${teamIds.map(() => '?').join(',')})
+      AND id != ?
+    `;
+
+    const [teamUsers] = await db.query(teamUsersQuery, [...teamIds, user_id]);
+
+    const UserIds = teamUsers.map(user => user.id);
+    return UserIds;
+  } catch (error) {
+    console.error("Error in getTeamuserids:", error);
+    return [];
+  }
+};
 
 
 
