@@ -153,19 +153,19 @@ apiRouter.post("/profile", profileController.createOrUpdateProfile);
 apiRouter.get("/profile/:id", profileController.getProfile);
 
 // User Routes
-apiRouter.post("/user", RoleController.checkRole(),userController.createUser);
+apiRouter.post("/user", RoleController.checkRole(['user.add_user']),userController.createUser);
 apiRouter.put(
   "/user/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['user.edit_user']),
   userController.updateUser
 );
 apiRouter.delete(
   "/user/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['user.delete_user']),
   userController.deleteUser
 );
-apiRouter.get("/user/:id", RoleController.checkRole(), userController.getUser);
-apiRouter.get("/user", RoleController.checkRole(), userController.getAllUsers);
+apiRouter.get("/user/:id", RoleController.checkRole(['user.view_user']), userController.getUser);
+apiRouter.get("/user", RoleController.checkRole(['user.view_user']), userController.getAllUsers);
 
 // Product Routes
 apiRouter.post(
