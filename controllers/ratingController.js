@@ -27,8 +27,7 @@ exports.getRating = async (req, res) => {
 };
 exports.getAllUserRating = async (req, res) => {
   try {
-    const reqbody = req.query;
-    await getRatings(reqbody,res);
+    await getRatings(req,res);
   
   } catch (error) {
     const statusCode = error.status || 500;

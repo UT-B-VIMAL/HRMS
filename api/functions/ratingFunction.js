@@ -180,7 +180,12 @@ exports.getAnnualRatings = async (req, res) => {
 
 
 exports.ratingUpdation = async (payload, res, req) => {
-  let { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id, updated_by ,import_status} = payload;
+  let { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id ,import_status} = payload;
+   const accessToken = req.headers.authorization?.split(" ")[1];
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
+  const updated_by = await getUserIdFromAccessToken(accessToken);
   if( import_status == 1) {
     const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [user_id]);
     if (!empUsers.length) {
@@ -432,9 +437,14 @@ exports.getRatingById = async (req, res) => {
 
 exports.getRatings = async (req, res) => {
   // try {
-    const { team_id, month, user_id, search, page = 1, perPage = 10 } = req;
+    const { team_id, month, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
     const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
     const currentMonth = new Date().toISOString().slice(0, 7);
     const selectedMonth = month || currentMonth;
