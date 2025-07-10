@@ -281,20 +281,20 @@ apiRouter.get(
 
 // Task Routes
 apiRouter.post("/taskImport", taskController.bulkimportTask);
-apiRouter.post("/task", RoleController.checkRole(), taskController.createTask);
+apiRouter.post("/task", RoleController.checkRole(['kanban_board.add_task']), taskController.createTask);
 apiRouter.put(
   "/task/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.edit_task']),
   taskController.updateTask
 );
 apiRouter.delete(
   "/task/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.delete_task']),
   taskController.deleteTask
 );
-apiRouter.get("/task/:id", RoleController.checkRole(), taskController.getTask);
-apiRouter.get("/task", RoleController.checkRole(), taskController.getAllTasks);
-apiRouter.put("/taskupdate/:id", RoleController.checkRole(), (req, res) =>
+apiRouter.get("/task/:id", RoleController.checkRole(['kanban_board.view_task']), taskController.getTask);
+apiRouter.get("/task", RoleController.checkRole(['kanban_board.view_task']), taskController.getAllTasks);
+apiRouter.put("/taskupdate/:id", RoleController.checkRole(['kanban_board.edit_task']), (req, res) =>
   taskController.updateDatas(req, res, req.io)
 );
 apiRouter.get(
@@ -329,37 +329,37 @@ apiRouter.post("/subtaskImport", subtaskController.bulkimportSubTask);
 
 apiRouter.post(
   "/subtask",
-  RoleController.checkRole(),
+  RoleController.checkRole(['	kanban_board.add_subtask']),
   subtaskController.createSubTask
 );
 apiRouter.put(
   "/subtask/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.edit_subtask']),
   subtaskController.updateSubTask
 );
 apiRouter.delete(
   "/subtask/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.delete_subtask']),
   subtaskController.deleteSubTask
 );
 apiRouter.get(
   "/subtask/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_subtask']),
   subtaskController.getSubTask
 );
 apiRouter.get(
   "/subtask",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_subtask']),
   subtaskController.getAllSubTasks
 );
-apiRouter.put("/subtaskupdate/:id", RoleController.checkRole(), (req, res) =>
+apiRouter.put("/subtaskupdate/:id", RoleController.checkRole(['	kanban_board.edit_subtask']), (req, res) =>
   subtaskController.updateDatas(req, res, req.io)
 );
 
 // Idle Employee Route
 apiRouter.get(
   "/idleEmployee",
-  RoleController.checkRole(),
+  RoleController.checkRole(['idle_employees.view_idle_employees','idle_employees.idle_employees_team_filter']),
   idleEmployeeController.get_idleEmployee
 );
 
@@ -473,12 +473,12 @@ apiRouter.get(
 // Productivity
 apiRouter.get(
   "/teamwise_productivity",
-  RoleController.checkRole(),
+  RoleController.checkRole(['productivity.view_teamwise_split','productivity.teamwise_split_filter']),
   productivityController.get_teamwiseProductivity
 );
 apiRouter.get(
   "/individual_status",
-  RoleController.checkRole(),
+  RoleController.checkRole(['productivity.view_individual_split','productivity.individual_status_filter']),
   productivityController.get_individualProductivity
 );
 
@@ -525,24 +525,24 @@ apiRouter.post("/all_present", (req, res) =>
 // Comments
 apiRouter.post(
   "/comments",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.add_task_comments','kanban_board.add_subtask_comments']),
   commentsController.addComments
 );
 apiRouter.get(
   "/comments/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_task_comments','kanban_board.view_subtask_comments']),
   commentsController.getComments
 );
 
 apiRouter.put(
   "/comments/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.edit_task_comments','kanban_board.edit_subtask_comments']),
   commentsController.updateComments
 );
 
 apiRouter.delete(
   "/comments",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.delete_task_comments','kanban_board.delete_subtask_comments']),
   commentsController.deleteComments
 );
 
