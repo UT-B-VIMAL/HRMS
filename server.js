@@ -459,7 +459,8 @@ apiRouter.get(
 
 //rating
 apiRouter.post("/updateRating", RoleController.checkRole(), (req, res) =>
-  ratingController.ratingUpdations(req, res, req.io)
+  ratingController.ratingUpdations(req, res, req.io),
+  RoleController.checkRole(['rating.all_edit_rating','rating.team_edit_rating'])
 );
 apiRouter.get(
   "/getRating",
@@ -468,24 +469,24 @@ apiRouter.get(
 );
 apiRouter.get(
   "/getAllUserRating",
-  RoleController.checkRole(),
+  RoleController.checkRole(['rating.team_view_monthly_rating','rating.all_view_monthly_rating','rating.excluded_roles']),
   ratingController.getAllUserRating
 );
 apiRouter.get(
   "/getAnnualRatings",
-  RoleController.checkRole(),
+  RoleController.checkRole(['rating.team_view_annual_rating','rating.all_view_annual_rating','rating.excluded_roles']),
   ratingController.getAnnualRatings
 );
 
 //Attendance
 apiRouter.get(
   "/getAttendanceList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['attendance.all_view_attendance','attendance.team_view_attendance','attendance.show_excluded_roles','attendance.exclude_from_associates']),
   attendanceController.getAttendanceList
 );
 apiRouter.post(
   "/updateAttendance",
-  RoleController.checkRole(),
+  RoleController.checkRole(['attendance.edit_attendance']),
   attendanceController.updateAttendance
 );
 apiRouter.get(
@@ -494,7 +495,8 @@ apiRouter.get(
   attendanceController.getAttendanceListReport
 );
 apiRouter.post("/all_present", (req, res) =>
-  attendanceController.updateAttendanceAndNotify(req, res, req.io)
+  attendanceController.updateAttendanceAndNotify(req, res, req.io),
+  RoleController.checkRole(['attendance.team_all_present','attendance.all_all_present','attendance.excluded_roles_all_present'])
 );
 
 // Comments
