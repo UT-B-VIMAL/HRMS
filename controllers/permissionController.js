@@ -113,17 +113,6 @@ const assignPermissionsToRole = async (req, res) => {
             return successResponse(res, assignedPermissions, "Assigned permissions retrieved successfully");
         }
 
-        // 3. 🔁 Remove old Keycloak roles before deleting DB entries
-        const [oldPermissions] = await db.execute(
-            `SELECT p.name FROM permissions p
-             JOIN role_has_permissions rp ON p.id = rp.permission_id
-             WHERE rp.role_id = ?`,
-            [role_id]
-        );
-
-        for (const perm of oldPermissions) {
-            await deleteClientRoleFromKeycloak(perm.name);
-        }
 
         // 4. Remove old DB entries
         await db.execute('DELETE FROM role_has_permissions WHERE role_id = ?', [role_id]);
