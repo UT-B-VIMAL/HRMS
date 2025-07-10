@@ -4,15 +4,22 @@ const {successResponse,errorResponse,} = require("../../helpers/responseHelper")
 const moment = require('moment');
 const {attendanceValidator, attendanceFetch}=  require("../../validators/AttendanceValidator");
 const getPagination = require("../../helpers/pagination");
-const { getAuthUserDetails } = require("./commonFunction");
+const { getAuthUserDetails, getUserIdFromAccessToken } = require("./commonFunction");
 const { Parser } = require('json2csv');
 const { userSockets } = require("../../helpers/notificationHelper");
 
 
 exports.getAttendance = async (req, res) => {
-  const { date, search, page = 1, perPage = 10, user_id } = req.query;
+  const { date, search, page = 1, perPage = 10 } = req.query;
 
   try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
+    console.log(user_id);
     let query = '';
     let queryParams = [];
 
@@ -148,7 +155,14 @@ exports.getAttendance = async (req, res) => {
 // Controller function
 exports.updateAttendanceData = async (req, res) => {
 
-  let { id, date, attendanceType, halfDay, status, updated_by , import_status } = req.body;
+  let { id, date, attendanceType, halfDay, status , import_status } = req.body;
+  const accessToken = req.headers.authorization?.split(" ")[1];
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
+  console.log(accessToken)
+
+  const updated_by = await getUserIdFromAccessToken(accessToken);
   if( import_status == 1) {
     const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [id]);
     if (!empUsers.length) {

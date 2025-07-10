@@ -654,7 +654,7 @@ apiRouter.get("/loginapi", empdashboardController.loginapis);
 //common
 apiRouter.get(
   "/getDropDownList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['role.view_role']),
   commonController.getDropDownList
 );
 
