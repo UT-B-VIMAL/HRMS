@@ -223,17 +223,17 @@ apiRouter.get(
 apiRouter.get("/project_status", projectController.project_status);
 apiRouter.get(
   "/project_request",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.all_project_request_view','project_request.team_project_request_view']),
   projectController.project_request
 );
 apiRouter.get(
   "/project_requestupdate",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.project_request_update']),
   projectController.project_requestupdate
 );
 apiRouter.put(
   "/project_requestchange/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.project_request_update']),
   (req, res) => projectController.project_requestchange(req, res, req.io)
 );
 
