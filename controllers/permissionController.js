@@ -1,4 +1,7 @@
 const db = require('../config/db');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
+require('dotenv').config();
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 const {
   getAuthUserDetails,
