@@ -359,7 +359,7 @@ apiRouter.put("/subtaskupdate/:id", RoleController.checkRole(['	kanban_board.edi
 // Idle Employee Route
 apiRouter.get(
   "/idleEmployee",
-  RoleController.checkRole(['idle_employees.view_idle_employees','idle_employees.idle_employees_team_filter']),
+  RoleController.checkRole(['idle_employees.all_idle_employees_view','idle_employees.team_idle_employees_view','idle_employees.idle_employees_team_filter']),
   idleEmployeeController.get_idleEmployee
 );
 
