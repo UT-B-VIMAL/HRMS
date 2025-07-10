@@ -676,6 +676,20 @@ exports.getTeamuserids = async (user_id) => {
 };
 
 
+exports.getExcludedRoleIdsByPermission = async (permissionName) => {
+  const [rows] = await db.query(
+    `
+    SELECT rhp.role_id
+    FROM role_has_permissions rhp
+    JOIN permissions p ON rhp.permission_id = p.id
+    WHERE p.name = ?
+    `,
+    [permissionName]
+  );
+  return rows.map(r => r.role_id);
+};
+
+
 
 
 
