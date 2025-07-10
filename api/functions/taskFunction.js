@@ -508,12 +508,15 @@ exports.getTask = async (queryParams, res, req) => {
     // Role-based filtering
     if (userDetails.role_id === 3) {
       const queryTeams = `
-    SELECT id FROM teams 
-    WHERE deleted_at IS NULL AND reporting_user_id = ?
-  `;
-      const [teamRows] = await db.query(queryTeams, [user_id]);
+      SELECT id, team_id FROM users 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
+    const [teamRows] = await db.query(queryTeams, [user_id]);
 
-      let teamIds = teamRows.map((row) => row.id);
+    // Check if teamRows[0] exists before using
+    const teamIds = teamRows.length > 0 && teamRows[0].team_id
+      ? teamRows[0].team_id.split(',')
+      : [];
 
       // Also include the user's own team_id
       if (userDetails.team_id) {
@@ -555,12 +558,15 @@ exports.getTask = async (queryParams, res, req) => {
 
     if (userDetails.role_id === 3) {
       const queryTeams = `
-    SELECT id FROM teams 
-    WHERE deleted_at IS NULL AND reporting_user_id = ?
-  `;
-      const [teamRows] = await db.query(queryTeams, [user_id]);
+      SELECT id, team_id FROM users 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
+    const [teamRows] = await db.query(queryTeams, [user_id]);
 
-      let teamIds = teamRows.map((row) => row.id);
+    // Check if teamRows[0] exists before using
+    const teamIds = teamRows.length > 0 && teamRows[0].team_id
+      ? teamRows[0].team_id.split(',')
+      : [];
 
       // Include the current user's own team
       if (userDetails.team_id) {
@@ -590,19 +596,9 @@ exports.getTask = async (queryParams, res, req) => {
         );
       }
     } else if (userDetails.role_id === 4) {
-      // subtaskQuery += ` AND (st.user_id = ?)`;
-      // subtaskParams.push(user_id);
       subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
       subtaskParams.push(user_id, user_id, id);
     }
-
-    // if (userDetails.role_id === 3) {
-    //   subtaskQuery += ` AND st.team_id = ?`;
-    //   subtaskParams.push(userDetails.team_id);
-    // } else if (userDetails.role_id === 4) {
-    //   subtaskQuery += ` AND (st.user_id = ?)`;
-    //   subtaskParams.push(user_id);
-    // }
 
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
@@ -630,7 +626,7 @@ exports.getTask = async (queryParams, res, req) => {
     `;
     const histories = await db.query(historiesQuery, [id]);
 
-    // // Comments query
+    // Comments query
     const commentsQuery = `
     SELECT 
       c.*,  
@@ -647,14 +643,6 @@ exports.getTask = async (queryParams, res, req) => {
     `;
 
     const comments = await db.query(commentsQuery, [id]);
-
-    // // Status mapping
-    // const statusMap = {
-    //   0: "To Do",
-    //   1: "In Progress",
-    //   2: "In Review",
-    //   3: "Done",
-    // };
 
     // Prepare task data
     const taskData = task.map((task) => {
@@ -734,7 +722,6 @@ exports.getTask = async (queryParams, res, req) => {
             assignee: subtask.user_id,
             assigneename: subtask.assignee_name || "",
             short_name: (subtask.assignee_name || "").substr(0, 2),
-            // status_text: statusMap[subtask.status] || "Unknown",
             status_text: commonStatusGroup(
               subtask.status,
               subtask.reopen_status,
@@ -770,7 +757,7 @@ exports.getTask = async (queryParams, res, req) => {
     const commentsData = [];
 
     if (Array.isArray(comments) && comments[0].length > 0) {
-      const grouped = new Map(); // Use Map to preserve SQL order
+      const grouped = new Map(); 
 
       comments[0].forEach((row) => {
         if (!grouped.has(row.id)) {
@@ -1730,34 +1717,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
     return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
-
-// exports.deleteTask = async (id, res) => {
-//   try {
-//     const subtaskQuery =
-//       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
-//     const [subtaskResult] = await db.query(subtaskQuery, [id]);
-
-//     if (subtaskResult[0].subtaskCount > 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Task has associated subtasks and cannot be deleted",
-//         400
-//       );
-//     }
-
-//     const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
-//     const [result] = await db.query(query, [id]);
-
-//     if (result.affectedRows === 0) {
-//       return errorResponse(res, null, "Task not found", 404);
-//     }
-
-//     return successResponse(res, null, "Task deleted successfully");
-//   } catch (error) {
-//     return errorResponse(res, error.message, "Error deleting task", 500);
-//   }
-// };
 
 exports.deleteTask = async (req, res) => {
   const id = req.params.id;
