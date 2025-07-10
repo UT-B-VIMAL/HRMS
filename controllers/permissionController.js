@@ -106,7 +106,7 @@ const assignPermissionsToRole = async (req, res) => {
 
         const role = roleRows[0];
 
-        // 2. If permissions is empty or not sent, return assigned permissions
+        // 2. If permissions is empty or not sent, return current assigned permissions
         if (!permissions || permissions.length === 0) {
             const [assignedPermissions] = await db.execute(
                 `SELECT p.id, p.display_name 
@@ -119,9 +119,14 @@ const assignPermissionsToRole = async (req, res) => {
             return successResponse(res, assignedPermissions, "Assigned permissions retrieved successfully");
         }
 
-        // 3. Assign permissions
+        // ✅ 3. Delete all existing permissions for this role
+        await db.execute(
+            'DELETE FROM role_has_permissions WHERE role_id = ?',
+            [role_id]
+        );
+
+        // ✅ 4. Assign new permissions
         for (const permissionId of permissions) {
-            // Check if permission exists
             const [permRows] = await db.execute(
                 'SELECT * FROM permissions WHERE id = ?',
                 [permissionId]
@@ -133,23 +138,22 @@ const assignPermissionsToRole = async (req, res) => {
 
             const permission = permRows[0];
 
-            // Insert or update role_has_permissions
             await db.execute(`
                 INSERT INTO role_has_permissions (role_id, permission_id, updated_by)
                 VALUES (?, ?, ?)
-                ON DUPLICATE KEY UPDATE updated_by = ?, updated_at = NOW()
-            `, [role_id, permissionId, userId, userId]);
+            `, [role_id, permissionId, userId]);
 
             // Assign in Keycloak (or similar)
             await assignClientRoleToGroup(role.group_name, permission.name);
         }
 
-        return successResponse(res, null, "Permissions assigned to role successfully");
+        return successResponse(res, null, "Permissions updated successfully for role");
     } catch (error) {
         console.error(error);
         return errorResponse(res, error.message || "Internal Server Error");
     }
 };
+
 
 
 const hasPermission = async (permissionName, accessToken) => {
