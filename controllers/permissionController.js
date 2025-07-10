@@ -16,7 +16,7 @@ const createPermission = async (req, res) => {
 
         // Check if a permission with the same name already exists
         const [existingRows] = await db.execute(
-            'SELECT * FROM permissions WHERE name = ?',
+            'SELECT * FROM permissions WHERE name = ? AND deleted_at IS NULL',
             [name]
         );
 
@@ -95,18 +95,13 @@ const assignPermissionsToRole = async (req, res) => {
         const userId = await getUserIdFromAccessToken(accessToken);
 
         // 1. Check if role exists
-        const [roleRows] = await db.execute(
-            'SELECT * FROM roles WHERE id = ?',
-            [role_id]
-        );
-
+        const [roleRows] = await db.execute('SELECT * FROM roles WHERE id = ?', [role_id]);
         if (roleRows.length === 0) {
             return errorResponse(res, null, 'Role not found', 404);
         }
-
         const role = roleRows[0];
 
-        // 2. If permissions is empty or not sent, return current assigned permissions
+        // 2. If no permissions passed, return current ones
         if (!permissions || permissions.length === 0) {
             const [assignedPermissions] = await db.execute(
                 `SELECT p.id, p.display_name 
@@ -115,23 +110,27 @@ const assignPermissionsToRole = async (req, res) => {
                  WHERE rp.role_id = ?`,
                 [role_id]
             );
-
             return successResponse(res, assignedPermissions, "Assigned permissions retrieved successfully");
         }
 
-        // ✅ 3. Delete all existing permissions for this role
-        await db.execute(
-            'DELETE FROM role_has_permissions WHERE role_id = ?',
+        // 3. 🔁 Remove old Keycloak roles before deleting DB entries
+        const [oldPermissions] = await db.execute(
+            `SELECT p.name FROM permissions p
+             JOIN role_has_permissions rp ON p.id = rp.permission_id
+             WHERE rp.role_id = ?`,
             [role_id]
         );
 
-        // ✅ 4. Assign new permissions
-        for (const permissionId of permissions) {
-            const [permRows] = await db.execute(
-                'SELECT * FROM permissions WHERE id = ?',
-                [permissionId]
-            );
+        for (const perm of oldPermissions) {
+            await deleteClientRoleFromKeycloak(perm.name);
+        }
 
+        // 4. Remove old DB entries
+        await db.execute('DELETE FROM role_has_permissions WHERE role_id = ?', [role_id]);
+
+        // 5. Insert new permissions
+        for (const permissionId of permissions) {
+            const [permRows] = await db.execute('SELECT * FROM permissions WHERE id = ?', [permissionId]);
             if (permRows.length === 0) {
                 return errorResponse(res, null, `Permission with ID ${permissionId} not found`, 404);
             }
@@ -143,7 +142,7 @@ const assignPermissionsToRole = async (req, res) => {
                 VALUES (?, ?, ?)
             `, [role_id, permissionId, userId]);
 
-            // Assign in Keycloak (or similar)
+            // 6. Add in Keycloak
             await assignClientRoleToGroup(role.group_name, permission.name);
         }
 
@@ -153,6 +152,7 @@ const assignPermissionsToRole = async (req, res) => {
         return errorResponse(res, error.message || "Internal Server Error");
     }
 };
+
 
 
 
