@@ -16,7 +16,7 @@ const createPermission = async (req, res) => {
 
         // Check if a permission with the same name already exists
         const [existingRows] = await db.execute(
-            'SELECT * FROM permissions WHERE name = ? AND deleted_at IS NULL',
+            'SELECT * FROM permissions WHERE name = ?',
             [name]
         );
 
