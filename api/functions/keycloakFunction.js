@@ -611,6 +611,8 @@ async function assignClientRoleToGroup(groupName, roleName) {
     try {
         const token = await getAdminToken();
 
+        console.log("roleName:", roleName);
+
         // Fetch the group ID from Keycloak
         const groupsResponse = await axios.get(
             `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups`,
