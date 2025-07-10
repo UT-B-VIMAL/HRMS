@@ -365,36 +365,11 @@ apiRouter.get(
 
 // PM Dashboard Routes
 apiRouter.get(
-  "/pmproducts",
-  RoleController.checkRole(),
-  pmdashboardController.pmproductsection
-);
-apiRouter.get(
-  "/pmutilization",
-  RoleController.checkRole(),
-  pmdashboardController.pmutilizationsection
-);
-apiRouter.get(
-  "/pmattendance",
-  RoleController.checkRole(),
-  pmdashboardController.pmattendancesection
-);
-apiRouter.get(
-  "/pmdashboard",
-  RoleController.checkRole(),
-  pmdashboardController.pmdashboardsection
-);
-apiRouter.get(
-  "/pmviewproduct",
-  RoleController.checkRole(),
-  pmdashboardController.pmviewproductsection
-);
-apiRouter.get(
-  "/pmTasksByProduct",
+  "/pmTasksByProduct",RoleController.checkRole(['dashboard.all_product_graph','dashboard.team_product_graph','dashboard.user_product_graph']),
   pmdashboardController.pmfetchUserTasksByProduct
 );
 apiRouter.get(
-  "/pmUtilizationAndAttendance",
+  "/pmUtilizationAndAttendance",RoleController.checkRole(['dashboard.team_details']),
   pmdashboardController.pmUtilizationAndAttendance
 );
 

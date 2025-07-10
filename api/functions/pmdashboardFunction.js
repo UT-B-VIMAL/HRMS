@@ -6,7 +6,9 @@ const {
 const {
   getColorForProduct,
   getUserIdFromAccessToken,
+  getTeamuserids,
 } = require("../../api/functions/commonFunction");
+const { hasPermission } = require("../../controllers/permissionController");
 
 exports.fetchProducts = async (payload, res) => {
   try {
@@ -1177,37 +1179,14 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     }
 
     let userIdsFilter = []; // filter list
-    if (loggedInUser.role_id === 3) {
-      // Get teams that report to this user
-      const [teamResult] = await db.query(
-        "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
-        [login_id]
-      );
+    if (await hasPermission("dashboard.team_product_graph", accessToken)) {
 
-      if (teamResult.length === 0) {
-        return errorResponse(
-          res,
-          null,
-          "You are not currently assigned a reporting TL for your team.",
-          404
-        );
-      }
-
-      const teamIds = teamResult.map((team) => team.id);
-
-      // Get team members of these teams
-      const [teamMembers] = await db.query(
-        `SELECT id FROM users 
-         WHERE team_id IN (?) AND role_id = 4 AND deleted_at IS NULL`,
-        [teamIds]
-      );
-
-      userIdsFilter = teamMembers.map((u) => u.id);
+      userIdsFilter = await getTeamuserids(user_id);
 
       if (userIdsFilter.length === 0) {
         return successResponse(res, [], "No team members found", 200);
       }
-    } else if (loggedInUser.role_id === 4) {
+    } else if (await hasPermission("dashboard.user_product_graph", accessToken)) {
       userIdsFilter = [login_id];
     }
 
@@ -1365,49 +1344,70 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       return errorResponse(res, null, "Future dates are not allowed", 400);
     }
 
-    // Base WHERE condition
-    const baseWhere = `
-      u.deleted_at IS NULL AND t.deleted_at IS NULL
-      AND DATE(u.created_at) <= ?
-      ${team_id ? "AND u.team_id = ?" : ""}
-    `;
-    const queryParams = team_id ? [formattedDate, team_id] : [formattedDate];
+    const exclusionChecks = {
+      totalUsers: 'exclude_from_total_users',
+      associateUsers: 'exclude_from_associates',
+      attendanceUsers: 'exclude_from_attendance'
+    };
+    const excludedRoleMap = {};
 
-    // Query 1: Total Strength (All except Admin)
-    const [totalUsers] = await db.query(
-      `
+    for (const [key, permissionName] of Object.entries(exclusionChecks)) {
+      const hasAccess = await hasPermission(permissionName, accessToken);
+      if (!hasAccess) {
+        const [rows] = await db.query(`
+          SELECT rhp.role_id
+          FROM role_has_permissions rhp
+          JOIN permissions p ON rhp.permission_id = p.id
+          WHERE p.name = ?
+        `, [permissionName]);
+        excludedRoleMap[key] = rows.map(r => r.role_id);
+      } else {
+        excludedRoleMap[key] = [];
+      }
+    }
+
+    // STEP 2: Query each user group with dynamic exclusions
+
+    const buildWhereClause = (excludedRoles) => {
+      return `
+        u.deleted_at IS NULL AND t.deleted_at IS NULL
+        AND DATE(u.created_at) <= ?
+        ${team_id ? "AND u.team_id = ?" : ""}
+        ${excludedRoles.length ? `AND u.role_id NOT IN (${excludedRoles.map(() => '?').join(',')})` : ''}
+      `;
+    };
+
+    const buildParams = (excludedRoles) => {
+      const params = team_id ? [formattedDate, team_id] : [formattedDate];
+      return excludedRoles.length ? [...params, ...excludedRoles] : params;
+    };
+
+    // Total Users
+    const [totalUsers] = await db.query(`
       SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
              COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
       FROM users u
       LEFT JOIN teams t ON u.team_id = t.id
-      WHERE ${baseWhere} AND u.role_id NOT IN (1)
-    `,
-      queryParams
-    );
+      WHERE ${buildWhereClause(excludedRoleMap.totalUsers)}
+    `, buildParams(excludedRoleMap.totalUsers));
 
-    // Query 2: Associates Only (Not Admin, PM, TL)
-    const [associateUsers] = await db.query(
-      `
+    // Associates
+    const [associateUsers] = await db.query(`
       SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
              COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
       FROM users u
       LEFT JOIN teams t ON u.team_id = t.id
-      WHERE ${baseWhere} AND u.role_id NOT IN (1, 2, 3)
-    `,
-      queryParams
-    );
+      WHERE ${buildWhereClause(excludedRoleMap.associateUsers)}
+    `, buildParams(excludedRoleMap.associateUsers));
 
-    // Query 3: Attendance check (All except Admin)
-    const [attendanceUsers] = await db.query(
-      `
+    // Attendance Users
+    const [attendanceUsers] = await db.query(`
       SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
              COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
       FROM users u
       LEFT JOIN teams t ON u.team_id = t.id
-      WHERE ${baseWhere} AND u.role_id NOT IN (1)
-    `,
-      queryParams
-    );
+      WHERE ${buildWhereClause(excludedRoleMap.attendanceUsers)}
+    `, buildParams(excludedRoleMap.attendanceUsers));
 
     if (
       associateUsers.length === 0 ||
