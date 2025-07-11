@@ -1149,6 +1149,12 @@ exports.updateTaskData = async (id, payload, res, req) => {
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
 
+    const hasStartTask = await hasPermission("task.start_task", accessToken);
+    const hasPauseTask = await hasPermission("task.pause_task", accessToken);
+    const hasOnholdTask = await hasPermission("task.onhold_task", accessToken);
+    const hasEndTask = await hasPermission("task.end_task", accessToken);
+
+    
     const [tasks] = await db.query(
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
       [id]
@@ -1261,7 +1267,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         if (!userDetails || userDetails.id == undefined) {
           return;
         }
-        if (userDetails.role_id == 4) {
+        if (hasStartTask) {
           await this.startTask(currentTask, "task", currentTask.id, res);
         } else {
           return errorResponse(res, "You are not allowed to start task", 400);
@@ -1273,7 +1279,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
         if (existingSubtaskSublime.length > 0) {
           const timeline = existingSubtaskSublime[0];
-          if (userDetails.role_id == 4) {
+          if (hasPauseTask) {
             await this.pauseTask(
               currentTask,
               "task",
@@ -1293,7 +1299,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
         if (existingSubtaskSublime.length > 0) {
           const timeline = existingSubtaskSublime[0];
-          if (userDetails.role_id == 4) {
+          if (hasEndTask) {
             await this.endTask(
               currentTask,
               "task",
@@ -1461,14 +1467,15 @@ exports.updateTaskData = async (id, payload, res, req) => {
       payload.active_status == 0 &&
       payload.reopen_status == 0
     ) {
-      if (role_id == 4) {
-        payload.hold_status = 0;
-      } else {
+     if (hasPauseTask) {
+         payload.hold_status = 0;
+      } else if (hasOnholdTask) {
         payload.hold_status = 1;
+      } else {
+        payload.hold_status = 0;
       }
-    } else {
-      payload.hold_status = 0;
-    }
+     }
+
 
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
       status = Number(status);
