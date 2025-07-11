@@ -1599,10 +1599,9 @@ exports.getProjectCompletion = async (req, res) => {
 
     const user_id = await getUserIdFromAccessToken(accessToken);
 
-    const is_all_project_data = await hasPermission("dashboard.all_project_data", accessToken);
-    const is_team_project_data = await hasPermission("dashboard.team_project_data", accessToken);
-    const is_user_project_data = await hasPermission("dashboard.user_project_data", accessToken);
-
+    const is_all_project_data = await hasPermission("dashboard.all_project_graph", accessToken);
+    const is_team_project_data = await hasPermission("dashboard.team_project_graph", accessToken);
+    const is_user_project_data = await hasPermission("dashboard.user_project_graph", accessToken);
 
     let teamIds = [];
 
