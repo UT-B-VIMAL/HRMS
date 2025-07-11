@@ -623,10 +623,10 @@ exports.projectRequest = async (req, res) => {
       if (employee_id) {
       effectiveUserIds = [employee_id]; // ✅ Always use only this employee’s data
     } else {
-      if (role_id === 3) {
+      if (await hasPermission("project_request.team_project_request_view", accessToken)) {
         
         effectiveUserIds = await getTeamuserids(user_id);
-      } else if (role_id === 2) {
+      } else if (await hasPermission("project_request.all_project_request_view", accessToken)) {
         taskConditions.push("t.assigned_user_id = ?");
         subtaskConditions.push("st.assigned_user_id = ?");
         taskValues.push(user_id);

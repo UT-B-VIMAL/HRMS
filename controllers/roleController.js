@@ -88,35 +88,67 @@ const checkRole = (requiredPermissions = []) => {
 
 
 const createRole = async (req, res) => {
-    try {
-        const { name, short_name } = req.body;
-        const group = `${name}Group`;
-        const accessToken = req.headers.authorization?.split(' ')[1];
-          if (!accessToken) {
-            return errorResponse(res, 'Access token is required', 401);
-          }
-        
-          const userId = await getUserIdFromAccessToken(accessToken);
+  try {
+    const { name, short_name } = req.body;
+    const group = `${name}Group`;
 
-        await createGroupInKeycloak(group);
-
-        const [result] = await db.execute(
-            `INSERT INTO roles (name, short_name, group_name, created_by, created_at)
-             VALUES (?, ?, ?, ?, NOW())`,
-            [name, short_name, group, userId]
-        );
-
-        return successResponse(res, {
-            id: result.insertId,
-            name,
-            short_name,
-            group_name: group,
-            userId
-        }, "Role created successfully", 201);
-    } catch (error) {
-        return errorResponse(res, error.message || "Internal Server Error");
+    const accessToken = req.headers.authorization?.split(' ')[1];
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
     }
+
+    const userId = await getUserIdFromAccessToken(accessToken);
+
+    // 🔍 Check if role with same name & short_name exists
+    const [existing] = await db.execute(
+      `SELECT * FROM roles WHERE name = ? AND short_name = ?`,
+      [name, short_name]
+    );
+
+    if (existing.length > 0) {
+      const existingRole = existing[0];
+      if (existingRole.deleted_at) {
+        // 🛠️ Restore the soft-deleted role
+        await db.execute(
+          `UPDATE roles SET deleted_at = NULL, updated_at = NOW(), created_by = ? WHERE id = ?`,
+          [userId, existingRole.id]
+        );
+        await createGroupInKeycloak(existingRole.group_name);
+        return successResponse(res, {
+          id: existingRole.id,
+          name,
+          short_name,
+          group_name: existingRole.group_name,
+          userId
+        }, "Role created successfully", 200);
+      } else {
+        return errorResponse(res, null, 'Role with this name and short name already exists', 400);
+      }
+    }
+
+    // ✅ Create group in Keycloak
+    await createGroupInKeycloak(group);
+
+    // ✅ Insert new role
+    const [result] = await db.execute(
+      `INSERT INTO roles (name, short_name, group_name, created_by, created_at)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [name, short_name, group, userId]
+    );
+
+    return successResponse(res, {
+      id: result.insertId,
+      name,
+      short_name,
+      group_name: group,
+      userId
+    }, "Role created successfully", 201);
+  } catch (error) {
+    console.error("Error in createRole:", error.message);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
 };
+
 
 const getRole = async (req, res) => {
     try {
