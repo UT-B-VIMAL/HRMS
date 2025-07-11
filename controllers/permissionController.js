@@ -82,65 +82,66 @@ const deletePermission = async (req, res) => {
 };
 
 
-
 const assignPermissionsToRole = async (req, res) => {
-    try {
-        const { role_id, permissions } = req.body;
+  try {
+    const { role_id, permissions } = req.body;
 
-        const accessToken = req.headers.authorization?.split(' ')[1];
-        if (!accessToken) {
-            return errorResponse(res, 'Access token is required', 401);
-        }
+    const accessToken = req.headers.authorization?.split(' ')[1];
+    if (!accessToken) return errorResponse(res, 'Access token is required', 401);
 
-        const userId = await getUserIdFromAccessToken(accessToken);
+    const userId = await getUserIdFromAccessToken(accessToken);
 
-        // 1. Check if role exists
-        const [roleRows] = await db.execute('SELECT * FROM roles WHERE id = ?', [role_id]);
-        if (roleRows.length === 0) {
-            return errorResponse(res, null, 'Role not found', 404);
-        }
-        const role = roleRows[0];
+    const [roleRows] = await db.execute('SELECT * FROM roles WHERE id = ?', [role_id]);
+    if (roleRows.length === 0) return errorResponse(res, null, 'Role not found', 404);
 
-        // 2. If no permissions passed, return current ones
-        if (!permissions || permissions.length === 0) {
-            const [assignedPermissions] = await db.execute(
-                `SELECT p.id, p.display_name 
-                 FROM permissions p
-                 JOIN role_has_permissions rp ON p.id = rp.permission_id
-                 WHERE rp.role_id = ?`,
-                [role_id]
-            );
-            return successResponse(res, assignedPermissions, "Assigned permissions retrieved successfully");
-        }
+    const role = roleRows[0];
 
-
-        // 4. Remove old DB entries
-        await db.execute('DELETE FROM role_has_permissions WHERE role_id = ?', [role_id]);
-
-        // 5. Insert new permissions
-        for (const permissionId of permissions) {
-            const [permRows] = await db.execute('SELECT * FROM permissions WHERE id = ?', [permissionId]);
-            if (permRows.length === 0) {
-                return errorResponse(res, null, `Permission with ID ${permissionId} not found`, 404);
-            }
-
-            const permission = permRows[0];
-
-            await db.execute(`
-                INSERT INTO role_has_permissions (role_id, permission_id, updated_by)
-                VALUES (?, ?, ?)
-            `, [role_id, permissionId, userId]);
-
-            // 6. Add in Keycloak
-            await assignClientRoleToGroup(role.group_name, permission.name);
-        }
-
-        return successResponse(res, null, "Permissions updated successfully for role");
-    } catch (error) {
-        console.error(error);
-        return errorResponse(res, error.message || "Internal Server Error");
+    if (!permissions || permissions.length === 0) {
+      const [assignedPermissions] = await db.execute(
+        `SELECT p.id, p.display_name 
+         FROM permissions p
+         JOIN role_has_permissions rp ON p.id = rp.permission_id
+         WHERE rp.role_id = ?`,
+        [role_id]
+      );
+      return successResponse(res, assignedPermissions, "Assigned permissions retrieved successfully");
     }
+
+    // Validate all permissions at once
+    const [validPermissions] = await db.query(
+      `SELECT * FROM permissions WHERE id IN (${permissions.map(() => '?').join(',')})`,
+      permissions
+    );
+
+    if (validPermissions.length !== permissions.length) {
+      const validIds = validPermissions.map(p => p.id);
+      const invalid = permissions.filter(id => !validIds.includes(id));
+      return errorResponse(res, null, `Invalid permission IDs: ${invalid.join(', ')}`, 404);
+    }
+
+    await db.execute('DELETE FROM role_has_permissions WHERE role_id = ?', [role_id]);
+
+    // Bulk insert
+    const values = permissions.map(id => [role_id, id, userId]);
+    await db.query(
+      'INSERT INTO role_has_permissions (role_id, permission_id, updated_by) VALUES ?',
+      [values]
+    );
+
+    // Assign Keycloak roles in parallel
+    await Promise.all(
+      validPermissions.map(p =>
+        assignClientRoleToGroup(role.group_name, p.name)
+      )
+    );
+
+    return successResponse(res, null, "Permissions updated successfully for role");
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, error.message || "Internal Server Error");
+  }
 };
+
 
 
 
