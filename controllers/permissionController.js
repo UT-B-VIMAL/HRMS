@@ -211,12 +211,30 @@ const hasPermission = async (permissionName, accessToken) => {
 
 const getGroupedPermissions = async (req, res) => {
     try {
-        const [rows] = await db.query(`
-      SELECT id, name, display_name 
-      FROM permissions 
-      WHERE deleted_at IS NULL
-      ORDER BY id
-    `);
+        const { role_id } = req.query;
+
+        let rows = [];
+
+        if (role_id) {
+            // Fetch only permissions assigned to this role
+            const [assigned] = await db.query(`
+                SELECT p.id, p.name, p.display_name
+                FROM permissions p
+                JOIN role_has_permissions rp ON p.id = rp.permission_id
+                WHERE rp.role_id = ? AND p.deleted_at IS NULL
+                ORDER BY p.id
+            `, [role_id]);
+            rows = assigned;
+        } else {
+            // Fetch all permissions
+            const [all] = await db.query(`
+                SELECT id, name, display_name 
+                FROM permissions 
+                WHERE deleted_at IS NULL
+                ORDER BY id
+            `);
+            rows = all;
+        }
 
         const grouped = {};
 
@@ -234,6 +252,7 @@ const getGroupedPermissions = async (req, res) => {
         return errorResponse(res, error.message, "Error fetching grouped permissions", 500);
     }
 };
+
 
 
 module.exports = {
