@@ -92,9 +92,7 @@ async function signInUser(username, password) {
       role_id: user.role_id,
       employee_id: user.employee_id,
       profile_name: profileName,
-      designation_name: user.designation_name,
-      role_name: await getRoleName(user.role_id),
-      access_token: response.data.access_token,
+      designation_name: user.designation_name,      access_token: response.data.access_token,
       refresh_token: response.data.refresh_token,
       login_expiry: loginExpiry,
       permissions // ✅ return permission list here
@@ -354,8 +352,8 @@ async function createUserInKeycloak(userData) {
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
-        console.log(roleName + 'Group');
-        const groupResponse = await assignGroupToUser(userId, roleName + 'Group');
+        
+        const groupResponse = await assignGroupToUser(userId, roleName);
 
         if (groupResponse.error) {
           console.error("Group assignment failed:", groupResponse.details);
@@ -403,8 +401,7 @@ async function editUserInKeycloak(userId, userData) {
     if (roleName) {
       try {
         const roleres = await assignRoleToUser(userId, roleName);
-        console.log(roleName + 'Group');
-        const groupResponse = await assignGroupToUser(userId, roleName + 'Group');
+        const groupResponse = await assignGroupToUser(userId, roleName);
 
         if (groupResponse.error) {
           console.error("Group assignment failed:", groupResponse.details);
@@ -590,16 +587,6 @@ async function getUserByEmployeeId(identifier) {
     throw error;
   }
 }
-
-
-const getRoleName = async (roleId) => {
-  const query = "SELECT role FROM roles WHERE id = ?"; // Select 'role' column
-  const values = [roleId];
-  const [result] = await db.query(query, values);
-
-
-  return result.length > 0 ? result[0].role : null; // Return 'role' from the result
-};
 
 
 async function changePasswordInKeycloak(userId, newPassword) {

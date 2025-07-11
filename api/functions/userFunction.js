@@ -216,10 +216,6 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-
-
-
-// Update User
 exports.updateUser = async (id, payload, res, req) => {
   const {
     first_name,
@@ -341,7 +337,6 @@ exports.deleteUser = async (id, res) => {
       }
     }
 
-    // Role 2: Manager check
     if (role_id === 2) {
       const [assignedTasks] = await db.query(
         `SELECT COUNT(*) AS task_mgr_count FROM tasks WHERE assigned_user_id = ? AND deleted_at IS NULL`,
@@ -396,7 +391,7 @@ exports.deleteUser = async (id, res) => {
 
 const getRoleName = async (roleId) => {
   try {
-    const query = "SELECT role FROM roles WHERE id = ?";
+    const query = "SELECT group_name FROM roles WHERE id = ?";
     const values = [roleId];
     const [result] = await db.query(query, values);
 
