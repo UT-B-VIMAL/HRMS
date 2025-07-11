@@ -294,7 +294,7 @@ apiRouter.delete(
 );
 apiRouter.get("/task/:id", RoleController.checkRole(['kanban_board.view_task']), taskController.getTask);
 apiRouter.get("/task", RoleController.checkRole(['kanban_board.view_task']), taskController.getAllTasks);
-apiRouter.put("/taskupdate/:id", RoleController.checkRole(['kanban_board.edit_task']), (req, res) =>
+apiRouter.put("/taskupdate/:id", RoleController.checkRole(['kanban_board.edit_task','task.start_task','task.pause_task','task.onhold_task','task.end_task','task.done_task']), (req, res) =>
   taskController.updateDatas(req, res, req.io)
 );
 apiRouter.get(
@@ -352,7 +352,7 @@ apiRouter.get(
   RoleController.checkRole(['kanban_board.view_subtask']),
   subtaskController.getAllSubTasks
 );
-apiRouter.put("/subtaskupdate/:id", RoleController.checkRole(['	kanban_board.edit_subtask']), (req, res) =>
+apiRouter.put("/subtaskupdate/:id", RoleController.checkRole(['	kanban_board.edit_subtask','task.start_task','task.pause_task','task.onhold_task','task.end_task','task.done_task']), (req, res) =>
   subtaskController.updateDatas(req, res, req.io)
 );
 
