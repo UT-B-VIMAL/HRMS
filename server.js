@@ -170,87 +170,87 @@ apiRouter.get("/user", RoleController.checkRole(['user.view_user']), userControl
 // Product Routes
 apiRouter.post(
   "/products",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.add_product']),
   productController.createProduct
 );
 apiRouter.put(
   "/products/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_product']),
   productController.updateProduct
 );
 apiRouter.delete(
   "/products/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.delete_product']),
   productController.deleteProduct
 );
 apiRouter.get(
   "/products/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_product']),
   productController.getProduct
 );
 apiRouter.get(
   "/products",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.view_product']),
   productController.getAllProducts
 );
 
 // Project Routes
 apiRouter.post(
   "/projects",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.add_project']),
   projectController.createProject
 );
 apiRouter.put(
   "/projects/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_project']),
   projectController.updateProject
 );
 apiRouter.delete(
   "/projects/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.delete_project']),
   projectController.deleteProject
 );
 apiRouter.get(
   "/projects/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_project']),
   projectController.getProject
 );
 apiRouter.get(
   "/projects",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.view_project']),
   projectController.getAllProjects
 );
 apiRouter.get("/project_status", projectController.project_status);
 apiRouter.get(
   "/project_request",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.all_project_request_view','project_request.team_project_request_view']),
   projectController.project_request
 );
 apiRouter.get(
   "/project_requestupdate",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.project_request_update']),
   projectController.project_requestupdate
 );
 apiRouter.put(
   "/project_requestchange/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.project_request_update']),
   (req, res) => projectController.project_requestchange(req, res, req.io)
 );
 
 // Team Routes
-apiRouter.post("/team", RoleController.checkRole(), teamController.createTeam);
+apiRouter.post("/team", RoleController.checkRole(['	team.add_team']), teamController.createTeam);
 apiRouter.put(
   "/team/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['team.edit_team']),
   teamController.updateTeam
 );
 apiRouter.delete(
   "/team/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['team.delete_team']),
   teamController.deleteTeam
 );
-apiRouter.get("/team/:id", RoleController.checkRole(), teamController.getTeam);
-apiRouter.get("/team", RoleController.checkRole(), teamController.getAllTeams);
+apiRouter.get("/team/:id", RoleController.checkRole(['team.edit_team']), teamController.getTeam);
+apiRouter.get("/team", RoleController.checkRole(['team.view_team']), teamController.getAllTeams);
 
 // Designation Routes
 apiRouter.post(
@@ -305,7 +305,7 @@ apiRouter.get(
 apiRouter.get("/doneTask", RoleController.checkRole(), taskController.doneTask);
 apiRouter.post(
   "/updateTaskTimeLineStatus",
-  RoleController.checkRole(),
+  RoleController.checkRole(['task.start_task','task.pause_task','task.end_task']),
   (req, res) => taskController.updateTaskTimeLineStatus(req, res, req.io)
 );
 apiRouter.get(
