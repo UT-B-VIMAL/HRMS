@@ -652,8 +652,8 @@ exports.fetchPmviewproductdata = async (req, res) => {
         totalSubtasks > 0
           ? Math.round((completedSubtasks / totalSubtasks) * 100)
           : task.status === 3
-          ? 100
-          : 0;
+            ? 100
+            : 0;
 
       // Return the formatted task object
       return {
@@ -720,15 +720,15 @@ exports.fetchPmviewproductdata = async (req, res) => {
       // Create subtask if applicable
       const subtask = row.subtask_id
         ? {
-            id: row.subtask_id,
-            name: row.subtask_name,
-            status: row.subtask_status,
-            active_status: row.subtask_active_status,
-            reopen_status: row.subtask_reopen_status,
-            estimated_hours: row.subtask_estimation_hours,
-            description: row.subtask_description,
-            assigned_user_id: row.subtask_assigned_user_id,
-          }
+          id: row.subtask_id,
+          name: row.subtask_name,
+          status: row.subtask_status,
+          active_status: row.subtask_active_status,
+          reopen_status: row.subtask_reopen_status,
+          estimated_hours: row.subtask_estimation_hours,
+          description: row.subtask_description,
+          assigned_user_id: row.subtask_assigned_user_id,
+        }
         : null;
 
       // Find category based on task's subtask or status
@@ -772,10 +772,10 @@ exports.fetchPmviewproductdata = async (req, res) => {
           const completionPercentage =
             existingTask.TotalSubtaskCount > 0
               ? Math.round(
-                  (existingTask.CompletedSubtaskCount /
-                    existingTask.TotalSubtaskCount) *
-                    100
-                )
+                (existingTask.CompletedSubtaskCount /
+                  existingTask.TotalSubtaskCount) *
+                100
+              )
               : 0;
 
           existingTask.CompletionPercentage = completionPercentage;
@@ -1180,14 +1180,13 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 
     let userIdsFilter = []; // filter list
     if (await hasPermission("dashboard.team_product_graph", accessToken)) {
+
       userIdsFilter = await getTeamuserids(login_id);
 
       if (userIdsFilter.length === 0) {
         return successResponse(res, [], "No team members found", 200);
       }
-    } else if (
-      await hasPermission("dashboard.user_product_graph", accessToken)
-    ) {
+    } else if (await hasPermission("dashboard.user_product_graph", accessToken)) {
       userIdsFilter = [login_id];
     }
 
@@ -1335,7 +1334,6 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   if (!accessToken) {
     return errorResponse(res, "Access token is required", 401);
   }
-
   try {
     const { team_id, date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
@@ -1351,66 +1349,69 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     }
 
     const exclusionChecks = {
-      totalUsers: "dashboard.exclude_from_total_users",
-      associateUsers: "dashboard.exclude_from_associates",
-      attendanceUsers: "dashboard.exclude_from_attendance",
+      totalUsers: 'dashboard.exclude_from_total_users',
+      associateUsers: 'dashboard.exclude_from_associates',
+      attendanceUsers: 'dashboard.exclude_from_attendance'
     };
     const excludedRoleMap = {};
 
     for (const [key, permissionName] of Object.entries(exclusionChecks)) {
       const hasAccess = await hasPermission(permissionName, accessToken);
-      if (hasAccess) {
-        const [rows] = await db.query(
-          `SELECT rhp.role_id
-           FROM role_has_permissions rhp
-           JOIN permissions p ON rhp.permission_id = p.id
-           WHERE p.name = ?`,
-          [permissionName]
-        );
-        excludedRoleMap[key] = rows.map((r) => r.role_id);
+      if (!hasAccess) {
+        const [rows] = await db.query(`
+          SELECT rhp.role_id
+          FROM role_has_permissions rhp
+          JOIN permissions p ON rhp.permission_id = p.id
+          WHERE p.name = ?
+        `, [permissionName]);
+        excludedRoleMap[key] = rows.map(r => r.role_id);
       } else {
         excludedRoleMap[key] = [];
       }
     }
 
-    // Fetch all teams for name lookup
-    const [teams] = await db.query(`SELECT id, name FROM teams WHERE deleted_at IS NULL`);
-    const teamsMap = {};
-    teams.forEach(t => {
-      teamsMap[t.id.toString()] = t.name;
-    });
+    // STEP 2: Query each user group with dynamic exclusions
 
     const buildWhereClause = (excludedRoles) => {
       return `
-        u.deleted_at IS NULL 
+        u.deleted_at IS NULL AND t.deleted_at IS NULL
         AND DATE(u.created_at) <= ?
-        ${team_id ? `AND (${team_id.split(",").map(() => `FIND_IN_SET(?, u.team_id)`).join(" OR ")})` : ""}
-        ${excludedRoles.length ? `AND u.role_id NOT IN (${excludedRoles.map(() => "?").join(",")})` : ""}
+        ${team_id ? "AND u.team_id = ?" : ""}
+        ${excludedRoles.length ? `AND u.role_id NOT IN (${excludedRoles.map(() => '?').join(',')})` : ''}
       `;
     };
 
     const buildParams = (excludedRoles) => {
-      const teamIds = team_id ? team_id.split(",").map(id => id.trim()) : [];
-      const params = [formattedDate, ...teamIds];
+      const params = team_id ? [formattedDate, team_id] : [formattedDate];
       return excludedRoles.length ? [...params, ...excludedRoles] : params;
     };
 
-    // Base query
-    const getUsers = async (excludedRoles) => {
-      return db.query(
-        `
-        SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id,
-               COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
-        FROM users u
-        WHERE ${buildWhereClause(excludedRoles)}
-        `,
-        buildParams(excludedRoles)
-      );
-    };
+    // Total Users
+    const [totalUsers] = await db.query(`
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
+             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+      FROM users u
+      LEFT JOIN teams t ON u.team_id = t.id
+      WHERE ${buildWhereClause(excludedRoleMap.totalUsers)}
+    `, buildParams(excludedRoleMap.totalUsers));
 
-    const [totalUsers] = await getUsers(excludedRoleMap.totalUsers);
-    const [associateUsers] = await getUsers(excludedRoleMap.associateUsers);
-    const [attendanceUsers] = await getUsers(excludedRoleMap.attendanceUsers);
+    // Associates
+    const [associateUsers] = await db.query(`
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
+             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+      FROM users u
+      LEFT JOIN teams t ON u.team_id = t.id
+      WHERE ${buildWhereClause(excludedRoleMap.associateUsers)}
+    `, buildParams(excludedRoleMap.associateUsers));
+
+    // Attendance Users
+    const [attendanceUsers] = await db.query(`
+      SELECT u.id AS user_id, u.employee_id, u.team_id, u.role_id, t.name AS team_name,
+             COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS employee_name
+      FROM users u
+      LEFT JOIN teams t ON u.team_id = t.id
+      WHERE ${buildWhereClause(excludedRoleMap.attendanceUsers)}
+    `, buildParams(excludedRoleMap.attendanceUsers));
 
     if (
       associateUsers.length === 0 ||
@@ -1423,11 +1424,14 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     const associateIds = associateUsers.map((u) => u.user_id);
     const attendanceIds = attendanceUsers.map((u) => u.user_id);
 
-    // Leave data
+    // Step 2: Fetch Leave Data
     const [leaveRows] = await db.query(
-      `SELECT user_id, day_type, half_type
-       FROM employee_leave
-       WHERE deleted_at IS NULL AND DATE(date) = ? AND user_id IN (?)`,
+      `
+      SELECT user_id, day_type, half_type
+      FROM employee_leave
+      WHERE deleted_at IS NULL AND DATE(date) = ?
+        AND user_id IN (?)
+    `,
       [formattedDate, attendanceIds]
     );
     const leaveMap = {};
@@ -1435,18 +1439,28 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       leaveMap[user_id] = { day_type, half_type };
     });
 
-    // Timeline activity
+    // Step 3: Working activity data
     let timelineQuery = `
-      SELECT user_id FROM sub_tasks_user_timeline
-      WHERE DATE(start_time) = ? AND user_id IN (?)`;
-    if (formattedDate === new Date().toISOString().split("T")[0]) {
+  SELECT user_id
+  FROM sub_tasks_user_timeline
+  WHERE DATE(start_time) = ?
+    AND user_id IN (?)
+`;
+    const isToday = formattedDate === new Date().toISOString().split("T")[0];
+
+    if (isToday) {
       timelineQuery += ` AND end_time IS NULL`;
     }
-    timelineQuery += ` GROUP BY user_id`;
-    const [timelineRows] = await db.query(timelineQuery, [formattedDate, associateIds]);
-    const workingUserIds = new Set(timelineRows.map(r => r.user_id));
 
-    // Initialize results
+    timelineQuery += ` GROUP BY user_id`;
+
+    const [timelineRows] = await db.query(timelineQuery, [
+      formattedDate,
+      associateIds,
+    ]);
+    const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
+
+    // Step 4: Initialize result map
     const resultMap = {};
     const defaultGroupKey = team_id ? null : "overall";
 
@@ -1463,47 +1477,37 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       };
     }
 
-    // Total strength logic
+    // Fill total strength first
     totalUsers.forEach((user) => {
-      const userTeamIds = user.team_id.split(",").map(id => id.trim());
-
-      const matchedTeamIds = team_id
-        ? team_id.split(",").filter(id => userTeamIds.includes(id))
-        : userTeamIds;
-
-      const groupKeys = team_id ? matchedTeamIds : [defaultGroupKey];
-
-      groupKeys.forEach((groupKey) => {
-        if (!resultMap[groupKey]) {
-          resultMap[groupKey] = {
-            team_id: parseInt(groupKey),
-            team_name: teamsMap[groupKey] || "Unknown Team",
-            total_strength: 0,
-            present_employees: [],
-            absent_employees: [],
-            active_employees: [],
-            idle_employees: [],
-            total_strength_employees: [],
-          };
-        }
-
-        const employee = {
-          user_id: user.user_id,
-          employee_id: user.employee_id ? String(user.employee_id).padStart(3, "0") : "N/A",
-          employee_name: user.employee_name || "N/A",
-          team_name: (team_id
-  ? matchedTeamIds.map(id => teamsMap[id] || "N/A")
-  : userTeamIds.map(id => teamsMap[id] || "N/A")
-).join(", "),
-
+      const groupKey = team_id ? user.team_id : defaultGroupKey;
+      if (!resultMap[groupKey]) {
+        resultMap[groupKey] = {
+          team_id: user.team_id,
+          team_name: user.team_name || "Unknown Team",
+          total_strength: 0,
+          present_employees: [],
+          absent_employees: [],
+          active_employees: [],
+          idle_employees: [],
+          total_strength_employees: [],
         };
+      }
 
-        resultMap[groupKey].total_strength_employees.push(employee);
-        resultMap[groupKey].total_strength++;
-      });
+      const result = resultMap[groupKey];
+      const employee = {
+        user_id: user.user_id,
+        employee_id: user.employee_id
+          ? String(user.employee_id).padStart(3, "0")
+          : "N/A",
+        employee_name: user.employee_name || "N/A",
+        team_name: user.team_name || "N/A",
+      };
+
+      result.total_strength_employees.push(employee);
+      result.total_strength++;
     });
 
-    // Attendance logic
+    // Attendance check (only for associate users)
     const currentTime = new Date();
     const cutoffTimeStart = new Date(targetDate);
     cutoffTimeStart.setHours(13, 30, 0);
@@ -1511,21 +1515,17 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     cutoffTimeEnd.setHours(13, 31, 0);
 
     associateUsers.forEach((user) => {
-      const userTeamIds = user.team_id.split(",").map(id => id.trim());
-      const matchedTeamIds = team_id
-        ? team_id.split(",").filter(id => userTeamIds.includes(id))
-        : userTeamIds;
-      const groupKeys = team_id ? matchedTeamIds : [defaultGroupKey];
+      const groupKey = team_id ? user.team_id : defaultGroupKey;
+      if (!resultMap[groupKey]) return;
 
+      const result = resultMap[groupKey];
       const employee = {
         user_id: user.user_id,
-        employee_id: user.employee_id ? String(user.employee_id).padStart(3, "0") : "N/A",
+        employee_id: user.employee_id
+          ? String(user.employee_id).padStart(3, "0")
+          : "N/A",
         employee_name: user.employee_name || "N/A",
-        team_name: (team_id
-  ? matchedTeamIds.map(id => teamsMap[id] || "N/A")
-  : userTeamIds.map(id => teamsMap[id] || "N/A")
-).join(", "),
-
+        team_name: user.team_name || "N/A",
       };
 
       const leave = leaveMap[user.user_id];
@@ -1539,30 +1539,21 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
             leave.half_type === 2 &&
             currentTime >= cutoffTimeEnd));
 
-      groupKeys.forEach((groupKey) => {
-        if (!resultMap[groupKey]) return;
-
-        employee.team_name = (team_id
-  ? matchedTeamIds.map(id => teamsMap[id] || "N/A")
-  : userTeamIds.map(id => teamsMap[id] || "N/A")
-).join(", ");
-
-
-        if (isAbsent) {
-          resultMap[groupKey].absent_employees.push(employee);
+      if (isAbsent) {
+        result.absent_employees.push(employee);
+      } else {
+        result.present_employees.push(employee);
+        if (workingUserIds.has(user.user_id)) {
+          result.active_employees.push(employee);
         } else {
-          resultMap[groupKey].present_employees.push(employee);
-          if (workingUserIds.has(user.user_id)) {
-            resultMap[groupKey].active_employees.push(employee);
-          } else {
-            resultMap[groupKey].idle_employees.push(employee);
-          }
+          result.idle_employees.push(employee);
         }
-      });
+      }
     });
 
-    // Final response
+    // Step 5: Format response
     const pad = (num) => num.toString().padStart(2, "0");
+
     const finalOutput = Object.values(resultMap).map((group) => ({
       team_id: group.team_id,
       team_name: group.team_name,
@@ -1593,7 +1584,6 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
   }
 };
 
-
 exports.getProjectCompletion = async (req, res) => {
   try {
     const { product_id, project_id, team_id, associate_id } = req.query;
@@ -1609,18 +1599,9 @@ exports.getProjectCompletion = async (req, res) => {
 
     const user_id = await getUserIdFromAccessToken(accessToken);
 
-    const is_all_project_data = await hasPermission(
-      "dashboard.all_project_data",
-      accessToken
-    );
-    const is_team_project_data = await hasPermission(
-      "dashboard.team_project_data",
-      accessToken
-    );
-    const is_user_project_data = await hasPermission(
-      "dashboard.user_project_data",
-      accessToken
-    );
+    const is_all_project_data = await hasPermission("dashboard.all_project_graph", accessToken);
+    const is_team_project_data = await hasPermission("dashboard.team_project_graph", accessToken);
+    const is_user_project_data = await hasPermission("dashboard.user_project_graph", accessToken);
 
     let teamIds = [];
 
@@ -1632,19 +1613,19 @@ exports.getProjectCompletion = async (req, res) => {
 
       if (userRow.length && userRow[0].team_id) {
         teamIds = userRow[0].team_id
-          .split(",")
-          .map((id) => parseInt(id.trim()))
-          .filter((id) => !isNaN(id));
+          .split(',')
+          .map(id => parseInt(id.trim()))
+          .filter(id => !isNaN(id));
       }
 
       if (teamIds.length === 0) {
         return successResponse(res, {
           completed_tasks: project_id
             ? {
-                pending_percentage: "0.00",
-                inprogress_percentage: "0.00",
-                completed_percentage: "0.00",
-              }
+              pending_percentage: "0.00",
+              inprogress_percentage: "0.00",
+              completed_percentage: "0.00",
+            }
             : [],
           team_utilization: [],
         });
@@ -1655,9 +1636,7 @@ exports.getProjectCompletion = async (req, res) => {
     let teamFilterParams = [];
 
     if (is_team_project_data) {
-      const teamConditions = teamIds
-        .map(() => `FIND_IN_SET(?, team_id)`)
-        .join(" OR ");
+      const teamConditions = teamIds.map(() => `FIND_IN_SET(?, team_id)`).join(" OR ");
       teamFilterSql = `AND user_id IN (SELECT id FROM users WHERE ${teamConditions})`;
       teamFilterParams = [...teamIds];
     } else if (is_all_project_data) {
@@ -1830,32 +1809,15 @@ exports.getProjectCompletion = async (req, res) => {
     const total_completed_percent =
       totalSum.total > 0
         ? parseFloat(
-            ((totalSum.completed_count / totalSum.total) * 100).toFixed(2)
-          )
+          ((totalSum.completed_count / totalSum.total) * 100).toFixed(2)
+        )
         : 0;
 
     const completed_tasks = {
       projects:
         othersProjects.length > 0
           ? [
-              ...visibleProjects.map(
-                ({
-                  project_id,
-                  project_name,
-                  pending_percent,
-                  inprogress_percent,
-                  completed_percent,
-                }) => ({
-                  project_id,
-                  project_name,
-                  pending_percent,
-                  inprogress_percent,
-                  completed_percent,
-                })
-              ),
-              othersSummary,
-            ]
-          : visibleProjects.map(
+            ...visibleProjects.map(
               ({
                 project_id,
                 project_name,
@@ -1870,23 +1832,40 @@ exports.getProjectCompletion = async (req, res) => {
                 completed_percent,
               })
             ),
+            othersSummary,
+          ]
+          : visibleProjects.map(
+            ({
+              project_id,
+              project_name,
+              pending_percent,
+              inprogress_percent,
+              completed_percent,
+            }) => ({
+              project_id,
+              project_name,
+              pending_percent,
+              inprogress_percent,
+              completed_percent,
+            })
+          ),
       others_list:
         othersProjects.length > 0
           ? othersProjects.map(
-              ({
-                project_id,
-                project_name,
-                pending_percent,
-                inprogress_percent,
-                completed_percent,
-              }) => ({
-                project_id,
-                project_name,
-                pending_percent,
-                inprogress_percent,
-                completed_percent,
-              })
-            )
+            ({
+              project_id,
+              project_name,
+              pending_percent,
+              inprogress_percent,
+              completed_percent,
+            }) => ({
+              project_id,
+              project_name,
+              pending_percent,
+              inprogress_percent,
+              completed_percent,
+            })
+          )
           : [],
       total_completed_percent,
     };
@@ -1896,11 +1875,9 @@ exports.getProjectCompletion = async (req, res) => {
     const projectId = project_id ? parseInt(project_id) : null;
 
     if (is_team_project_data) {
-      const teamConditions = teamIds
-        .map(() => `FIND_IN_SET(?, u.team_id)`)
-        .join(" OR ");
+  const teamConditions = teamIds.map(() => `FIND_IN_SET(?, u.team_id)`).join(" OR ");
 
-      teamUtilizationSql = `
+  teamUtilizationSql = `
     WITH
     user_estimates AS (
       SELECT u.id AS user_id,
@@ -1950,18 +1927,18 @@ exports.getProjectCompletion = async (req, res) => {
     ORDER BY total_worked_hours DESC, total_estimated_hours DESC;
   `;
 
-      teamUtilizationParams = [
-        productId,
-        projectId,
-        projectId,
-        ...teamIds,
-        productId,
-        projectId,
-        projectId,
-        ...teamIds,
-        ...teamIds,
-      ];
-    } else if (is_all_project_data) {
+  teamUtilizationParams = [
+    productId,
+    projectId,
+    projectId,
+    ...teamIds,
+    productId,
+    projectId,
+    projectId,
+    ...teamIds,
+    ...teamIds,
+  ];
+}else if (is_all_project_data) {
       // Admin or PM - single optional team_id filter
       if (team_id) {
         // team_id filter present
