@@ -1181,7 +1181,7 @@ exports.fetchUserTasksByProduct = async (req, res) => {
     let userIdsFilter = []; // filter list
     if (await hasPermission("dashboard.team_product_graph", accessToken)) {
 
-      userIdsFilter = await getTeamuserids(user_id);
+      userIdsFilter = await getTeamuserids(login_id);
 
       if (userIdsFilter.length === 0) {
         return successResponse(res, [], "No team members found", 200);
@@ -1330,6 +1330,10 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 };
 
 exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
+  const accessToken = req.headers.authorization?.split(" ")[1];
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
   try {
     const { team_id, date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
@@ -1345,9 +1349,9 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     }
 
     const exclusionChecks = {
-      totalUsers: 'exclude_from_total_users',
-      associateUsers: 'exclude_from_associates',
-      attendanceUsers: 'exclude_from_attendance'
+      totalUsers: 'dashboard.exclude_from_total_users',
+      associateUsers: 'dashboard.exclude_from_associates',
+      attendanceUsers: 'dashboard.exclude_from_attendance'
     };
     const excludedRoleMap = {};
 
@@ -1449,8 +1453,6 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     }
 
     timelineQuery += ` GROUP BY user_id`;
-
-    console.log("Timeline Query:", timelineQuery);
 
     const [timelineRows] = await db.query(timelineQuery, [
       formattedDate,
