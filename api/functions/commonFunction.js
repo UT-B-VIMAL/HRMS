@@ -677,6 +677,8 @@ exports.getTeamuserids = async (user_id) => {
 
 
 exports.getExcludedRoleIdsByPermission = async (permissionName) => {
+    console.log(`Fetching excluded role IDs for permission: ${permissionName}`);
+    
   const [rows] = await db.query(
     `
     SELECT rhp.role_id
