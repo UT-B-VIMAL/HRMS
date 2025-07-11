@@ -315,12 +315,12 @@ apiRouter.get(
 );
 apiRouter.get(
   "/deletedTaskList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.view_restore_project']),
   taskController.deletedTaskList
 );
 apiRouter.post(
   "/restoreTasks",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.update_restore_project	']),
   taskController.taskRestore
 );
 
