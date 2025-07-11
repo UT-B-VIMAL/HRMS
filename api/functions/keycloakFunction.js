@@ -34,6 +34,7 @@ async function getAdminToken() {
 
 async function signInUser(username, password) {
   try {
+    // 1. Authenticate with Keycloak
     const response = await axios.post(
       `${keycloakConfig.serverUrl}/realms/${keycloakConfig.realm}/protocol/openid-connect/token`,
       new URLSearchParams({
@@ -46,39 +47,60 @@ async function signInUser(username, password) {
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
 
+    // 2. Get user from your database
     const user = await getUserByEmployeeId(username);
+    if (!user) throw new Error("User not found in the database");
 
-
-    if (user) {
-      const role = await getRoleName(user.role_id);
-      let profileName = '';
-      if (user.last_name) {
-        const firstNameInitial = user.first_name ? user.first_name.charAt(0).toUpperCase() : '';
-        const lastNameInitial = user.last_name.charAt(0).toUpperCase();
-        profileName = `${firstNameInitial}${lastNameInitial}`;
-      } else if (user.first_name) {
-        profileName = user.first_name.substring(0, 2).toUpperCase();
-      }
-      const expiresInSeconds = response.data.expires_in;
-      const loginExpiry = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
-
-      return {
-        keycloak_id: user.keycloak_id,
-        user_id: user.id,
-        role_id: user.role_id,
-        employee_id: user.employee_id,
-        profile_name: profileName,
-        designation_name: user.designation_name,
-        role_name: role,
-        access_token: response.data.access_token,
-        refresh_token: response.data.refresh_token,
-        login_expiry: loginExpiry
-      };
-    } else {
-      throw new Error('User not found in the database');
+    // 3. Format profile name
+    let profileName = '';
+    if (user.last_name) {
+      const f = user.first_name?.charAt(0).toUpperCase() || '';
+      const l = user.last_name.charAt(0).toUpperCase();
+      profileName = `${f}${l}`;
+    } else if (user.first_name) {
+      profileName = user.first_name.substring(0, 2).toUpperCase();
     }
+
+    // 4. Get permissions from Keycloak group
+    const adminToken = await getAdminToken();
+
+    const userGroups = await axios.get(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${user.keycloak_id}/groups`,
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+
+    const groupId = userGroups.data?.[0]?.id;
+    if (!groupId) throw new Error("Group not assigned to user");
+
+    const groupRoles = await axios.get(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups/${groupId}/role-mappings`,
+      { headers: { Authorization: `Bearer ${adminToken}` } }
+    );
+
+    const clientMappings = groupRoles.data.clientMappings || {};
+    const clientRoles = clientMappings[keycloakConfig.clientId]?.mappings || [];
+
+    const permissions = clientRoles.map(role => role.name); // Permission names
+
+    // 5. Return final login response
+    const expiresInSeconds = response.data.expires_in;
+    const loginExpiry = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+    return {
+      keycloak_id: user.keycloak_id,
+      user_id: user.id,
+      role_id: user.role_id,
+      employee_id: user.employee_id,
+      profile_name: profileName,
+      designation_name: user.designation_name,
+      role_name: await getRoleName(user.role_id),
+      access_token: response.data.access_token,
+      refresh_token: response.data.refresh_token,
+      login_expiry: loginExpiry,
+      permissions // ✅ return permission list here
+    };
   } catch (error) {
-    console.error("Error signing in user:", error.response ? error.response.data : error.message);
+    console.error("Error signing in user:", error.response?.data || error.message);
     throw error;
   }
 }

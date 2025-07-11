@@ -26,6 +26,7 @@ const {
 const { updateTimelineShema } = require("../../validators/taskValidator");
 const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
+const { hasPermission } = require("../../controllers/permissionController");
 
 // Insert Task
 exports.createTask = async (payload, res, req) => {
@@ -481,6 +482,11 @@ exports.getTask = async (queryParams, res, req) => {
     if (!userDetails || userDetails.id === undefined) {
       return errorResponse(res, "User not found", "Invalid user ID", 404);
     }
+    const hasTeamView    = await hasPermission("kanban_board.view_team_kanban_board_data", accessToken);
+    const hasUserView    = await hasPermission("kanban_board.user_view_kanban_board_data", accessToken);
+    const hasTaskView    = await hasPermission("kanban_board.view_task", accessToken);
+    const hasSubtaskView = await hasPermission("kanban_board.view_subtask", accessToken);
+
 
     // Base Task Query
     let taskQuery = `
@@ -506,7 +512,8 @@ exports.getTask = async (queryParams, res, req) => {
     let taskParams = [id];
 
     // Role-based filtering
-    if (userDetails.role_id === 3) {
+    if (hasTeamView && hasTaskView ) {
+      
       const queryTeams = `
       SELECT id, team_id FROM users 
       WHERE deleted_at IS NULL AND id = ?
@@ -556,7 +563,7 @@ exports.getTask = async (queryParams, res, req) => {
 
     let subtaskParams = [id];
 
-    if (userDetails.role_id === 3) {
+    if (hasTeamView && hasSubtaskView ) {
       const queryTeams = `
       SELECT id, team_id FROM users 
       WHERE deleted_at IS NULL AND id = ?
@@ -595,7 +602,7 @@ exports.getTask = async (queryParams, res, req) => {
           403
         );
       }
-    } else if (userDetails.role_id === 4) {
+    } else if (hasUserView && hasSubtaskView) {
       subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
       subtaskParams.push(user_id, user_id, id);
     }
