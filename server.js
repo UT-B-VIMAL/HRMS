@@ -299,10 +299,10 @@ apiRouter.put("/taskupdate/:id", RoleController.checkRole(['kanban_board.edit_ta
 );
 apiRouter.get(
   "/getTaskDatas",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_all_kanban_board_data','kanban_board.view_team_kanban_board_data','kanban_board.view_user_kanban_board_data']),
   taskController.getTaskDatas
 );
-apiRouter.get("/doneTask", RoleController.checkRole(), taskController.doneTask);
+apiRouter.get("/doneTask", RoleController.checkRole(['Kanban_board.done_task']), taskController.doneTask);
 apiRouter.post(
   "/updateTaskTimeLineStatus",
   RoleController.checkRole(['task.start_task','task.pause_task','task.end_task']),
@@ -315,12 +315,12 @@ apiRouter.get(
 );
 apiRouter.get(
   "/deletedTaskList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.view_restore_project']),
   taskController.deletedTaskList
 );
 apiRouter.post(
   "/restoreTasks",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.update_restore_project	']),
   taskController.taskRestore
 );
 
@@ -329,7 +329,7 @@ apiRouter.post("/subtaskImport", subtaskController.bulkimportSubTask);
 
 apiRouter.post(
   "/subtask",
-  RoleController.checkRole(['	kanban_board.add_subtask']),
+  RoleController.checkRole(['kanban_board.add_subtask']),
   subtaskController.createSubTask
 );
 apiRouter.put(
