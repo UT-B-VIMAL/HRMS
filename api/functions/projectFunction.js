@@ -717,7 +717,7 @@ exports.projectRequest = async (req, res) => {
   LEFT JOIN users u ON u.id = st.user_id
   LEFT JOIN users ua ON ua.id = st.assigned_user_id
   LEFT JOIN projects pr ON pr.id = t.project_id
-  LEFT JOIN teams tm ON tm.id = u.team_id
+  LEFT JOIN teams tm ON FIND_IN_SET(tm.id, u.team_id)
   LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
   WHERE st.status = 2 AND st.deleted_at IS NULL ${subtaskWhereClause}
 `;
@@ -739,7 +739,7 @@ exports.projectRequest = async (req, res) => {
   LEFT JOIN users u ON u.id = t.user_id
   LEFT JOIN users ua ON ua.id = t.assigned_user_id
   LEFT JOIN projects pr ON pr.id = t.project_id
-  LEFT JOIN teams tm ON tm.id = u.team_id
+  LEFT JOIN teams tm ON FIND_IN_SET(tm.id, u.team_id)
   LEFT JOIN users u_assigned ON u_assigned.id = t.assigned_user_id
   WHERE t.deleted_at IS NULL AND t.status = 2 
     AND t.id NOT IN (SELECT task_id FROM sub_tasks WHERE deleted_at IS NULL)

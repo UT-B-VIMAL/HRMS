@@ -1527,7 +1527,7 @@ exports.tltaskpendinglist = async (req, res) => {
     // Determine user IDs to filter by, based on role
     let filterUserIds = [];
 
-    if (user.role_id === 3) {
+    if (await hasPermission("dashboard.team_pending_list", accessToken)) {
       // Team Leader - get team members
       const [teamUsers] = await db.query(
         "SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL",
@@ -1546,7 +1546,7 @@ exports.tltaskpendinglist = async (req, res) => {
       } else {
         filterUserIds = teamUserIds;
       }
-    } else if (user.role_id === 4) {
+    } else if (await hasPermission("dashboard.user_pending_list", accessToken)) {
       // Regular User - only own data
       filterUserIds = [login_id];
     } else {
