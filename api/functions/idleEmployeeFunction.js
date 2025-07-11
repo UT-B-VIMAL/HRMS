@@ -284,11 +284,11 @@ const { hasPermission } = require("../../controllers/permissionController");
 exports.get_idleEmployee = async (req, res) => {
   try {
     const { team_id, page = 1, perPage = 10 } = req.query;
-
     const accessToken = req.headers.authorization?.split(' ')[1];
-        if (!accessToken) {
-            return errorResponse(res, 'Access token is required', 401);
-        }
+
+    if (!accessToken) {
+      return errorResponse(res, 'Access token is required', 401);
+    }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
 
@@ -296,10 +296,12 @@ exports.get_idleEmployee = async (req, res) => {
     const hasAllIdle = await hasPermission("idle_employees.all_idle_employees_view", accessToken);
     const hasTeamIdle = await hasPermission("idle_employees.team_idle_employees_view", accessToken);
     const hasExceedRole = await hasPermission("idle_employees.show_excluded_roles", accessToken);
+console.log(`User ID: ${user_id}, hasAllIdle: ${hasAllIdle}, hasTeamIdle: ${hasTeamIdle}, hasExceedRole: ${hasExceedRole}`);
 
     if (!hasAllIdle && !hasTeamIdle) {
       return errorResponse(res, null, "Access denied", 403);
     }
+
     const pageNumber = parseInt(page, 10);
     const perPageNumber = parseInt(perPage, 10);
     const offset = (pageNumber - 1) * perPageNumber;
@@ -313,18 +315,19 @@ exports.get_idleEmployee = async (req, res) => {
       return errorResponse(res, "User not found", "Invalid user", 404);
     }
 
-     // Exclude roles by permission
+    // Get excluded roles based on permission
     let excludedRoleIds = [];
-    if (!hasExceedRole) {
-      excludedRoleIds = await getExcludedRoleIdsByPermission();
+    if (hasExceedRole) {      
+      excludedRoleIds = await getExcludedRoleIdsByPermission("idle_employees.show_excluded_roles");
     }
 
+    // Get team IDs from user table (comma-separated string)
     const teamIds = user.team_id ? user.team_id.split(',') : [];
 
     let queryParams = [];
     let countQueryParams = [];
 
-    // Main query
+    // Base query
     let baseQuery = `
       SELECT users.id, users.employee_id,
         COALESCE(CONCAT(COALESCE(users.first_name, ''), ' ', COALESCE(NULLIF(users.last_name, ''), '')), '') AS user_name,
@@ -360,11 +363,10 @@ exports.get_idleEmployee = async (req, res) => {
     }
 
     // Team-based filtering
-    if (hasAllIdle && team_id) {      
+    if (hasAllIdle && team_id) {
       baseQuery += ` AND FIND_IN_SET(?, users.team_id)`;
       queryParams.push(team_id);
-    } 
-    if (hasTeamIdle) {      
+    } else if (hasTeamIdle) {
       const teamFilter = teamIds.map(() => `FIND_IN_SET(?, users.team_id)`).join(" OR ");
       baseQuery += ` AND (${teamFilter}) AND users.id != ?`;
       queryParams.push(...teamIds, user_id);
@@ -411,7 +413,7 @@ exports.get_idleEmployee = async (req, res) => {
       countQueryParams.push(...teamIds, user_id);
     }
 
-    // Final query with pagination
+    // Add pagination
     const finalQuery = `${baseQuery} ORDER BY users.id DESC LIMIT ? OFFSET ?`;
     queryParams.push(perPageNumber, offset);
 
