@@ -299,7 +299,7 @@ apiRouter.put("/taskupdate/:id", RoleController.checkRole(['kanban_board.edit_ta
 );
 apiRouter.get(
   "/getTaskDatas",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_all_kanban_board_data','kanban_board.view_team_kanban_board_data','kanban_board.view_user_kanban_board_data']),
   taskController.getTaskDatas
 );
 apiRouter.get("/doneTask", RoleController.checkRole(), taskController.doneTask);
@@ -315,12 +315,12 @@ apiRouter.get(
 );
 apiRouter.get(
   "/deletedTaskList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.view_restore_project']),
   taskController.deletedTaskList
 );
 apiRouter.post(
   "/restoreTasks",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.update_restore_project	']),
   taskController.taskRestore
 );
 
