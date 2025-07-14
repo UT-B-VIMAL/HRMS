@@ -4,9 +4,10 @@ const {successResponse,errorResponse,} = require("../../helpers/responseHelper")
 const moment = require('moment');
 const {attendanceValidator, attendanceFetch}=  require("../../validators/AttendanceValidator");
 const getPagination = require("../../helpers/pagination");
-const { getAuthUserDetails, getUserIdFromAccessToken } = require("./commonFunction");
+const { getAuthUserDetails, getUserIdFromAccessToken, getExcludedRoleIdsByPermission } = require("./commonFunction");
 const { Parser } = require('json2csv');
 const { userSockets } = require("../../helpers/notificationHelper");
+const { hasPermission } = require("../../controllers/permissionController");
 
 
 exports.getAttendance = async (req, res) => {
@@ -19,11 +20,18 @@ exports.getAttendance = async (req, res) => {
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
-    console.log(user_id);
-    let query = '';
-    let queryParams = [];
+    const today = new Date().toISOString().slice(0, 10);
+    const dynamicDate = date || today;
 
-    // Validate user_id
+    const hasAllAttendance = await hasPermission("attendance.all_view_attendance", accessToken);
+    const hasTeamAttendance = await hasPermission("attendance.team_view_attendance", accessToken);
+    const hasExceedRole = await hasPermission("attendance.show_excluded_roles", accessToken);
+    const hasExcludeFromAssociates = await hasPermission("attendance.exclude_from_associates", accessToken);
+
+    if (!hasAllAttendance && !hasTeamAttendance) {
+      return errorResponse(res, null, "Access denied", 403);
+    }
+
     const { error } = attendanceFetch.validate({ user_id }, { abortEarly: false });
     if (error) {
       const errorMessages = error.details.reduce((acc, err) => {
@@ -33,71 +41,54 @@ exports.getAttendance = async (req, res) => {
       return errorResponse(res, errorMessages, "Validation Error", 400);
     }
 
-    // Fetch authenticated user details
     const user = await getAuthUserDetails(user_id, res);
-    const today = new Date().toISOString().slice(0, 10);
-    const dynamicDate = date || today;
-    if (user.role_id == 3) {
+
+    if (hasTeamAttendance) {
       const [teamResult] = await db.query(
         "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
         [user_id]
       );
-
-      if (!teamResult.length || teamResult[0].reporting_user_id === null) {
+      if (!teamResult.length) {
         return errorResponse(res, null, "You are not currently assigned a reporting TL for your team", 400);
       }
     }
-    // Base Query
-    query = `
-      SELECT 
-          u.id AS user_id, 
-          COALESCE(CONCAT(u.first_name, ' ', u.last_name)) AS first_name, 
-          u.employee_id,
-          u.created_at AS joining_date,
-          el.day_type, 
-          el.date AS leave_date, 
-          el.half_type as half_type_val,
-          el.day_type as day_type_val,
-          CASE 
-            WHEN el.day_type = 1 THEN 'Absent'
-            WHEN el.day_type = 2 THEN 'Half Day'
-            ELSE 'Present'
-          END AS status,
-          CASE 
-              WHEN el.day_type = 1 THEN 'Full Day' 
-              WHEN el.day_type = 2 THEN 'Half Day' 
-              ELSE 'Full Day' 
-          END AS day_type,
-          CASE 
-              WHEN el.half_type = 1 THEN 'First Half' 
-              WHEN el.half_type = 2 THEN 'Second Half' 
-              ELSE NULL 
-          END AS half_type
+
+    let baseQuery = `
       FROM 
-          users u
+        users u
       LEFT JOIN 
-          employee_leave el 
-          ON u.id = el.user_id AND el.date = ? 
+        employee_leave el ON u.id = el.user_id AND el.date = ?
       LEFT JOIN 
-          teams t 
-          ON u.team_id = t.id  
+        teams t ON FIND_IN_SET(t.id, u.team_id)
       WHERE 
-          u.deleted_at IS NULL
+        u.deleted_at IS NULL
     `;
+    let queryParams = [dynamicDate];
 
-    queryParams.push(dynamicDate);
+    let excludedRoleIds = hasExceedRole ? await getExcludedRoleIdsByPermission("attendance.show_excluded_roles") : [];
+    let excludeAssociateRoleIds = hasExcludeFromAssociates ? await getExcludedRoleIdsByPermission("attendance.exclude_from_associates") : [];
 
-    // Role-Based Filtering Logic
-    if (user.role_id === 1 || user.role_id === 2) {
-      query += ` AND u.role_id IN (2, 3) `;
-    } else {
-      query += ` AND (t.reporting_user_id = ? OR u.team_id = ?) AND u.role_id NOT IN (1,2,3) AND u.id != ? `;
-      queryParams.push(user_id, user.team_id, user_id);
+    // Role filters
+    if (hasAllAttendance && excludeAssociateRoleIds.length > 0) {
+      console.log("Excluding associate roles:", excludeAssociateRoleIds);
+      baseQuery += ` AND u.role_id NOT IN (${excludeAssociateRoleIds.map(() => '?').join(',')})`;
+      queryParams.push(...excludeAssociateRoleIds);
     }
+    if (hasTeamAttendance) {
+      baseQuery += ` AND (t.reporting_user_id = ? OR FIND_IN_SET(?, u.team_id))`;
+      queryParams.push(user_id, user.team_id);
 
-    // Search Filter
+      if (excludedRoleIds.length > 0) {
+        baseQuery += ` AND u.role_id NOT IN (${excludedRoleIds.map(() => '?').join(',')})`;
+        queryParams.push(...excludedRoleIds);
+      }
+
+      baseQuery += ` AND u.id != ?`;
+      queryParams.push(user_id);
+    }
+    // Search
     if (search) {
-      query += `
+      baseQuery += `
         AND (
           REPLACE(CONCAT(u.first_name, ' ', u.last_name), ' ', '') LIKE REPLACE(?, ' ', '')
           OR u.employee_id LIKE ?
@@ -120,23 +111,55 @@ exports.getAttendance = async (req, res) => {
       `;
       queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
-    query += ' AND (u.created_at <= ? OR u.created_at LIKE ?)';
+
+    baseQuery += ' AND (u.created_at <= ? OR u.created_at LIKE ?)';
     queryParams.push(dynamicDate, `${dynamicDate}%`);
 
-    // Execute query
-    const [result] = await db.query(query, queryParams);
-    const totalRecords = result.length;
+    // First run COUNT query
+    const [countResult] = await db.query(`SELECT COUNT(*) AS total ${baseQuery}`, queryParams);
+    const totalRecords = countResult[0]?.total || 0;
 
     const pagination = getPagination(page, perPage, totalRecords);
     const offset = (Number(page) - 1) * Number(perPage);
-    query += ` LIMIT ?, ? `;
-    queryParams.push(offset, Number(perPage));
-    const [result1] = await db.query(query, queryParams);
-     const rowsWithSerialNo = result1.map((row, index) => ({
+
+    // Now fetch paginated data
+    const paginatedQuery = `
+      SELECT 
+        u.id AS user_id, 
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name)) AS first_name, 
+        u.employee_id,
+        u.created_at AS joining_date,
+        el.day_type, 
+        el.date AS leave_date, 
+        el.half_type as half_type_val,
+        el.day_type as day_type_val,
+        CASE 
+          WHEN el.day_type = 1 THEN 'Absent'
+          WHEN el.day_type = 2 THEN 'Half Day'
+          ELSE 'Present'
+        END AS status,
+        CASE 
+          WHEN el.day_type = 1 THEN 'Full Day' 
+          WHEN el.day_type = 2 THEN 'Half Day' 
+          ELSE 'Full Day' 
+        END AS day_type,
+        CASE 
+          WHEN el.half_type = 1 THEN 'First Half' 
+          WHEN el.half_type = 2 THEN 'Second Half' 
+          ELSE NULL 
+        END AS half_type
+      ${baseQuery}
+      LIMIT ?, ?
+    `;
+
+    const paginatedParams = [...queryParams, offset, Number(perPage)];
+    const [result] = await db.query(paginatedQuery, paginatedParams);
+
+    const rowsWithSerialNo = result.map((row, index) => ({
       s_no: offset + index + 1,
       ...row,
     }));
-    // Return Response
+
     return successResponse(
       res,
       rowsWithSerialNo,
@@ -161,7 +184,6 @@ exports.updateAttendanceData = async (req, res) => {
     return errorResponse(res, "Access token is required", 401);
   }
   console.log(accessToken)
-
   const updated_by = await getUserIdFromAccessToken(accessToken);
   if( import_status == 1) {
     const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [id]);
@@ -270,6 +292,12 @@ exports.updateAttendanceAndNotify = async (req, res) => {
 
   try {
     // Fetch user details
+    // const accessToken = req.headers.authorization?.split(" ")[1];
+    // if (!accessToken) {
+    //   return errorResponse(res, "Access token is required", 401);
+    // }
+
+    // const user_id = await getUserIdFromAccessToken(accessToken);
     const userQuery = `
       SELECT id, role_id, team_id 
       FROM users 
@@ -283,6 +311,10 @@ exports.updateAttendanceAndNotify = async (req, res) => {
 
     const { role_id, team_id } = userResult[0];
 
+  // const hasAllAttendance = await hasPermission("attendance.team_all_present", accessToken);
+  // const hasTeamAttendance = await hasPermission("attendance.all_all_present", accessToken);
+  // const hasExceedRole = await hasPermission("attendance.excluded_roles_all_present", accessToken);
+  // const hasExcludeFromAssociates = await hasPermission("attendance.exclude_from_associates", accessToken);
     // Fetch team name
     const teamQuery = `
       SELECT name 
