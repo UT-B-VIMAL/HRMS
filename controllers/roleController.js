@@ -8,9 +8,8 @@ const {
     createGroupInKeycloak,
     updateGroupInKeycloak,
     findGroupInKeycloak,
-    deleteGroupInKeycloak,
-    assignClientRoleToGroup
-} = require('../api/functions/keycloakFunction');
+    deleteGroupInKeycloak
+  } = require('../api/functions/keycloakFunction');
 
 const {
   getAuthUserDetails,
