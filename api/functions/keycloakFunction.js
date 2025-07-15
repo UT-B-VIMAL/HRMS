@@ -616,58 +616,67 @@ async function changePasswordInKeycloak(userId, newPassword) {
   }
 };
 
-async function assignClientRoleToGroup(groupName, roleName) {
+async function assignClientRoleToGroup(groupName, roleNames = []) {
     try {
         const token = await getAdminToken();
 
-        console.log("roleName:", roleName);
-
-        // Fetch the group ID from Keycloak
+        // 1. Get the group
         const groupsResponse = await axios.get(
             `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups`,
             { headers: { Authorization: `Bearer ${token}` } }
         );
-
         const group = groupsResponse.data.find(group => group.name === groupName);
-        if (!group) {
-            throw new Error('Group not found in Keycloak');
-        }
+        if (!group) throw new Error('Group not found in Keycloak');
 
-        // Fetch the client ID from Keycloak
+        // 2. Get the client
         const clientsResponse = await axios.get(
             `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/clients`,
             { headers: { Authorization: `Bearer ${token}` } }
         );
+        const client = clientsResponse.data.find(c => c.clientId === keycloakConfig.clientId);
+        if (!client) throw new Error('Client not found in Keycloak');
 
-        const client = clientsResponse.data.find(client => client.clientId === keycloakConfig.clientId);
-        if (!client) {
-            throw new Error('Client not found in Keycloak');
-        }
-
-        // Fetch the role ID from Keycloak
+        // 3. Get all roles for this client
         const rolesResponse = await axios.get(
             `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/clients/${client.id}/roles`,
             { headers: { Authorization: `Bearer ${token}` } }
         );
+        const allClientRoles = rolesResponse.data;
 
-        const role = rolesResponse.data.find(role => role.name === roleName);
-        if (!role) {
-            throw new Error('Role not found in Keycloak');
+        // 4. Unassign all current client roles from the group
+        await axios.delete(
+            `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups/${group.id}/role-mappings/clients/${client.id}`,
+            {
+                headers: { Authorization: `Bearer ${token}` },
+                data: allClientRoles, // send full list as body
+            }
+        );
+
+        // 5. Filter roles to assign
+        const rolesToAssign = allClientRoles.filter(role =>
+            roleNames.includes(role.name)
+        );
+
+        if (rolesToAssign.length === 0) {
+            console.warn("No matching roles found in Keycloak for:", roleNames);
+            return { message: 'No roles assigned because none matched in Keycloak' };
         }
 
-        // Assign the client role to the group in Keycloak
+        // 6. Assign the filtered roles
         await axios.post(
             `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/groups/${group.id}/role-mappings/clients/${client.id}`,
-            [{ id: role.id, name: role.name }],
+            rolesToAssign,
             { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        return { message: 'Client role assigned to group successfully in Keycloak' };
+        return { message: 'Client roles reassigned successfully in Keycloak' };
     } catch (error) {
-        console.error("Error assigning client role to group in Keycloak:", error.message);
-        throw new Error('Error assigning client role to group in Keycloak: ' + error.message);
+        console.error("Error in assignClientRolesToGroup:", error.message);
+        throw new Error('Error assigning client roles to group: ' + error.message);
     }
 }
+
+
 
 async function createClientRoleInKeycloak(roleName) {
     try {
