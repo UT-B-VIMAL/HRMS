@@ -632,7 +632,10 @@ exports.projectRequest = async (req, res) => {
         subtaskConditions.push("st.assigned_user_id = ?");
         taskValues.push(user_id);
         subtaskValues.push(user_id);
-      }
+      }else if (await hasPermission("project_request.exclude_project_request_view", accessToken)) {
+  // ✅ PM view: show all data → no user filter applied
+  effectiveUserIds = []; // skip adding any user filter later
+}
     }
     }
     
