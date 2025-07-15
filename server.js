@@ -223,7 +223,7 @@ apiRouter.get(
 apiRouter.get("/project_status", projectController.project_status);
 apiRouter.get(
   "/project_request",
-  RoleController.checkRole(['project_request.all_project_request_view','project_request.team_project_request_view']),
+  RoleController.checkRole(['project_request.all_project_request_view','project_request.team_project_request_view','project_request.exclude_project_request_view']),
   projectController.project_request
 );
 apiRouter.get(
