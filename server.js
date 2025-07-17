@@ -299,7 +299,7 @@ apiRouter.put("/taskupdate/:id", RoleController.checkRole(['kanban_board.edit_ta
 );
 apiRouter.get(
   "/getTaskDatas",
-  RoleController.checkRole(['kanban_board.view_all_kanban_board_data','kanban_board.view_team_kanban_board_data','kanban_board.view_user_kanban_board_data']),
+  RoleController.checkRole(['kanban_board.view_all_kanban_board_data','kanban_board.view_team_kanban_board_data','kanban_board.user_view_kanban_board_data']),
   taskController.getTaskDatas
 );
 apiRouter.get("/doneTask", RoleController.checkRole(['Kanban_board.done_task']), taskController.doneTask);
