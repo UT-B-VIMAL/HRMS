@@ -302,7 +302,7 @@ apiRouter.get(
   RoleController.checkRole(['kanban_board.view_all_kanban_board_data','kanban_board.view_team_kanban_board_data','kanban_board.user_view_kanban_board_data']),
   taskController.getTaskDatas
 );
-apiRouter.get("/doneTask", RoleController.checkRole(['Kanban_board.done_task']), taskController.doneTask);
+apiRouter.get("/doneTask", RoleController.checkRole(['kanban_board.done_task']), taskController.doneTask);
 apiRouter.post(
   "/updateTaskTimeLineStatus",
   RoleController.checkRole(['task.start_task','task.pause_task','task.end_task']),
