@@ -458,10 +458,8 @@ apiRouter.get(
 );
 
 //rating
-apiRouter.post("/updateRating", RoleController.checkRole(), (req, res) =>
-  ratingController.ratingUpdations(req, res, req.io),
-  RoleController.checkRole(['rating.all_edit_rating','rating.team_edit_rating'])
-);
+apiRouter.post("/updateRating", RoleController.checkRole(['rating.all_edit_rating','rating.team_edit_rating','rating.pm_notification','rating.admin_notification']), (req, res) =>
+  ratingController.ratingUpdations(req, res, req.io));
 apiRouter.get(
   "/getRating",
   RoleController.checkRole(),
@@ -496,7 +494,7 @@ apiRouter.get(
 );
 apiRouter.post("/all_present", (req, res) =>
   attendanceController.updateAttendanceAndNotify(req, res, req.io),
-  RoleController.checkRole(['attendance.team_all_present','attendance.all_all_present','attendance.excluded_roles_all_present'])
+  RoleController.checkRole(['attendance.team_all_present','attendance.all_all_present','attendance.excluded_roles_all_present','attendance.exclude_from_associates_all_present'])
 );
 
 // Comments

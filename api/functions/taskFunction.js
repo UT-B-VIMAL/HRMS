@@ -1961,10 +1961,9 @@ const formatTime = (seconds) => {
   )}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
-exports.getTaskList = async (queryParams, res) => {
+exports.getTaskList = async (req, res) => {
   try {
     const {
-      user_id,
       product_id,
       project_id,
       team_id,
@@ -1973,8 +1972,17 @@ exports.getTaskList = async (queryParams, res) => {
       member_id,
       dropdown_products,
       dropdown_projects,
-    } = queryParams;
+    } = req.query;
+  const accessToken = req.headers.authorization?.split(" ")[1];
 
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
+
+  const user_id = await getUserIdFromAccessToken(accessToken);
+  const hasAllData = await hasPermission("kanban_board.view_all_kanban_board_data", accessToken);
+  const hasTeamdata = await hasPermission("kanban_board.view_team_kanban_board_data", accessToken);
+  const hasUserData = await hasPermission("	kanban_board.user_view_kanban_board_data", accessToken);
     // Validate if user_id exists
     if (!user_id) {
       console.log("Missing user_id in query parameters");
@@ -2024,12 +2032,12 @@ exports.getTaskList = async (queryParams, res) => {
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users u ON tasks.user_id = u.id
       LEFT JOIN users AS asu ON tasks.assigned_user_id = asu.id
-      LEFT JOIN teams ON u.team_id = teams.id
+      LEFT JOIN teams ON FIND_IN_SET(teams.id, u.team_id) 
       WHERE tasks.deleted_at IS NULL
     `;
 
     const params = [];
-    if (role_id !== 3) {
+    if (!hasTeamdata) {
       if (team_id) {
         baseQuery += ` AND (
         u.team_id = ? OR EXISTS (
@@ -2043,14 +2051,16 @@ exports.getTaskList = async (queryParams, res) => {
         params.push(team_id, team_id);
       }
     }
-    if (role_id === 3) {
-      const queryteam =
-        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-      const [rowteams] = await db.query(queryteam, [user_id]);
-      let teamIds = [];
-      if (rowteams.length > 0) {
-        teamIds = rowteams.map((row) => row.id);
-        baseQuery += ` AND u.team_id IN (?)`;
+    if (hasTeamdata) {
+      // const queryteam =
+      //   "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+
+      // const [rowteams] = await db.query(queryteam, [user_id]);
+      // let teamIds = [];
+      const teamIds = userDetails.team_id ? userDetails.team_id.split(',') : [];
+      console.log("teamIds", teamIds);
+      if (teamIds.length > 0) {
+        baseQuery += ` AND FIND_IN_SET(u.team_id, ?)`;
         params.push(teamIds);
         baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
@@ -2102,7 +2112,7 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-    if (role_id === 4) {
+    if (hasUserData) {
       baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
           (NOT EXISTS (
@@ -2146,7 +2156,7 @@ exports.getTaskList = async (queryParams, res) => {
 
       params.push(user_id, user_id, user_id, user_id);
     }
-    if (role_id === 3) {
+    if (hasTeamdata) {
       if (member_id) {
         baseQuery += `
           AND (
@@ -2207,7 +2217,7 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-    if (role_id === 2) {
+    if (hasAllData) {
       baseQuery += `
           ORDER BY
         CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
@@ -2259,16 +2269,16 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.hold_status
         FROM sub_tasks
         LEFT JOIN users AS assigned_u ON sub_tasks.assigned_user_id = assigned_u.id
-        LEFT JOIN teams AS subtask_user_team ON assigned_u.team_id = subtask_user_team.id
+        LEFT JOIN teams AS subtask_user_team ON FIND_IN_SET(subtask_user_team.id , assigned_u.team_id)
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
-         LEFT JOIN users AS subtask_user ON sub_tasks.user_id = subtask_user.id
-          LEFT JOIN teams AS subtask_assignee_team ON subtask_user.team_id = subtask_assignee_team.id
+        LEFT JOIN users AS subtask_user ON sub_tasks.user_id = subtask_user.id
+        LEFT JOIN teams AS subtask_assignee_team ON FIND_IN_SET(subtask_assignee_team.id, subtask_user.team_id)
         LEFT JOIN users AS task_user ON tasks.user_id = task_user.id
         WHERE task_id IN (?)
           AND sub_tasks.deleted_at IS NULL
       `;
       const queryParams = [taskIds];
-      if (role_id === 2) {
+      if (hasAllData) {
         query += `
           ORDER BY
             CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
@@ -2286,18 +2296,19 @@ exports.getTaskList = async (queryParams, res) => {
       }
 
       // Add user_id filter only if role_id is 4
-      if (role_id === 4) {
+      if (hasUserData) {
         query +=
           " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
         queryParams.push(user_id, user_id);
-      } else if (role_id === 3) {
-        const queryteam =
-          "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-        const [rowteams] = await db.query(queryteam, [user_id]);
-        let teamIds = [];
-        if (rowteams.length > 0) {
-          teamIds = rowteams.map((row) => row.id);
-        }
+      } else if (hasTeamdata) {
+        // const queryteam =
+        //   "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+        // const [rowteams] = await db.query(queryteam, [user_id]);
+         const teamIds = userDetails.team_id ? userDetails.team_id.split(',') : [];
+        // console.log("teamIds", teamIds);
+        // if (rowteams.length > 0) {
+        //   teamIds = rowteams.map((row) => row.id);
+        // }
 
         query +=
           " AND sub_tasks.deleted_at IS NULL AND (sub_tasks.user_id IS NULL AND tasks.team_id IN (?)) OR (sub_tasks.user_id IS NOT NULL AND subtask_user.team_id IN (?) AND sub_tasks.deleted_at IS NULL)";
