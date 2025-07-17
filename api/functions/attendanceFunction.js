@@ -286,7 +286,6 @@ exports.updateAttendanceData = async (req, res) => {
   }
 };
 
-
 exports.updateAttendanceAndNotify = async (req, res) => {
   const { user_id } = req.query;
 
@@ -607,7 +606,7 @@ exports.getEmployeeAttendance = async (req, res) => {
     } catch (error) {
       return errorResponse(res, error.message, "Error fetching Attendance Report", 500);
     }
-  };
+};
 
 
 
