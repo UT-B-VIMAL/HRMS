@@ -1982,7 +1982,8 @@ exports.getTaskList = async (req, res) => {
   const user_id = await getUserIdFromAccessToken(accessToken);
   const hasAllData = await hasPermission("kanban_board.view_all_kanban_board_data", accessToken);
   const hasTeamdata = await hasPermission("kanban_board.view_team_kanban_board_data", accessToken);
-  const hasUserData = await hasPermission("	kanban_board.user_view_kanban_board_data", accessToken);
+  const hasUserData = await hasPermission("kanban_board.user_view_kanban_board_data", accessToken);
+
   if( !hasAllData && !hasTeamdata && !hasUserData) {
     return errorResponse(res, "You do not have permission to view tasks", 403);
   }
