@@ -1357,7 +1357,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 
     for (const [key, permissionName] of Object.entries(exclusionChecks)) {
       const hasAccess = await hasPermission(permissionName, accessToken);
-      if (!hasAccess) {
+      if (hasAccess) {
         const [rows] = await db.query(`
           SELECT rhp.role_id
           FROM role_has_permissions rhp
@@ -1385,6 +1385,7 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       const params = team_id ? [formattedDate, team_id] : [formattedDate];
       return excludedRoles.length ? [...params, ...excludedRoles] : params;
     };
+    console.log(buildParams(excludedRoleMap.totalUsers));
 
     // Total Users
     const [totalUsers] = await db.query(`
