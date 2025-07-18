@@ -395,14 +395,13 @@ const getRoleName = async (roleId) => {
     const values = [roleId];
     const [result] = await db.query(query, values);
 
-    console.log("Query Result:", result);
 
     if (result.length === 0) {
       console.log(`No role found for roleId: ${roleId}`);
       return null;
     }
 
-    return result[0].role;
+    return result[0].group_name;
   } catch (error) {
     console.error('Error fetching role name:', error.message);
     return null;
