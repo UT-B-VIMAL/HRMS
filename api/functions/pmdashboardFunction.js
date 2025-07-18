@@ -1875,134 +1875,152 @@ exports.getProjectCompletion = async (req, res) => {
     const projectId = project_id ? parseInt(project_id) : null;
 
     if (is_team_project_data) {
-  const teamConditions = teamIds.map(() => `FIND_IN_SET(?, u.team_id)`).join(" OR ");
+      const teamConditions = teamIds.map(() => `FIND_IN_SET(?, u.team_id)`).join(" OR ");
 
-  teamUtilizationSql = `
-    WITH
-    user_estimates AS (
-      SELECT u.id AS user_id,
-        SUM(CASE
-          WHEN EXISTS (
-            SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
-          )
-          THEN (
-            SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
-            FROM sub_tasks s2
-            WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
-          )
-          ELSE TIME_TO_SEC(t.estimated_hours)
-        END) AS total_est_seconds
-      FROM tasks t
-      JOIN users u ON u.id = t.user_id
-      WHERE t.deleted_at IS NULL
-        AND t.product_id = ?
-        AND (? IS NULL OR t.project_id = ?)
-        AND (${teamConditions})
-        AND u.role_id = 4
-      GROUP BY u.id
-    ),
-    worked_by_user AS (
-      SELECT u.id AS user_id,
-        SUM(TIMESTAMPDIFF(SECOND, st.start_time, IFNULL(st.end_time, CURRENT_TIMESTAMP))) AS total_work_seconds
-      FROM sub_tasks_user_timeline st
-      JOIN users u ON u.id = st.user_id
-      WHERE st.deleted_at IS NULL
-        AND st.product_id = ?
-        AND (? IS NULL OR st.project_id = ?)
-        AND (${teamConditions})
-        AND u.role_id = 4
-      GROUP BY u.id
+    teamUtilizationSql = `
+  WITH
+  user_estimates AS (
+    SELECT u.id AS user_id,
+      SUM(CASE
+        WHEN EXISTS (
+          SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+        )
+        THEN (
+          SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+          FROM sub_tasks s2
+          WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+        )
+        ELSE TIME_TO_SEC(t.estimated_hours)
+      END) AS total_est_seconds
+    FROM tasks t
+    JOIN users u ON u.id = t.user_id
+    WHERE t.deleted_at IS NULL
+      AND t.product_id = ?
+      AND (? IS NULL OR t.project_id = ?)
+      AND (${teamConditions})
+      AND u.role_id IN (
+        SELECT rp.role_id
+        FROM role_has_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE p.name = 'dashboard.user_project_graph'
+      )
+    GROUP BY u.id
+  ),
+  worked_by_user AS (
+    SELECT u.id AS user_id,
+      SUM(TIMESTAMPDIFF(SECOND, st.start_time, IFNULL(st.end_time, CURRENT_TIMESTAMP))) AS total_work_seconds
+    FROM sub_tasks_user_timeline st
+    JOIN users u ON u.id = st.user_id
+    WHERE st.deleted_at IS NULL
+      AND st.product_id = ?
+      AND (? IS NULL OR st.project_id = ?)
+      AND (${teamConditions})
+      AND u.role_id IN (
+        SELECT rp.role_id
+        FROM role_has_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE p.name = 'dashboard.user_project_graph'
+      )
+    GROUP BY u.id
+  )
+  SELECT u.first_name AS name,
+    ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
+    ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
+  FROM users u
+  LEFT JOIN user_estimates ue ON ue.user_id = u.id
+  LEFT JOIN worked_by_user wu ON wu.user_id = u.id
+  WHERE (${teamConditions})
+    AND u.role_id IN (
+      SELECT rp.role_id
+      FROM role_has_permissions rp
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE p.name = 'dashboard.user_project_graph'
     )
-    SELECT u.first_name AS name,
-      ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
-      ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
-    FROM users u
-    LEFT JOIN user_estimates ue ON ue.user_id = u.id
-    LEFT JOIN worked_by_user wu ON wu.user_id = u.id
-    WHERE (${teamConditions})
-      AND u.role_id = 4
-      AND u.deleted_at IS NULL
-      ${associateFilter || ""}
-      AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
-    ORDER BY total_worked_hours DESC, total_estimated_hours DESC;
-  `;
+    AND u.deleted_at IS NULL
+    ${associateFilter || ""}
+    AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
+  ORDER BY total_worked_hours DESC, total_estimated_hours DESC;
+`;
 
-  teamUtilizationParams = [
-    productId,
-    projectId,
-    projectId,
-    ...teamIds,
-    productId,
-    projectId,
-    projectId,
-    ...teamIds,
-    ...teamIds,
-  ];
-}else if (is_all_project_data) {
+
+      teamUtilizationParams = [
+        productId,
+        projectId,
+        projectId,
+        ...teamIds,
+        productId,
+        projectId,
+        projectId,
+        ...teamIds,
+        ...teamIds,
+      ];
+    } else if (is_all_project_data) {
       // Admin or PM - single optional team_id filter
       if (team_id) {
         // team_id filter present
         teamUtilizationSql = `
         WITH
-        user_estimates AS (
-          SELECT
-            u.id AS user_id,
-            SUM(
-              CASE
-                WHEN EXISTS (
-                  SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
-                )
-                THEN (
-                  SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
-                  FROM sub_tasks s2
-                  WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
-                )
-                ELSE TIME_TO_SEC(t.estimated_hours)
-              END
-            ) AS total_est_seconds
-          FROM tasks t
-          JOIN users u ON u.id = t.user_id
-          WHERE
-            t.deleted_at IS NULL
-            AND t.product_id = ?
-            AND (? IS NULL OR t.project_id = ?)
-            AND u.team_id = ?
-            AND u.role_id = 4
-          GROUP BY u.id
-        ),
-        worked_by_user AS (
-          SELECT
-            u.id AS user_id,
-            SUM(
-              TIMESTAMPDIFF(
-                SECOND,
-                st.start_time,
-                IFNULL(st.end_time, CURRENT_TIMESTAMP)
-              )
-            ) AS total_work_seconds
-          FROM sub_tasks_user_timeline st
-          JOIN users u ON u.id = st.user_id
-          WHERE
-            st.deleted_at IS NULL
-            AND st.product_id = ?
-            AND (? IS NULL OR st.project_id = ?)
-            AND u.team_id = ?
-            AND u.role_id = 4
-          GROUP BY u.id
-        )
-        SELECT
-          u.first_name AS name,
-          ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
-          ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
-        FROM users u
-        LEFT JOIN user_estimates ue ON ue.user_id = u.id
-        LEFT JOIN worked_by_user wu ON wu.user_id = u.id
-        WHERE u.team_id = ?
-  AND u.role_id = 4
+user_estimates AS (
+  SELECT u.id AS user_id,
+    SUM(CASE
+      WHEN EXISTS (
+        SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+      )
+      THEN (
+        SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+        FROM sub_tasks s2
+        WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+      )
+      ELSE TIME_TO_SEC(t.estimated_hours)
+    END) AS total_est_seconds
+  FROM tasks t
+  JOIN users u ON u.id = t.user_id
+  WHERE t.deleted_at IS NULL
+    AND t.product_id = ?
+    AND (? IS NULL OR t.project_id = ?)
+    AND (${teamConditions})
+    AND u.role_id IN (
+      SELECT role_id
+      FROM role_has_permissions rp
+      JOIN permissions p ON rp.permission_id = p.id
+      WHERE p.name = 'dashboard.user_project_graph'
+    )
+  GROUP BY u.id
+),
+worked_by_user AS (
+  SELECT u.id AS user_id,
+    SUM(TIMESTAMPDIFF(SECOND, st.start_time, IFNULL(st.end_time, CURRENT_TIMESTAMP))) AS total_work_seconds
+  FROM sub_tasks_user_timeline st
+  JOIN users u ON u.id = st.user_id
+  WHERE st.deleted_at IS NULL
+    AND st.product_id = ?
+    AND (? IS NULL OR st.project_id = ?)
+    AND (${teamConditions})
+    AND u.role_id IN (
+      SELECT role_id
+      FROM role_has_permissions rp
+      JOIN permissions p ON rp.permission_id = p.id
+      WHERE p.name = 'dashboard.user_project_graph'
+    )
+  GROUP BY u.id
+)
+SELECT u.first_name AS name,
+  ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
+  ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
+FROM users u
+LEFT JOIN user_estimates ue ON ue.user_id = u.id
+LEFT JOIN worked_by_user wu ON wu.user_id = u.id
+WHERE (${teamConditions})
+  AND u.role_id IN (
+    SELECT role_id
+    FROM role_has_permissions rp
+    JOIN permissions p ON rp.permission_id = p.id
+    WHERE p.name = 'dashboard.user_project_graph'
+  )
   AND u.deleted_at IS NULL
-  AND (ue.total_est_seconds IS NOT NULL OR wu.total_work_seconds IS NOT NULL)
+  ${associateFilter || ""}
   AND (COALESCE(ue.total_est_seconds, 0) > 0 OR COALESCE(wu.total_work_seconds, 0) > 0)
-ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
+ORDER BY total_worked_hours DESC, total_estimated_hours DESC;
         `;
 
         const teamIdInt = parseInt(team_id);
@@ -2021,64 +2039,74 @@ ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
       } else {
         // No team_id filter for admin/pm, aggregate by team
         teamUtilizationSql = `
-        WITH
-        user_estimates AS (
-          SELECT
-            u.team_id,
-            SUM(
-              CASE
-                WHEN EXISTS (
-                  SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
-                )
-                THEN (
-                  SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
-                  FROM sub_tasks s2
-                  WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
-                )
-                ELSE TIME_TO_SEC(t.estimated_hours)
-              END
-            ) AS total_est_seconds
-          FROM tasks t
-          JOIN users u ON u.id = t.user_id
-          WHERE
-            t.deleted_at IS NULL
-            AND t.product_id = ?
-            AND (? IS NULL OR t.project_id = ?)
-            AND u.role_id = 4
-          GROUP BY u.team_id
-        ),
-        worked_by_team AS (
-          SELECT
-            u.team_id,
-            SUM(
-              TIMESTAMPDIFF(
-                SECOND,
-                st.start_time,
-                IFNULL(st.end_time, CURRENT_TIMESTAMP)
-              )
-            ) AS total_work_seconds
-          FROM sub_tasks_user_timeline st
-          JOIN users u ON u.id = st.user_id
-          WHERE
-            st.deleted_at IS NULL
-            AND st.product_id = ?
-            AND (? IS NULL OR st.project_id = ?)
-            AND u.role_id = 4
-          GROUP BY u.team_id
+  WITH
+  user_estimates AS (
+    SELECT
+      u.team_id,
+      SUM(
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
+          )
+          THEN (
+            SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+            FROM sub_tasks s2
+            WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+          )
+          ELSE TIME_TO_SEC(t.estimated_hours)
+        END
+      ) AS total_est_seconds
+    FROM tasks t
+    JOIN users u ON u.id = t.user_id
+    WHERE
+      t.deleted_at IS NULL
+      AND t.product_id = ?
+      AND (? IS NULL OR t.project_id = ?)
+      AND u.role_id IN (
+        SELECT rp.role_id
+        FROM role_has_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE p.name = 'dashboard.user_project_graph'
+      )
+    GROUP BY u.team_id
+  ),
+  worked_by_team AS (
+    SELECT
+      u.team_id,
+      SUM(
+        TIMESTAMPDIFF(
+          SECOND,
+          st.start_time,
+          IFNULL(st.end_time, CURRENT_TIMESTAMP)
         )
-        SELECT
-  t.name AS team_name,
-  t.short_name AS team_short_name,
-  ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
-  ROUND(COALESCE(wt.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
-FROM teams t
-LEFT JOIN user_estimates ue ON ue.team_id = t.id
-LEFT JOIN worked_by_team wt ON wt.team_id = t.id
-WHERE t.deleted_at IS NULL
-HAVING total_estimated_hours > 0 OR total_worked_hours > 0
-ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
+      ) AS total_work_seconds
+    FROM sub_tasks_user_timeline st
+    JOIN users u ON u.id = st.user_id
+    WHERE
+      st.deleted_at IS NULL
+      AND st.product_id = ?
+      AND (? IS NULL OR st.project_id = ?)
+      AND u.role_id IN (
+        SELECT rp.role_id
+        FROM role_has_permissions rp
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE p.name = 'dashboard.user_project_graph'
+      )
+    GROUP BY u.team_id
+  )
+  SELECT
+    t.name AS team_name,
+    t.short_name AS team_short_name,
+    ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
+    ROUND(COALESCE(wt.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
+  FROM teams t
+  LEFT JOIN user_estimates ue ON ue.team_id = t.id
+  LEFT JOIN worked_by_team wt ON wt.team_id = t.id
+  WHERE t.deleted_at IS NULL
+  HAVING total_estimated_hours > 0 OR total_worked_hours > 0
+  ORDER BY total_worked_hours DESC, total_estimated_hours DESC;
+`;
 
-        `;
 
         teamUtilizationParams = [
           productId,
@@ -2091,52 +2119,58 @@ ORDER BY total_worked_hours DESC,total_estimated_hours DESC;
       }
     } else if (is_user_project_data) {
       teamUtilizationSql = `
-        WITH
-        user_estimates AS (
-          SELECT u.id AS user_id,
-            SUM(CASE
-              WHEN EXISTS (
-                SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
-              )
-              THEN (
-                SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
-                FROM sub_tasks s2
-                WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
-              )
-              ELSE TIME_TO_SEC(t.estimated_hours)
-            END) AS total_est_seconds
-          FROM tasks t
-          JOIN users u ON u.id = t.user_id
-          WHERE t.deleted_at IS NULL
-            AND t.product_id = ?
-            AND (? IS NULL OR t.project_id = ?)
-            AND u.id = ?
-          GROUP BY u.id
-        ),
-        worked_by_user AS (
-          SELECT u.id AS user_id,
-          pr.name AS project_name,
-            SUM(TIMESTAMPDIFF(SECOND, st.start_time, IFNULL(st.end_time, CURRENT_TIMESTAMP))) AS total_work_seconds
-          FROM sub_tasks_user_timeline st
-          JOIN users u ON u.id = st.user_id
-          JOIN projects pr ON pr.id = st.project_id
-          WHERE st.deleted_at IS NULL
-            AND st.product_id = ?
-            AND (? IS NULL OR st.project_id = ?)
-            AND u.id = ?
-          GROUP BY u.id
+  WITH
+  user_estimates AS (
+    SELECT u.id AS user_id,
+      SUM(CASE
+        WHEN EXISTS (
+          SELECT 1 FROM sub_tasks s WHERE s.task_id = t.id AND s.deleted_at IS NULL
         )
-        SELECT u.first_name AS name,
-          wu.project_name,
-          ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
-          ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
-        FROM users u
-        LEFT JOIN user_estimates ue ON ue.user_id = u.id
-        LEFT JOIN worked_by_user wu ON wu.user_id = u.id
-        WHERE u.id = ?
-          AND u.role_id = 4
-          AND u.deleted_at IS NULL
-      `;
+        THEN (
+          SELECT SUM(TIME_TO_SEC(s2.estimated_hours))
+          FROM sub_tasks s2
+          WHERE s2.task_id = t.id AND s2.deleted_at IS NULL
+        )
+        ELSE TIME_TO_SEC(t.estimated_hours)
+      END) AS total_est_seconds
+    FROM tasks t
+    JOIN users u ON u.id = t.user_id
+    WHERE t.deleted_at IS NULL
+      AND t.product_id = ?
+      AND (? IS NULL OR t.project_id = ?)
+      AND u.id = ?
+    GROUP BY u.id
+  ),
+  worked_by_user AS (
+    SELECT u.id AS user_id,
+      pr.name AS project_name,
+      SUM(TIMESTAMPDIFF(SECOND, st.start_time, IFNULL(st.end_time, CURRENT_TIMESTAMP))) AS total_work_seconds
+    FROM sub_tasks_user_timeline st
+    JOIN users u ON u.id = st.user_id
+    JOIN projects pr ON pr.id = st.project_id
+    WHERE st.deleted_at IS NULL
+      AND st.product_id = ?
+      AND (? IS NULL OR st.project_id = ?)
+      AND u.id = ?
+    GROUP BY u.id
+  )
+  SELECT u.first_name AS name,
+    wu.project_name,
+    ROUND(COALESCE(ue.total_est_seconds, 0) / 3600, 2) AS total_estimated_hours,
+    ROUND(COALESCE(wu.total_work_seconds, 0) / 3600, 2) AS total_worked_hours
+  FROM users u
+  LEFT JOIN user_estimates ue ON ue.user_id = u.id
+  LEFT JOIN worked_by_user wu ON wu.user_id = u.id
+  WHERE u.id = ?
+    AND u.role_id IN (
+      SELECT rp.role_id
+      FROM role_has_permissions rp
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE p.name = 'dashboard.user_project_graph'
+    )
+    AND u.deleted_at IS NULL
+`;
+
       teamUtilizationParams = [
         productId,
         projectId,
