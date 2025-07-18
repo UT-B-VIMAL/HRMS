@@ -11,6 +11,7 @@ const {
   convertToSeconds,
   calculateRemainingHours,
   calculatePercentage,
+  parseTimeTakenToSeconds,
 } = require("../../helpers/responseHelper");
 const {
   getAuthUserDetails,
@@ -482,48 +483,79 @@ exports.getTask = async (queryParams, res, req) => {
     if (!userDetails || userDetails.id === undefined) {
       return errorResponse(res, "User not found", "Invalid user ID", 404);
     }
-    const hasTeamView    = await hasPermission("kanban_board.view_team_kanban_board_data", accessToken);
-    const hasUserView    = await hasPermission("kanban_board.user_view_kanban_board_data", accessToken);
-    const hasTaskView    = await hasPermission("kanban_board.view_task", accessToken);
-    const hasSubtaskView = await hasPermission("kanban_board.view_subtask", accessToken);
-
+    const hasTeamView = await hasPermission(
+      "kanban_board.view_team_kanban_board_data",
+      accessToken
+    );
+    const hasUserView = await hasPermission(
+      "kanban_board.user_view_kanban_board_data",
+      accessToken
+    );
+    const hasTaskView = await hasPermission(
+      "kanban_board.view_task",
+      accessToken
+    );
+    const hasSubtaskView = await hasPermission(
+      "kanban_board.view_subtask",
+      accessToken
+    );
 
     // Base Task Query
     let taskQuery = `
       SELECT 
-        t.*, 
-        te.name AS team_name, 
-        COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
-        COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
-        p.name AS product_name, 
-        pj.name AS project_name,
-        CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
-        CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
-      FROM tasks t 
-      LEFT JOIN teams te ON t.team_id = te.id 
-      LEFT JOIN users assignee ON t.user_id = assignee.id 
-      LEFT JOIN users owner ON t.assigned_user_id = owner.id 
-      LEFT JOIN products p ON t.product_id = p.id 
-      LEFT JOIN projects pj ON t.project_id = pj.id 
-      WHERE t.id = ?
-      AND t.deleted_at IS NULL
+    t.*, 
+    te.name AS team_name, 
+    COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''))), 'Unknown Owner') AS owner_name, 
+    COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''))), 'Unknown Assignee') AS assignee_name, 
+    p.name AS product_name, 
+    pj.name AS project_name,
+    CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
+    CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date,
+
+    SUM(
+      CASE 
+        WHEN stu.subtask_id IS NULL THEN TIMESTAMPDIFF(SECOND, stu.start_time, COALESCE(stu.end_time, NOW()))
+        ELSE 0
+      END
+    ) AS time_taken_in_seconds,
+
+    ROUND(
+      SUM(
+        CASE 
+          WHEN stu.subtask_id IS NULL THEN TIMESTAMPDIFF(SECOND, stu.start_time, COALESCE(stu.end_time, NOW()))
+          ELSE 0
+        END
+      ) / t.estimated_hours * 100, 2
+    ) AS time_taken_percentage
+
+FROM tasks t 
+LEFT JOIN teams te ON t.team_id = te.id 
+LEFT JOIN users assignee ON t.user_id = assignee.id 
+LEFT JOIN users owner ON t.assigned_user_id = owner.id 
+LEFT JOIN products p ON t.product_id = p.id 
+LEFT JOIN projects pj ON t.project_id = pj.id 
+LEFT JOIN sub_tasks_user_timeline stu ON t.id = stu.task_id
+
+WHERE 
+    t.id = ?
+    AND t.deleted_at IS NULL
     `;
 
     let taskParams = [id];
 
     // Role-based filtering
-    if (hasTeamView && hasTaskView ) {
-      
+    if (hasTeamView && hasTaskView) {
       const queryTeams = `
       SELECT id, team_id FROM users 
       WHERE deleted_at IS NULL AND id = ?
     `;
-    const [teamRows] = await db.query(queryTeams, [user_id]);
+      const [teamRows] = await db.query(queryTeams, [user_id]);
 
-    // Check if teamRows[0] exists before using
-    const teamIds = teamRows.length > 0 && teamRows[0].team_id
-      ? teamRows[0].team_id.split(',')
-      : [];
+      // Check if teamRows[0] exists before using
+      const teamIds =
+        teamRows.length > 0 && teamRows[0].team_id
+          ? teamRows[0].team_id.split(",")
+          : [];
 
       // Also include the user's own team_id
       if (userDetails.team_id) {
@@ -563,17 +595,18 @@ exports.getTask = async (queryParams, res, req) => {
 
     let subtaskParams = [id];
 
-    if (hasTeamView && hasSubtaskView ) {
+    if (hasTeamView && hasSubtaskView) {
       const queryTeams = `
       SELECT id, team_id FROM users 
       WHERE deleted_at IS NULL AND id = ?
     `;
-    const [teamRows] = await db.query(queryTeams, [user_id]);
+      const [teamRows] = await db.query(queryTeams, [user_id]);
 
-    // Check if teamRows[0] exists before using
-    const teamIds = teamRows.length > 0 && teamRows[0].team_id
-      ? teamRows[0].team_id.split(',')
-      : [];
+      // Check if teamRows[0] exists before using
+      const teamIds =
+        teamRows.length > 0 && teamRows[0].team_id
+          ? teamRows[0].team_id.split(",")
+          : [];
 
       // Include the current user's own team
       if (userDetails.team_id) {
@@ -651,21 +684,24 @@ exports.getTask = async (queryParams, res, req) => {
 
     const comments = await db.query(commentsQuery, [id]);
 
-    // Prepare task data
     const taskData = task.map((task) => {
-      const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
-      const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
+      const totalEstimatedHours = task.estimated_hours || "00:00:00";
 
-      // Calculate remaining hours and ensure consistent formatting
-      const remainingHours = calculateRemainingHours(
-        totalEstimatedHours,
-        timeTaken
+      // Convert estimated time to seconds
+      const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
+
+      // Get actual time taken in seconds
+      const timeTakenInSeconds = Number(task.time_taken_in_seconds) || 0;
+
+      // Format time taken
+      const timeTaken = formatTimeDHMS(timeTakenInSeconds);
+      const workedSeconds = parseTimeTakenToSeconds(timeTaken);
+      // Calculate remaining time
+      const remainingInSeconds = estimatedInSeconds - timeTakenInSeconds;
+      const remainingHours = formatTimeDHMS(
+        remainingInSeconds > 0 ? remainingInSeconds : 0
       );
 
-      // Calculate percentage for hours
-      const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
-      const timeTakenInSeconds = convertToSeconds(timeTaken);
-      const remainingInSeconds = convertToSeconds(remainingHours);
 
       return {
         task_id: task.id || "",
@@ -684,34 +720,29 @@ exports.getTask = async (queryParams, res, req) => {
         team: task.team_name || "",
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
-        estimated_hours: formatTimeDHMS(totalEstimatedHours),
-        estimated_hours_percentage: calculatePercentage(
-          estimatedInSeconds,
-          estimatedInSeconds
-        ),
-        time_taken: formatTimeDHMS(timeTaken),
+        estimated_hours: totalEstimatedHours,
+        estimated_hours_percentage: "100.00%", // Always 100%
+        time_taken: timeTaken,
         time_taken_percentage: calculatePercentage(
-          timeTakenInSeconds,
+          workedSeconds,
           estimatedInSeconds
         ),
-        remaining_hours: formatTimeDHMS(remainingHours),
+        remaining_hours: remainingHours,
         remaining_hours_percentage: calculatePercentage(
-          remainingInSeconds,
+          remainingInSeconds > 0 ? remainingInSeconds : 0,
           estimatedInSeconds
         ),
         start_date: task.start_date,
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
-        // status_text: statusMap[task.status] || "Unknown",
         status_text: commonStatusGroup(
           task.status,
           task.reopen_status,
           task.active_status,
           task.hold_status
         ),
-
-        is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
+        is_exceed: timeTakenInSeconds > estimatedInSeconds,
       };
     });
 
@@ -764,7 +795,7 @@ exports.getTask = async (queryParams, res, req) => {
     const commentsData = [];
 
     if (Array.isArray(comments) && comments[0].length > 0) {
-      const grouped = new Map(); 
+      const grouped = new Map();
 
       comments[0].forEach((row) => {
         if (!grouped.has(row.id)) {
@@ -1146,12 +1177,10 @@ exports.updateTaskData = async (id, payload, res, req) => {
     due_date: "end_date",
   };
   try {
-    
     const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
       return errorResponse(res, "Access token is required", 401);
     }
-
 
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
@@ -1161,7 +1190,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
     const hasOnholdTask = await hasPermission("task.onhold_task", accessToken);
     const hasEndTask = await hasPermission("task.end_task", accessToken);
 
-    
     const [tasks] = await db.query(
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
       [id]
@@ -1474,15 +1502,14 @@ exports.updateTaskData = async (id, payload, res, req) => {
       payload.active_status == 0 &&
       payload.reopen_status == 0
     ) {
-     if (hasPauseTask) {
-         payload.hold_status = 0;
+      if (hasPauseTask) {
+        payload.hold_status = 0;
       } else if (hasOnholdTask) {
         payload.hold_status = 1;
       } else {
         payload.hold_status = 0;
       }
-     }
-
+    }
 
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
       status = Number(status);
@@ -1973,20 +2000,33 @@ exports.getTaskList = async (req, res) => {
       dropdown_products,
       dropdown_projects,
     } = req.query;
-  const accessToken = req.headers.authorization?.split(" ")[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
 
-  if (!accessToken) {
-    return errorResponse(res, "Access token is required", 401);
-  }
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
 
-  const user_id = await getUserIdFromAccessToken(accessToken);
-  const hasAllData = await hasPermission("kanban_board.view_all_kanban_board_data", accessToken);
-  const hasTeamdata = await hasPermission("kanban_board.view_team_kanban_board_data", accessToken);
-  const hasUserData = await hasPermission("kanban_board.user_view_kanban_board_data", accessToken);
+    const user_id = await getUserIdFromAccessToken(accessToken);
+    const hasAllData = await hasPermission(
+      "kanban_board.view_all_kanban_board_data",
+      accessToken
+    );
+    const hasTeamdata = await hasPermission(
+      "kanban_board.view_team_kanban_board_data",
+      accessToken
+    );
+    const hasUserData = await hasPermission(
+      "kanban_board.user_view_kanban_board_data",
+      accessToken
+    );
 
-  if( !hasAllData && !hasTeamdata && !hasUserData) {
-    return errorResponse(res, "You do not have permission to view tasks", 403);
-  }
+    if (!hasAllData && !hasTeamdata && !hasUserData) {
+      return errorResponse(
+        res,
+        "You do not have permission to view tasks",
+        403
+      );
+    }
     // Validate if user_id exists
     if (!user_id) {
       console.log("Missing user_id in query parameters");
@@ -2061,7 +2101,7 @@ exports.getTaskList = async (req, res) => {
 
       // const [rowteams] = await db.query(queryteam, [user_id]);
       // let teamIds = [];
-      const teamIds = userDetails.team_id ? userDetails.team_id.split(',') : [];
+      const teamIds = userDetails.team_id ? userDetails.team_id.split(",") : [];
       console.log("teamIds", teamIds);
       if (teamIds.length > 0) {
         baseQuery += ` AND FIND_IN_SET(u.team_id, ?)`;
@@ -2308,7 +2348,9 @@ exports.getTaskList = async (req, res) => {
         // const queryteam =
         //   "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
         // const [rowteams] = await db.query(queryteam, [user_id]);
-         const teamIds = userDetails.team_id ? userDetails.team_id.split(',') : [];
+        const teamIds = userDetails.team_id
+          ? userDetails.team_id.split(",")
+          : [];
         // console.log("teamIds", teamIds);
         // if (rowteams.length > 0) {
         //   teamIds = rowteams.map((row) => row.id);

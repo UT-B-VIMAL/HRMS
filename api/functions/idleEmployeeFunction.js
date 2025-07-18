@@ -296,7 +296,7 @@ exports.get_idleEmployee = async (req, res) => {
     const hasAllIdle = await hasPermission("idle_employees.all_idle_employees_view", accessToken);
     const hasTeamIdle = await hasPermission("idle_employees.team_idle_employees_view", accessToken);
     const hasExceedRole = await hasPermission("idle_employees.show_excluded_roles", accessToken);
-console.log(`User ID: ${user_id}, hasAllIdle: ${hasAllIdle}, hasTeamIdle: ${hasTeamIdle}, hasExceedRole: ${hasExceedRole}`);
+// console.log(`User ID: ${user_id}, hasAllIdle: ${hasAllIdle}, hasTeamIdle: ${hasTeamIdle}, hasExceedRole: ${hasExceedRole}`);
 
     if (!hasAllIdle && !hasTeamIdle) {
       return errorResponse(res, null, "Access denied", 403);
