@@ -814,6 +814,12 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
   };
 
   try {
+
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+    
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
     

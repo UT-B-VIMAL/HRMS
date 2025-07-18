@@ -301,16 +301,26 @@ exports.projectStatus = async (req, res) => {
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
 
+   const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
+    const userId = await getUserIdFromAccessToken(accessToken);
+    
+    const hasTeamstatusView    = await hasPermission("project_status.view_team_project_status", accessToken);
+
+
     const taskConditions = [];
     const taskValues = [];
     const subtaskConditions = [];
     const subtaskValues = [];
 
-    if (users.role_id === 3) {
-      taskConditions.push("tm.reporting_user_id = ?");
-      taskValues.push(users.id);
-      subtaskConditions.push("tm.reporting_user_id = ?");
-      subtaskValues.push(users.id);
+    if (hasTeamstatusView) {
+      taskConditions.push("FIND_IN_SET(?, u.team_id)");
+      taskValues.push(users.team_id);
+      subtaskConditions.push("FIND_IN_SET(?, u.team_id)");
+      subtaskValues.push(users.team_id);
     }
 
     if (product_id) {
