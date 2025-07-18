@@ -8,7 +8,7 @@ const {
     getAuthUserDetails,
     getUserIdFromAccessToken,
 } = require("../api/functions/commonFunction");
-const { assignClientRoleToGroup, createClientRoleInKeycloak, deleteClientRoleFromKeycloak, getAdminToken } = require('../api/functions/keycloakFunction');
+const { assignClientRoleToGroup, createClientRoleInKeycloak, deleteClientRoleFromKeycloak, getAdminToken, logoutUserFromKeycloak } = require('../api/functions/keycloakFunction');
 
 const createPermission = async (req, res) => {
     try {
@@ -134,6 +134,20 @@ const assignPermissionsToRole = async (req, res) => {
         // 6. Sync roles in Keycloak
         const permissionNames = validPermissions.map(p => p.name);
         await assignClientRoleToGroup(role.group_name, permissionNames);
+
+
+        const [users] = await db.query(
+            'SELECT keycloak_id FROM users WHERE role_id = ? AND keycloak_id IS NOT NULL',
+            [role_id]
+        );
+
+        for (const user of users) {
+            try {
+                await logoutUserFromKeycloak(user.keycloak_id);
+            } catch (logoutErr) {
+                console.error(`Failed to logout user ${user.keycloak_id}:`, logoutErr.message);
+            }
+        }
 
         return successResponse(res, null, "Permissions updated successfully for role");
     } catch (error) {
