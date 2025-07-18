@@ -7,6 +7,7 @@ const {
   convertToSeconds,
   calculateRemainingHours,
   calculatePercentage,
+  parseTimeTakenToSeconds,
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
 const { startTask, pauseTask, endTask } = require("../functions/taskFunction");
@@ -312,13 +313,30 @@ exports.getSubTask = async (id, res) => {
         COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
         COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
         p.name AS product_name, 
-        pj.name AS project_name 
+        pj.name AS project_name,
+      SUM(
+            CASE 
+              WHEN stu.subtask_id IS NOT NULL THEN TIMESTAMPDIFF(SECOND, stu.start_time, COALESCE(stu.end_time, NOW()))
+              ELSE 0
+            END
+          ) AS time_taken_in_seconds,
+
+          ROUND(
+            SUM(
+              CASE 
+                WHEN stu.subtask_id IS NOT NULL THEN TIMESTAMPDIFF(SECOND, stu.start_time, COALESCE(stu.end_time, NOW()))
+                ELSE 0
+              END
+            ) / (st.estimated_hours * 3600) * 100, 2
+          ) AS time_taken_percentage
+          
       FROM sub_tasks st 
       LEFT JOIN teams te ON st.team_id = te.id 
       LEFT JOIN users assignee ON st.user_id = assignee.id 
       LEFT JOIN users owner ON st.assigned_user_id = owner.id 
       LEFT JOIN products p ON st.product_id = p.id 
       LEFT JOIN projects pj ON st.project_id = pj.id 
+      LEFT JOIN sub_tasks_user_timeline stu ON st.id = stu.subtask_id
       WHERE st.id = ?
       AND st.deleted_at IS NULL;
     `;
@@ -385,18 +403,20 @@ ORDER BY h.id DESC;
 
     const subtaskData = subtask.map((subtask) => {
       const totalEstimatedHours = subtask.estimated_hours || "00:00:00"; // Default format as "HH:MM:SS"
-      const timeTaken = subtask.total_hours_worked || "00:00:00"; // Default format as "HH:MM:SS"
+     // Convert estimated time to seconds
+      const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
+      // Get actual time taken in seconds
+      const timeTakenInSeconds = Number(subtask.time_taken_in_seconds) || 0;
 
-      // Calculate remaining hours and ensure consistent formatting
-      const remainingHours = calculateRemainingHours(
-        totalEstimatedHours,
-        timeTaken
+     // Format time taken
+      const timeTaken = formatTimeDHMS(timeTakenInSeconds);
+      const workedSeconds = parseTimeTakenToSeconds(timeTaken);
+      // Calculate remaining time
+      const remainingInSeconds = estimatedInSeconds - timeTakenInSeconds;
+      const remainingHours = formatTimeDHMS(
+        remainingInSeconds > 0 ? remainingInSeconds : 0
       );
 
-      // Calculate percentages for hours
-      const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
-      const timeTakenInSeconds = convertToSeconds(timeTaken);
-      const remainingInSeconds = convertToSeconds(remainingHours);
 
       return {
         subtask_id: subtask.id || "",
@@ -412,19 +432,16 @@ ORDER BY h.id DESC;
         team: subtask.team_name || "",
         assignee_id: subtask.assigned_user_id || "",
         assignee: subtask.assignee_name?.trim() ? subtask.assignee_name : "",
-        estimated_hours: formatTimeDHMS(totalEstimatedHours),
-        estimated_hours_percentage: calculatePercentage(
-          estimatedInSeconds,
-          estimatedInSeconds
-        ),
-        time_taken: formatTimeDHMS(timeTaken),
+        estimated_hours: totalEstimatedHours,
+        estimated_hours_percentage: "100.00%",
+        time_taken: timeTaken,
         time_taken_percentage: calculatePercentage(
-          timeTakenInSeconds,
+          workedSeconds,
           estimatedInSeconds
         ),
-        remaining_hours: formatTimeDHMS(remainingHours),
+        remaining_hours: remainingHours,
         remaining_hours_percentage: calculatePercentage(
-          remainingInSeconds,
+          remainingInSeconds > 0 ? remainingInSeconds : 0,
           estimatedInSeconds
         ),
         start_date: subtask.start_date || "",
