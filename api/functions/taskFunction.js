@@ -720,7 +720,7 @@ WHERE
         team: task.team_name || "",
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
-        estimated_hours: totalEstimatedHours,
+        estimated_hours:  formatTimeDHMS(totalEstimatedHours),
         estimated_hours_percentage: "100.00%", // Always 100%
         time_taken: timeTaken,
         time_taken_percentage: calculatePercentage(
