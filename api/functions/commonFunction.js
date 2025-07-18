@@ -323,15 +323,56 @@ exports.getAuthUserDetails = async (authUserId, res) => {
     }
 };
 
+// exports.formatTimeDHMS = (time) => {
+//       if (typeof time !== 'string') {
+//         time = String(time || "00:00:00");
+//     }
+//     if (time === "00:00:00") {
+//         return "0m 0s";
+//     }
+
+//     const [hours, minutes, seconds] = time.split(":").map(Number);
+//     const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+
+//     const days = Math.floor(totalSeconds / (8 * 3600)); // 8 hours per day
+//     const remainingSeconds = totalSeconds % (8 * 3600);
+
+//     const remainingHours = Math.floor(remainingSeconds / 3600);
+//     const remainingMinutes = Math.floor((remainingSeconds % 3600) / 60);
+//     const finalSeconds = remainingSeconds % 60;
+
+//     let result = '';
+//     if (days > 0) {
+//         result += `${days}d `;
+//     }
+//     if (remainingHours > 0) {
+//         result += `${remainingHours}h `;
+//     }
+//     if (remainingMinutes > 0) {
+//         result += `${remainingMinutes}m `;
+//     }
+//     if (finalSeconds > 0 || result === '') {
+//         result += `${finalSeconds}s`;
+//     }
+
+//     return result.trim();
+// };
+
 exports.formatTimeDHMS = (time) => {
-    if (time === "00:00:00") {
+    let totalSeconds;
+
+    if (typeof time === "number" || /^[0-9]+$/.test(time)) {
+        // If time is raw seconds (e.g., "192482")
+        totalSeconds = parseInt(time, 10);
+    } else if (typeof time === "string" && time.includes(":")) {
+        // If time is "HH:MM:SS" format
+        const [hours, minutes, seconds] = time.split(":").map(Number);
+        totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+    } else {
         return "0m 0s";
     }
 
-    const [hours, minutes, seconds] = time.split(":").map(Number);
-    const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-
-    const days = Math.floor(totalSeconds / (8 * 3600)); // 8 hours per day
+    const days = Math.floor(totalSeconds / (8 * 3600)); // 8 hours/day
     const remainingSeconds = totalSeconds % (8 * 3600);
 
     const remainingHours = Math.floor(remainingSeconds / 3600);
@@ -339,22 +380,13 @@ exports.formatTimeDHMS = (time) => {
     const finalSeconds = remainingSeconds % 60;
 
     let result = '';
-    if (days > 0) {
-        result += `${days}d `;
-    }
-    if (remainingHours > 0) {
-        result += `${remainingHours}h `;
-    }
-    if (remainingMinutes > 0) {
-        result += `${remainingMinutes}m `;
-    }
-    if (finalSeconds > 0 || result === '') {
-        result += `${finalSeconds}s`;
-    }
+    if (days > 0) result += `${days}d `;
+    if (remainingHours > 0) result += `${remainingHours}h `;
+    if (remainingMinutes > 0) result += `${remainingMinutes}m `;
+    if (finalSeconds > 0 || result === '') result += `${finalSeconds}s`;
 
     return result.trim();
 };
-
 
 exports.getISTTime = () => {
     const now = new Date();
