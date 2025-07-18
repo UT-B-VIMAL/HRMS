@@ -829,6 +829,24 @@ async function findGroupInKeycloak(groupName) {
     }
 }
 
+async function logoutUserFromKeycloak(keycloakId) {
+  try {
+    const token = await getAdminToken();
+
+    await axios.post(
+      `${keycloakConfig.serverUrl}/admin/realms/${keycloakConfig.realm}/users/${keycloakId}/logout`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    console.log(`Logged out user ${keycloakId} from Keycloak`);
+  } catch (error) {
+    console.error(`Error logging out user ${keycloakId}:`, error.message);
+    throw error;
+  }
+}
+
+
 module.exports = {
   createUserInKeycloak,
   editUserInKeycloak,
@@ -837,6 +855,7 @@ module.exports = {
   assignRoleToUser,
   signInUser,
   logoutUser,
+  logoutUserFromKeycloak,
   changePassword,
   forgotPassword,
   resetPasswordWithKeycloak,
