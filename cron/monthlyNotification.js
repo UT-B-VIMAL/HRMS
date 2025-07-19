@@ -34,12 +34,12 @@ const sendMonthlyNotification = async () => {
 
       // Fetch all users in the team
       const teamUsersQuery = `
-        SELECT id 
-        FROM users 
-        WHERE team_id = ? 
-        AND id != ? 
-        AND deleted_at IS NULL
-      `;
+                 SELECT id 
+                 FROM users 
+                 WHERE FIND_IN_SET(?, team_id) > 0
+                 AND id != ? 
+                 AND deleted_at IS NULL
+                   `;
       const [teamUsers] = await db.query(teamUsersQuery, [TeamId, reportingUserId]);
 
       let allRatingsUpdated = true;
