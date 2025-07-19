@@ -142,7 +142,6 @@ apiRouter.post("/login", loginController.login);
 apiRouter.post("/logout", loginController.logout);
 apiRouter.put(
   "/change_password/:id",
-  RoleController.checkRole(),
   loginController.changePassword
 );
 apiRouter.post("/forgot_password", loginController.forgotPassword);
