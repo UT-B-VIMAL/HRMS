@@ -3,7 +3,7 @@ const {
   successResponse,
   errorResponse,
 } = require("../../helpers/responseHelper");
-const { getUserIdFromAccessToken } = require("./commonFunction");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
 const { uploadcommentsFileToS3, deleteFileFromS3 } = require("../../config/s3");
 const path = require("path");
 const moment = require("moment");
