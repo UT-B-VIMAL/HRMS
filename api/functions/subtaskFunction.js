@@ -432,7 +432,7 @@ ORDER BY h.id DESC;
         team: subtask.team_name || "",
         assignee_id: subtask.assigned_user_id || "",
         assignee: subtask.assignee_name?.trim() ? subtask.assignee_name : "",
-        estimated_hours: totalEstimatedHours,
+        estimated_hours:  formatTimeDHMS(totalEstimatedHours),
         estimated_hours_percentage: "100.00%",
         time_taken: timeTaken,
         time_taken_percentage: calculatePercentage(
