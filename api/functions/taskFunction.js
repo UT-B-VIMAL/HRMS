@@ -1517,6 +1517,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
       holdStatus = Number(holdStatus);
+console.log("Status:", status, "Reopen Status:", reopenStatus, "Active Status:", activeStatus, "Hold Status:", holdStatus);
 
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
