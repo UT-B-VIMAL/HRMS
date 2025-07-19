@@ -11,8 +11,6 @@ const { getUserIdFromAccessToken } = require('../api/utils/tokenUtils');
 const createPermission = async (req, res) => {
     try {
         const { name, display_name, description, created_by } = req.body;
-
-        // Check if a permission with the same name already exists
         const [existingRows] = await db.execute(
             'SELECT * FROM permissions WHERE name = ?',
             [name]
