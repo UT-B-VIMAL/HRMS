@@ -20,9 +20,9 @@ const {
   getISTTime,
   checkUpdatePermission,
   commonStatusGroup,
-  getColorForProduct
+  getColorForProduct,
 } = require("../../api/functions/commonFunction");
-const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
 
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -703,7 +703,6 @@ WHERE
         remainingInSeconds > 0 ? remainingInSeconds : 0
       );
 
-
       return {
         task_id: task.id || "",
         name: task.name || "",
@@ -721,7 +720,7 @@ WHERE
         team: task.team_name || "",
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
-        estimated_hours:  formatTimeDHMS(totalEstimatedHours),
+        estimated_hours: formatTimeDHMS(totalEstimatedHours),
         estimated_hours_percentage: "100.00%", // Always 100%
         time_taken: timeTaken,
         time_taken_percentage: calculatePercentage(
@@ -1517,7 +1516,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
       holdStatus = Number(holdStatus);
-console.log("Status:", status, "Reopen Status:", reopenStatus, "Active Status:", activeStatus, "Hold Status:", holdStatus);
 
       if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
@@ -1650,15 +1648,31 @@ console.log("Status:", status, "Reopen Status:", reopenStatus, "Active Status:",
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
     const taskHistoryEntries = [];
+    // Precompute the current status group before any payload mutation
+    const oldStatusGroup = getStatusGroup(
+      currentTask.status,
+      currentTask.reopen_status,
+      currentTask.active_status,
+      currentTask.hold_status
+    );
+
+    // Later, when building task history entries
     for (const key in cleanedPayload) {
       const newValue = Number(payload[key]);
       const oldValue = Number(currentTask[key]);
 
       if (!isNaN(newValue) && newValue !== oldValue) {
         const flag = statusFlagMapping[key] || null;
+
+        const oldData =
+          flag === 0 || flag === 1
+            ? oldStatusGroup
+            : await processStatusData(flag, currentTask[key], id, null);
+        const newData = await processStatusData1(flag, payload[key]);
+
         taskHistoryEntries.push([
-          await processStatusData(flag, currentTask[key], id, null),
-          await processStatusData1(flag, payload[key]),
+          oldData,
+          newData,
           id,
           null,
           `Changed ${key}`,
@@ -1821,8 +1835,6 @@ exports.deleteTask = async (req, res) => {
       reopen_status,
       active_status
     );
-    console.log("Current Status Group:", currentGroup);
-
     if (currentGroup === "InProgress") {
       return errorResponse(
         res,
@@ -2383,7 +2395,14 @@ exports.getTaskList = async (req, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
-      console.log(holdStatus);
+      console.log(
+        "getStatusGroup called with:",
+        status,
+        reopenStatus,
+        activeStatus,
+        holdStatus
+      );
+
       if (
         (status === 0 &&
           reopenStatus === 0 &&
