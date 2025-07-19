@@ -2,6 +2,7 @@ const db = require('../../config/db');
 const { hasPermission } = require('../../controllers/permissionController');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const jwt = require('jsonwebtoken');
+const { getUserIdFromAccessToken } = require('../utils/tokenUtils');
 
 exports.getAllData = async (req, res) => {
     const { type, id, task_user_id ,project_id,product_id } = req.query;
@@ -14,7 +15,7 @@ exports.getAllData = async (req, res) => {
     }
     console.log(accessToken)
 
-    const user_id = await this.getUserIdFromAccessToken(accessToken);
+    const user_id = await getUserIdFromAccessToken(accessToken);
     const hasAllProducts = await hasPermission("dropdown.all_products", accessToken);
     const hasTeamProducts = await hasPermission("dropdown.team_products", accessToken);
     const hasUserProducts = await hasPermission("dropdown.user_products", accessToken);
@@ -603,32 +604,32 @@ exports.addHistorydata = async (
     }
 };
 
-exports.getUserIdFromAccessToken = async (accessToken) => {
-    try {
-        if (!accessToken) {
-            throw new Error('Access token is missing or invalid');
-        }
-        const decoded = jwt.decode(accessToken);
-        const keycloakId = decoded?.sub;
+// exports.getUserIdFromAccessToken = async (accessToken) => {
+//     try {
+//         if (!accessToken) {
+//             throw new Error('Access token is missing or invalid');
+//         }
+//         const decoded = jwt.decode(accessToken);
+//         const keycloakId = decoded?.sub;
         
-        if (!keycloakId) {
-            throw new Error('Keycloak user ID not found in token');
-        }
+//         if (!keycloakId) {
+//             throw new Error('Keycloak user ID not found in token');
+//         }
 
-        const keycloakUserQuery = "SELECT id FROM users WHERE keycloak_id = ? AND deleted_at IS NULL LIMIT 1";
-        const [user] = await db.query(keycloakUserQuery, [keycloakId]);
+//         const keycloakUserQuery = "SELECT id FROM users WHERE keycloak_id = ? AND deleted_at IS NULL LIMIT 1";
+//         const [user] = await db.query(keycloakUserQuery, [keycloakId]);
 
 
-        if (!user) {
-            throw new Error('User not found in the database');
-        }
-        const userId = user[0].id;
-        return userId; 
-    } catch (error) {
-        console.error('Error retrieving user ID from access token:', error.message);
-        throw new Error('Error retrieving user ID: ' + error.message);
-    }
-};
+//         if (!user) {
+//             throw new Error('User not found in the database');
+//         }
+//         const userId = user[0].id;
+//         return userId; 
+//     } catch (error) {
+//         console.error('Error retrieving user ID from access token:', error.message);
+//         throw new Error('Error retrieving user ID: ' + error.message);
+//     }
+// };
 
 
 const productColors = [
