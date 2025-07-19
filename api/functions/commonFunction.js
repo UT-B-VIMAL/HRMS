@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { hasPermission } = require('../../controllers/permissionController');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const jwt = require('jsonwebtoken')
 
@@ -14,6 +15,18 @@ exports.getAllData = async (req, res) => {
     console.log(accessToken)
 
     const user_id = await this.getUserIdFromAccessToken(accessToken);
+    const hasAllProducts = await hasPermission("dropdown.all_products", accessToken);
+    const hasTeamProducts = await hasPermission("dropdown.team_products", accessToken);
+    const hasUserProducts = await hasPermission("dropdown.user_products", accessToken);
+    const hasAllProjects = await hasPermission("dropdown.all_projects", accessToken);
+    const hasTeamProjects = await hasPermission("dropdown.team_projects", accessToken);
+    const hasUserProjects = await hasPermission("dropdown.user_projects", accessToken);
+    const hasTeamUsers= await hasPermission("dropdown.team_users", accessToken);
+    
+    const hasTeamProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.team_products") ;
+    const hasUserProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.user_products") ;
+    console.log("hasTeamProductsIds",hasTeamProductsIds)
+    console.log("hasUserProductsIds",hasUserProductsIds)
     // try {
     // Initialize queries based on type
     if (type === "teams") {
@@ -57,7 +70,7 @@ exports.getAllData = async (req, res) => {
                     teamIds = teamRows.map(t => t.team_id);
                 }
 
-
+   
         if (userIds.size > 0) {
         const userIdList = [...userIds];
         const [teamRows] = await db.query(
@@ -71,26 +84,28 @@ exports.getAllData = async (req, res) => {
         teamIds = [-1]; // fallback to avoid SQL error
     }
 
-    query = `SELECT id, name FROM teams WHERE deleted_at IS NULL AND id IN (?)`;
+    query = `SELECT DISTINCT teams.id, teams.name FROM teams LEFT JOIN users ON teams.id = users.team_id WHERE teams.deleted_at IS NULL AND users.deleted_at IS NULL AND teams.id IN (?)`;
     queryParams.push(teamIds);
     } else if (type === "users") {
-        query = "SELECT id, role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
+        query = `SELECT id, role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id IN (${hasUserProductsIds.map(() => '?').join(',')})`;
+        queryParams.push(...hasUserProductsIds);
     }
     else if (type === "tl") {
-        query = "SELECT id,role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE role_id = 3 AND deleted_at IS NULL";
+     query = `SELECT id, role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id IN (${hasTeamProductsIds.map(() => '?').join(',')})`;
+        queryParams.push(...hasTeamProductsIds);
     } else if (type === "products") {
 
         const users = await this.getAuthUserDetails(user_id, res);
         if (!users) return;
-        if (users.role_id === 3) {
-            const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-            const [rows] = await db.query(query1, [user_id]);
-            let teamIds = [];
-            if (rows.length > 0) {
-                teamIds = rows.map(row => row.id);
-            } else {
-                teamIds.push(users.team_id);
-            }
+        if (hasTeamProducts) {
+            // const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+            // const [rows] = await db.query(query1, [user_id]);
+            const teamIds = users.team_id ? users.team_id.split(',') : [];
+            // if (rows.length > 0) {
+            //     teamIds = rows.map(row => row.id);
+            // } else {
+            //     teamIds.push(users.team_id);
+            // }
             const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
             const [userRows] = await db.query(userIdList, [teamIds]);
             const userIds = userRows.map(row => row.id);
@@ -106,7 +121,7 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(productIds);
-        } else if (users.role_id === 4) {
+        } else if (hasUserProducts) {
             const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id=?";
             const [taskRows] = await db.query(queryTasks, [user_id]);
 
@@ -119,23 +134,25 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(productIds);
-        } else {
+        } else if( hasAllProducts) {
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
-
+        }else{
+            return errorResponse(res, "Unauthorized access", "You do not have permission to view products", 403);
         }
     } else if (type === "projects") {
         // if(user_id){
         const users = await this.getAuthUserDetails(user_id, res);
         if (!users) return;
-        if (users.role_id === 3) {
-            const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-            const [rows] = await db.query(query1, [user_id]);
-            let teamIds = [];
-            if (rows.length > 0) {
-                teamIds = rows.map(row => row.id);
-            } else {
-                teamIds.push(users.team_id);
-            }
+        if (hasTeamProjects) {
+            // const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+            // const [rows] = await db.query(query1, [user_id]);
+            // let teamIds = [];
+            // if (rows.length > 0) {
+            //     teamIds = rows.map(row => row.id);
+            // } else {
+            //     teamIds.push(users.team_id);
+            // }
+            const teamIds = users.team_id ? users.team_id.split(',') : [];
             const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
             const [userRows] = await db.query(userIdList, [teamIds]);
             const userIds = userRows.map(row => row.id);
@@ -151,7 +168,7 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(projectIds);
-        } else if (users.role_id === 4) {
+        } else if (hasUserProjects) {
             const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id=?";
             const [taskRows] = await db.query(queryTasks, [user_id]);
 
@@ -163,8 +180,10 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(projectIds);
-        } else {
+        } else if( hasAllProjects) {
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
+        }else{
+            return errorResponse(res, "Unauthorized access", "You do not have permission to view projects", 403);
         }
 
         // }
@@ -236,7 +255,7 @@ exports.getAllData = async (req, res) => {
         queryParams.push(id);
     }
     if (type === "assignee" && id) {
-        query += " AND team_id = ?";
+        query += " AND FIND_IN_SET(?, team_id)";
         queryParams.push(id);
     }
     if (type === "tasks" && id) {
@@ -248,24 +267,29 @@ exports.getAllData = async (req, res) => {
         }
     }
     if (type === "teams" && id) {
+        
         const users = await this.getAuthUserDetails(id, res);
         if (!users) return;
-        if (users.role_id === 3) {
-            query += " AND reporting_user_id = ?";
-            queryParams.push(id);
+        if (hasTeamUsers) {
+            const teamIds = users.team_id ? users.team_id.split(',') : [];
+            console.log("teamIds", teamIds)
+            query += " AND teams.id IN (?)";
+
+            queryParams.push(teamIds);
         }
     }
     if (type === "users" && user_id) {
         const users = await this.getAuthUserDetails(user_id, res);
         if (!users) return;
-        if (users.role_id === 3) {
-            const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-            const [rows] = await db.query(query1, [user_id]);
-            let teamIds = [];
-            if (rows.length > 0) {
-                teamIds = rows.map(row => row.id);
-            }
-            query += " AND team_id IN (?) AND id!=?";
+        if (hasTeamUsers) {
+            // const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+            // const [rows] = await db.query(query1, [user_id]);
+            // let teamIds = [];
+            // if (rows.length > 0) {
+            //     teamIds = rows.map(row => row.id);
+            // }
+            const teamIds = users.team_id ? users.team_id.split(',') : [];
+            query += ` AND team_id IN (?) AND id!=?`;
             queryParams.push(teamIds, user_id);
         }
     }
