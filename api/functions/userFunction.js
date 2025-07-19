@@ -4,9 +4,10 @@ const { successResponse, errorResponse } = require('../../helpers/responseHelper
 const getPagination = require('../../helpers/pagination');
 const { createUserInKeycloak, deleteUserInKeycloak, editUserInKeycloak } = require("../functions/keycloakFunction");
 const {
-  getAuthUserDetails,
-  getUserIdFromAccessToken,
+  getAuthUserDetails
 } = require("../../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 
 // Create User
 exports.createUser = async (payload, res, req) => {

@@ -9,7 +9,7 @@ const { userSockets } = require("../../helpers/notificationHelper");
 const {
   getUserIdFromAccessToken,
   getTeamuserids
-} = require("../../api/functions/commonFunction");
+} = require("../../api/utils/tokenUtils");
 
 // Insert Expense
 exports.createexpense = async (req, res) => {

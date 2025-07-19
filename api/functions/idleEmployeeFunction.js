@@ -5,7 +5,8 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const moment = require("moment");
-const {getUserIdFromAccessToken,getExcludedRoleIdsByPermission} = require("../../api/functions/commonFunction");
+const {getExcludedRoleIdsByPermission} = require("../../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
 const { hasPermission } = require("../../controllers/permissionController");
 
 

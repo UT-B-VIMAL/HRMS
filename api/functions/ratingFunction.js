@@ -5,7 +5,9 @@ const {
   successResponse,
 } = require("../../helpers/responseHelper");
 const { userSockets } = require('../../helpers/notificationHelper');
-const { getAuthUserDetails, getUserIdFromAccessToken, getExcludedRoleIdsByPermission } = require("./commonFunction");
+const { getAuthUserDetails, getExcludedRoleIdsByPermission } = require("./commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 const getPagination  = require("../../helpers/pagination");
 const { hasPermission } = require("../../controllers/permissionController");
 const e = require("express");

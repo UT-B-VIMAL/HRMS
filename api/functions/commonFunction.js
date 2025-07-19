@@ -1,7 +1,7 @@
 const db = require('../../config/db');
 const { hasPermission } = require('../../controllers/permissionController');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
 
 exports.getAllData = async (req, res) => {
     const { type, id, task_user_id ,project_id,product_id } = req.query;
@@ -106,7 +106,7 @@ exports.getAllData = async (req, res) => {
             // } else {
             //     teamIds.push(users.team_id);
             // }
-            
+
             const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
             const [userRows] = await db.query(userIdList, [teamIds]);
             const userIds = userRows.map(row => row.id);
@@ -637,8 +637,6 @@ exports.addHistorydata = async (
         return errorResponse(res, null, error.message, 400);
     }
 };
-
-
 
 exports.getUserIdFromAccessToken = async (accessToken) => {
     try {
