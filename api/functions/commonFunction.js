@@ -106,6 +106,7 @@ exports.getAllData = async (req, res) => {
             // } else {
             //     teamIds.push(users.team_id);
             // }
+            
             const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
             const [userRows] = await db.query(userIdList, [teamIds]);
             const userIds = userRows.map(row => row.id);
