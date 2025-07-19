@@ -1511,39 +1511,52 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
-      status = Number(status);
-      reopenStatus = Number(reopenStatus);
-      activeStatus = Number(activeStatus);
-      holdStatus = Number(holdStatus);
+  const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
+  status = Number(status);
+  reopenStatus = Number(reopenStatus);
+  activeStatus = Number(activeStatus);
+  holdStatus = Number(holdStatus);
 
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-        return "To Do";
-      } else if (
-        status === 1 &&
-        reopenStatus === 0 &&
-        activeStatus === 0 &&
-        holdStatus === 0
-      ) {
-        return "Paused";
-      } else if (
-        status === 1 &&
-        reopenStatus === 0 &&
-        activeStatus === 0 &&
-        holdStatus === 1
-      ) {
-        return "On Hold";
-      } else if (status === 2 && reopenStatus === 0) {
-        return "Pending Approval";
-      } else if (reopenStatus === 1 && activeStatus === 0) {
-        return "Reopen";
-      } else if (status === 1 && activeStatus === 1) {
-        return "InProgress";
-      } else if (status === 3) {
-        return "Done";
-      }
-      return "";
-    };
+  console.log(
+    "Status Params =>",
+    "Status:", status,
+    "Reopen Status:", reopenStatus,
+    "Active Status:", activeStatus,
+    "Hold Status:", holdStatus
+  );
+
+  let statusGroup = "";
+
+  if (status === 0 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+    statusGroup = "To Do";
+  } else if (
+    status === 1 &&
+    reopenStatus === 0 &&
+    activeStatus === 0 &&
+    holdStatus === 0
+  ) {
+    statusGroup = "Paused";
+  } else if (
+    status === 1 &&
+    reopenStatus === 0 &&
+    activeStatus === 0 &&
+    holdStatus === 1
+  ) {
+    statusGroup = "On Hold";
+  } else if (status === 2 && reopenStatus === 0) {
+    statusGroup = "Pending Approval";
+  } else if (reopenStatus === 1 && activeStatus === 0) {
+    statusGroup = "Reopen";
+  } else if (status === 1 && activeStatus === 1) {
+    statusGroup = "InProgress";
+  } else if (status === 3) {
+    statusGroup = "Done";
+  }
+
+  console.log("Determined Status Group:", statusGroup);
+  return statusGroup;
+};
+
 
     const getUsername = async (userId) => {
       try {
@@ -1573,6 +1586,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     };
 
     async function processStatusData(statusFlag, data, taskId, subtaskId) {
+      console.log("data:", data, "taskId:", taskId);
+
       let task_data;
 
       if (!subtaskId) {
@@ -1590,6 +1605,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
 
       const task = task_data[0][0];
+      console.log("Processing task data:", task);
+
       switch (statusFlag) {
         case 0:
           return getStatusGroup(
@@ -1617,6 +1634,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     }
 
     async function processStatusData1(statusFlag, data) {
+      console.log("Processing status data:", data);
+
       switch (statusFlag) {
         case 0:
           return getStatusGroup(
@@ -1835,6 +1854,8 @@ exports.deleteTask = async (req, res) => {
       reopen_status,
       active_status
     );
+    console.log("Current Status Group:", currentGroup);
+
     if (currentGroup === "InProgress") {
       return errorResponse(
         res,
