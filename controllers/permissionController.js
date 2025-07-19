@@ -4,11 +4,9 @@ const axios = require('axios');
 const keycloakConfig = require('../config/keycloak');
 require('dotenv').config();
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
-const {
-    getAuthUserDetails,
-    getUserIdFromAccessToken,
-} = require("../api/functions/commonFunction");
+
 const { assignClientRoleToGroup, createClientRoleInKeycloak, deleteClientRoleFromKeycloak, getAdminToken, logoutUserFromKeycloak } = require('../api/functions/keycloakFunction');
+const { getUserIdFromAccessToken } = require('../api/utils/tokenUtils');
 
 const createPermission = async (req, res) => {
     try {

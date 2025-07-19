@@ -5,9 +5,10 @@ const {
 } = require("../../helpers/responseHelper");
 const {
   getColorForProduct,
-  getUserIdFromAccessToken,
   getTeamuserids,
 } = require("../../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 const { hasPermission } = require("../../controllers/permissionController");
 
 exports.fetchProducts = async (payload, res) => {

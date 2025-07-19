@@ -18,9 +18,10 @@ const {
   formatTimeDHMS,
   commonStatusGroup,
   checkUpdatePermission,
-  addHistorydata,
-  getUserIdFromAccessToken,
+  addHistorydata
 } = require("./commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
