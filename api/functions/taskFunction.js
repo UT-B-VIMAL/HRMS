@@ -1511,8 +1511,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    
-  const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
+
+  const getStatusGroupName = (status, reopenStatus, activeStatus, holdStatus) => {
   status = Number(status);
   reopenStatus = Number(reopenStatus);
   activeStatus = Number(activeStatus);
@@ -1610,14 +1610,14 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(
+          return getStatusGroupName(
             task.status,
             task.reopen_status,
             task.active_status,
             task.hold_status
           );
         case 1:
-          return getStatusGroup(
+          return getStatusGroupName(
             task.status,
             task.reopen_status,
             task.active_status,
@@ -1639,14 +1639,14 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(
+          return getStatusGroupName(
             status,
             reopen_status,
             active_status,
             payload.hold_status
           );
         case 1:
-          return getStatusGroup(
+          return getStatusGroupName(
             status,
             reopen_status,
             active_status,
@@ -1669,7 +1669,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
     );
     const taskHistoryEntries = [];
     // Precompute the current status group before any payload mutation
-    const oldStatusGroup = getStatusGroup(
+    const oldStatusGroup = getStatusGroupName(
       currentTask.status,
       currentTask.reopen_status,
       currentTask.active_status,
@@ -2454,6 +2454,7 @@ exports.getTaskList = async (req, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
+
     // from your destructure:
     let search = (rawSearch || "").toLowerCase().trim();
     const isSearching = search !== "";
