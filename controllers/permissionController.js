@@ -4,17 +4,13 @@ const axios = require('axios');
 const keycloakConfig = require('../config/keycloak');
 require('dotenv').config();
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
-const {
-    getAuthUserDetails,
-    getUserIdFromAccessToken,
-} = require("../api/functions/commonFunction");
+
 const { assignClientRoleToGroup, createClientRoleInKeycloak, deleteClientRoleFromKeycloak, getAdminToken, logoutUserFromKeycloak } = require('../api/functions/keycloakFunction');
+const { getUserIdFromAccessToken } = require('../api/utils/tokenUtils');
 
 const createPermission = async (req, res) => {
     try {
         const { name, display_name, description, created_by } = req.body;
-
-        // Check if a permission with the same name already exists
         const [existingRows] = await db.execute(
             'SELECT * FROM permissions WHERE name = ?',
             [name]

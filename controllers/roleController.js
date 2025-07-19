@@ -11,10 +11,7 @@ const {
     deleteGroupInKeycloak
   } = require('../api/functions/keycloakFunction');
 
-const {
-  getAuthUserDetails,
-  getUserIdFromAccessToken,
-} = require("../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../api/utils/tokenUtils");
 
 const { successResponse, errorResponse } = require('../helpers/responseHelper');
 

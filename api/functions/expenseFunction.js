@@ -7,9 +7,10 @@ const {
 const { uploadexpenseFileToS3, deleteFileFromS3 } = require("../../config/s3");
 const { userSockets } = require("../../helpers/notificationHelper");
 const {
-  getUserIdFromAccessToken,
   getTeamuserids
 } = require("../../api/functions/commonFunction");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
+
 
 // Insert Expense
 exports.createexpense = async (req, res) => {

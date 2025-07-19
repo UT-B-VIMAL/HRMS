@@ -20,9 +20,10 @@ const {
   getISTTime,
   checkUpdatePermission,
   commonStatusGroup,
-  getColorForProduct,
-  getUserIdFromAccessToken,
+  getColorForProduct
 } = require("../../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
 const { Parser } = require("json2csv");

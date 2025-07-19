@@ -5,9 +5,10 @@ const {
 } = require("../../helpers/responseHelper");
 const {
   getColorForProduct,
-  getUserIdFromAccessToken,
   getAuthUserDetails,
 } = require("../../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 const moment = require("moment");
 exports.fetchAttendance = async (req, res) => {
   try {

@@ -6,7 +6,9 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const { projectSchema } = require("../../validators/projectValidator");
-const { getAuthUserDetails, getUserIdFromAccessToken, getTeamuserids } = require("./commonFunction");
+const { getAuthUserDetails, getTeamuserids } = require("./commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 const { userSockets } = require("../../helpers/notificationHelper");
 const { hasPermission } = require("../../controllers/permissionController");
 

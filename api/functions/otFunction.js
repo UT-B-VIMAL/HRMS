@@ -8,9 +8,10 @@ const moment = require("moment");
 const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
 const {
-  getUserIdFromAccessToken,
   getTeamuserids
 } = require("../../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 
 // Insert OT
 exports.createOt = async (payload, res, req) => {

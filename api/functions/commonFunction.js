@@ -1,7 +1,8 @@
 const db = require('../../config/db');
 const { hasPermission } = require('../../controllers/permissionController');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const { getUserIdFromAccessToken } = require('../utils/tokenUtils');
 
 exports.getAllData = async (req, res) => {
     const { type, id, task_user_id ,project_id,product_id } = req.query;
@@ -14,7 +15,7 @@ exports.getAllData = async (req, res) => {
     }
     console.log(accessToken)
 
-    const user_id = await this.getUserIdFromAccessToken(accessToken);
+    const user_id = await getUserIdFromAccessToken(accessToken);
     const hasAllProducts = await hasPermission("dropdown.all_products", accessToken);
     const hasTeamProducts = await hasPermission("dropdown.team_products", accessToken);
     const hasUserProducts = await hasPermission("dropdown.user_products", accessToken);
@@ -106,7 +107,7 @@ exports.getAllData = async (req, res) => {
             // } else {
             //     teamIds.push(users.team_id);
             // }
-            
+
             const userIdList = "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)";
             const [userRows] = await db.query(userIdList, [teamIds]);
             const userIds = userRows.map(row => row.id);
@@ -347,41 +348,6 @@ exports.getAuthUserDetails = async (authUserId, res) => {
         return errorResponse(res, error.message, 'Error fetching User', 500);
     }
 };
-
-// exports.formatTimeDHMS = (time) => {
-//       if (typeof time !== 'string') {
-//         time = String(time || "00:00:00");
-//     }
-//     if (time === "00:00:00") {
-//         return "0m 0s";
-//     }
-
-//     const [hours, minutes, seconds] = time.split(":").map(Number);
-//     const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-
-//     const days = Math.floor(totalSeconds / (8 * 3600)); // 8 hours per day
-//     const remainingSeconds = totalSeconds % (8 * 3600);
-
-//     const remainingHours = Math.floor(remainingSeconds / 3600);
-//     const remainingMinutes = Math.floor((remainingSeconds % 3600) / 60);
-//     const finalSeconds = remainingSeconds % 60;
-
-//     let result = '';
-//     if (days > 0) {
-//         result += `${days}d `;
-//     }
-//     if (remainingHours > 0) {
-//         result += `${remainingHours}h `;
-//     }
-//     if (remainingMinutes > 0) {
-//         result += `${remainingMinutes}m `;
-//     }
-//     if (finalSeconds > 0 || result === '') {
-//         result += `${finalSeconds}s`;
-//     }
-
-//     return result.trim();
-// };
 
 exports.formatTimeDHMS = (time) => {
     let totalSeconds;
@@ -638,34 +604,32 @@ exports.addHistorydata = async (
     }
 };
 
-
-
-exports.getUserIdFromAccessToken = async (accessToken) => {
-    try {
-        if (!accessToken) {
-            throw new Error('Access token is missing or invalid');
-        }
-        const decoded = jwt.decode(accessToken);
-        const keycloakId = decoded?.sub;
+// exports.getUserIdFromAccessToken = async (accessToken) => {
+//     try {
+//         if (!accessToken) {
+//             throw new Error('Access token is missing or invalid');
+//         }
+//         const decoded = jwt.decode(accessToken);
+//         const keycloakId = decoded?.sub;
         
-        if (!keycloakId) {
-            throw new Error('Keycloak user ID not found in token');
-        }
+//         if (!keycloakId) {
+//             throw new Error('Keycloak user ID not found in token');
+//         }
 
-        const keycloakUserQuery = "SELECT id FROM users WHERE keycloak_id = ? AND deleted_at IS NULL LIMIT 1";
-        const [user] = await db.query(keycloakUserQuery, [keycloakId]);
+//         const keycloakUserQuery = "SELECT id FROM users WHERE keycloak_id = ? AND deleted_at IS NULL LIMIT 1";
+//         const [user] = await db.query(keycloakUserQuery, [keycloakId]);
 
 
-        if (!user) {
-            throw new Error('User not found in the database');
-        }
-        const userId = user[0].id;
-        return userId; 
-    } catch (error) {
-        console.error('Error retrieving user ID from access token:', error.message);
-        throw new Error('Error retrieving user ID: ' + error.message);
-    }
-};
+//         if (!user) {
+//             throw new Error('User not found in the database');
+//         }
+//         const userId = user[0].id;
+//         return userId; 
+//     } catch (error) {
+//         console.error('Error retrieving user ID from access token:', error.message);
+//         throw new Error('Error retrieving user ID: ' + error.message);
+//     }
+// };
 
 
 const productColors = [

@@ -4,10 +4,11 @@ const {successResponse,errorResponse,} = require("../../helpers/responseHelper")
 const moment = require('moment');
 const {attendanceValidator, attendanceFetch}=  require("../../validators/AttendanceValidator");
 const getPagination = require("../../helpers/pagination");
-const { getAuthUserDetails, getUserIdFromAccessToken, getExcludedRoleIdsByPermission } = require("./commonFunction");
+const { getAuthUserDetails, getExcludedRoleIdsByPermission } = require("./commonFunction");
 const { Parser } = require('json2csv');
 const { userSockets } = require("../../helpers/notificationHelper");
 const { hasPermission } = require("../../controllers/permissionController");
+const { getUserIdFromAccessToken } = require("../utils/tokenUtils");
 
 
 exports.getAttendance = async (req, res) => {
@@ -43,15 +44,15 @@ exports.getAttendance = async (req, res) => {
 
     const user = await getAuthUserDetails(user_id, res);
 
-    if (hasTeamAttendance) {
-      const [teamResult] = await db.query(
-        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
-        [user_id]
-      );
-      if (!teamResult.length) {
-        return errorResponse(res, null, "You are not currently assigned a reporting TL for your team", 400);
-      }
-    }
+    // if (hasTeamAttendance) {
+    //   const [teamResult] = await db.query(
+    //     "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
+    //     [user_id]
+    //   );
+    //   if (!teamResult.length) {
+    //     return errorResponse(res, null, "You are not currently assigned a reporting TL for your team", 400);
+    //   }
+    // }
 
     let baseQuery = `
       FROM 
@@ -75,8 +76,10 @@ exports.getAttendance = async (req, res) => {
       queryParams.push(...excludeAssociateRoleIds);
     }
     if (hasTeamAttendance) {
-      baseQuery += ` AND (t.reporting_user_id = ? OR FIND_IN_SET(?, u.team_id))`;
-      queryParams.push(user_id, user.team_id);
+      const teamIds = user.team_id ? user.team_id.split(',') : []; 
+      console.log("Team IDs:", teamIds);
+      baseQuery += ` AND FIND_IN_SET(u.team_id, ?)`;
+      queryParams.push(teamIds.join(','));
 
       if (excludedRoleIds.length > 0) {
         baseQuery += ` AND u.role_id NOT IN (${excludedRoleIds.map(() => '?').join(',')})`;
