@@ -653,7 +653,7 @@ apiRouter.get("/loginapi", empdashboardController.loginapis);
 //common
 apiRouter.get(
   "/getDropDownList",
-  RoleController.checkRole(['role.view_role','kanban_board.priority_filter','kanban_board.priority_filter','kanban_board.project_filter','kanban_board.member_filter','kanban_board.team_filter','rating.team_filter']),
+  RoleController.checkRole(['role.view_role','kanban_board.priority_filter','kanban_board.priority_filter','kanban_board.project_filter','kanban_board.member_filter','kanban_board.team_filter','rating.team_filter','dropdown.all_products','dropdown.team_products','dropdown.user_products','dropdown.all_projects','dropdown.team_projects','dropdown.user_projects','dropdown.team_users','dropdown.managers']),
   commonController.getDropDownList
 );
 

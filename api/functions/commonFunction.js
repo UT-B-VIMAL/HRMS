@@ -26,6 +26,7 @@ exports.getAllData = async (req, res) => {
     
     const hasTeamProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.team_products") ;
     const hasUserProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.user_products") ;
+    const managerIds= await this.getExcludedRoleIdsByPermission("dropdown.managers") ;
     console.log("hasTeamProductsIds",hasTeamProductsIds)
     console.log("hasUserProductsIds",hasUserProductsIds)
     // try {
@@ -196,9 +197,11 @@ exports.getAllData = async (req, res) => {
     } else if (type === "roles") {
         query = "SELECT id, name ,short_name FROM roles WHERE deleted_at IS NULL";
     } else if (type === "owners") {
-        query = "SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 2";
+        query = `SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id IN (${managerIds.map(() => '?').join(',')})`
+        queryParams.push(...managerIds);
     } else if (type === "assignee") {
-        query = "SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id = 4";
+        query = `SELECT id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id IN (${hasUserProductsIds.map(() => '?').join(',')})`
+        queryParams.push(...hasUserProductsIds);
     }
     else if (type === "ot_projects") {
         const users = await this.getAuthUserDetails(user_id, res);
