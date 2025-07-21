@@ -2140,10 +2140,9 @@ exports.getTaskList = async (req, res) => {
       // const [rowteams] = await db.query(queryteam, [user_id]);
       // let teamIds = [];
       const teamIds = userDetails.team_id ? userDetails.team_id.split(",") : [];
-      console.log("teamIds", teamIds);
       if (teamIds.length > 0) {
         baseQuery += ` AND FIND_IN_SET(u.team_id, ?)`;
-        params.push(teamIds);
+        params.push(teamIds.join(","));
         baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
           (NOT EXISTS (
