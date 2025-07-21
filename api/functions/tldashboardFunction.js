@@ -8,6 +8,8 @@ const {
   getAuthUserDetails,
 } = require("../../api/functions/commonFunction");
 const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+const { hasPermission } = require("../../controllers/permissionController");
+
 
 const moment = require("moment");
 exports.fetchAttendance = async (req, res) => {
