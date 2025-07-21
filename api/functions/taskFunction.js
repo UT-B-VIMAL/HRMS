@@ -1675,6 +1675,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
       currentTask.active_status,
       currentTask.hold_status
     );
+    console.log("Old Status Group--------:", oldStatusGroup);
+    
 
     // Later, when building task history entries
     for (const key in cleanedPayload) {
@@ -2417,13 +2419,6 @@ exports.getTaskList = async (req, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
-      console.log(
-        "getStatusGroup called with:",
-        status,
-        reopenStatus,
-        activeStatus,
-        holdStatus
-      );
 
       if (
         (status === 0 &&
