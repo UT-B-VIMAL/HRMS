@@ -2966,7 +2966,7 @@ exports.pauseTask = async (
   );
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, hold_status=0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
   await db.query(
