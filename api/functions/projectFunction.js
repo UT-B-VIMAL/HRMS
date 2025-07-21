@@ -300,7 +300,6 @@ exports.projectStatus = async (req, res) => {
     const {
       product_id,
       project_id,
-      user_id,
       employee_id,
       date,
       status,
@@ -309,16 +308,24 @@ exports.projectStatus = async (req, res) => {
       perPage = 10,
     } = req.query;
 
+
+
+
+    
     const offset = (page - 1) * perPage;
-    const users = await getAuthUserDetails(user_id, res);
-    if (!users) return;
+    
+
 
     const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
       return errorResponse(res, "Access token is required", 401);
     }
 
-    const userId = await getUserIdFromAccessToken(accessToken);
+    const user_id = await getUserIdFromAccessToken(accessToken);
+
+
+    const users = await getAuthUserDetails(user_id, res);
+    if (!users) return;
 
     const hasTeamstatusView = await hasPermission(
       "project_status.view_team_project_status",
