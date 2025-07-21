@@ -11,6 +11,7 @@ const {
   convertToSeconds,
   calculateRemainingHours,
   calculatePercentage,
+  parseTimeTakenToSeconds,
 } = require("../../helpers/responseHelper");
 const {
   getAuthUserDetails,
@@ -20,12 +21,14 @@ const {
   checkUpdatePermission,
   commonStatusGroup,
   getColorForProduct,
-  getUserIdFromAccessToken,
 } = require("../../api/functions/commonFunction");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
+
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
 const { Parser } = require("json2csv");
 const { userSockets } = require("../../helpers/notificationHelper");
+const { hasPermission } = require("../../controllers/permissionController");
 
 // Insert Task
 exports.createTask = async (payload, res, req) => {
@@ -481,39 +484,79 @@ exports.getTask = async (queryParams, res, req) => {
     if (!userDetails || userDetails.id === undefined) {
       return errorResponse(res, "User not found", "Invalid user ID", 404);
     }
+    const hasTeamView = await hasPermission(
+      "kanban_board.view_team_kanban_board_data",
+      accessToken
+    );
+    const hasUserView = await hasPermission(
+      "kanban_board.user_view_kanban_board_data",
+      accessToken
+    );
+    const hasTaskView = await hasPermission(
+      "kanban_board.view_task",
+      accessToken
+    );
+    const hasSubtaskView = await hasPermission(
+      "kanban_board.view_subtask",
+      accessToken
+    );
 
     // Base Task Query
     let taskQuery = `
       SELECT 
-        t.*, 
-        te.name AS team_name, 
-        COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''), '')), 'Unknown Owner') AS owner_name, 
-        COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''), '')), 'Unknown Assignee') AS assignee_name, 
-        p.name AS product_name, 
-        pj.name AS project_name,
-        CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
-        CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date
-      FROM tasks t 
-      LEFT JOIN teams te ON t.team_id = te.id 
-      LEFT JOIN users assignee ON t.user_id = assignee.id 
-      LEFT JOIN users owner ON t.assigned_user_id = owner.id 
-      LEFT JOIN products p ON t.product_id = p.id 
-      LEFT JOIN projects pj ON t.project_id = pj.id 
-      WHERE t.id = ?
-      AND t.deleted_at IS NULL
+    t.*, 
+    te.name AS team_name, 
+    COALESCE(CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(NULLIF(owner.last_name, ''))), 'Unknown Owner') AS owner_name, 
+    COALESCE(CONCAT(COALESCE(assignee.first_name, ''), ' ', COALESCE(NULLIF(assignee.last_name, ''))), 'Unknown Assignee') AS assignee_name, 
+    p.name AS product_name, 
+    pj.name AS project_name,
+    CONVERT_TZ(t.start_date, '+00:00', '+05:30') AS start_date,
+    CONVERT_TZ(t.end_date, '+00:00', '+05:30') AS end_date,
+
+    SUM(
+      CASE 
+        WHEN stu.subtask_id IS NULL THEN TIMESTAMPDIFF(SECOND, stu.start_time, COALESCE(stu.end_time, NOW()))
+        ELSE 0
+      END
+    ) AS time_taken_in_seconds,
+
+    ROUND(
+      SUM(
+        CASE 
+          WHEN stu.subtask_id IS NULL THEN TIMESTAMPDIFF(SECOND, stu.start_time, COALESCE(stu.end_time, NOW()))
+          ELSE 0
+        END
+      ) / t.estimated_hours * 100, 2
+    ) AS time_taken_percentage
+
+FROM tasks t 
+LEFT JOIN teams te ON t.team_id = te.id 
+LEFT JOIN users assignee ON t.user_id = assignee.id 
+LEFT JOIN users owner ON t.assigned_user_id = owner.id 
+LEFT JOIN products p ON t.product_id = p.id 
+LEFT JOIN projects pj ON t.project_id = pj.id 
+LEFT JOIN sub_tasks_user_timeline stu ON t.id = stu.task_id
+
+WHERE 
+    t.id = ?
+    AND t.deleted_at IS NULL
     `;
 
     let taskParams = [id];
 
     // Role-based filtering
-    if (userDetails.role_id === 3) {
+    if (hasTeamView && hasTaskView) {
       const queryTeams = `
-    SELECT id FROM teams 
-    WHERE deleted_at IS NULL AND reporting_user_id = ?
-  `;
+      SELECT id, team_id FROM users 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
       const [teamRows] = await db.query(queryTeams, [user_id]);
 
-      let teamIds = teamRows.map((row) => row.id);
+      // Check if teamRows[0] exists before using
+      const teamIds =
+        teamRows.length > 0 && teamRows[0].team_id
+          ? teamRows[0].team_id.split(",")
+          : [];
 
       // Also include the user's own team_id
       if (userDetails.team_id) {
@@ -553,14 +596,18 @@ exports.getTask = async (queryParams, res, req) => {
 
     let subtaskParams = [id];
 
-    if (userDetails.role_id === 3) {
+    if (hasTeamView && hasSubtaskView) {
       const queryTeams = `
-    SELECT id FROM teams 
-    WHERE deleted_at IS NULL AND reporting_user_id = ?
-  `;
+      SELECT id, team_id FROM users 
+      WHERE deleted_at IS NULL AND id = ?
+    `;
       const [teamRows] = await db.query(queryTeams, [user_id]);
 
-      let teamIds = teamRows.map((row) => row.id);
+      // Check if teamRows[0] exists before using
+      const teamIds =
+        teamRows.length > 0 && teamRows[0].team_id
+          ? teamRows[0].team_id.split(",")
+          : [];
 
       // Include the current user's own team
       if (userDetails.team_id) {
@@ -589,20 +636,10 @@ exports.getTask = async (queryParams, res, req) => {
           403
         );
       }
-    } else if (userDetails.role_id === 4) {
-      // subtaskQuery += ` AND (st.user_id = ?)`;
-      // subtaskParams.push(user_id);
+    } else if (hasUserView && hasSubtaskView) {
       subtaskQuery += ` AND (st.user_id = ? OR (st.user_id IS NULL AND ? = (SELECT user_id FROM tasks WHERE id = ?)))`;
       subtaskParams.push(user_id, user_id, id);
     }
-
-    // if (userDetails.role_id === 3) {
-    //   subtaskQuery += ` AND st.team_id = ?`;
-    //   subtaskParams.push(userDetails.team_id);
-    // } else if (userDetails.role_id === 4) {
-    //   subtaskQuery += ` AND (st.user_id = ?)`;
-    //   subtaskParams.push(user_id);
-    // }
 
     const subtasks = await db.query(subtaskQuery, subtaskParams);
 
@@ -630,7 +667,7 @@ exports.getTask = async (queryParams, res, req) => {
     `;
     const histories = await db.query(historiesQuery, [id]);
 
-    // // Comments query
+    // Comments query
     const commentsQuery = `
     SELECT 
       c.*,  
@@ -648,29 +685,23 @@ exports.getTask = async (queryParams, res, req) => {
 
     const comments = await db.query(commentsQuery, [id]);
 
-    // // Status mapping
-    // const statusMap = {
-    //   0: "To Do",
-    //   1: "In Progress",
-    //   2: "In Review",
-    //   3: "Done",
-    // };
-
-    // Prepare task data
     const taskData = task.map((task) => {
-      const totalEstimatedHours = task.estimated_hours || "00:00:00"; // Ensure default format as "HH:MM:SS"
-      const timeTaken = task.total_hours_worked || "00:00:00"; // Ensure default format as "HH:MM:SS"
+      const totalEstimatedHours = task.estimated_hours || "00:00:00";
 
-      // Calculate remaining hours and ensure consistent formatting
-      const remainingHours = calculateRemainingHours(
-        totalEstimatedHours,
-        timeTaken
-      );
-
-      // Calculate percentage for hours
+      // Convert estimated time to seconds
       const estimatedInSeconds = convertToSeconds(totalEstimatedHours);
-      const timeTakenInSeconds = convertToSeconds(timeTaken);
-      const remainingInSeconds = convertToSeconds(remainingHours);
+
+      // Get actual time taken in seconds
+      const timeTakenInSeconds = Number(task.time_taken_in_seconds) || 0;
+
+      // Format time taken
+      const timeTaken = formatTimeDHMS(timeTakenInSeconds);
+      const workedSeconds = parseTimeTakenToSeconds(timeTaken);
+      // Calculate remaining time
+      const remainingInSeconds = estimatedInSeconds - timeTakenInSeconds;
+      const remainingHours = formatTimeDHMS(
+        remainingInSeconds > 0 ? remainingInSeconds : 0
+      );
 
       return {
         task_id: task.id || "",
@@ -690,33 +721,28 @@ exports.getTask = async (queryParams, res, req) => {
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
         estimated_hours: formatTimeDHMS(totalEstimatedHours),
-        estimated_hours_percentage: calculatePercentage(
-          estimatedInSeconds,
-          estimatedInSeconds
-        ),
-        time_taken: formatTimeDHMS(timeTaken),
+        estimated_hours_percentage: "100.00%", // Always 100%
+        time_taken: timeTaken,
         time_taken_percentage: calculatePercentage(
-          timeTakenInSeconds,
+          workedSeconds,
           estimatedInSeconds
         ),
-        remaining_hours: formatTimeDHMS(remainingHours),
+        remaining_hours: remainingHours,
         remaining_hours_percentage: calculatePercentage(
-          remainingInSeconds,
+          remainingInSeconds > 0 ? remainingInSeconds : 0,
           estimatedInSeconds
         ),
         start_date: task.start_date,
         end_date: task.end_date,
         priority: task.priority,
         description: task.description,
-        // status_text: statusMap[task.status] || "Unknown",
         status_text: commonStatusGroup(
           task.status,
           task.reopen_status,
           task.active_status,
           task.hold_status
         ),
-
-        is_exceed: timeTakenInSeconds > estimatedInSeconds ? true : false,
+        is_exceed: timeTakenInSeconds > estimatedInSeconds,
       };
     });
 
@@ -734,7 +760,6 @@ exports.getTask = async (queryParams, res, req) => {
             assignee: subtask.user_id,
             assigneename: subtask.assignee_name || "",
             short_name: (subtask.assignee_name || "").substr(0, 2),
-            // status_text: statusMap[subtask.status] || "Unknown",
             status_text: commonStatusGroup(
               subtask.status,
               subtask.reopen_status,
@@ -770,7 +795,7 @@ exports.getTask = async (queryParams, res, req) => {
     const commentsData = [];
 
     if (Array.isArray(comments) && comments[0].length > 0) {
-      const grouped = new Map(); // Use Map to preserve SQL order
+      const grouped = new Map();
 
       comments[0].forEach((row) => {
         if (!grouped.has(row.id)) {
@@ -1152,8 +1177,18 @@ exports.updateTaskData = async (id, payload, res, req) => {
     due_date: "end_date",
   };
   try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
     const userDetails = await getAuthUserDetails(updated_by, res);
     const role_id = userDetails.role_id;
+
+    const hasStartTask = await hasPermission("task.start_task", accessToken);
+    const hasPauseTask = await hasPermission("task.pause_task", accessToken);
+    const hasOnholdTask = await hasPermission("task.onhold_task", accessToken);
+    const hasEndTask = await hasPermission("task.end_task", accessToken);
 
     const [tasks] = await db.query(
       "SELECT * FROM tasks WHERE id = ? AND deleted_at IS NULL",
@@ -1267,7 +1302,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         if (!userDetails || userDetails.id == undefined) {
           return;
         }
-        if (userDetails.role_id == 4) {
+        if (hasStartTask) {
           await this.startTask(currentTask, "task", currentTask.id, res);
         } else {
           return errorResponse(res, "You are not allowed to start task", 400);
@@ -1279,7 +1314,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
         if (existingSubtaskSublime.length > 0) {
           const timeline = existingSubtaskSublime[0];
-          if (userDetails.role_id == 4) {
+          if (hasPauseTask) {
             await this.pauseTask(
               currentTask,
               "task",
@@ -1299,7 +1334,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
         if (existingSubtaskSublime.length > 0) {
           const timeline = existingSubtaskSublime[0];
-          if (userDetails.role_id == 4) {
+          if (hasEndTask) {
             await this.endTask(
               currentTask,
               "task",
@@ -1467,48 +1502,62 @@ exports.updateTaskData = async (id, payload, res, req) => {
       payload.active_status == 0 &&
       payload.reopen_status == 0
     ) {
-      if (role_id == 4) {
+      if (hasPauseTask) {
         payload.hold_status = 0;
-      } else {
+      } else if (hasOnholdTask) {
         payload.hold_status = 1;
+      } else {
+        payload.hold_status = 0;
       }
-    } else {
-      payload.hold_status = 0;
     }
 
-    const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
-      status = Number(status);
-      reopenStatus = Number(reopenStatus);
-      activeStatus = Number(activeStatus);
-      holdStatus = Number(holdStatus);
 
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-        return "To Do";
-      } else if (
-        status === 1 &&
-        reopenStatus === 0 &&
-        activeStatus === 0 &&
-        holdStatus === 0
-      ) {
-        return "Paused";
-      } else if (
-        status === 1 &&
-        reopenStatus === 0 &&
-        activeStatus === 0 &&
-        holdStatus === 1
-      ) {
-        return "On Hold";
-      } else if (status === 2 && reopenStatus === 0) {
-        return "Pending Approval";
-      } else if (reopenStatus === 1 && activeStatus === 0) {
-        return "Reopen";
-      } else if (status === 1 && activeStatus === 1) {
-        return "InProgress";
-      } else if (status === 3) {
-        return "Done";
-      }
-      return "";
-    };
+  const getStatusGroupName = (status, reopenStatus, activeStatus, holdStatus) => {
+  status = Number(status);
+  reopenStatus = Number(reopenStatus);
+  activeStatus = Number(activeStatus);
+  holdStatus = Number(holdStatus);
+
+  console.log(
+    "Status Params =>",
+    "Status:", status,
+    "Reopen Status:", reopenStatus,
+    "Active Status:", activeStatus,
+    "Hold Status:", holdStatus
+  );
+
+  let statusGroup = "";
+
+  if (status === 0 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+    statusGroup = "To Do";
+  } else if (
+    status === 1 &&
+    reopenStatus === 0 &&
+    activeStatus === 0 &&
+    holdStatus === 0
+  ) {
+    statusGroup = "Paused";
+  } else if (
+    status === 1 &&
+    reopenStatus === 0 &&
+    activeStatus === 0 &&
+    holdStatus === 1
+  ) {
+    statusGroup = "On Hold";
+  } else if (status === 2 && reopenStatus === 0) {
+    statusGroup = "Pending Approval";
+  } else if (reopenStatus === 1 && activeStatus === 0) {
+    statusGroup = "Reopen";
+  } else if (status === 1 && activeStatus === 1) {
+    statusGroup = "InProgress";
+  } else if (status === 3) {
+    statusGroup = "Done";
+  }
+
+  console.log("Determined Status Group:", statusGroup);
+  return statusGroup;
+};
+
 
     const getUsername = async (userId) => {
       try {
@@ -1538,6 +1587,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     };
 
     async function processStatusData(statusFlag, data, taskId, subtaskId) {
+      console.log("data:", data, "taskId:", taskId);
+
       let task_data;
 
       if (!subtaskId) {
@@ -1555,16 +1606,18 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
 
       const task = task_data[0][0];
+      console.log("Processing task data:", task);
+
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(
+          return getStatusGroupName(
             task.status,
             task.reopen_status,
             task.active_status,
             task.hold_status
           );
         case 1:
-          return getStatusGroup(
+          return getStatusGroupName(
             task.status,
             task.reopen_status,
             task.active_status,
@@ -1582,16 +1635,18 @@ exports.updateTaskData = async (id, payload, res, req) => {
     }
 
     async function processStatusData1(statusFlag, data) {
+      console.log("Processing status data:", data);
+
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(
+          return getStatusGroupName(
             status,
             reopen_status,
             active_status,
             payload.hold_status
           );
         case 1:
-          return getStatusGroup(
+          return getStatusGroupName(
             status,
             reopen_status,
             active_status,
@@ -1613,15 +1668,33 @@ exports.updateTaskData = async (id, payload, res, req) => {
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
     const taskHistoryEntries = [];
+    // Precompute the current status group before any payload mutation
+    const oldStatusGroup = getStatusGroupName(
+      currentTask.status,
+      currentTask.reopen_status,
+      currentTask.active_status,
+      currentTask.hold_status
+    );
+    console.log("Old Status Group--------:", oldStatusGroup);
+    
+
+    // Later, when building task history entries
     for (const key in cleanedPayload) {
       const newValue = Number(payload[key]);
       const oldValue = Number(currentTask[key]);
 
       if (!isNaN(newValue) && newValue !== oldValue) {
         const flag = statusFlagMapping[key] || null;
+
+        const oldData =
+          flag === 0 || flag === 1
+            ? oldStatusGroup
+            : await processStatusData(flag, currentTask[key], id, null);
+        const newData = await processStatusData1(flag, payload[key]);
+
         taskHistoryEntries.push([
-          await processStatusData(flag, currentTask[key], id, null),
-          await processStatusData1(flag, payload[key]),
+          oldData,
+          newData,
           id,
           null,
           `Changed ${key}`,
@@ -1730,34 +1803,6 @@ exports.updateTaskData = async (id, payload, res, req) => {
     return errorResponse(res, error.message, "Error updating task", 500);
   }
 };
-
-// exports.deleteTask = async (id, res) => {
-//   try {
-//     const subtaskQuery =
-//       "SELECT COUNT(*) as subtaskCount FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL";
-//     const [subtaskResult] = await db.query(subtaskQuery, [id]);
-
-//     if (subtaskResult[0].subtaskCount > 0) {
-//       return errorResponse(
-//         res,
-//         null,
-//         "Task has associated subtasks and cannot be deleted",
-//         400
-//       );
-//     }
-
-//     const query = "UPDATE tasks SET deleted_at = NOW() WHERE id = ?";
-//     const [result] = await db.query(query, [id]);
-
-//     if (result.affectedRows === 0) {
-//       return errorResponse(res, null, "Task not found", 404);
-//     }
-
-//     return successResponse(res, null, "Task deleted successfully");
-//   } catch (error) {
-//     return errorResponse(res, error.message, "Error deleting task", 500);
-//   }
-// };
 
 exports.deleteTask = async (req, res) => {
   const id = req.params.id;
@@ -1981,10 +2026,9 @@ const formatTime = (seconds) => {
   )}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
-exports.getTaskList = async (queryParams, res) => {
+exports.getTaskList = async (req, res) => {
   try {
     const {
-      user_id,
       product_id,
       project_id,
       team_id,
@@ -1993,8 +2037,34 @@ exports.getTaskList = async (queryParams, res) => {
       member_id,
       dropdown_products,
       dropdown_projects,
-    } = queryParams;
+    } = req.query;
+    const accessToken = req.headers.authorization?.split(" ")[1];
 
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
+
+    const user_id = await getUserIdFromAccessToken(accessToken);
+    const hasAllData = await hasPermission(
+      "kanban_board.view_all_kanban_board_data",
+      accessToken
+    );
+    const hasTeamdata = await hasPermission(
+      "kanban_board.view_team_kanban_board_data",
+      accessToken
+    );
+    const hasUserData = await hasPermission(
+      "kanban_board.user_view_kanban_board_data",
+      accessToken
+    );
+
+    if (!hasAllData && !hasTeamdata && !hasUserData) {
+      return errorResponse(
+        res,
+        "You do not have permission to view tasks",
+        403
+      );
+    }
     // Validate if user_id exists
     if (!user_id) {
       console.log("Missing user_id in query parameters");
@@ -2044,12 +2114,12 @@ exports.getTaskList = async (queryParams, res) => {
       LEFT JOIN products ON tasks.product_id = products.id
       LEFT JOIN users u ON tasks.user_id = u.id
       LEFT JOIN users AS asu ON tasks.assigned_user_id = asu.id
-      LEFT JOIN teams ON u.team_id = teams.id
+      LEFT JOIN teams ON FIND_IN_SET(teams.id, u.team_id) 
       WHERE tasks.deleted_at IS NULL
     `;
 
     const params = [];
-    if (role_id !== 3) {
+    if (!hasTeamdata) {
       if (team_id) {
         baseQuery += ` AND (
         u.team_id = ? OR EXISTS (
@@ -2063,15 +2133,16 @@ exports.getTaskList = async (queryParams, res) => {
         params.push(team_id, team_id);
       }
     }
-    if (role_id === 3) {
-      const queryteam =
-        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-      const [rowteams] = await db.query(queryteam, [user_id]);
-      let teamIds = [];
-      if (rowteams.length > 0) {
-        teamIds = rowteams.map((row) => row.id);
-        baseQuery += ` AND u.team_id IN (?)`;
-        params.push(teamIds);
+    if (hasTeamdata) {
+      // const queryteam =
+      //   "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+
+      // const [rowteams] = await db.query(queryteam, [user_id]);
+      // let teamIds = [];
+      const teamIds = userDetails.team_id ? userDetails.team_id.split(",") : [];
+      if (teamIds.length > 0) {
+        baseQuery += ` AND FIND_IN_SET(u.team_id, ?)`;
+        params.push(teamIds.join(","));
         baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
           (NOT EXISTS (
@@ -2122,7 +2193,7 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-    if (role_id === 4) {
+    if (hasUserData) {
       baseQuery += ` AND (
           -- 1. If the task is assigned to the user but has no subtasks, return it
           (NOT EXISTS (
@@ -2166,7 +2237,7 @@ exports.getTaskList = async (queryParams, res) => {
 
       params.push(user_id, user_id, user_id, user_id);
     }
-    if (role_id === 3) {
+    if (hasTeamdata) {
       if (member_id) {
         baseQuery += `
           AND (
@@ -2227,7 +2298,7 @@ exports.getTaskList = async (queryParams, res) => {
       }
     }
 
-    if (role_id === 2) {
+    if (hasAllData) {
       baseQuery += `
           ORDER BY
         CASE WHEN tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
@@ -2279,16 +2350,16 @@ exports.getTaskList = async (queryParams, res) => {
           sub_tasks.hold_status
         FROM sub_tasks
         LEFT JOIN users AS assigned_u ON sub_tasks.assigned_user_id = assigned_u.id
-        LEFT JOIN teams AS subtask_user_team ON assigned_u.team_id = subtask_user_team.id
+        LEFT JOIN teams AS subtask_user_team ON FIND_IN_SET(subtask_user_team.id , assigned_u.team_id)
         LEFT JOIN tasks ON sub_tasks.task_id = tasks.id
-         LEFT JOIN users AS subtask_user ON sub_tasks.user_id = subtask_user.id
-          LEFT JOIN teams AS subtask_assignee_team ON subtask_user.team_id = subtask_assignee_team.id
+        LEFT JOIN users AS subtask_user ON sub_tasks.user_id = subtask_user.id
+        LEFT JOIN teams AS subtask_assignee_team ON FIND_IN_SET(subtask_assignee_team.id, subtask_user.team_id)
         LEFT JOIN users AS task_user ON tasks.user_id = task_user.id
         WHERE task_id IN (?)
           AND sub_tasks.deleted_at IS NULL
       `;
       const queryParams = [taskIds];
-      if (role_id === 2) {
+      if (hasAllData) {
         query += `
           ORDER BY
             CASE WHEN sub_tasks.assigned_user_id = ? THEN 0 ELSE 1 END,
@@ -2306,18 +2377,21 @@ exports.getTaskList = async (queryParams, res) => {
       }
 
       // Add user_id filter only if role_id is 4
-      if (role_id === 4) {
+      if (hasUserData) {
         query +=
           " AND sub_tasks.user_id = ? OR (sub_tasks.user_id IS NULL AND tasks.user_id = ? AND sub_tasks.deleted_at IS NULL)";
         queryParams.push(user_id, user_id);
-      } else if (role_id === 3) {
-        const queryteam =
-          "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
-        const [rowteams] = await db.query(queryteam, [user_id]);
-        let teamIds = [];
-        if (rowteams.length > 0) {
-          teamIds = rowteams.map((row) => row.id);
-        }
+      } else if (hasTeamdata) {
+        // const queryteam =
+        //   "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
+        // const [rowteams] = await db.query(queryteam, [user_id]);
+        const teamIds = userDetails.team_id
+          ? userDetails.team_id.split(",")
+          : [];
+        // console.log("teamIds", teamIds);
+        // if (rowteams.length > 0) {
+        //   teamIds = rowteams.map((row) => row.id);
+        // }
 
         query +=
           " AND sub_tasks.deleted_at IS NULL AND (sub_tasks.user_id IS NULL AND tasks.team_id IN (?)) OR (sub_tasks.user_id IS NOT NULL AND subtask_user.team_id IN (?) AND sub_tasks.deleted_at IS NULL)";
@@ -2344,7 +2418,7 @@ exports.getTaskList = async (queryParams, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
-      console.log(holdStatus);
+
       if (
         (status === 0 &&
           reopenStatus === 0 &&
@@ -2356,6 +2430,13 @@ exports.getTaskList = async (queryParams, res) => {
           holdStatus === 0)
       ) {
         return "To_Do";
+      }else if (
+        holdStatus === 0 &&
+        status === 1 &&
+        activeStatus === 0 &&
+        reopenStatus === 0
+      ) {
+        return "Paused";
       } else if (
         holdStatus === 1 &&
         status === 1 &&
@@ -2374,6 +2455,7 @@ exports.getTaskList = async (queryParams, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
+
     // from your destructure:
     let search = (rawSearch || "").toLowerCase().trim();
     const isSearching = search !== "";
@@ -2885,7 +2967,7 @@ exports.pauseTask = async (
   );
 
   await db.query(
-    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, updated_at = NOW() WHERE id = ?",
+    "UPDATE ?? SET total_hours_worked = ?, status = 1, active_status = 0, reopen_status = 0, hold_status=0, updated_at = NOW() WHERE id = ?",
     [type === "subtask" ? "sub_tasks" : "tasks", newTotalHoursWorked, id]
   );
   await db.query(
@@ -3008,15 +3090,21 @@ exports.updateTaskTimeLine = async (req, res) => {
       userTeamId = taskOrSubtask.team_id;
     }
 
-    const getStatusGroups = (t_status, reopenStatus, activeStatus) => {
+    const getStatusGroups = (t_status, reopenStatus, activeStatus,holdstatus) => {
       t_status = Number(t_status);
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
+      holdStatus = Number(activeStatus);
+
       if (t_status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
-      } else if (t_status === 1 && reopenStatus === 0 && activeStatus === 0) {
+      } else if (t_status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+        return "Paused";
+        
+      } else if (t_status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
         return "On Hold";
-      } else if (t_status === 2 && reopenStatus === 0) {
+        
+      }else if (t_status === 2 && reopenStatus === 0) {
         return "Pending Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -3032,7 +3120,8 @@ exports.updateTaskTimeLine = async (req, res) => {
     const old_data = getStatusGroups(
       taskOrSubtask.status,
       taskOrSubtask.reopen_status,
-      taskOrSubtask.active_status
+      taskOrSubtask.active_status,
+      taskOrSubtask.hold_status
     );
     console.log("old_data", taskId, subtaskId, taskOrSubtask.user_id);
     if (action === "start") {

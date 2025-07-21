@@ -5,9 +5,12 @@ const {
 } = require("../../helpers/responseHelper");
 const {
   getColorForProduct,
-  getUserIdFromAccessToken,
   getAuthUserDetails,
 } = require("../../api/functions/commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+const { hasPermission } = require("../../controllers/permissionController");
+
+
 const moment = require("moment");
 exports.fetchAttendance = async (req, res) => {
   try {
@@ -1527,12 +1530,13 @@ exports.tltaskpendinglist = async (req, res) => {
     // Determine user IDs to filter by, based on role
     let filterUserIds = [];
 
-    if (user.role_id === 3) {
+    if (await hasPermission("dashboard.team_pending_list", accessToken)) {
       // Team Leader - get team members
-      const [teamUsers] = await db.query(
-        "SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL",
-        [user.team_id]
-      );
+        const [teamUsers] = await db.query(
+          "SELECT id FROM users WHERE FIND_IN_SET(team_id, ?) AND deleted_at IS NULL",
+          [user.team_id]
+        );
+
       const teamUserIds = teamUsers.map((u) => u.id);
       if (teamUserIds.length === 0)
         return successResponse(res, [], "No team members found", 200, null, 0);
@@ -1546,7 +1550,7 @@ exports.tltaskpendinglist = async (req, res) => {
       } else {
         filterUserIds = teamUserIds;
       }
-    } else if (user.role_id === 4) {
+    } else if (await hasPermission("dashboard.user_pending_list", accessToken)) {
       // Regular User - only own data
       filterUserIds = [login_id];
     } else {

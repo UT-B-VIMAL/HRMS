@@ -5,35 +5,47 @@ const {
   successResponse,
 } = require("../../helpers/responseHelper");
 const { userSockets } = require('../../helpers/notificationHelper');
-const { getAuthUserDetails, getUserIdFromAccessToken } = require("./commonFunction");
+const { getAuthUserDetails, getExcludedRoleIdsByPermission } = require("./commonFunction");
+const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+
 const getPagination  = require("../../helpers/pagination");
+const { hasPermission } = require("../../controllers/permissionController");
+const e = require("express");
 
 
 // phase 2
 
 exports.getAnnualRatings = async (req, res) => {
-  const { search, year, page = 1, perPage = 10 , team_id} = req.query;
+  const { search, year, page = 1, perPage = 10, team_id } = req.query;
   const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
- const accessToken = req.headers.authorization?.split(" ")[1];
-    if (!accessToken) {
-      return errorResponse(res, "Access token is required", 401);
-    }
-    console.log(accessToken)
+  const accessToken = req.headers.authorization?.split(" ")[1];
 
-    const user_id = await getUserIdFromAccessToken(accessToken);
-  // Define all 12 months
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
+
+  const user_id = await getUserIdFromAccessToken(accessToken);
+  const hasAllRating = await hasPermission("rating.all_view_annual_rating", accessToken);
+  const hasTeamRating = await hasPermission("rating.team_view_annual_rating", accessToken);
+  // const hasExceedRole = await hasPermission("rating.excluded_roles", accessToken);
+
+  const excludedRoleIds =  await getExcludedRoleIdsByPermission("rating.excluded_roles") ;
+  const AllroleIds = hasAllRating ? await getExcludedRoleIdsByPermission("rating.all_view_annual_rating") : [];
+
+  if (!hasAllRating && !hasTeamRating) {
+    return errorResponse(res, null, "Access denied", 403);
+  }
+
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
-  // Construct SQL to fetch all months dynamically
-  const monthColumns = months.map((month, index) => {
-    const monthNum = (index + 1).toString().padStart(2, '0'); // Convert index to "01", "02", etc.
-    return `COALESCE(ROUND(SUM(CASE WHEN SUBSTRING(ratings.month, 6, 2) = '${monthNum}' THEN ratings.average END), 1), '-') AS ${month}`;
+  const monthColumns = months.map((_, index) => {
+    const monthNum = (index + 1).toString().padStart(2, '0');
+    return `COALESCE(ROUND(SUM(CASE WHEN SUBSTRING(ratings.month, 6, 2) = '${monthNum}' THEN ratings.average END), 1), '-') AS ${months[index]}`;
   }).join(', ');
 
-  // Main query for the paginated data
   let query = `
     SELECT 
       users.id AS user_id,
@@ -43,44 +55,54 @@ exports.getAnnualRatings = async (req, res) => {
       teams.name AS team_name,
       ${monthColumns}, 
       CASE 
-          WHEN COUNT(DISTINCT CASE WHEN ratings.average IS NOT NULL THEN SUBSTRING(ratings.month, 1, 7) END) = 0 THEN '-'
-          ELSE 
-              ROUND(
-                  SUM(ratings.average) / 
-                  COUNT(DISTINCT CASE WHEN ratings.average IS NOT NULL THEN SUBSTRING(ratings.month, 1, 7) END), 
-                  1
-              )
+        WHEN COUNT(DISTINCT CASE WHEN ratings.average IS NOT NULL THEN SUBSTRING(ratings.month, 1, 7) END) = 0 THEN '-'
+        ELSE 
+          ROUND(
+            SUM(ratings.average) / 
+            COUNT(DISTINCT CASE WHEN ratings.average IS NOT NULL THEN SUBSTRING(ratings.month, 1, 7) END), 
+            1
+          )
       END AS overall_average
     FROM 
       users
     LEFT JOIN 
-      teams ON users.team_id = teams.id
+      teams ON FIND_IN_SET(teams.id, users.team_id)
     LEFT JOIN 
       ratings ON users.id = ratings.user_id
-      AND SUBSTRING(ratings.month, 1, 4) = ?  AND ratings.status = 1
-    WHERE 
-      users.role_id NOT IN (1,2)
-      AND users.deleted_at IS NULL
+      AND SUBSTRING(ratings.month, 1, 4) = ? AND ratings.status = 1
+    WHERE users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
+
   const queryParams = [year, year];
   const users = await getAuthUserDetails(user_id, res);
   if (!users) return;
-  if(users.role_id===3){
-  const [teamRows] = await db.query(
-      `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
-      [user_id]
-    );
-    if(teamRows.length == 0){
-      return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
-    }
-    const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
-    query += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
-    queryParams.push(teamIds);
+console.log("all role ids", AllroleIds);
+  if (hasAllRating ) {
+       query += ` AND users.role_id NOT IN (${AllroleIds.map(() => '?').join(',')})`;
+      queryParams.push(...AllroleIds);
   }
- 
 
-  if (search && search.trim() !== "") {
+  if (hasTeamRating && !hasAllRating) {
+    // const [teamRows] = await db.query(
+    //   `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
+    //   [user_id]
+    // );
+    // if (teamRows.length === 0) {
+    //   return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
+    // }
+    const teamIds = users.team_id ? users.team_id.split(',') : [];
+    if (teamIds.length > 0) {
+      query += ` AND (${teamIds.map(() => `FIND_IN_SET(?, users.team_id)`).join(' OR ')})`;
+      queryParams.push(...teamIds);
+    }
+    if (excludedRoleIds.length > 0) {
+      query += ` AND users.role_id NOT IN (${excludedRoleIds.map(() => '?').join(',')})`;
+      queryParams.push(...excludedRoleIds);
+    }
+  }
+
+  if (search?.trim()) {
     const searchWildcard = `%${search.trim()}%`;
     query += `
       AND (
@@ -91,77 +113,83 @@ exports.getAnnualRatings = async (req, res) => {
     `;
     queryParams.push(searchWildcard, searchWildcard, searchWildcard);
   }
+
   if (team_id) {
-    query += ' AND users.team_id = ?';
+    query += ' AND FIND_IN_SET(?, users.team_id)';
     queryParams.push(team_id);
   }
 
-  // Query for counting total records (without pagination)
+  query += `
+    GROUP BY users.id, users.first_name, users.employee_id, teams.name
+    ORDER BY ratings.updated_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  queryParams.push(parseInt(perPage, 10), offset);
+
+  // COUNT QUERY
   let countQuery = `
     SELECT 
       COUNT(DISTINCT users.id) AS totalRecords
     FROM 
       users
     LEFT JOIN 
-      teams ON users.team_id = teams.id
+      teams ON FIND_IN_SET(teams.id, users.team_id)
     LEFT JOIN 
       ratings ON users.id = ratings.user_id
       AND SUBSTRING(ratings.month, 1, 4) = ? 
-    WHERE 
-      users.role_id NOT IN (1,2)
-      AND users.deleted_at IS NULL
+    WHERE users.deleted_at IS NULL
       AND YEAR(users.created_at) <= ?
   `;
+  const countQueryParams = [year, year];
 
-  // Apply the same conditions for the count query
-  const countQueryParams = [...queryParams];
-  if (users.role_id === 3) {
-    const [teamRows] = await db.query(
-      `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
-      [user_id]
-    );
-    const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
-    countQuery += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
-    countQueryParams.push(teamIds);
+  if (hasAllRating) {
+     countQuery += ` AND users.role_id NOT IN (${AllroleIds.map(() => '?').join(',')})`;
+      countQueryParams.push(...AllroleIds);
   }
-  if (search && search.trim() !== "") {
+
+  if (hasTeamRating && !hasAllRating) {
+    // const [teamRows] = await db.query(
+    //   `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
+    //   [user_id]
+    // );
+   const teamIds = users.team_id ? users.team_id.split(',') : [];
+    if (teamIds.length > 0) {
+      countQuery += ` AND (${teamIds.map(() => `FIND_IN_SET(?, users.team_id)`).join(' OR ')})`;
+      countQueryParams.push(...teamIds);
+    }
+    if (excludedRoleIds.length > 0) {
+      countQuery += ` AND users.role_id NOT IN (${excludedRoleIds.map(() => '?').join(',')})`;
+      countQueryParams.push(...excludedRoleIds);
+    }
+  }
+
+  if (search?.trim()) {
     const searchWildcard = `%${search.trim()}%`;
     countQuery += `
       AND (
-        REPLACE(CONCAT(users.first_name, ' ', users.last_name), ' ', '') LIKE REPLACE(?, ' ', '') 
+        REPLACE(CONCAT(users.first_name, ' ', users.last_name), ' ', '') LIKE REPLACE(?, ' ', '')
         OR users.employee_id LIKE ? 
         OR teams.name LIKE ?
       )
     `;
     countQueryParams.push(searchWildcard, searchWildcard, searchWildcard);
   }
-  if(team_id) {
-    countQuery += ' AND users.team_id = ?';
+
+  if (team_id) {
+    countQuery += ' AND FIND_IN_SET(?, users.team_id)';
     countQueryParams.push(team_id);
   }
-  // Add pagination to the main query
-  query += ` 
-    GROUP BY users.id, users.first_name, users.employee_id, teams.name
-    ORDER BY  ratings.updated_at DESC
-    LIMIT ? OFFSET ?
-  `;
-  queryParams.push(parseInt(perPage, 10), offset);
 
   try {
-    // Execute the count query for total records
     const [countResult] = await db.query(countQuery, countQueryParams);
     const totalRecords = countResult[0]?.totalRecords || 0;
 
-    // Execute the main query for paginated data
     const [result] = await db.query(query, queryParams);
-
-    // Add serial numbers to rows
     const rowsWithSerialNo = result.map((row, index) => ({
-      s_no: page && perPage ? (parseInt(page, 10) - 1) * parseInt(perPage, 10) + index + 1 : index + 1,
+      s_no: offset + index + 1,
       ...row,
     }));
 
-    // Calculate pagination
     const pagination = getPagination(page, perPage, totalRecords);
 
     return successResponse(
@@ -180,7 +208,19 @@ exports.getAnnualRatings = async (req, res) => {
 
 
 exports.ratingUpdation = async (payload, res, req) => {
-  let { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id, updated_by ,import_status} = payload;
+  let { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id ,import_status} = payload;
+   const accessToken = req.headers.authorization?.split(" ")[1];
+  if (!accessToken) {
+    return errorResponse(res, "Access token is required", 401);
+  }
+  const updated_by = await getUserIdFromAccessToken(accessToken);
+  const hasAllRating = await hasPermission("rating.all_edit_rating", accessToken);
+  const hasTeamRating = await hasPermission("rating.team_edit_rating", accessToken);
+  
+  const hasPmnotificationRoleIds =  await getExcludedRoleIdsByPermission("rating.pm_notification") ;
+  const hasadminnotificationRoleIds =  await getExcludedRoleIdsByPermission("rating.admin_notification") ;
+  console.log("hasPmnotificationRoleIds", hasPmnotificationRoleIds);
+  console.log("hasadminnotificationRoleIds", hasadminnotificationRoleIds);
   if( import_status == 1) {
     const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [user_id]);
     if (!empUsers.length) {
@@ -235,7 +275,7 @@ exports.ratingUpdation = async (payload, res, req) => {
     const values = [user_id, quality, timelines, agility, attitude, responsibility, average, month, rater, updated_by, remarks, status,pm_status];
     await db.query(insertQuery, values);
   }
-  if(user.role_id == 2 && status == 1){
+  if(hasAllRating && status == 1){
     const updateQuery = `
       UPDATE ratings SET pm_status = 1 where user_id = ? AND month = ? AND rater = "TL"`;
     const values = [user_id, month];
@@ -278,7 +318,7 @@ exports.ratingUpdation = async (payload, res, req) => {
   successResponse(res, responsePayload, "Rating Updated successfully", 200);
 
   // Asynchronous notification handling
-  if (user.role_id === "3" && status == "1") {
+  if (hasTeamRating && status == "1" && !hasAllRating) {
     // Check if all ratings for the team are updated
     const teamQuery = `
       SELECT id, name FROM teams WHERE id = ? AND deleted_at IS NULL
@@ -287,7 +327,7 @@ exports.ratingUpdation = async (payload, res, req) => {
     const teamName = teamResult.length > 0 ? teamResult[0].name : 'Unknown Team';
 
     const teamMembersQuery = `
-      SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL
+      SELECT id FROM users WHERE FIND_IN_SET(?, team_id) AND deleted_at IS NULL
     `;
     const [teamMembers] = await db.query(teamMembersQuery, [user.team_id]);
 
@@ -301,16 +341,21 @@ exports.ratingUpdation = async (payload, res, req) => {
 
     if (allRatingsUpdated.every(Boolean)) {
       // Send notification to all PMs
-      const pmUsersQuery = `
-        SELECT id FROM users WHERE role_id = 2 AND deleted_at IS NULL
-      `;
+      let pmUsersQuery;
+      if (hasPmnotificationRoleIds.length > 0) {
+        pmUsersQuery = `
+          SELECT id FROM users
+          WHERE role_id  IN (${hasPmnotificationRoleIds.map(() => '?').join(',')}) AND deleted_at IS NULL`
+      }else {
+        return errorResponse(res, "No PMs found for notification", "Not Found", 404);
+      }
       const [pmUsers] = await db.query(pmUsersQuery);
 
       const notificationPayload = {
         title: `${teamName} Updated Attendance`,
         body: `${teamName} has updated team attendance.`,
       };
-
+console.log("pm users", pmUsers);
       pmUsers.forEach(async (pmUser) => {
         const socketIds = userSockets[pmUser.id];
         if (Array.isArray(socketIds)) {
@@ -326,7 +371,7 @@ exports.ratingUpdation = async (payload, res, req) => {
     }
   }
 
-  if (user.role_id === "2" && status == "1") {
+  if (hasAllRating && status == "1") {
     // Check if all ratings for all teams are updated
     const allTeamsQuery = `
       SELECT id, name FROM teams WHERE deleted_at IS NULL
@@ -352,11 +397,17 @@ exports.ratingUpdation = async (payload, res, req) => {
 
     if (allRatingsUpdated.every(Boolean)) {
       // Send notification to all Admins
-      const adminUsersQuery = `
-        SELECT id FROM users WHERE role_id = 1 AND deleted_at IS NULL
-      `;
-      const [adminUsers] = await db.query(adminUsersQuery);
+      let adminUsersQuery;
+      if (hasadminnotificationRoleIds.length > 0) {
+        console.log("Excluding admin roles:", hasadminnotificationRoleIds);
+        adminUsersQuery = `
+          SELECT id FROM users
+          WHERE role_id IN (${hasadminnotificationRoleIds.map(() => '?').join(',')}) AND deleted_at IS NULL`
+      } else {
+        return errorResponse(res, "No Admins found for notification", "Not Found", 404);
+      }
 
+      const [adminUsers] = await db.query(adminUsersQuery);
       const notificationPayload = {
         title: 'Employee Rating Updated',
         body: `Performance rating has been updated successfully.`,
@@ -432,9 +483,14 @@ exports.getRatingById = async (req, res) => {
 
 exports.getRatings = async (req, res) => {
   // try {
-    const { team_id, month, user_id, search, page = 1, perPage = 10 } = req;
+    const { team_id, month, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return errorResponse(res, "Access token is required", 401);
+    }
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
     const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
     const currentMonth = new Date().toISOString().slice(0, 7);
     const selectedMonth = month || currentMonth;
@@ -445,34 +501,58 @@ exports.getRatings = async (req, res) => {
 
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
+    const hasAllRating = await hasPermission("rating.all_view_monthly_rating", accessToken);
+    const hasTeamRating = await hasPermission("rating.team_view_monthly_rating", accessToken);
+    // const hasExceedRole = await hasPermission("rating.excluded_roles", accessToken);
+
+    const excludedRoleIds =  await getExcludedRoleIdsByPermission("rating.excluded_roles") ;
+    const AllroleIds = hasAllRating ? await getExcludedRoleIdsByPermission("rating.all_view_monthly_rating") : [];
+     if (!hasAllRating && !hasTeamRating) {
+        return errorResponse(res, null, "Access denied", 403);
+      }
 
     const values = [];
-    let whereClause = "WHERE users.role_id NOT IN (1,2) AND users.deleted_at IS NULL";
-    
+   let whereClause = ' WHERE 1=1 ';
+    console.log("all role ids", AllroleIds);
+    console.log("excluded role ids", excludedRoleIds);
+    if (hasAllRating) {
+      whereClause += ` AND users.role_id NOT IN (${AllroleIds.map(() => '?').join(',')})`;
+      values.push(...AllroleIds);
+    }
+    console.log("values",values)
+
     // if (users.role_id === 2) {
     //   whereClause += "  AND users.role_id NOT IN (1, 2) AND users.deleted_at IS NULL";
     // }
     
     if (team_id) {
-      whereClause += ' AND users.team_id = ?';
+      whereClause += ' AND FIND_IN_SET(?, users.team_id)';
       values.push(team_id);
     }
 
-    if (users.role_id === 3) {
-      const [teamRows] = await db.query(
-        `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
-        [user_id]
-      );
+    if (hasTeamRating && !hasAllRating) {
+      // const [teamRows] = await db.query(
+      //   `SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?`,
+      //   [user_id]
+      // );
 
-        if (teamRows.length == 0) {
-          return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
-        }
-      const teamIds = teamRows.length > 0 ? teamRows.map(row => row.id) : [users.team_id];
-      whereClause += ' AND users.team_id IN (?) AND users.role_id != 3 AND users.role_id != 2';
-      values.push(teamIds);
+      //   if (teamRows.length == 0) {
+      //     return errorResponse(res, null, "You are not currently assigned a reporting TL for your team.", 400);
+      //   }
+     const teamIds = users.team_id ? users.team_id.split(',') : [];
+      console.log("team ids", teamIds);
+        if (teamIds.length > 0) {
+        whereClause += ` AND (${teamIds.map(() => `FIND_IN_SET(?, users.team_id)`).join(' OR ')})`;
+        values.push(...teamIds);
+      }
+        if (excludedRoleIds.length > 0) {
+     whereClause += ` AND users.role_id NOT IN (${excludedRoleIds.map(() => '?').join(',')})`;
+      values.push(...excludedRoleIds);
+    }
     }
 
     if (search) {
+      console.log("search", search);
        whereClause += ` AND (
         REPLACE(CONCAT(users.first_name, ' ', users.last_name), ' ', '') LIKE REPLACE(?, ' ', '') 
         OR users.employee_id LIKE ? 
@@ -486,9 +566,9 @@ exports.getRatings = async (req, res) => {
     const firstDayOfMonth = `${selectedMonth}-01`;
     whereClause += ' AND (users.created_at <= ? OR users.created_at LIKE ?)';
     values.push(firstDayOfMonth, `${selectedMonth}%`);
-
+console.log("where clause", whereClause);
     // Get total records count
-    const countQuery = `SELECT COUNT(*) as total FROM users LEFT JOIN teams ON users.team_id = teams.id ${whereClause}`;
+    const countQuery = `SELECT COUNT(*) as total FROM users LEFT JOIN teams ON FIND_IN_SET(teams.id, users.team_id) ${whereClause}`;
     const [countResult] = await db.query(countQuery, values);
     const totalRecords = countResult[0].total;
 
@@ -496,7 +576,7 @@ exports.getRatings = async (req, res) => {
     const userQuery = `
       SELECT users.id as user_id, COALESCE(CONCAT(first_name, ' ', last_name)) as empname, users.team_id, users.employee_id, teams.name AS team_name, users.created_at as joining_date, role_id
       FROM users
-      LEFT JOIN teams ON users.team_id = teams.id
+      LEFT JOIN teams ON FIND_IN_SET(teams.id, users.team_id)
       ${whereClause}
       ORDER BY users.id
       LIMIT ? OFFSET ?`;
@@ -568,7 +648,7 @@ exports.getRatings = async (req, res) => {
       }
 
       // Adjust for TLs
-      if (user.role_id === 3 && overallScore !== "-" || user.role_id === 2 && overallScore !== "-") {
+      if (hasTeamRating && overallScore !== "-" || hasAllRating && overallScore !== "-") {
         overallScore = (parseFloat(overallScore) * 2).toFixed(1);
       }
 
@@ -581,8 +661,8 @@ exports.getRatings = async (req, res) => {
         joining_date: user.joining_date,
         employee_name: user.empname,
         team: user.team_name,
-        user_type: user.role_id === 4 ? "Employee" : user.role_id === 3 ? "TL" : "PM",
-        raters: users.role_id === 3 ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
+        user_type: hasAllRating ? "PM" : hasTeamRating ? "TL" : "Employee",
+        raters: hasTeamRating ? defaultRatings.filter(r => r.rater === "TL") : defaultRatings,
         overall_score: overallScore
       };
     });

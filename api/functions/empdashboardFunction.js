@@ -5,7 +5,7 @@ const {
 } = require("../../helpers/responseHelper");
 const {
   getUserIdFromAccessToken
-} = require("../../api/functions/commonFunction");
+} = require("../../api/utils/tokenUtils");
 
 exports.fetchPendingTask = async (req, res) => {
   try {

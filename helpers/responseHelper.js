@@ -95,4 +95,17 @@ const calculatePercentage = (value, total) => {
   return ((value / total) * 100).toFixed(2) + "%";
 };
 
-module.exports = { successResponse, errorResponse, getResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage };
+
+function parseTimeTakenToSeconds(timeTaken) {
+  const regex = /(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?/;
+  const matches = timeTaken.match(regex);
+
+  const days = parseInt(matches[1]) || 0;
+  const hours = parseInt(matches[2]) || 0;
+  const minutes = parseInt(matches[3]) || 0;
+  const seconds = parseInt(matches[4]) || 0;
+
+  return (days * 8 * 3600) + (hours * 3600) + (minutes * 60) + seconds;
+}
+
+module.exports = { successResponse, errorResponse, getResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage,parseTimeTakenToSeconds };

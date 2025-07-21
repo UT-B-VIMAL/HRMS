@@ -33,6 +33,8 @@ const otdetailController = require("./controllers/otdetailController");
 const expensedetailController = require("./controllers/expensedetailController");
 const reportController = require("./controllers/reportController");
 const notificationRoutes = require("./routes/notificationRoutes");
+const permissionRoutes = require("./routes/permissionRoutes");
+const roleRoutes = require("./routes/roleRoutes");
 
 const {
   registerSocket,
@@ -140,7 +142,6 @@ apiRouter.post("/login", loginController.login);
 apiRouter.post("/logout", loginController.logout);
 apiRouter.put(
   "/change_password/:id",
-  RoleController.checkRole(),
   loginController.changePassword
 );
 apiRouter.post("/forgot_password", loginController.forgotPassword);
@@ -151,104 +152,104 @@ apiRouter.post("/profile", profileController.createOrUpdateProfile);
 apiRouter.get("/profile/:id", profileController.getProfile);
 
 // User Routes
-apiRouter.post("/user", RoleController.checkRole(),userController.createUser);
+apiRouter.post("/user", RoleController.checkRole(['user.add_user']),userController.createUser);
 apiRouter.put(
   "/user/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['user.edit_user']),
   userController.updateUser
 );
 apiRouter.delete(
   "/user/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['user.delete_user']),
   userController.deleteUser
 );
-apiRouter.get("/user/:id", RoleController.checkRole(), userController.getUser);
-apiRouter.get("/user", RoleController.checkRole(), userController.getAllUsers);
+apiRouter.get("/user/:id", RoleController.checkRole(['user.view_user']), userController.getUser);
+apiRouter.get("/user", RoleController.checkRole(['user.view_user']), userController.getAllUsers);
 
 // Product Routes
 apiRouter.post(
   "/products",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.add_product']),
   productController.createProduct
 );
 apiRouter.put(
   "/products/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_product']),
   productController.updateProduct
 );
 apiRouter.delete(
   "/products/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.delete_product']),
   productController.deleteProduct
 );
 apiRouter.get(
   "/products/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_product']),
   productController.getProduct
 );
 apiRouter.get(
   "/products",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.view_product']),
   productController.getAllProducts
 );
 
 // Project Routes
 apiRouter.post(
   "/projects",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.add_project']),
   projectController.createProject
 );
 apiRouter.put(
   "/projects/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_project']),
   projectController.updateProject
 );
 apiRouter.delete(
   "/projects/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.delete_project']),
   projectController.deleteProject
 );
 apiRouter.get(
   "/projects/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.edit_project']),
   projectController.getProject
 );
 apiRouter.get(
   "/projects",
-  RoleController.checkRole(),
+  RoleController.checkRole(['product_project.view_project']),
   projectController.getAllProjects
 );
 apiRouter.get("/project_status", projectController.project_status);
 apiRouter.get(
   "/project_request",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.all_project_request_view','project_request.team_project_request_view','project_request.exclude_project_request_view']),
   projectController.project_request
 );
 apiRouter.get(
   "/project_requestupdate",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.project_request_update']),
   projectController.project_requestupdate
 );
 apiRouter.put(
   "/project_requestchange/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['project_request.project_request_update']),
   (req, res) => projectController.project_requestchange(req, res, req.io)
 );
 
 // Team Routes
-apiRouter.post("/team", RoleController.checkRole(), teamController.createTeam);
+apiRouter.post("/team", RoleController.checkRole(['	team.add_team']), teamController.createTeam);
 apiRouter.put(
   "/team/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['team.edit_team']),
   teamController.updateTeam
 );
 apiRouter.delete(
   "/team/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['team.delete_team']),
   teamController.deleteTeam
 );
-apiRouter.get("/team/:id", RoleController.checkRole(), teamController.getTeam);
-apiRouter.get("/team", RoleController.checkRole(), teamController.getAllTeams);
+apiRouter.get("/team/:id", RoleController.checkRole(['team.edit_team']), teamController.getTeam);
+apiRouter.get("/team", RoleController.checkRole(['team.view_team']), teamController.getAllTeams);
 
 // Designation Routes
 apiRouter.post(
@@ -279,31 +280,31 @@ apiRouter.get(
 
 // Task Routes
 apiRouter.post("/taskImport", taskController.bulkimportTask);
-apiRouter.post("/task", RoleController.checkRole(), taskController.createTask);
+apiRouter.post("/task", RoleController.checkRole(['kanban_board.add_task']), taskController.createTask);
 apiRouter.put(
   "/task/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.edit_task']),
   taskController.updateTask
 );
 apiRouter.delete(
   "/task/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.delete_task']),
   taskController.deleteTask
 );
-apiRouter.get("/task/:id", RoleController.checkRole(), taskController.getTask);
-apiRouter.get("/task", RoleController.checkRole(), taskController.getAllTasks);
-apiRouter.put("/taskupdate/:id", RoleController.checkRole(), (req, res) =>
+apiRouter.get("/task/:id", RoleController.checkRole(['kanban_board.view_task']), taskController.getTask);
+apiRouter.get("/task", RoleController.checkRole(['kanban_board.view_task']), taskController.getAllTasks);
+apiRouter.put("/taskupdate/:id", RoleController.checkRole(['kanban_board.edit_task','task.start_task','task.pause_task','task.onhold_task','task.end_task','task.done_task','task.reopen_task']), (req, res) =>
   taskController.updateDatas(req, res, req.io)
 );
 apiRouter.get(
   "/getTaskDatas",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_all_kanban_board_data','kanban_board.view_team_kanban_board_data','kanban_board.user_view_kanban_board_data']),
   taskController.getTaskDatas
 );
-apiRouter.get("/doneTask", RoleController.checkRole(), taskController.doneTask);
+apiRouter.get("/doneTask", RoleController.checkRole(['kanban_board.done_task']), taskController.doneTask);
 apiRouter.post(
   "/updateTaskTimeLineStatus",
-  RoleController.checkRole(),
+  RoleController.checkRole(['task.start_task','task.pause_task','task.end_task']),
   (req, res) => taskController.updateTaskTimeLineStatus(req, res, req.io)
 );
 apiRouter.get(
@@ -313,12 +314,12 @@ apiRouter.get(
 );
 apiRouter.get(
   "/deletedTaskList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.view_restore_project']),
   taskController.deletedTaskList
 );
 apiRouter.post(
   "/restoreTasks",
-  RoleController.checkRole(),
+  RoleController.checkRole(['deleted_task.update_restore_project	']),
   taskController.taskRestore
 );
 
@@ -327,72 +328,47 @@ apiRouter.post("/subtaskImport", subtaskController.bulkimportSubTask);
 
 apiRouter.post(
   "/subtask",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.add_subtask']),
   subtaskController.createSubTask
 );
 apiRouter.put(
   "/subtask/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.edit_subtask']),
   subtaskController.updateSubTask
 );
 apiRouter.delete(
   "/subtask/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.delete_subtask']),
   subtaskController.deleteSubTask
 );
 apiRouter.get(
   "/subtask/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_subtask']),
   subtaskController.getSubTask
 );
 apiRouter.get(
   "/subtask",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_subtask']),
   subtaskController.getAllSubTasks
 );
-apiRouter.put("/subtaskupdate/:id", RoleController.checkRole(), (req, res) =>
+apiRouter.put("/subtaskupdate/:id", RoleController.checkRole(['	kanban_board.edit_subtask','task.start_task','task.pause_task','task.onhold_task','task.end_task','task.done_task','task.reopen_task']), (req, res) =>
   subtaskController.updateDatas(req, res, req.io)
 );
 
 // Idle Employee Route
 apiRouter.get(
   "/idleEmployee",
-  RoleController.checkRole(),
+  RoleController.checkRole(['idle_employees.all_idle_employees_view','idle_employees.team_idle_employees_view','idle_employees.idle_employees_team_filter','idle_employees.show_excluded_roles']),
   idleEmployeeController.get_idleEmployee
 );
 
 // PM Dashboard Routes
 apiRouter.get(
-  "/pmproducts",
-  RoleController.checkRole(),
-  pmdashboardController.pmproductsection
-);
-apiRouter.get(
-  "/pmutilization",
-  RoleController.checkRole(),
-  pmdashboardController.pmutilizationsection
-);
-apiRouter.get(
-  "/pmattendance",
-  RoleController.checkRole(),
-  pmdashboardController.pmattendancesection
-);
-apiRouter.get(
-  "/pmdashboard",
-  RoleController.checkRole(),
-  pmdashboardController.pmdashboardsection
-);
-apiRouter.get(
-  "/pmviewproduct",
-  RoleController.checkRole(),
-  pmdashboardController.pmviewproductsection
-);
-apiRouter.get(
-  "/pmTasksByProduct",
+  "/pmTasksByProduct",RoleController.checkRole(['dashboard.all_product_graph','dashboard.team_product_graph','dashboard.user_product_graph']),
   pmdashboardController.pmfetchUserTasksByProduct
 );
 apiRouter.get(
-  "/pmUtilizationAndAttendance",
+  "/pmUtilizationAndAttendance",RoleController.checkRole(['dashboard.team_details']),
   pmdashboardController.pmUtilizationAndAttendance
 );
 
@@ -471,19 +447,18 @@ apiRouter.get(
 // Productivity
 apiRouter.get(
   "/teamwise_productivity",
-  RoleController.checkRole(),
+  RoleController.checkRole(['productivity.view_teamwise_split','productivity.teamwise_split_filter']),
   productivityController.get_teamwiseProductivity
 );
 apiRouter.get(
   "/individual_status",
-  RoleController.checkRole(),
+  RoleController.checkRole(['productivity.view_individual_split','productivity.individual_status_filter']),
   productivityController.get_individualProductivity
 );
 
 //rating
-apiRouter.post("/updateRating", RoleController.checkRole(), (req, res) =>
-  ratingController.ratingUpdations(req, res, req.io)
-);
+apiRouter.post("/updateRating", RoleController.checkRole(['rating.all_edit_rating','rating.team_edit_rating','rating.pm_notification','rating.admin_notification']), (req, res) =>
+  ratingController.ratingUpdations(req, res, req.io));
 apiRouter.get(
   "/getRating",
   RoleController.checkRole(),
@@ -491,24 +466,24 @@ apiRouter.get(
 );
 apiRouter.get(
   "/getAllUserRating",
-  RoleController.checkRole(),
+  RoleController.checkRole(['rating.team_view_monthly_rating','rating.all_view_monthly_rating','rating.excluded_roles']),
   ratingController.getAllUserRating
 );
 apiRouter.get(
   "/getAnnualRatings",
-  RoleController.checkRole(),
+  RoleController.checkRole(['rating.team_view_annual_rating','rating.all_view_annual_rating','rating.excluded_roles']),
   ratingController.getAnnualRatings
 );
 
 //Attendance
 apiRouter.get(
   "/getAttendanceList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['attendance.all_view_attendance','attendance.team_view_attendance','attendance.show_excluded_roles','attendance.exclude_from_associates']),
   attendanceController.getAttendanceList
 );
 apiRouter.post(
   "/updateAttendance",
-  RoleController.checkRole(),
+  RoleController.checkRole(['attendance.edit_attendance']),
   attendanceController.updateAttendance
 );
 apiRouter.get(
@@ -517,30 +492,31 @@ apiRouter.get(
   attendanceController.getAttendanceListReport
 );
 apiRouter.post("/all_present", (req, res) =>
-  attendanceController.updateAttendanceAndNotify(req, res, req.io)
+  attendanceController.updateAttendanceAndNotify(req, res, req.io),
+  RoleController.checkRole(['attendance.team_all_present','attendance.all_all_present','attendance.excluded_roles_all_present','attendance.exclude_from_associates_all_present'])
 );
 
 // Comments
 apiRouter.post(
   "/comments",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.add_task_comments','kanban_board.add_subtask_comments']),
   commentsController.addComments
 );
 apiRouter.get(
   "/comments/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.view_task_comments','kanban_board.view_subtask_comments']),
   commentsController.getComments
 );
 
 apiRouter.put(
   "/comments/:id",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.edit_task_comments','kanban_board.edit_subtask_comments']),
   commentsController.updateComments
 );
 
 apiRouter.delete(
   "/comments",
-  RoleController.checkRole(),
+  RoleController.checkRole(['kanban_board.delete_task_comments','kanban_board.delete_subtask_comments']),
   commentsController.deleteComments
 );
 
@@ -677,7 +653,7 @@ apiRouter.get("/loginapi", empdashboardController.loginapis);
 //common
 apiRouter.get(
   "/getDropDownList",
-  RoleController.checkRole(),
+  RoleController.checkRole(['role.view_role','kanban_board.priority_filter','kanban_board.priority_filter','kanban_board.project_filter','kanban_board.member_filter','kanban_board.team_filter','rating.team_filter','dropdown.all_products','dropdown.team_products','dropdown.user_products','dropdown.all_projects','dropdown.team_projects','dropdown.user_projects','dropdown.team_users','dropdown.managers']),
   commonController.getDropDownList
 );
 
@@ -704,6 +680,8 @@ apiRouter.get(
 // Use `/api` as a common prefix
 app.use("/api", apiRouter);
 app.use("/api", notificationRoutes);
+app.use("/api", permissionRoutes);
+app.use("/api", roleRoutes);
 
 app.use(globalErrorHandler);
 
