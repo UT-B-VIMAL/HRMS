@@ -2430,6 +2430,13 @@ exports.getTaskList = async (req, res) => {
           holdStatus === 0)
       ) {
         return "To_Do";
+      }else if (
+        holdStatus === 0 &&
+        status === 1 &&
+        activeStatus === 0 &&
+        reopenStatus === 0
+      ) {
+        return "Paused";
       } else if (
         holdStatus === 1 &&
         status === 1 &&
@@ -3083,15 +3090,21 @@ exports.updateTaskTimeLine = async (req, res) => {
       userTeamId = taskOrSubtask.team_id;
     }
 
-    const getStatusGroups = (t_status, reopenStatus, activeStatus) => {
+    const getStatusGroups = (t_status, reopenStatus, activeStatus,holdstatus) => {
       t_status = Number(t_status);
       reopenStatus = Number(reopenStatus);
       activeStatus = Number(activeStatus);
+      holdStatus = Number(activeStatus);
+
       if (t_status === 0 && reopenStatus === 0 && activeStatus === 0) {
         return "To Do";
-      } else if (t_status === 1 && reopenStatus === 0 && activeStatus === 0) {
+      } else if (t_status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+        return "Paused";
+        
+      } else if (t_status === 1 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 1) {
         return "On Hold";
-      } else if (t_status === 2 && reopenStatus === 0) {
+        
+      }else if (t_status === 2 && reopenStatus === 0) {
         return "Pending Approval";
       } else if (reopenStatus === 1 && activeStatus === 0) {
         return "Reopen";
@@ -3107,7 +3120,8 @@ exports.updateTaskTimeLine = async (req, res) => {
     const old_data = getStatusGroups(
       taskOrSubtask.status,
       taskOrSubtask.reopen_status,
-      taskOrSubtask.active_status
+      taskOrSubtask.active_status,
+      taskOrSubtask.hold_status
     );
     console.log("old_data", taskId, subtaskId, taskOrSubtask.user_id);
     if (action === "start") {

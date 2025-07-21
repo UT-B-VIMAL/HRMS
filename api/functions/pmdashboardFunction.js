@@ -1356,20 +1356,32 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     };
     const excludedRoleMap = {};
 
+    // for (const [key, permissionName] of Object.entries(exclusionChecks)) {
+    //   const hasAccess = await hasPermission(permissionName, accessToken);
+    //   console.log(`Checking permission for ${permissionName}: ${hasAccess}`);
+      
+    //   if (hasAccess) {
+    //     const [rows] = await db.query(`
+    //       SELECT rhp.role_id
+    //       FROM role_has_permissions rhp
+    //       JOIN permissions p ON rhp.permission_id = p.id
+    //       WHERE p.name = ?
+    //     `, [permissionName]);
+    //     excludedRoleMap[key] = rows.map(r => r.role_id);
+    //   } else {
+    //     excludedRoleMap[key] = [];
+    //   }
+    // }
     for (const [key, permissionName] of Object.entries(exclusionChecks)) {
-      const hasAccess = await hasPermission(permissionName, accessToken);
-      if (hasAccess) {
-        const [rows] = await db.query(`
-          SELECT rhp.role_id
-          FROM role_has_permissions rhp
-          JOIN permissions p ON rhp.permission_id = p.id
-          WHERE p.name = ?
-        `, [permissionName]);
-        excludedRoleMap[key] = rows.map(r => r.role_id);
-      } else {
-        excludedRoleMap[key] = [];
-      }
-    }
+  const [rows] = await db.query(`
+    SELECT rhp.role_id
+    FROM role_has_permissions rhp
+    JOIN permissions p ON rhp.permission_id = p.id
+    WHERE p.name = ?
+  `, [permissionName]);
+  excludedRoleMap[key] = rows.map(r => r.role_id);
+}
+
 
     // STEP 2: Query each user group with dynamic exclusions
 
@@ -1636,6 +1648,7 @@ exports.getProjectCompletion = async (req, res) => {
 
     let teamFilterSql = "";
     let teamFilterParams = [];
+    let associateFilter = "";
 
     if (is_team_project_data) {
       const teamConditions = teamIds.map(() => `FIND_IN_SET(?, team_id)`).join(" OR ");
