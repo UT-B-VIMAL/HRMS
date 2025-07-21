@@ -7,8 +7,10 @@ const {
 const { uploadexpenseFileToS3, deleteFileFromS3 } = require("../../config/s3");
 const { userSockets } = require("../../helpers/notificationHelper");
 const {
-  getUserIdFromAccessToken,
+  getTeamuserids
 } = require("../../api/functions/commonFunction");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
+
 
 // Insert Expense
 exports.createexpense = async (req, res) => {
@@ -1301,19 +1303,20 @@ exports.getAlltlemployeeexpense = async (req, res) => {
     }
 
     // Fetch team IDs for the reporting user
-    const [teamResult] = await db.query(
-      "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
-      [user_id]
-    );
-    if (teamResult.length === 0) {
-      return errorResponse(
-        res,
-        null,
-        "You are not currently assigned a reporting TL for your team.",
-        404
-      );
-    }
-    const teamIds = teamResult.map((team) => team.id);
+    // const [teamResult] = await db.query(
+    //   "SELECT id FROM teams WHERE reporting_user_id = ? AND deleted_at IS NULL",
+    //   [user_id]
+    // );
+    // if (teamResult.length === 0) {
+    //   return errorResponse(
+    //     res,
+    //     null,
+    //     "You are not currently assigned a reporting TL for your team.",
+    //     404
+    //   );
+    // }
+    // const teamIds = teamResult.map((team) => team.id);
+    const teamIds = await getTeamuserids(user_id);
 
     // Validate status
     if (!status) {
