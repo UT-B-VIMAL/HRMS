@@ -20,9 +20,9 @@ const {
   getISTTime,
   checkUpdatePermission,
   commonStatusGroup,
-  getColorForProduct
+  getColorForProduct,
 } = require("../../api/functions/commonFunction");
-const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
 
 // const moment = require("moment");
 const { updateTimelineShema } = require("../../validators/taskValidator");
@@ -703,7 +703,6 @@ WHERE
         remainingInSeconds > 0 ? remainingInSeconds : 0
       );
 
-
       return {
         task_id: task.id || "",
         name: task.name || "",
@@ -721,7 +720,7 @@ WHERE
         team: task.team_name || "",
         assignee_id: task.user_id || "",
         assignee: task.assignee_name || "",
-        estimated_hours:  formatTimeDHMS(totalEstimatedHours),
+        estimated_hours: formatTimeDHMS(totalEstimatedHours),
         estimated_hours_percentage: "100.00%", // Always 100%
         time_taken: timeTaken,
         time_taken_percentage: calculatePercentage(
@@ -1512,39 +1511,53 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
-      status = Number(status);
-      reopenStatus = Number(reopenStatus);
-      activeStatus = Number(activeStatus);
-      holdStatus = Number(holdStatus);
 
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0) {
-        return "To Do";
-      } else if (
-        status === 1 &&
-        reopenStatus === 0 &&
-        activeStatus === 0 &&
-        holdStatus === 0
-      ) {
-        return "Paused";
-      } else if (
-        status === 1 &&
-        reopenStatus === 0 &&
-        activeStatus === 0 &&
-        holdStatus === 1
-      ) {
-        return "On Hold";
-      } else if (status === 2 && reopenStatus === 0) {
-        return "Pending Approval";
-      } else if (reopenStatus === 1 && activeStatus === 0) {
-        return "Reopen";
-      } else if (status === 1 && activeStatus === 1) {
-        return "InProgress";
-      } else if (status === 3) {
-        return "Done";
-      }
-      return "";
-    };
+  const getStatusGroupName = (status, reopenStatus, activeStatus, holdStatus) => {
+  status = Number(status);
+  reopenStatus = Number(reopenStatus);
+  activeStatus = Number(activeStatus);
+  holdStatus = Number(holdStatus);
+
+  console.log(
+    "Status Params =>",
+    "Status:", status,
+    "Reopen Status:", reopenStatus,
+    "Active Status:", activeStatus,
+    "Hold Status:", holdStatus
+  );
+
+  let statusGroup = "";
+
+  if (status === 0 && reopenStatus === 0 && activeStatus === 0 && holdStatus === 0) {
+    statusGroup = "To Do";
+  } else if (
+    status === 1 &&
+    reopenStatus === 0 &&
+    activeStatus === 0 &&
+    holdStatus === 0
+  ) {
+    statusGroup = "Paused";
+  } else if (
+    status === 1 &&
+    reopenStatus === 0 &&
+    activeStatus === 0 &&
+    holdStatus === 1
+  ) {
+    statusGroup = "On Hold";
+  } else if (status === 2 && reopenStatus === 0) {
+    statusGroup = "Pending Approval";
+  } else if (reopenStatus === 1 && activeStatus === 0) {
+    statusGroup = "Reopen";
+  } else if (status === 1 && activeStatus === 1) {
+    statusGroup = "InProgress";
+  } else if (status === 3) {
+    statusGroup = "Done";
+  }
+
+  console.log("Determined Status Group:", statusGroup);
+  return statusGroup;
+};
+
 
     const getUsername = async (userId) => {
       try {
@@ -1574,6 +1587,8 @@ exports.updateTaskData = async (id, payload, res, req) => {
     };
 
     async function processStatusData(statusFlag, data, taskId, subtaskId) {
+      console.log("data:", data, "taskId:", taskId);
+
       let task_data;
 
       if (!subtaskId) {
@@ -1591,16 +1606,18 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
 
       const task = task_data[0][0];
+      console.log("Processing task data:", task);
+
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(
+          return getStatusGroupName(
             task.status,
             task.reopen_status,
             task.active_status,
             task.hold_status
           );
         case 1:
-          return getStatusGroup(
+          return getStatusGroupName(
             task.status,
             task.reopen_status,
             task.active_status,
@@ -1618,16 +1635,18 @@ exports.updateTaskData = async (id, payload, res, req) => {
     }
 
     async function processStatusData1(statusFlag, data) {
+      console.log("Processing status data:", data);
+
       switch (statusFlag) {
         case 0:
-          return getStatusGroup(
+          return getStatusGroupName(
             status,
             reopen_status,
             active_status,
             payload.hold_status
           );
         case 1:
-          return getStatusGroup(
+          return getStatusGroupName(
             status,
             reopen_status,
             active_status,
@@ -1649,15 +1668,31 @@ exports.updateTaskData = async (id, payload, res, req) => {
       Object.entries(payload).filter(([key]) => !fieldsToRemove.includes(key))
     );
     const taskHistoryEntries = [];
+    // Precompute the current status group before any payload mutation
+    const oldStatusGroup = getStatusGroupName(
+      currentTask.status,
+      currentTask.reopen_status,
+      currentTask.active_status,
+      currentTask.hold_status
+    );
+
+    // Later, when building task history entries
     for (const key in cleanedPayload) {
       const newValue = Number(payload[key]);
       const oldValue = Number(currentTask[key]);
 
       if (!isNaN(newValue) && newValue !== oldValue) {
         const flag = statusFlagMapping[key] || null;
+
+        const oldData =
+          flag === 0 || flag === 1
+            ? oldStatusGroup
+            : await processStatusData(flag, currentTask[key], id, null);
+        const newData = await processStatusData1(flag, payload[key]);
+
         taskHistoryEntries.push([
-          await processStatusData(flag, currentTask[key], id, null),
-          await processStatusData1(flag, payload[key]),
+          oldData,
+          newData,
           id,
           null,
           `Changed ${key}`,
@@ -2382,7 +2417,14 @@ exports.getTaskList = async (req, res) => {
 
     // Helper function to determine the status group
     const getStatusGroup = (status, reopenStatus, activeStatus, holdStatus) => {
-      console.log(holdStatus);
+      console.log(
+        "getStatusGroup called with:",
+        status,
+        reopenStatus,
+        activeStatus,
+        holdStatus
+      );
+
       if (
         (status === 0 &&
           reopenStatus === 0 &&
@@ -2412,6 +2454,7 @@ exports.getTaskList = async (req, res) => {
       }
       return null; // Default case if status doesn't match any known group
     };
+
     // from your destructure:
     let search = (rawSearch || "").toLowerCase().trim();
     const isSearching = search !== "";
