@@ -1636,6 +1636,7 @@ exports.getProjectCompletion = async (req, res) => {
 
     let teamFilterSql = "";
     let teamFilterParams = [];
+    let associateFilter = "";
 
     if (is_team_project_data) {
       const teamConditions = teamIds.map(() => `FIND_IN_SET(?, team_id)`).join(" OR ");
