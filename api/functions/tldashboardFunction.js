@@ -1530,10 +1530,11 @@ exports.tltaskpendinglist = async (req, res) => {
 
     if (await hasPermission("dashboard.team_pending_list", accessToken)) {
       // Team Leader - get team members
-      const [teamUsers] = await db.query(
-        "SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL",
-        [user.team_id]
-      );
+        const [teamUsers] = await db.query(
+          "SELECT id FROM users WHERE FIND_IN_SET(team_id, ?) AND deleted_at IS NULL",
+          [user.team_id]
+        );
+
       const teamUserIds = teamUsers.map((u) => u.id);
       if (teamUserIds.length === 0)
         return successResponse(res, [], "No team members found", 200, null, 0);
