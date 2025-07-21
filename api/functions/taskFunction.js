@@ -1998,6 +1998,11 @@ const lastActiveTask = async (userId) => {
     task.task_hold_status = task.subtask_id
       ? task.subtask_hold_status
       : task.task_hold_status;
+    task.status_text  = commonStatusGroup(
+     task.subtask_id? task.subtask_status : task.task_status,
+     task.subtask_id? task.subtask_reopen_status : task.task_reopen_status,
+    task.subtask_id? task.subtask_active_status : task.task_active_status,
+    )
     const keysToRemove = [
       "subtask_priority",
       "task_priority",
