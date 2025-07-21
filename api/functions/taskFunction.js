@@ -2430,6 +2430,13 @@ exports.getTaskList = async (req, res) => {
           holdStatus === 0)
       ) {
         return "To_Do";
+      }else if (
+        holdStatus === 0 &&
+        status === 1 &&
+        activeStatus === 0 &&
+        reopenStatus === 0
+      ) {
+        return "Paused";
       } else if (
         holdStatus === 1 &&
         status === 1 &&
