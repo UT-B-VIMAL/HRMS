@@ -105,7 +105,22 @@ exports.createUser = async (payload, res, req) => {
 // Get User
 exports.getUser = async (id, res) => {
   try {
-    const query = 'SELECT * FROM users WHERE id = ?';
+    const query = `
+      SELECT 
+        u.*, 
+        (
+          SELECT GROUP_CONCAT(name SEPARATOR ', ')
+          FROM teams
+          WHERE FIND_IN_SET(teams.id, u.team_id)
+        ) AS team_names,
+        r.name AS role_name,
+        d.name AS designation_name
+      FROM users u
+      LEFT JOIN roles r ON r.id = u.role_id
+      LEFT JOIN designations d ON d.id = u.designation_id
+      WHERE u.id = ? AND u.deleted_at IS NULL
+    `;
+
     const [rows] = await db.query(query, [id]);
 
     if (rows.length === 0) {
@@ -114,9 +129,11 @@ exports.getUser = async (id, res) => {
 
     return successResponse(res, rows[0], 'User retrieved successfully');
   } catch (error) {
+    console.error('Error retrieving user:', error.message);
     return errorResponse(res, error.message, 'Error retrieving user', 500);
   }
 };
+
 
 exports.getAllUsers = async (req, res) => {
   try {
@@ -129,23 +146,27 @@ exports.getAllUsers = async (req, res) => {
       SELECT 
         u.id, 
         u.employee_id, 
-        u.first_name, u.last_name, 
+        u.first_name, 
+        u.last_name, 
         u.role_id,
         r.name AS role_name, 
         u.designation_id, 
         u.email,
         u.team_id,
         u.keycloak_id, 
-        t.name AS team_name
+        (
+          SELECT GROUP_CONCAT(name SEPARATOR ', ')
+          FROM teams
+          WHERE FIND_IN_SET(teams.id, u.team_id)
+        ) AS team_names
       FROM users u
-      LEFT JOIN teams t ON t.id = u.team_id
       LEFT JOIN roles r ON r.id = u.role_id
       LEFT JOIN designations d ON d.id = u.designation_id
       WHERE u.deleted_at IS NULL
     `;
 
     let params = [];
-    let searchValue = `%${search}%`;
+    const searchValue = `%${search}%`;
 
     if (search.trim() !== '') {
       query += ` AND (
@@ -155,10 +176,17 @@ exports.getAllUsers = async (req, res) => {
         u.email LIKE ? OR 
         r.name LIKE ? OR 
         u.designation_id LIKE ? OR 
-        u.employee_id LIKE ? OR 
-        t.name LIKE ?
+        u.employee_id LIKE ? OR
+        EXISTS (
+          SELECT 1 FROM teams t2 
+          WHERE FIND_IN_SET(t2.id, u.team_id) 
+          AND t2.name LIKE ?
+        )
       )`;
-      params.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
+      params.push(
+        searchValue, searchValue, searchValue, searchValue,
+        searchValue, searchValue, searchValue, searchValue
+      );
     }
 
     if (team_id) {
@@ -166,19 +194,19 @@ exports.getAllUsers = async (req, res) => {
       params.push(team_id);
     }
 
-
     query += ` ORDER BY u.id DESC LIMIT ? OFFSET ?`;
     params.push(perPageLimit, offset);
 
+    // Count query
     let countQuery = `
       SELECT COUNT(*) AS total_records 
       FROM users u
-      LEFT JOIN teams t ON t.id = u.team_id
       LEFT JOIN roles r ON r.id = u.role_id
       WHERE u.deleted_at IS NULL
     `;
 
     let countParams = [];
+
     if (search.trim() !== '') {
       countQuery += ` AND (
         CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR 
@@ -187,16 +215,22 @@ exports.getAllUsers = async (req, res) => {
         u.email LIKE ? OR 
         r.name LIKE ? OR 
         u.designation_id LIKE ? OR 
-        t.name LIKE ?
+        EXISTS (
+          SELECT 1 FROM teams t2 
+          WHERE FIND_IN_SET(t2.id, u.team_id) 
+          AND t2.name LIKE ?
+        )
       )`;
-      countParams.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
+      countParams.push(
+        searchValue, searchValue, searchValue, searchValue,
+        searchValue, searchValue, searchValue
+      );
     }
 
     if (team_id) {
       countQuery += ` AND FIND_IN_SET(?, u.team_id)`;
       countParams.push(team_id);
     }
-
 
     // Execute the queries
     const [users] = await db.query(query, params);
@@ -210,12 +244,19 @@ exports.getAllUsers = async (req, res) => {
       ...user,
     }));
 
-    return successResponse(res, data, data.length === 0 ? 'No users found' : 'Users retrieved successfully', 200, pagination);
+    return successResponse(
+      res,
+      data,
+      data.length === 0 ? 'No users found' : 'Users retrieved successfully',
+      200,
+      pagination
+    );
   } catch (error) {
     console.error('Error retrieving users:', error.message);
     return errorResponse(res, error.message, 'Error retrieving users', 500);
   }
 };
+
 
 exports.updateUser = async (id, payload, res, req) => {
   const {
