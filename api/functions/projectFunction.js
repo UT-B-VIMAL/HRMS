@@ -7,7 +7,7 @@ const {
 } = require("../../helpers/responseHelper");
 const { projectSchema } = require("../../validators/projectValidator");
 const { getAuthUserDetails, getTeamuserids } = require("./commonFunction");
-const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
 
 const { userSockets } = require("../../helpers/notificationHelper");
 const { hasPermission } = require("../../controllers/permissionController");
@@ -115,15 +115,25 @@ exports.updateProject = async (id, payload, res) => {
     if (checkProductResults[0].count == 0) {
       return errorResponse(res, "Product Not Found", "Product Not Found", 404);
     }
-    const findProject = 'SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL';
+    const findProject =
+      "SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL";
     const [projectResult] = await db.query(findProject, [id]);
-    if(projectResult[0].product_id !== product) {
+    if (projectResult[0].product_id !== product) {
       const checkProductInTasksQuery = `
       SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND product_id = ? AND deleted_at IS NULL`;
-      const [checkProductInTasks] = await db.query(checkProductInTasksQuery, [id, projectResult[0].product_id]);
+      const [checkProductInTasks] = await db.query(checkProductInTasksQuery, [
+        id,
+        projectResult[0].product_id,
+      ]);
       const checkProductInSubTasksQuery = `SELECT COUNT(*) as count FROM sub_tasks WHERE project_id = ? AND product_id = ? AND deleted_at IS NULL`;
-      const [checkProductInSubTasks] = await db.query(checkProductInSubTasksQuery, [id, projectResult[0].product_id]);
-      if (checkProductInTasks[0].count > 0 || checkProductInSubTasks[0].count > 0) {
+      const [checkProductInSubTasks] = await db.query(
+        checkProductInSubTasksQuery,
+        [id, projectResult[0].product_id]
+      );
+      if (
+        checkProductInTasks[0].count > 0 ||
+        checkProductInSubTasks[0].count > 0
+      ) {
         return errorResponse(
           res,
           "This project is referenced in the Tasks or Sub-Tasks and cannot be updated",
@@ -303,15 +313,17 @@ exports.projectStatus = async (req, res) => {
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
 
-   const accessToken = req.headers.authorization?.split(" ")[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
       return errorResponse(res, "Access token is required", 401);
     }
 
     const userId = await getUserIdFromAccessToken(accessToken);
-    
-    const hasTeamstatusView    = await hasPermission("project_status.view_team_project_status", accessToken);
 
+    const hasTeamstatusView = await hasPermission(
+      "project_status.view_team_project_status",
+      accessToken
+    );
 
     const taskConditions = [];
     const taskValues = [];
@@ -353,13 +365,26 @@ exports.projectStatus = async (req, res) => {
       subtaskValues.push(date);
     }
 
+    // if (status === "0") {
+    //   taskConditions.push("t.status = 0");
+    //   taskConditions.push("t.active_status = 0");
+    //   taskConditions.push("t.reopen_status = 0");
+    //   subtaskConditions.push("st.status = 0");
+    //   subtaskConditions.push("st.active_status = 0");
+    //   subtaskConditions.push("st.reopen_status = 0");
+    // }
     if (status === "0") {
-      taskConditions.push("t.status = 0");
-      taskConditions.push("t.active_status = 0");
-      taskConditions.push("t.reopen_status = 0");
-      subtaskConditions.push("st.status = 0");
-      subtaskConditions.push("st.active_status = 0");
-      subtaskConditions.push("st.reopen_status = 0");
+       taskConditions.push(`(
+        (t.status = 0 AND t.active_status = 0 AND t.reopen_status = 0 AND t.hold_status = 0)
+        OR
+        (t.status = 1 AND t.active_status = 0 AND t.reopen_status = 0 AND t.hold_status = 0)
+      )`);
+
+          subtaskConditions.push(`(
+        (st.status = 0 AND st.active_status = 0 AND st.reopen_status = 0 AND st.hold_status = 0)
+        OR
+        (st.status = 1 AND st.active_status = 0 AND st.reopen_status = 0 AND st.hold_status = 0)
+      )`);
     } else if (status === "1") {
       taskConditions.push("t.status = 1");
       taskConditions.push("t.active_status = 1");
@@ -609,9 +634,9 @@ exports.projectRequest = async (req, res) => {
       perPage = 10,
     } = req.query;
 
-    const accessToken = req.headers.authorization?.split(' ')[1];
+    const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
-      return errorResponse(res, 'Access token is required', 401);
+      return errorResponse(res, "Access token is required", 401);
     }
     const user_id = await getUserIdFromAccessToken(accessToken);
     const offset = (page - 1) * perPage;
@@ -634,23 +659,36 @@ exports.projectRequest = async (req, res) => {
       const { role_id } = roleResult[0];
 
       if (employee_id) {
-      effectiveUserIds = [employee_id]; // ✅ Always use only this employee’s data
-    } else {
-      if (await hasPermission("project_request.team_project_request_view", accessToken)) {
-        
-        effectiveUserIds = await getTeamuserids(user_id);
-      } else if (await hasPermission("project_request.all_project_request_view", accessToken)) {
-        taskConditions.push("t.assigned_user_id = ?");
-        subtaskConditions.push("st.assigned_user_id = ?");
-        taskValues.push(user_id);
-        subtaskValues.push(user_id);
-      }else if (await hasPermission("project_request.exclude_project_request_view", accessToken)) {
-  // ✅ PM view: show all data → no user filter applied
-  effectiveUserIds = []; // skip adding any user filter later
-}
+        effectiveUserIds = [employee_id]; // ✅ Always use only this employee’s data
+      } else {
+        if (
+          await hasPermission(
+            "project_request.team_project_request_view",
+            accessToken
+          )
+        ) {
+          effectiveUserIds = await getTeamuserids(user_id);
+        } else if (
+          await hasPermission(
+            "project_request.all_project_request_view",
+            accessToken
+          )
+        ) {
+          taskConditions.push("t.assigned_user_id = ?");
+          subtaskConditions.push("st.assigned_user_id = ?");
+          taskValues.push(user_id);
+          subtaskValues.push(user_id);
+        } else if (
+          await hasPermission(
+            "project_request.exclude_project_request_view",
+            accessToken
+          )
+        ) {
+          // ✅ PM view: show all data → no user filter applied
+          effectiveUserIds = []; // skip adding any user filter later
+        }
+      }
     }
-    }
-    
 
     // Apply user filter only if necessary
     if (effectiveUserIds.length > 0) {
@@ -898,11 +936,19 @@ exports.getRequestupdate = async (req, res) => {
   }
 };
 
-
 exports.getRequestchange = async (_id, payload, res, req) => {
   let id = _id;
   let typeLocal = payload.type;
-  const { remark, rating, action, import_status, employee_id, project_name, task_name, subtask_name } = payload;
+  const {
+    remark,
+    rating,
+    action,
+    import_status,
+    employee_id,
+    project_name,
+    task_name,
+    subtask_name,
+  } = payload;
 
   if (import_status === "1") {
     if (!employee_id || !task_name || !project_name) {
@@ -914,14 +960,16 @@ exports.getRequestchange = async (_id, payload, res, req) => {
       [project_name]
     );
 
-    if (projectRows.length === 0) return errorResponse(res, null, "Project not found", 404);
+    if (projectRows.length === 0)
+      return errorResponse(res, null, "Project not found", 404);
     const project_id = projectRows[0].project_id;
 
     const [userRows] = await db.query(
       "SELECT id AS user_id FROM users WHERE employee_id = ? AND deleted_at IS NULL",
       [employee_id]
     );
-    if (userRows.length === 0) return errorResponse(res, null, "User not found", 404);
+    if (userRows.length === 0)
+      return errorResponse(res, null, "User not found", 404);
     const emp_user_id = userRows[0].user_id;
 
     if (!subtask_name) {
@@ -931,7 +979,8 @@ exports.getRequestchange = async (_id, payload, res, req) => {
          WHERE name = ? AND user_id = ? AND deleted_at IS NULL AND project_id = ?`,
         [task_name, emp_user_id, project_id]
       );
-      if (taskRows.length === 0) return errorResponse(res, null, "Task not found", 404);
+      if (taskRows.length === 0)
+        return errorResponse(res, null, "Task not found", 404);
       id = taskRows[0].task_id;
     } else {
       typeLocal = "subtask";
@@ -940,18 +989,17 @@ exports.getRequestchange = async (_id, payload, res, req) => {
          WHERE name = ? AND user_id = ? AND deleted_at IS NULL AND project_id = ?`,
         [subtask_name, emp_user_id, project_id]
       );
-      if (subtaskRows.length === 0) return errorResponse(res, null, "SubTask not found", 404);
+      if (subtaskRows.length === 0)
+        return errorResponse(res, null, "SubTask not found", 404);
       id = subtaskRows[0].subtask_id;
     }
     payload.type = typeLocal;
     payload.user_id = emp_user_id;
-    
-
   }
 
-  const accessToken = req.headers.authorization?.split(' ')[1];
+  const accessToken = req.headers.authorization?.split(" ")[1];
   if (!accessToken) {
-    return errorResponse(res, 'Access token is required', 401);
+    return errorResponse(res, "Access token is required", 401);
   }
   const auth_user_id = await getUserIdFromAccessToken(accessToken);
 
@@ -977,12 +1025,22 @@ exports.getRequestchange = async (_id, payload, res, req) => {
 
   const validType = ["task", "subtask"];
   if (!validType.includes(typeLocal)) {
-    return errorResponse(res, null, "Invalid type. It should be either task or subtask.", 400);
+    return errorResponse(
+      res,
+      null,
+      "Invalid type. It should be either task or subtask.",
+      400
+    );
   }
 
   const validActions = ["reopen", "close"];
   if (!validActions.includes(action)) {
-    return errorResponse(res, null, "Invalid action. It should be either reopen or close.", 400);
+    return errorResponse(
+      res,
+      null,
+      "Invalid action. It should be either reopen or close.",
+      400
+    );
   }
 
   try {
@@ -993,7 +1051,14 @@ exports.getRequestchange = async (_id, payload, res, req) => {
       [id]
     );
     if (oldDataRows.length === 0) {
-      return errorResponse(res, null, `${typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)} not found or deleted`, 404);
+      return errorResponse(
+        res,
+        null,
+        `${
+          typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)
+        } not found or deleted`,
+        404
+      );
     }
 
     const oldData = oldDataRows[0];
@@ -1004,7 +1069,8 @@ exports.getRequestchange = async (_id, payload, res, req) => {
       statusToSet = 0;
       reopenstatusToSet = 1;
       notificationTitle = "Task Reopened";
-      notificationBody = "Your task has been reopened for further review. Please check the updates.";
+      notificationBody =
+        "Your task has been reopened for further review. Please check the updates.";
     } else if (action === "close") {
       statusToSet = 3;
       reopenstatusToSet = 0;
@@ -1040,12 +1106,21 @@ exports.getRequestchange = async (_id, payload, res, req) => {
 
     const [updateResult] = await db.query(updateQuery, values);
     if (updateResult.affectedRows === 0) {
-      return errorResponse(res, null, `${typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)} not found or deleted`, 404);
+      return errorResponse(
+        res,
+        null,
+        `${
+          typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)
+        } not found or deleted`,
+        404
+      );
     }
 
     const getStatusLabel = (status, reopenStatus, activeStatus) => {
-      if (status === 0 && reopenStatus === 0 && activeStatus === 0) return "To Do";
-      if (status === 1 && reopenStatus === 0 && activeStatus === 0) return "On Hold";
+      if (status === 0 && reopenStatus === 0 && activeStatus === 0)
+        return "To Do";
+      if (status === 1 && reopenStatus === 0 && activeStatus === 0)
+        return "On Hold";
       if (status === 2 && reopenStatus === 0) return "Pending Approval";
       if (reopenStatus === 1 && activeStatus === 0) return "Reopen";
       if (status === 1 && activeStatus === 1) return "InProgress";
@@ -1053,8 +1128,16 @@ exports.getRequestchange = async (_id, payload, res, req) => {
       return "";
     };
 
-    const oldStatusLabel = getStatusLabel(oldData.status, oldData.reopen_status, oldData.active_status);
-    const newStatusLabel = getStatusLabel(statusToSet, reopenstatusToSet, oldData.active_status);
+    const oldStatusLabel = getStatusLabel(
+      oldData.status,
+      oldData.reopen_status,
+      oldData.active_status
+    );
+    const newStatusLabel = getStatusLabel(
+      statusToSet,
+      reopenstatusToSet,
+      oldData.active_status
+    );
 
     const taskId = typeLocal === "task" ? id : oldData.task_id;
     const subtaskId = typeLocal === "subtask" ? id : null;
@@ -1099,7 +1182,9 @@ exports.getRequestchange = async (_id, payload, res, req) => {
     return successResponse(
       res,
       { id },
-      `${typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)} updated successfully`,
+      `${
+        typeLocal.charAt(0).toUpperCase() + typeLocal.slice(1)
+      } updated successfully`,
       200
     );
   } catch (error) {
@@ -1107,4 +1192,3 @@ exports.getRequestchange = async (_id, payload, res, req) => {
     return errorResponse(res, error.message, "Server error", 500);
   }
 };
-
