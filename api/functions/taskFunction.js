@@ -1407,7 +1407,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
         2,
         "0"
       )}`;
+
       // Validate range only if both dates are present
+      
       // const startDateToCheck = payload.start_date || currentTask.start_date;
       // const dueDateToCheck = payload.end_date || currentTask.end_date;
 
