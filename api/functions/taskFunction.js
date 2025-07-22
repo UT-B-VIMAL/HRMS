@@ -1899,6 +1899,8 @@ const lastActiveTask = async (userId) => {
                 s.active_status as subtask_active_status,
                 s.status as subtask_status,
                 s.reopen_status as subtask_reopen_status,
+                s.hold_status as subtask_hold_status,
+                t.hold_status as task_hold_status,
                 t.id as task_id
                 
         FROM sub_tasks_user_timeline stut
@@ -1993,6 +1995,15 @@ const lastActiveTask = async (userId) => {
       ? task.subtask_assigned_by
       : task.task_assigned_by;
     task.timeTaken = timeTaken;
+    task.task_hold_status = task.subtask_id
+      ? task.subtask_hold_status
+      : task.task_hold_status;
+    task.status_text  = commonStatusGroup(
+     task.subtask_id? task.subtask_status : task.task_status,
+     task.subtask_id? task.subtask_reopen_status : task.task_reopen_status,
+    task.subtask_id? task.subtask_active_status : task.task_active_status,
+      task.subtask_id? task.subtask_hold_status : task.task_hold_status
+    )
     const keysToRemove = [
       "subtask_priority",
       "task_priority",

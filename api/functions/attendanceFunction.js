@@ -66,8 +66,8 @@ exports.getAttendance = async (req, res) => {
     `;
     let queryParams = [dynamicDate];
 
-    let excludedRoleIds = hasExceedRole ? await getExcludedRoleIdsByPermission("attendance.show_excluded_roles") : [];
-    let excludeAssociateRoleIds = hasExcludeFromAssociates ? await getExcludedRoleIdsByPermission("attendance.exclude_from_associates") : [];
+    let excludedRoleIds =  await getExcludedRoleIdsByPermission("attendance.show_excluded_roles") ;
+    let excludeAssociateRoleIds =  await getExcludedRoleIdsByPermission("attendance.exclude_from_associates") ;
 
     // Role filters
     if (hasAllAttendance && excludeAssociateRoleIds.length > 0) {
@@ -316,7 +316,7 @@ exports.updateAttendanceAndNotify = async (req, res) => {
   // const hasAllAttendance = await hasPermission("attendance.team_all_present", accessToken);
   // const hasTeamAttendance = await hasPermission("attendance.all_all_present", accessToken);
   // const hasExceedRole = await hasPermission("attendance.excluded_roles_all_present", accessToken);
-  // const hasExcludeFromAssociates = await hasPermission("attendance.exclude_from_associates", accessToken);
+  // const hasExcludeAssociateRoleIds =  await getExcludedRoleIdsByPermission("attendance.exclude_from_associates") ;
     // Fetch team name
     const teamQuery = `
       SELECT name 
@@ -341,11 +341,11 @@ exports.updateAttendanceAndNotify = async (req, res) => {
           FROM users 
           WHERE deleted_at IS NULL AND team_id IN (?) AND id != ?
       `;
-      const teamQuery = `
-          SELECT id 
-          FROM teams 
-          WHERE deleted_at IS NULL AND reporting_user_id = ?
-      `;
+      // const teamQuery = `
+      //     SELECT id 
+      //     FROM teams 
+      //     WHERE deleted_at IS NULL AND reporting_user_id = ?
+      // `;
       const [rows] = await db.query(teamQuery, [user_id]);
       const teamIds = rows.map(row => row.id);
       const userIds = teamIds.length > 0 
