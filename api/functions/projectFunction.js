@@ -322,7 +322,6 @@ exports.projectStatus = async (req, res) => {
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
-console.log(`User ID: ${user_id}`);
 
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
@@ -331,7 +330,6 @@ console.log(`User ID: ${user_id}`);
       "project_status.view_team_project_status",
       accessToken
     );
-console.log(`User has team status view permission: ${hasTeamstatusView}`);
 
     const taskConditions = [];
     const taskValues = [];
