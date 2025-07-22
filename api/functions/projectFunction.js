@@ -643,7 +643,7 @@ exports.projectStatus = async (req, res) => {
 
     successResponse(
       res,
-      paginatedData, // ✅ return paginated data with s_no
+      paginatedData, 
       paginatedData.length === 0
         ? "No data found"
         : "Data retrieved successfully",
