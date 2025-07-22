@@ -1407,6 +1407,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
         2,
         "0"
       )}`;
+      
 
       // Validate range only if both dates are present
       
