@@ -6,8 +6,11 @@ const {
 const {
   getColorForProduct,
   getAuthUserDetails,
+  getExcludedRoleIdsByPermission,
 } = require("../../api/functions/commonFunction");
 const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+const { hasPermission } = require("../../controllers/permissionController");
+
 
 const moment = require("moment");
 exports.fetchAttendance = async (req, res) => {
@@ -1530,10 +1533,11 @@ exports.tltaskpendinglist = async (req, res) => {
 
     if (await hasPermission("dashboard.team_pending_list", accessToken)) {
       // Team Leader - get team members
-      const [teamUsers] = await db.query(
-        "SELECT id FROM users WHERE team_id = ? AND deleted_at IS NULL",
-        [user.team_id]
-      );
+        const [teamUsers] = await db.query(
+          "SELECT id FROM users WHERE FIND_IN_SET(team_id, ?) AND deleted_at IS NULL",
+          [user.team_id]
+        );
+
       const teamUserIds = teamUsers.map((u) => u.id);
       if (teamUserIds.length === 0)
         return successResponse(res, [], "No team members found", 200, null, 0);
@@ -1707,9 +1711,17 @@ exports.getTeamWorkedHrs = async (req, res) => {
 
     const user_id = await getUserIdFromAccessToken(accessToken);
     const loggedInUser = await getAuthUserDetails(user_id, res);
-    const isTL = loggedInUser.role_id === 3;
     const userId = loggedInUser.id;
+    
+    const hasTLPermission = await hasPermission("dashboard.team_weekly_working_hours", accessToken);
+    const hasUserPermission = await hasPermission("dashboard.user_weekly_working_hours", accessToken);
 
+    const excludedRoleIds =  await getExcludedRoleIdsByPermission("dashboard.show_excluded_roles") ;
+
+    console.log("hasTLPermission", hasTLPermission);
+    console.log("hasUserPermission", hasUserPermission);
+    console.log("excludedRoleIds", excludedRoleIds);
+    
     const startDate = moment(from_date, "YYYY-MM-DD");
     const endDate = moment(to_date, "YYYY-MM-DD");
 
@@ -1735,20 +1747,20 @@ exports.getTeamWorkedHrs = async (req, res) => {
 
     let userIds = [];
 
-    if (isTL) {
-      const [teamRows] = await db.query(
-        "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
-        [userId]
-      );
+    if (hasTLPermission) {
+      // const [teamRows] = await db.query(
+      //   "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?",
+      //   [userId]
+      // );
 
-      if (!teamRows.length) {
-        return errorResponse(res, "You are not currently assigned a reporting TL for your team.", 404);
-      }
+      // if (!teamRows.length) {
+      //   return errorResponse(res, "You are not currently assigned a reporting TL for your team.", 404);
+      // }
 
-      const teamIds = teamRows.map((row) => row.id);
+      const teamIds = loggedInUser.team_id ? loggedInUser.team_id.split(',') : [];
       const [userRows] = await db.query(
-        "SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)",
-        [teamIds]
+        "SELECT id FROM users WHERE deleted_at IS NULL AND FIND_IN_SET(team_id, ?)",
+        [teamIds.join(",")],
       );
       userIds = userRows.map((row) => row.id);
     } else {
@@ -1766,14 +1778,15 @@ exports.getTeamWorkedHrs = async (req, res) => {
       }
       userIds = [associativeId];
     }
-
+    if (!userIds.length) return errorResponse(res,'No user IDs provided', 404);
+    if (!excludedRoleIds.length) excludedRoleIds = [-1];
     const placeholders = userIds.map(() => "?").join(",");
-
+    
     const [users] = await db.query(
       `SELECT id, CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) AS name
        FROM users
-       WHERE deleted_at IS NULL AND id IN (${placeholders}) AND role_id NOT IN (1, 2, 3)`,
-      [...userIds]
+       WHERE deleted_at IS NULL AND id IN (${placeholders}) AND role_id NOT IN (${excludedRoleIds.map(() => '?').join(',')})`,
+      [...userIds,...excludedRoleIds]
     );
 
     if (!users.length) {
@@ -1847,7 +1860,7 @@ exports.getTeamWorkedHrs = async (req, res) => {
         };
       });
 
-      if (isTL && !associative) {
+      if (hasTLPermission && !associative) {
         const top5 = dailyUsers.slice(0, 5);
         const others = dailyUsers.slice(5);
 
