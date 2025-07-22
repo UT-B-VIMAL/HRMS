@@ -297,7 +297,7 @@ exports.get_idleEmployee = async (req, res) => {
     const hasAllIdle = await hasPermission("idle_employees.all_idle_employees_view", accessToken);
     const hasTeamIdle = await hasPermission("idle_employees.team_idle_employees_view", accessToken);
     const hasExceedRole = await hasPermission("idle_employees.show_excluded_roles", accessToken);
-// console.log(`User ID: ${user_id}, hasAllIdle: ${hasAllIdle}, hasTeamIdle: ${hasTeamIdle}, hasExceedRole: ${hasExceedRole}`);
+ console.log(`User ID: ${user_id}, hasAllIdle: ${hasAllIdle}, hasTeamIdle: ${hasTeamIdle}, hasExceedRole: ${hasExceedRole}`);
 
     if (!hasAllIdle && !hasTeamIdle) {
       return errorResponse(res, null, "Access denied", 403);
@@ -368,6 +368,8 @@ exports.get_idleEmployee = async (req, res) => {
       baseQuery += ` AND FIND_IN_SET(?, users.team_id)`;
       queryParams.push(team_id);
     } else if (hasTeamIdle) {
+      console.log(`Team IDs: ${teamIds}, User ID: ${user_id}`);
+      
       const teamFilter = teamIds.map(() => `FIND_IN_SET(?, users.team_id)`).join(" OR ");
       baseQuery += ` AND (${teamFilter}) AND users.id != ?`;
       queryParams.push(...teamIds, user_id);
