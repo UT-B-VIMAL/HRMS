@@ -1,12 +1,14 @@
 const bcrypt = require('bcryptjs');
 const db = require('../../config/db');
+const axios = require('axios');
 const { successResponse, errorResponse } = require('../../helpers/responseHelper');
 const getPagination = require('../../helpers/pagination');
+const { uploadProfileFileToS3 } = require('../../config/s3');
 const { createUserInKeycloak, deleteUserInKeycloak, editUserInKeycloak } = require("../functions/keycloakFunction");
 const {
   getAuthUserDetails
 } = require("../../api/functions/commonFunction");
-const {getUserIdFromAccessToken} = require("../../api/utils/tokenUtils");
+const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
 
 
 // Create User
@@ -99,6 +101,178 @@ exports.createUser = async (payload, res, req) => {
   }
 
 };
+
+
+// 👇 Upload image from URL
+async function uploadImageFromUrlToS3(imageUrl, userId) {
+  try {
+    // Step 1: Download image as binary
+    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+
+    const fileBuffer = Buffer.from(response.data, 'binary');
+
+    // Step 2: Get file extension
+    const extension = imageUrl.split('.').pop().split(/\#|\?/)[0].toLowerCase();
+    const allowed = ['jpg', 'jpeg', 'png'];
+
+    if (!allowed.includes(extension)) {
+      console.warn(`Invalid file extension: ${extension}`);
+      return null;
+    }
+
+    // Step 3: Create unique filename
+    const filename = `${userId}_${Date.now()}.${extension}`;
+
+    // Step 4: Upload to S3
+    const s3Url = await uploadProfileFileToS3(fileBuffer, filename);
+
+    return s3Url;
+  } catch (err) {
+    console.error('Image download/upload failed:', err.message);
+    return null;
+  }
+}
+
+exports.createUserWithoutRole = async (payload, res, req) => {
+  const {
+    first_name,
+    last_name,
+    employee_id,
+    email,
+    password,
+    designation_name,
+    gender,
+    dob,
+    blood_group,
+    mobile_no,
+    emergency_contact_name,
+    emergency_contact_no,
+    address,
+    permanent_address,
+    profile_img,
+    created_by = 1,
+    deleted_at = null,
+  } = payload;
+
+  try {
+    const userId = created_by;
+    const formattedEmployeeId = String(employee_id).padStart(3, '0');
+
+    // Duplicate Checks
+    const [existingUsers] = await db.query(
+      `SELECT id FROM users WHERE employee_id = ? AND deleted_at IS NULL`,
+      [formattedEmployeeId]
+    );
+    if (existingUsers.length > 0) {
+      return errorResponse(res, 'Employee ID already exists', 'Duplicate entry', 400);
+    }
+
+    const [existingEmail] = await db.query(
+      `SELECT id FROM users WHERE email = ? AND deleted_at IS NULL`,
+      [email]
+    );
+    if (existingEmail.length > 0) {
+      return errorResponse(res, 'Email already exists', 'Duplicate entry', 400);
+    }
+
+    // Keycloak registration
+    const keycloakUserData = {
+      username: formattedEmployeeId,
+      email: email,
+      firstName: first_name,
+      lastName: last_name,
+      enabled: true,
+      emailVerified: true,
+      credentials: [
+        {
+          type: 'password',
+          value: password,
+          temporary: false,
+        },
+      ],
+    };
+
+    const keycloakId = await createUserInKeycloak(keycloakUserData);
+    if (!keycloakId || typeof keycloakId === 'object') {
+      return errorResponse(res, 'Failed to create user in Keycloak', 'Keycloak error', 500);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Upload image if provided
+    let uploadedProfileImageUrl = null;
+    if (profile_img && profile_img.startsWith('http')) {
+      uploadedProfileImageUrl = await uploadImageFromUrlToS3(profile_img, formattedEmployeeId);
+    }
+
+    // Insert into `users` table
+    const userInsertQuery = `
+      INSERT INTO users (
+        first_name, last_name, employee_id, email,
+        password, designation_id,
+        created_by, keycloak_id, deleted_at,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+
+    const userValues = [
+      first_name,
+      last_name,
+      formattedEmployeeId,
+      email,
+      hashedPassword,
+      designation_name,
+      userId,
+      keycloakId,
+      deleted_at,
+    ];
+
+    const [userResult] = await db.query(userInsertQuery, userValues);
+    const newUserId = userResult.insertId;
+
+    // Insert into `user_profiles` table
+    const profileInsertQuery = `
+      INSERT INTO user_profiles (
+        user_id, dob, gender, mobile_no,
+        emergency_contact_name, emergency_contact_no,
+        blood_group, address, permanent_address,
+        profile_img, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+
+    const profileValues = [
+      newUserId,
+      dob || null,
+      gender || null,
+      mobile_no || null,
+      emergency_contact_name || null,
+      emergency_contact_no || null,
+      blood_group || null,
+      address || null,
+      permanent_address || null,
+      uploadedProfileImageUrl || null,
+    ];
+
+    await db.query(profileInsertQuery, profileValues);
+
+    return successResponse(
+      res,
+      {
+        id: newUserId,
+        employee_id: formattedEmployeeId,
+        keycloak_user_id: keycloakId,
+        profile_img: uploadedProfileImageUrl || null,
+      },
+      'User and profile created successfully',
+      201
+    );
+  } catch (error) {
+    console.error('Error creating user:', error.message);
+    return errorResponse(res, error.message, 'Error creating user', 500);
+  }
+};
+
+
 
 
 

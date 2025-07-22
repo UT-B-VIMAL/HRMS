@@ -3,7 +3,8 @@ const {
   updateUser, 
   deleteUser, 
   getUser, 
-  getAllUsers 
+  getAllUsers,
+  createUserWithoutRole 
 } = require('../api/functions/userFunction');
 
 const { 
@@ -12,6 +13,7 @@ const {
 } = require('../helpers/responseHelper');
 
 const UserSchema = require("../validators/userValidator");
+const UserWithoutRoleSchema = require("../validators/userWithoutRoleValidator");
 
 exports.createUser = async (req, res) => {
   try {
@@ -28,6 +30,27 @@ exports.createUser = async (req, res) => {
       }
 
       await createUser(payload, res, req);
+  } catch (error) {
+      console.error('Error creating user:', error.message);
+      return errorResponse(res, error.message, 'Error creating user', 500);
+  }
+};
+
+exports.createUserWithoutRole = async (req, res) => {
+  try {
+      const payload = req.body;
+      const { error } = UserWithoutRoleSchema(false).validate(payload, { abortEarly: false });
+
+      if (error) {
+          const errorMessages = error.details.reduce((acc, err) => {
+              acc[err.path[0]] = err.message;
+              return acc;
+          }, {});
+
+          return errorResponse(res, errorMessages, "Validation Error", 403);
+      }
+
+      await createUserWithoutRole(payload, res, req);
   } catch (error) {
       console.error('Error creating user:', error.message);
       return errorResponse(res, error.message, 'Error creating user', 500);
