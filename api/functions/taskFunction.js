@@ -2917,14 +2917,14 @@ exports.endTask = async (
   comment,
   res
 ) => {
-  if (!comment) {
-    throw {
-      status: 400,
-      success: false,
-      message: "Comment is required",
-      error: "Comment is required",
-    };
-  }
+  // if (!comment) {
+  //   throw {
+  //     status: 400,
+  //     success: false,
+  //     message: "Comment is required",
+  //     error: "Comment is required",
+  //   };
+  // }
   const currentTime = moment();
   const timeDifference = currentTime.diff(lastStartTime, "seconds");
 
