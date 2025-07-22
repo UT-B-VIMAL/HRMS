@@ -1138,6 +1138,69 @@ exports.getRequestchange = async (_id, payload, res, req) => {
     `;
 
     const [updateResult] = await db.query(updateQuery, values);
+    // comments
+
+    if (updateResult.affectedRows > 0) {
+  const selectQuery = `
+    SELECT *
+    FROM ${table}
+    WHERE id = ? AND deleted_at IS NULL
+    LIMIT 1
+  `;
+  const [rows] = await db.query(selectQuery, [values[values.length - 1]]);
+  const updatedRecord = rows[0];
+
+  // Extract values
+  let task_Id, subtask_Id;
+
+// If table is "tasks"
+if (table === "tasks") {
+  task_Id = updatedRecord.id;      
+  subtask_Id = null;              
+} else {
+  subtask_Id = updatedRecord.id;   
+  task_Id = updatedRecord.task_id; 
+}
+
+const userId = updatedRecord.user_id;
+
+  // 3. Insert comment using these values
+  const insertCommentQuery = `
+    INSERT INTO task_comments (
+      task_id, subtask_id, user_id, comments, html_content, updated_by, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+  `;
+
+  const [commentResult] = await db.query(insertCommentQuery, [
+    task_Id,
+    subtask_Id,
+    userId,
+    remark?.trim() || null,
+     remark?.trim() || null,  
+    auth_user_id       
+  ]);
+  const historyQuerys = `
+      INSERT INTO task_histories (
+        old_data, new_data, task_id, subtask_id, text,
+        updated_by, status_flag, created_at, updated_at, deleted_at
+      ) VALUES (NULL, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+    `;
+    const historyValuess = [
+      remark,
+      task_Id,
+    subtask_Id,
+      "Remarks added",
+      auth_user_id,
+      21,
+    ];
+    await db.query(historyQuerys, historyValuess);
+
+  console.log(`✅ Comment inserted with ID: ${commentResult.insertId}`);
+} else {
+  console.log('⚠️ No rows updated, skipping comment insertion.');
+}
+    // comments
+
     if (updateResult.affectedRows === 0) {
       return errorResponse(
         res,
@@ -1175,6 +1238,8 @@ exports.getRequestchange = async (_id, payload, res, req) => {
     const taskId = typeLocal === "task" ? id : oldData.task_id;
     const subtaskId = typeLocal === "subtask" ? id : null;
 
+
+    
     const historyQuery = `
       INSERT INTO task_histories (
         old_data, new_data, task_id, subtask_id, text,
