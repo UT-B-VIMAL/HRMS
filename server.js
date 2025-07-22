@@ -153,6 +153,8 @@ apiRouter.get("/profile/:id", profileController.getProfile);
 
 // User Routes
 apiRouter.post("/user", RoleController.checkRole(['user.add_user']),userController.createUser);
+apiRouter.post("/create-user", userController.createUserWithoutRole);
+
 apiRouter.put(
   "/user/:id",
   RoleController.checkRole(['user.edit_user']),
