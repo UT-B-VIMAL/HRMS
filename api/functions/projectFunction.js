@@ -322,7 +322,7 @@ exports.projectStatus = async (req, res) => {
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
-
+console.log(`User ID: ${user_id}`);
 
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
@@ -331,6 +331,7 @@ exports.projectStatus = async (req, res) => {
       "project_status.view_team_project_status",
       accessToken
     );
+console.log(`User has team status view permission: ${hasTeamstatusView}`);
 
     const taskConditions = [];
     const taskValues = [];
@@ -338,11 +339,22 @@ exports.projectStatus = async (req, res) => {
     const subtaskValues = [];
 
     if (hasTeamstatusView) {
-      taskConditions.push("FIND_IN_SET(?, u.team_id)");
-      taskValues.push(users.team_id);
-      subtaskConditions.push("FIND_IN_SET(?, u.team_id)");
-      subtaskValues.push(users.team_id);
+      // Convert comma-separated team_id string to array
+      const teamIds = users.team_id.split(",").map(id => id.trim()).filter(Boolean);
+
+      if (teamIds.length > 0) {
+        const placeholders = teamIds.map(() => "?").join(",");
+
+        // Task condition
+        taskConditions.push(`u.team_id IN (${placeholders})`);
+        taskValues.push(...teamIds);
+
+        // Subtask condition
+        subtaskConditions.push(`u.team_id IN (${placeholders})`);
+        subtaskValues.push(...teamIds);
+      }
     }
+
 
     if (product_id) {
       taskConditions.push("t.product_id = ?");
