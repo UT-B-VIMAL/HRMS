@@ -6,7 +6,7 @@ const {
   getPagination,
 } = require("../../helpers/responseHelper");
 const { projectSchema } = require("../../validators/projectValidator");
-const { getAuthUserDetails, getTeamuserids } = require("./commonFunction");
+const { getAuthUserDetails, getTeamuserids,commonStatusGroup } = require("./commonFunction");
 const { getUserIdFromAccessToken } = require("../../api/utils/tokenUtils");
 
 const { userSockets } = require("../../helpers/notificationHelper");
@@ -322,7 +322,6 @@ exports.projectStatus = async (req, res) => {
     }
 
     const user_id = await getUserIdFromAccessToken(accessToken);
-console.log(`User ID: ${user_id}`);
 
     const users = await getAuthUserDetails(user_id, res);
     if (!users) return;
@@ -331,7 +330,6 @@ console.log(`User ID: ${user_id}`);
       "project_status.view_team_project_status",
       accessToken
     );
-console.log(`User has team status view permission: ${hasTeamstatusView}`);
 
     const taskConditions = [];
     const taskValues = [];
@@ -477,7 +475,10 @@ console.log(`User has team status view permission: ${hasTeamstatusView}`);
         tm.id AS team_id,
         tm.name AS team_name,
         u.id AS user_id,
-        t.status AS task_status,
+        t.status,
+        t.reopen_status,
+        t.active_status,
+        t.hold_status,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
         DATE(t.created_at) AS date,
         t.updated_at AS updated_at
@@ -525,7 +526,10 @@ console.log(`User has team status view permission: ${hasTeamstatusView}`);
         st.id AS subtask_id,
         u.id AS user_id,
         COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.first_name, u.last_name) AS assignee,
-        st.status AS subtask_status,
+        st.status,
+        st.reopen_status,
+        st.active_status,
+        st.hold_status,
         st.updated_at AS updated_at
       FROM sub_tasks st
       LEFT JOIN tasks t ON t.id = st.task_id
@@ -558,7 +562,12 @@ console.log(`User has team status view permission: ${hasTeamstatusView}`);
 
     const Tasks = tasks.map((task) => ({
       type: "Task",
-      status: mapStatus(task.task_status),
+        status: commonStatusGroup(
+                    task.status,
+                    task.reopen_status,
+                    task.active_status,
+                    task.hold_status
+                  ),
       date: task.date,
       product_name: task.product_name,
       project_name: task.project_name,
@@ -581,7 +590,12 @@ console.log(`User has team status view permission: ${hasTeamstatusView}`);
 
     const Subtasks = subtasks.map((subtask) => ({
       type: "SubTask",
-      status: mapStatus(subtask.subtask_status),
+      status: commonStatusGroup(
+                    subtask.status,
+                    subtask.reopen_status,
+                    subtask.active_status,
+                    subtask.hold_status
+                  ),
       date: subtask.date,
       product_name: subtask.product_name,
       project_name: subtask.project_name,
