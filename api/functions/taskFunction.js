@@ -1408,41 +1408,41 @@ exports.updateTaskData = async (id, payload, res, req) => {
         "0"
       )}`;
       // Validate range only if both dates are present
-      const startDateToCheck = payload.start_date || currentTask.start_date;
-      const dueDateToCheck = payload.end_date || currentTask.end_date;
+      // const startDateToCheck = payload.start_date || currentTask.start_date;
+      // const dueDateToCheck = payload.end_date || currentTask.end_date;
 
-      if (startDateToCheck && dueDateToCheck) {
-        const start = new Date(startDateToCheck);
-        const end = new Date(dueDateToCheck);
+      // if (startDateToCheck && dueDateToCheck) {
+      //   const start = new Date(startDateToCheck);
+      //   const end = new Date(dueDateToCheck);
 
-        // Normalize to remove time
-        start.setHours(0, 0, 0, 0);
-        end.setHours(0, 0, 0, 0);
+      //   // Normalize to remove time
+      //   start.setHours(0, 0, 0, 0);
+      //   end.setHours(0, 0, 0, 0);
 
-        if (start > end) {
-          return errorResponse(
-            res,
-            null,
-            "Start date cannot be after due date.",
-            400
-          );
-        }
+      //   if (start > end) {
+      //     return errorResponse(
+      //       res,
+      //       null,
+      //       "Start date cannot be after due date.",
+      //       400
+      //     );
+      //   }
 
-        const diffMs = end - start;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1; // inclusive
-        const maxAllowedHours = diffDays * 8;
+      //   const diffMs = end - start;
+      //   const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1; // inclusive
+      //   const maxAllowedHours = diffDays * 8;
 
-        if (totalHours > maxAllowedHours) {
-          return errorResponse(
-            res,
-            null,
-            `Estimated hours (${totalHours.toFixed(
-              2
-            )}h) exceed available working hours (${maxAllowedHours}h) between start and due date.`,
-            400
-          );
-        }
-      }
+      //   if (totalHours > maxAllowedHours) {
+      //     return errorResponse(
+      //       res,
+      //       null,
+      //       `Estimated hours (${totalHours.toFixed(
+      //         2
+      //       )}h) exceed available working hours (${maxAllowedHours}h) between start and due date.`,
+      //       400
+      //     );
+      //   }
+      // }
     }
 
     // if (payload.due_date) {
