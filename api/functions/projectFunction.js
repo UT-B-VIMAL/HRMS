@@ -581,8 +581,8 @@ exports.projectStatus = async (req, res) => {
       team_id: task.team_id,
       team_name: task.team_name,
       start_time: task.start_time ? task.start_time : "-",
-      end_time: task.task_status === 3 && task.end_time ? task.end_time : "-",
-      task_duration: task.task_status === 3 ? task.task_duration : "-",
+      end_time: task.status === 3 && task.end_time ? task.end_time : "-",
+      task_duration: task.status === 3 ? task.task_duration : "-",
       task_updated_at: task.updated_at
         ? moment(task.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
@@ -611,12 +611,12 @@ exports.projectStatus = async (req, res) => {
       team_name: subtask.team_name,
       start_time: subtask.start_time ? subtask.start_time : "-",
       end_time:
-        subtask.subtask_status === 3 && subtask.end_time
+        subtask.status === 3 && subtask.end_time
           ? subtask.end_time
           : "-",
-      time_taken: subtask.subtask_status === 3 ? subtask.time_taken : "-",
+      time_taken: subtask.status === 3 ? subtask.time_taken : "-",
       subtask_duration:
-        subtask.subtask_status === 3 ? subtask.subtask_duration : "-",
+        subtask.status === 3 ? subtask.subtask_duration : "-",
       task_updated_at: subtask.updated_at
         ? moment(subtask.updated_at).format("DD-MM-YYYY hh:mm:ss A")
         : "-",
@@ -643,7 +643,7 @@ exports.projectStatus = async (req, res) => {
 
     successResponse(
       res,
-      paginatedData, // ✅ return paginated data with s_no
+      paginatedData, 
       paginatedData.length === 0
         ? "No data found"
         : "Data retrieved successfully",
