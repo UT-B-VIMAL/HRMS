@@ -1407,94 +1407,9 @@ exports.updateTaskData = async (id, payload, res, req) => {
         2,
         "0"
       )}`;
-      // Validate range only if both dates are present
-      const startDateToCheck = payload.start_date || currentTask.start_date;
-      const dueDateToCheck = payload.end_date || currentTask.end_date;
-
-      if (startDateToCheck && dueDateToCheck) {
-        const start = new Date(startDateToCheck);
-        const end = new Date(dueDateToCheck);
-
-        // Normalize to remove time
-        start.setHours(0, 0, 0, 0);
-        end.setHours(0, 0, 0, 0);
-
-        if (start > end) {
-          return errorResponse(
-            res,
-            null,
-            "Start date cannot be after due date.",
-            400
-          );
-        }
-
-        const diffMs = end - start;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1; // inclusive
-        const maxAllowedHours = diffDays * 8;
-
-        if (totalHours > maxAllowedHours) {
-          return errorResponse(
-            res,
-            null,
-            `Estimated hours (${totalHours.toFixed(
-              2
-            )}h) exceed available working hours (${maxAllowedHours}h) between start and due date.`,
-            400
-          );
-        }
-      }
+      
     }
 
-    if (payload.due_date) {
-      const startDateToCheck = payload.start_date || currentTask.start_date;
-      const dueDateToCheck = payload.due_date || currentTask.due_date;
-      const estimatedHoursToCheck = (
-        payload.estimated_hours ||
-        currentTask.estimated_hours ||
-        ""
-      ).trim();
-      if (startDateToCheck && dueDateToCheck && estimatedHoursToCheck) {
-        let totalHours = 0;
-        const durationMatch = estimatedHoursToCheck.match(
-          /^((\d+)\s*d\s*)?((\d+)\s*h\s*)?((\d+)\s*m\s*)?((\d+)\s*s\s*)?$/i
-        );
-        if (durationMatch) {
-          const days = parseInt(durationMatch[2] || "0", 10);
-          const hours = parseInt(durationMatch[4] || "0", 10);
-          const minutes = parseInt(durationMatch[6] || "0", 10);
-          const seconds = parseInt(durationMatch[8] || "0", 10);
-          totalHours = days * 8 + hours + minutes / 60 + seconds / 3600;
-        } else {
-          const [h = "0", m = "0", s = "0"] = estimatedHoursToCheck.split(":");
-          totalHours =
-            parseInt(h, 10) + parseInt(m, 10) / 60 + parseInt(s, 10) / 3600;
-        }
-        // Normalize both dates (remove time & timezone)
-        const start = new Date(startDateToCheck);
-        const end = new Date(dueDateToCheck);
-        const localStart = new Date(
-          start.getFullYear(),
-          start.getMonth(),
-          start.getDate()
-        );
-        const localEnd = new Date(
-          end.getFullYear(),
-          end.getMonth(),
-          end.getDate()
-        );
-        const diffMs = localEnd - localStart;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24) + 1;
-        const requiredDays = Math.ceil(totalHours / 8);
-        if (diffDays < requiredDays) {
-          return errorResponse(
-            res,
-            null,
-            `End date must be at least ${requiredDays} day(s) after start date for estimated hours of ${estimatedHoursToCheck}`,
-            400
-          );
-        }
-      }
-    }
 
     let hold_status = 0;
     if (
