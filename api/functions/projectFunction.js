@@ -1142,7 +1142,7 @@ exports.getRequestchange = async (_id, payload, res, req) => {
 
     if (updateResult.affectedRows > 0) {
   const selectQuery = `
-    SELECT id AS task_id, user_id, subtask_id
+    SELECT *
     FROM ${table}
     WHERE id = ? AND deleted_at IS NULL
     LIMIT 1
@@ -1151,9 +1151,18 @@ exports.getRequestchange = async (_id, payload, res, req) => {
   const updatedRecord = rows[0];
 
   // Extract values
-  const task_Id = updatedRecord.task_id;
-  const userId = updatedRecord.user_id;
-  const subtask_Id = updatedRecord.subtask_id || null;
+  let task_Id, subtask_Id;
+
+// If table is "tasks"
+if (table === "tasks") {
+  task_Id = updatedRecord.id;      
+  subtask_Id = null;              
+} else {
+  subtask_Id = updatedRecord.id;   
+  task_Id = updatedRecord.task_id; 
+}
+
+const userId = updatedRecord.user_id;
 
   // 3. Insert comment using these values
   const insertCommentQuery = `
@@ -1174,13 +1183,12 @@ exports.getRequestchange = async (_id, payload, res, req) => {
       INSERT INTO task_histories (
         old_data, new_data, task_id, subtask_id, text,
         updated_by, status_flag, created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
+      ) VALUES (NULL, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NULL)
     `;
     const historyValuess = [
-      NULL,
       remark,
-      taskId,
-      subtaskId,
+      task_Id,
+    subtask_Id,
       "Remarks added",
       auth_user_id,
       21,
