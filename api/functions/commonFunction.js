@@ -23,6 +23,7 @@ exports.getAllData = async (req, res) => {
     const hasTeamProjects = await hasPermission("dropdown.team_projects", accessToken);
     const hasUserProjects = await hasPermission("dropdown.user_projects", accessToken);
     const hasTeamUsers= await hasPermission("dropdown.team_users", accessToken);
+    const hasOwnTeamFilter = await hasPermission("dropdown.ownteam_filter", accessToken);
     
     const hasTeamProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.team_products") ;
     const hasUserProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.user_products") ;
@@ -87,7 +88,15 @@ exports.getAllData = async (req, res) => {
     }
 
     query = `SELECT DISTINCT teams.id, teams.name FROM teams LEFT JOIN users ON teams.id = users.team_id WHERE teams.deleted_at IS NULL AND users.deleted_at IS NULL AND teams.id IN (?)`;
+
     queryParams.push(teamIds);
+    if( hasOwnTeamFilter && user_id) {
+           const users = await this.getAuthUserDetails(user_id, res);
+            const teamIds = users.team_id ? users.team_id.split(',') : [];
+            console.log("teamIds", teamIds)
+            query += " AND teams.id IN (?)";
+            queryParams.push(teamIds);
+    }
     } else if (type === "users") {
         query = `SELECT id, role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id IN (${hasUserProductsIds.map(() => '?').join(',')})`;
         queryParams.push(...hasUserProductsIds);
@@ -272,17 +281,16 @@ exports.getAllData = async (req, res) => {
         }
     }
     if (type === "teams" && id) {
-        
         const users = await this.getAuthUserDetails(id, res);
         if (!users) return;
         if (hasTeamUsers) {
             const teamIds = users.team_id ? users.team_id.split(',') : [];
             console.log("teamIds", teamIds)
             query += " AND teams.id IN (?)";
-
             queryParams.push(teamIds);
         }
     }
+    
     if (type === "users" && user_id) {
         const users = await this.getAuthUserDetails(user_id, res);
         if (!users) return;
