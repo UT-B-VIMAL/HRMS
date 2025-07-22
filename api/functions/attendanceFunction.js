@@ -341,11 +341,11 @@ exports.updateAttendanceAndNotify = async (req, res) => {
           FROM users 
           WHERE deleted_at IS NULL AND team_id IN (?) AND id != ?
       `;
-      const teamQuery = `
-          SELECT id 
-          FROM teams 
-          WHERE deleted_at IS NULL AND reporting_user_id = ?
-      `;
+      // const teamQuery = `
+      //     SELECT id 
+      //     FROM teams 
+      //     WHERE deleted_at IS NULL AND reporting_user_id = ?
+      // `;
       const [rows] = await db.query(teamQuery, [user_id]);
       const teamIds = rows.map(row => row.id);
       const userIds = teamIds.length > 0 
