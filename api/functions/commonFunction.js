@@ -13,7 +13,6 @@ exports.getAllData = async (req, res) => {
     if (!accessToken) {
       return errorResponse(res, "Access token is required", 401);
     }
-    console.log(accessToken)
 
     const user_id = await getUserIdFromAccessToken(accessToken);
     const hasAllProducts = await hasPermission("dropdown.all_products", accessToken);

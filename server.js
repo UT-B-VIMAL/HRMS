@@ -417,6 +417,7 @@ apiRouter.get(
 );
 apiRouter.get(
   "/getTeamWorkedHrs",
+   RoleController.checkRole(['dashboard.team_weekly_working_hours','dashboard.user_weekly_working_hours','dashboard.show_excluded_roles']),
   tldashboardController.getTeamWorkedHrsDetails
 );
 // Employee Dashboard Routes
