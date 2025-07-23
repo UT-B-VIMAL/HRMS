@@ -2984,11 +2984,11 @@ exports.endTask = async (
 // Main controller function
 exports.updateTaskTimeLine = async (req, res) => {
   try {
-    const { id, action, type, last_start_time, timeline_id, comment } =
+    const { id, action, type, last_start_time, timeline_id,comment } =
       req.body;
 
     // Validate the request body
-    const { error } = updateTimelineShema.validate(req.body, {
+    const { error } = updateTimelineShema.validate({ id, action, type, last_start_time, timeline_id}, {
       abortEarly: false,
     });
 
