@@ -13,7 +13,6 @@ exports.getAllData = async (req, res) => {
     if (!accessToken) {
       return errorResponse(res, "Access token is required", 401);
     }
-    console.log(accessToken)
 
     const user_id = await getUserIdFromAccessToken(accessToken);
     const hasAllProducts = await hasPermission("dropdown.all_products", accessToken);
@@ -133,7 +132,7 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(productIds);
-        } else if (hasUserProducts) {
+        } if (hasUserProducts) {
             const queryTasks = "SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id=?";
             const [taskRows] = await db.query(queryTasks, [user_id]);
 
@@ -146,7 +145,7 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(productIds);
-        } else if( hasAllProducts) {
+        }  if( hasAllProducts) {
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
         }else{
             return errorResponse(res, "Unauthorized access", "You do not have permission to view products", 403);
@@ -180,7 +179,7 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(projectIds);
-        } else if (hasUserProjects) {
+        } if (hasUserProjects) {
             const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id=?";
             const [taskRows] = await db.query(queryTasks, [user_id]);
 
@@ -192,7 +191,7 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(projectIds);
-        } else if( hasAllProjects) {
+        }  if( hasAllProjects) {
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
         }else{
             return errorResponse(res, "Unauthorized access", "You do not have permission to view projects", 403);

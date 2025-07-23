@@ -186,7 +186,6 @@ exports.updateAttendanceData = async (req, res) => {
   if (!accessToken) {
     return errorResponse(res, "Access token is required", 401);
   }
-  console.log(accessToken)
   const updated_by = await getUserIdFromAccessToken(accessToken);
   if( import_status == 1) {
     const [empUsers] = await db.query(`SELECT id FROM users WHERE employee_id = ?`, [id]);
