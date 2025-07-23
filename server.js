@@ -443,7 +443,7 @@ apiRouter.get(
 );
 apiRouter.get(
   "/empratings",
-  RoleController.checkRole(),
+  RoleController.checkRole(['dashboard.user_rating_view']),
   empdashboardController.empratingsection
 );
 
