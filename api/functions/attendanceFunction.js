@@ -26,8 +26,6 @@ exports.getAttendance = async (req, res) => {
 
     const hasAllAttendance = await hasPermission("attendance.all_view_attendance", accessToken);
     const hasTeamAttendance = await hasPermission("attendance.team_view_attendance", accessToken);
-    const hasExceedRole = await hasPermission("attendance.show_excluded_roles", accessToken);
-    const hasExcludeFromAssociates = await hasPermission("attendance.exclude_from_associates", accessToken);
 
     if (!hasAllAttendance && !hasTeamAttendance) {
       return errorResponse(res, null, "Access denied", 403);
