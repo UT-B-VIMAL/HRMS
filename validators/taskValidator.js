@@ -84,12 +84,6 @@ const validationshems = {
       then: Joi.required().messages({
           'any.required': 'Timeline ID is required for ending a subtask.'
       }),
-  }),
-  comment: Joi.string().when('action', {
-      is: 'end',
-      then: Joi.required().messages({
-          'any.required': 'Comment is required for ending a subtask.'
-      }),
   })
 })
 };
