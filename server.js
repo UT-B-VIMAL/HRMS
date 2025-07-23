@@ -41,8 +41,11 @@ const {
   unregisterSocket,
   userSockets,
 } = require("./helpers/notificationHelper");
-const monthlyNotificationCron = require("./cron/monthlyNotification"); // Import the monthly notification cron job
-const dailyAttendanceNotificationCron = require("./cron/dailyAttendanceNotification"); // Import the daily attendance notification cron job
+
+// Cron jobs-------------------------------
+require("./cron/monthlyNotification"); 
+require("./cron/dailyAttendanceNotification");
+require('./cron/autoPauseTasks');
 
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
