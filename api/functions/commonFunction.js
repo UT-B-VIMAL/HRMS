@@ -23,6 +23,7 @@ exports.getAllData = async (req, res) => {
     const hasUserProjects = await hasPermission("dropdown.user_projects", accessToken);
     const hasTeamUsers= await hasPermission("dropdown.team_users", accessToken);
     const hasOwnTeamFilter = await hasPermission("dropdown.ownteam_filter", accessToken);
+    const hasTaskpermission = await hasPermission("kanban_board.add_task", accessToken);
     
     const hasTeamProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.team_products") ;
     const hasUserProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.user_products") ;
@@ -145,7 +146,8 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(productIds);
-        }  if( hasAllProducts) {
+        }  if( hasAllProducts || hasTaskpermission) {
+            console.log("hasTaskpermission", hasTaskpermission)
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
         }else{
             return errorResponse(res, "Unauthorized access", "You do not have permission to view products", 403);
@@ -191,7 +193,7 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(projectIds);
-        }  if( hasAllProjects) {
+        }  if( hasAllProjects || hasTaskpermission) {
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
         }else{
             return errorResponse(res, "Unauthorized access", "You do not have permission to view projects", 403);
