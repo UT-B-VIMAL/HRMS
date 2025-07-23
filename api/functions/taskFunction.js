@@ -1953,7 +1953,10 @@ const formatTime = (seconds) => {
 };
 
 exports.getTaskList = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('API Response');
   try {
+    
     const {
       product_id,
       project_id,
@@ -2575,7 +2578,8 @@ exports.getTaskList = async (req, res) => {
       lastActiveTask: lastActiveTaskData,
     };
 
-    console.log("Sending success response");
+    console.timeEnd('API Response');
+    console.log(`[API End] ${new Date().toISOString()}`)
     return successResponse(res, data, "Task data retrieved successfully", 200);
   } catch (error) {
     console.error(error);
