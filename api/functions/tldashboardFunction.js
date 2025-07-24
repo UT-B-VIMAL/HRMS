@@ -1865,9 +1865,10 @@ exports.getTeamWorkedHrs = async (req, res) => {
           id: user.id,
           name: user.name,
           total_worked_hrs: convertSecondsToReadableTime(seconds),
+          seconds: seconds,
         };
-      });
-
+      }).sort((a, b) => b.seconds - a.seconds);
+      
       if (hasTLPermission && !associative) {
         const top5 = dailyUsers.slice(0, 5);
         const others = dailyUsers.slice(5);

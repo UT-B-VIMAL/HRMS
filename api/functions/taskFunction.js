@@ -12,6 +12,8 @@ const {
   calculateRemainingHours,
   calculatePercentage,
   parseTimeTakenToSeconds,
+  getTimeLeft,
+  getTimeDifference,
 } = require("../../helpers/responseHelper");
 const {
   getAuthUserDetails,
@@ -1861,9 +1863,11 @@ const lastActiveTask = async (userId) => {
 
     const task = lastActiveTaskRows[0];
 
-    const lastStartTime = moment(task.start_time);
-    const now = moment();
-    const timeDifference = now.diff(lastStartTime, "seconds"); // Calculate the difference in seconds
+    const lastStartTime =new Date(task.start_time);
+    const laststartTimeformatted = lastStartTime.toTimeString().split(' ')[0];
+    const now = moment.utc(); // Get current time in UTC
+    const timeDifference = getTimeDifference(now.format("HH:mm:ss"), laststartTimeformatted);
+    const timeDifferenceSeconds = convertToSeconds(timeDifference);
     const totalWorkedTime = task.subtask_id
       ? moment.duration(task.subtask_total_hours_worked).asSeconds()
       : moment.duration(task.task_total_hours_worked).asSeconds();
@@ -1871,22 +1875,18 @@ const lastActiveTask = async (userId) => {
     if (task.end_time) {
       totaltimeTaken = totalWorkedTime;
     } else {
-      totaltimeTaken = totalWorkedTime + timeDifference;
+      totaltimeTaken = totalWorkedTime + timeDifferenceSeconds;
     }
     const timeTaken = convertSecondsToHHMMSS(totaltimeTaken);
-    // Calculate the time left based on whether it's a subtask or task
-    const timeLeft = calculateTimeLeft(
-      task.subtask_id
+   
+    task.time_left = getTimeLeft(task.subtask_id
         ? task.subtask_estimated_hours
         : task.task_estimated_hours,
       task.subtask_id
         ? task.subtask_total_hours_worked
-        : task.task_total_hours_worked,
-      timeDifference
-    );
+        : task.task_total_hours_worked,timeDifference);
     task.timeline_id = task.id;
     // Add time left to the task or subtask object
-    task.time_left = timeLeft;
     task.type = task.subtask_id ? "subtask" : "task";
     task.priority = task.subtask_id
       ? task.subtask_priority
@@ -1955,7 +1955,10 @@ const formatTime = (seconds) => {
 };
 
 exports.getTaskList = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('API Response');
   try {
+    
     const {
       product_id,
       project_id,
@@ -2577,7 +2580,8 @@ exports.getTaskList = async (req, res) => {
       lastActiveTask: lastActiveTaskData,
     };
 
-    console.log("Sending success response");
+    console.timeEnd('API Response');
+    console.log(`[API End] ${new Date().toISOString()}`)
     return successResponse(res, data, "Task data retrieved successfully", 200);
   } catch (error) {
     console.error(error);
@@ -2587,11 +2591,15 @@ exports.getTaskList = async (req, res) => {
 
 // Utility function for calculating time left
 function calculateTimeLeft(estimatedHours, totalHoursWorked, timeDifference) {
+  console.log("Estimated Hours:", estimatedHours);
+  console.log("Total Hours Worked:", totalHoursWorked);
+  console
   const timeLeft =
     convertToSeconds(estimatedHours) - convertToSeconds(totalHoursWorked);
   const times = timeLeft - timeDifference;
   const time = convertSecondsToHHMMSS(times);
-  return times > 0 ? `${time}` : "Completed";
+  console.log("Time Left:", timeDifference);
+  return times > 0 ? `${time}` : "00:00:00";
 }
 
 exports.doneTaskList = async (req, res) => {
@@ -2982,11 +2990,11 @@ exports.endTask = async (
 // Main controller function
 exports.updateTaskTimeLine = async (req, res) => {
   try {
-    const { id, action, type, last_start_time, timeline_id, comment } =
+    const { id, action, type, last_start_time, timeline_id,comment } =
       req.body;
 
     // Validate the request body
-    const { error } = updateTimelineShema.validate(req.body, {
+    const { error } = updateTimelineShema.validate({ id, action, type, last_start_time, timeline_id}, {
       abortEarly: false,
     });
 

@@ -41,8 +41,11 @@ const {
   unregisterSocket,
   userSockets,
 } = require("./helpers/notificationHelper");
-const monthlyNotificationCron = require("./cron/monthlyNotification"); // Import the monthly notification cron job
-const dailyAttendanceNotificationCron = require("./cron/dailyAttendanceNotification"); // Import the daily attendance notification cron job
+
+// Cron jobs-------------------------------
+require("./cron/monthlyNotification"); 
+require("./cron/dailyAttendanceNotification");
+require('./cron/autoPauseTasks');
 
 const app = express();
 const isProduction = fs.existsSync(process.env.PRIVATE_KEY_LINK);
@@ -656,7 +659,7 @@ apiRouter.get("/loginapi", empdashboardController.loginapis);
 //common
 apiRouter.get(
   "/getDropDownList",
-  RoleController.checkRole(['role.view_role','kanban_board.priority_filter','kanban_board.priority_filter','kanban_board.project_filter','kanban_board.member_filter','kanban_board.team_filter','rating.team_filter','dropdown.all_products','dropdown.team_products','dropdown.user_products','dropdown.all_projects','dropdown.team_projects','dropdown.user_projects','dropdown.team_users','dropdown.managers','dropdown.ownteam_filter']),
+  RoleController.checkRole(['role.view_role','kanban_board.priority_filter','kanban_board.priority_filter','kanban_board.project_filter','kanban_board.member_filter','kanban_board.team_filter','rating.team_filter','dropdown.all_products','dropdown.team_products','dropdown.user_products','dropdown.all_projects','dropdown.team_projects','dropdown.user_projects','dropdown.team_users','dropdown.managers','dropdown.ownteam_filter','kanban_board.add_task']),
   commonController.getDropDownList
 );
 

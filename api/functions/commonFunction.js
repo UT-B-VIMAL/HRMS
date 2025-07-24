@@ -28,7 +28,7 @@ exports.getAllData = async (req, res) => {
     const hasTeamProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.team_products") ;
     const hasUserProductsIds =  await this.getExcludedRoleIdsByPermission("dropdown.user_products") ;
     const managerIds= await this.getExcludedRoleIdsByPermission("dropdown.managers") ;
-    console.log("hasTeamProductsIds",hasTeamProductsIds)
+    console.log("hasTeamProjects",hasTeamProjects)
     console.log("hasUserProductsIds",hasUserProductsIds)
     // try {
     // Initialize queries based on type
@@ -147,16 +147,16 @@ exports.getAllData = async (req, res) => {
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(productIds);
         }  if( hasAllProducts || hasTaskpermission) {
-            console.log("hasTaskpermission", hasTaskpermission)
             query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
-        }else{
+        }
+        if( !hasAllProducts && !hasTeamProducts && !hasUserProducts && !hasTaskpermission) {
             return errorResponse(res, "Unauthorized access", "You do not have permission to view products", 403);
         }
     } else if (type === "projects") {
         // if(user_id){
         const users = await this.getAuthUserDetails(user_id, res);
         if (!users) return;
-        if (hasTeamProjects) {
+        if (hasTeamProjects && !hasAllProjects) {
             // const query1 = "SELECT id FROM teams WHERE deleted_at IS NULL AND reporting_user_id = ?";
             // const [rows] = await db.query(query1, [user_id]);
             // let teamIds = [];
@@ -179,8 +179,12 @@ exports.getAllData = async (req, res) => {
             if (projectIds.length === 0) {
                 projectIds = [-1]; // Prevent SQL error
             }
-            query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
-            queryParams.push(projectIds);
+            if(hasTaskpermission){
+                query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
+            }else{
+              query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
+              queryParams.push(projectIds);
+            }
         } if (hasUserProjects) {
             const queryTasks = "SELECT DISTINCT project_id FROM tasks WHERE deleted_at IS NULL AND user_id=?";
             const [taskRows] = await db.query(queryTasks, [user_id]);
@@ -193,9 +197,11 @@ exports.getAllData = async (req, res) => {
             }
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL AND id IN (?)";
             queryParams.push(projectIds);
-        }  if( hasAllProjects || hasTaskpermission) {
+        } 
+         if( hasAllProjects ) {
             query = "SELECT id, name FROM projects WHERE deleted_at IS NULL";
-        }else{
+        }
+        if( !hasAllProjects && !hasTeamProjects && !hasUserProjects && !hasTaskpermission) {
             return errorResponse(res, "Unauthorized access", "You do not have permission to view projects", 403);
         }
 
