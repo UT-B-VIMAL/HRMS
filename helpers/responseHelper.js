@@ -104,16 +104,23 @@ function secondsToTimeString(totalSeconds) {
   const s = String(totalSeconds % 60).padStart(2, '0');
   return `${h}:${m}:${s}`;
 }
-function getTimeLeft(estimated, worked) {
-  console.log("Estimated:", estimated);
-  console.log("Worked:", worked);
+function getTimeLeft(estimated, worked,timeDifference = 0) {
+
   const estSeconds = convertToSeconds(estimated);
   const workedSeconds = convertToSeconds(worked);
-  const leftSeconds = Math.max(estSeconds - workedSeconds, 0); // avoid negative
+  const timeDifferenceSeconds = convertToSeconds(timeDifference);
+  const leftSeconds = Math.max(estSeconds - workedSeconds -timeDifferenceSeconds, 0); // avoid negative
+  console.log("Left Seconds:", leftSeconds);
   return secondsToTimeString(leftSeconds);
 }
 
+function getTimeDifference(currentTime, lastTime) {
 
+  const currentSeconds = convertToSeconds(currentTime);
+  const lastTimeSeconds = convertToSeconds(lastTime);
+  const leftSeconds = Math.max(currentSeconds - lastTimeSeconds, 0); // avoid negative
+  return secondsToTimeString(leftSeconds);// returns the difference in seconds
+}
 function parseTimeTakenToSeconds(timeTaken) {
   const regex = /(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?/;
   const matches = timeTaken.match(regex);
@@ -126,4 +133,4 @@ function parseTimeTakenToSeconds(timeTaken) {
   return (days * 8 * 3600) + (hours * 3600) + (minutes * 60) + seconds;
 }
 
-module.exports = { successResponse, errorResponse, getResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage,parseTimeTakenToSeconds,getTimeLeft };
+module.exports = { successResponse, errorResponse, getResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage,parseTimeTakenToSeconds,getTimeLeft,getTimeDifference };

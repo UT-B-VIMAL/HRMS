@@ -13,6 +13,7 @@ const {
   calculatePercentage,
   parseTimeTakenToSeconds,
   getTimeLeft,
+  getTimeDifference,
 } = require("../../helpers/responseHelper");
 const {
   getAuthUserDetails,
@@ -1860,9 +1861,11 @@ const lastActiveTask = async (userId) => {
 
     const task = lastActiveTaskRows[0];
 
-    const lastStartTime = moment(task.start_time);
-    const now = moment();
-    const timeDifference = now.diff(lastStartTime, "seconds"); // Calculate the difference in seconds
+    const lastStartTime =new Date(task.start_time);
+    const laststartTimeformatted = lastStartTime.toTimeString().split(' ')[0];
+    const now = moment.utc(); // Get current time in UTC
+    const timeDifference = getTimeDifference(now.format("HH:mm:ss"), laststartTimeformatted);
+    const timeDifferenceSeconds = convertToSeconds(timeDifference);
     const totalWorkedTime = task.subtask_id
       ? moment.duration(task.subtask_total_hours_worked).asSeconds()
       : moment.duration(task.task_total_hours_worked).asSeconds();
@@ -1870,7 +1873,7 @@ const lastActiveTask = async (userId) => {
     if (task.end_time) {
       totaltimeTaken = totalWorkedTime;
     } else {
-      totaltimeTaken = totalWorkedTime + timeDifference;
+      totaltimeTaken = totalWorkedTime + timeDifferenceSeconds;
     }
     const timeTaken = convertSecondsToHHMMSS(totaltimeTaken);
    
@@ -1879,7 +1882,7 @@ const lastActiveTask = async (userId) => {
         : task.task_estimated_hours,
       task.subtask_id
         ? task.subtask_total_hours_worked
-        : task.task_total_hours_worked);
+        : task.task_total_hours_worked,timeDifference);
     task.timeline_id = task.id;
     // Add time left to the task or subtask object
     task.type = task.subtask_id ? "subtask" : "task";
