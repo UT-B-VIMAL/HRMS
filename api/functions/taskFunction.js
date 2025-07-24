@@ -698,6 +698,8 @@ WHERE
 
       // Format time taken
       const timeTaken = formatTimeDHMS(timeTakenInSeconds);
+      console.log(timeTaken);
+      
       const workedSeconds = parseTimeTakenToSeconds(timeTaken);
       // Calculate remaining time
       const remainingInSeconds = estimatedInSeconds - timeTakenInSeconds;
