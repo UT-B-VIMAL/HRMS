@@ -1584,8 +1584,12 @@ exports.tltaskpendinglist = async (req, res) => {
           t.user_id,
           u.employee_id,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) AS employee_name,
-          CASE WHEN t.status = 0 AND t.reopen_status = 0 AND t.active_status = 0 THEN 1 ELSE 0 END AS todo_count,
-          CASE WHEN t.status = 1 AND t.reopen_status = 0 AND t.active_status = 0 AND t.hold_status = 1 THEN 1 ELSE 0 END AS onhold_count,
+          CASE 
+          WHEN (t.status IN (0, 1)) AND t.reopen_status = 0 AND t.active_status = 0 AND t.hold_status = 0 
+          THEN 1 
+          ELSE 0 
+         END AS todo_count,
+        CASE WHEN t.status = 1 AND t.reopen_status = 0 AND t.active_status = 0 AND t.hold_status = 1 THEN 1 ELSE 0 END AS onhold_count,
           CASE WHEN t.status = 0 AND t.reopen_status = 1 AND t.active_status = 0 THEN 1 ELSE 0 END AS reopen_count
         FROM tasks t
         INNER JOIN projects p ON p.id = t.project_id
@@ -1604,7 +1608,11 @@ exports.tltaskpendinglist = async (req, res) => {
           st.user_id,
           u.employee_id,
           CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')) AS employee_name,
-          CASE WHEN st.status = 0 AND st.reopen_status = 0 AND st.active_status = 0 THEN 1 ELSE 0 END AS todo_count,
+          CASE 
+          WHEN (st.status IN (0, 1)) AND st.reopen_status = 0 AND st.active_status = 0 AND st.hold_status = 0 
+          THEN 1 
+          ELSE 0 
+         END AS todo_count,
           CASE WHEN st.status = 1 AND st.reopen_status = 0 AND st.active_status = 0 AND st.hold_status = 1 THEN 1 ELSE 0 END AS onhold_count,
           CASE WHEN st.status = 0 AND st.reopen_status = 1 AND st.active_status = 0 THEN 1 ELSE 0 END AS reopen_count
         FROM sub_tasks st
