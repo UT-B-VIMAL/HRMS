@@ -16,6 +16,8 @@ const e = require("express");
 // phase 2
 
 exports.getAnnualRatings = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('AnnualRatingsList');
   const { search, year, page = 1, perPage = 10, team_id } = req.query;
   const offset = (parseInt(page, 10) - 1) * parseInt(perPage, 10);
   const accessToken = req.headers.authorization?.split(" ")[1];
@@ -191,7 +193,8 @@ console.log("all role ids", AllroleIds);
     }));
 
     const pagination = getPagination(page, perPage, totalRecords);
-
+console.timeEnd('AnnaulRatingsList');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       rowsWithSerialNo,
@@ -208,6 +211,8 @@ console.log("all role ids", AllroleIds);
 
 
 exports.ratingUpdation = async (payload, res, req) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('RatingUpdation');
   let { status, month, rater, quality, timelines, agility, attitude, responsibility, remarks, user_id ,import_status} = payload;
    const accessToken = req.headers.authorization?.split(" ")[1];
   if (!accessToken) {
@@ -314,7 +319,8 @@ exports.ratingUpdation = async (payload, res, req) => {
       [user_id, notificationPayload.title, notificationPayload.body, 0]
     );
   }
-
+console.timeEnd('RatingUpdation');
+    console.log(`[API End] ${new Date().toISOString()}`);
   successResponse(res, responsePayload, "Rating Updated successfully", 200);
 
   // Asynchronous notification handling
@@ -433,6 +439,8 @@ exports.getRatingById = async (req, res) => {
   try {
     // Extract rating_id from the request body
     const { rating_id } = req;
+console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('RatingById');
 
 
     // Query to fetch the rating by ID
@@ -463,7 +471,8 @@ exports.getRatingById = async (req, res) => {
         200
       );
     }
-
+console.timeEnd('RatingById');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       ratings[0],
@@ -482,6 +491,8 @@ exports.getRatingById = async (req, res) => {
 };
 
 exports.getRatings = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('MonthlyratingsList');
   // try {
     const { team_id, month, search, page = 1, perPage = 10 } = req.query;
     const offset = (page - 1) * perPage;
@@ -666,7 +677,8 @@ console.log("where clause", whereClause);
         overall_score: overallScore
       };
     });
-
+console.timeEnd('MonthlyratingsList');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, groupedResults, 'Ratings fetched successfully', 200, getPagination(page, perPage, totalRecords));
   // } catch (error) {
   //   console.error('Error fetching ratings:', error);
