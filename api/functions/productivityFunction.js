@@ -28,6 +28,10 @@ function convertSecondsToReadableTime(totalSeconds) {
 
 
 exports.get_individualStatus = async (req, res) => {
+
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Individual Status Start Execution Time');
+
   try {
     const {
       team_id,
@@ -315,6 +319,10 @@ exports.get_individualStatus = async (req, res) => {
       task_created_at: user.subtask_created_at || user.task_created_at || null,
     }));
 
+
+   console.timeEnd('Get Individual Status Start Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+
     return successResponse(
       res,
       data,
@@ -330,270 +338,11 @@ exports.get_individualStatus = async (req, res) => {
   }
 };
 
-// exports.getTeamwiseProductivity = async (req, res) => {
-//   try {
-//     const {
-//       team_id,
-//       from_date,
-//       to_date,
-//       search = "",
-//       page = 1,
-//       perpage = 10,
-//     } = req.query;
-
-//     const perPage = parseInt(perpage, 10) || 10;
-//     const currentPage = parseInt(page, 10) || 1;
-//     const offset = (currentPage - 1) * perPage;
-
-//     const params = [];
-//     let dateFilter = "";
-//     let searchFilter = "";
-//     let teamFilter = "";
-
-//     // Date filter
-//     if (from_date && to_date) {
-//       dateFilter = "AND DATE(utu.start_time) BETWEEN ? AND ?";
-//       params.push(from_date, to_date);
-//     } else if (from_date) {
-//       dateFilter = "AND DATE(utu.start_time) = ?";
-//       params.push(from_date);
-//     }
-
-//     // Search filter
-//     if (search) {
-//       searchFilter = `AND (u.employee_id LIKE ? OR CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) LIKE ?)`;
-//       params.push(`%${search}%`, `%${search}%`);
-//     }
-
-//     // Team filter
-//     if (team_id) {
-//       teamFilter = "AND u.team_id = ?";
-//       params.push(team_id);
-//     }
-
-//     const dataParams = [...params, perPage, offset];
-
-//     // COUNT query
-//     const countSql = `
-//      WITH UserTimeline AS (
-//   SELECT
-//     utu.id,
-//     utu.task_id,
-//     utu.subtask_id,
-//     utu.user_id,
-//     TIMESTAMPDIFF(SECOND, utu.start_time, COALESCE(utu.end_time, NOW())) AS session_seconds,
-//     utu.start_time
-//   FROM sub_tasks_user_timeline utu
-//      ${dateFilter}
-// ),
-
-// TimelineOrdered AS (
-//   SELECT
-//     *,
-//     ROW_NUMBER() OVER (PARTITION BY task_id, subtask_id ORDER BY start_time) AS rn
-//   FROM UserTimeline
-
-// ),
-
-// EstimatedTimes AS (
-//   SELECT
-//     st.id AS subtask_id,
-//     NULL AS task_id,
-//     TIME_TO_SEC(COALESCE(st.estimated_hours, '00:00:00')) AS estimated_seconds
-//   FROM sub_tasks st
-//   UNION ALL
-//   SELECT
-//     NULL AS subtask_id,
-//     t.id AS task_id,
-//     TIME_TO_SEC(COALESCE(t.estimated_hours, '00:00:00')) AS estimated_seconds
-//   FROM tasks t
-// ),
-
-// AccumulatedWork AS (
-//   SELECT
-//     tlo.*,
-//     et.estimated_seconds,
-//     SUM(session_seconds) OVER (
-//       PARTITION BY tlo.task_id, tlo.subtask_id
-//       ORDER BY tlo.start_time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-//     ) AS cumulative_seconds
-//   FROM TimelineOrdered tlo
-//   LEFT JOIN EstimatedTimes et
-//     ON (tlo.subtask_id = et.subtask_id AND tlo.subtask_id IS NOT NULL)
-//      OR (tlo.task_id = et.task_id AND tlo.subtask_id IS NULL)
-// ),
-
-// FinalCalc AS (
-//   SELECT
-//     *,
-//     -- Only calculate valid/exceed seconds if estimated_seconds > 0
-//     CASE
-//       WHEN estimated_seconds > 0
-//       THEN LEAST(GREATEST(estimated_seconds - (cumulative_seconds - session_seconds), 0), session_seconds)
-//       ELSE session_seconds
-//     END AS valid_seconds,
-
-//     CASE
-//       WHEN estimated_seconds > 0
-//       THEN GREATEST(cumulative_seconds - estimated_seconds, 0)
-//            - GREATEST(cumulative_seconds - estimated_seconds - session_seconds, 0)
-//       ELSE 0
-//     END AS exceed_seconds
-//   FROM AccumulatedWork
-// )
-
-// SELECT
-//   u.id AS user_id,
-//   COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown') AS employee_name,
-//   u.employee_id,
-//   COALESCE(SUM(fc.session_seconds), 0) AS total_worked_seconds,
-//   COALESCE(SUM(fc.valid_seconds), 0) AS within_estimate_seconds,
-//   COALESCE(SUM(fc.exceed_seconds), 0) AS exceed_seconds,
-// COALESCE(MAX(fc.estimated_seconds), 0) AS estimated_seconds
-
-// FROM users u
-// LEFT JOIN FinalCalc fc ON fc.user_id = u.id
-// WHERE u.deleted_at IS NULL
-
-//           ${searchFilter}
-//           ${teamFilter}
-//       `;
-
-//     const [countRows] = await db.query(countSql, params);
-//     const totalUsers = countRows[0]?.total_users || 0;
-
-//     // Data query
-//     const sql = `
-//      WITH UserTimeline AS (
-//   SELECT
-//     utu.id,
-//     utu.task_id,
-//     utu.subtask_id,
-//     utu.user_id,
-//     TIMESTAMPDIFF(SECOND, utu.start_time, COALESCE(utu.end_time, NOW())) AS session_seconds,
-//     utu.start_time
-//   FROM sub_tasks_user_timeline utu
-//      ${dateFilter}
-// ),
-
-// TimelineOrdered AS (
-//   SELECT
-//     *,
-//     ROW_NUMBER() OVER (PARTITION BY task_id, subtask_id ORDER BY start_time) AS rn
-//   FROM UserTimeline
-
-// ),
-
-// EstimatedTimes AS (
-//   SELECT
-//     st.id AS subtask_id,
-//     NULL AS task_id,
-//     TIME_TO_SEC(COALESCE(st.estimated_hours, '00:00:00')) AS estimated_seconds
-//   FROM sub_tasks st
-//   UNION ALL
-//   SELECT
-//     NULL AS subtask_id,
-//     t.id AS task_id,
-//     TIME_TO_SEC(COALESCE(t.estimated_hours, '00:00:00')) AS estimated_seconds
-//   FROM tasks t
-// ),
-
-// AccumulatedWork AS (
-//   SELECT
-//     tlo.*,
-//     et.estimated_seconds,
-//     SUM(session_seconds) OVER (
-//       PARTITION BY tlo.task_id, tlo.subtask_id
-//       ORDER BY tlo.start_time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-//     ) AS cumulative_seconds
-//   FROM TimelineOrdered tlo
-//   LEFT JOIN EstimatedTimes et
-//     ON (tlo.subtask_id = et.subtask_id AND tlo.subtask_id IS NOT NULL)
-//      OR (tlo.task_id = et.task_id AND tlo.subtask_id IS NULL)
-// ),
-
-// FinalCalc AS (
-//   SELECT
-//     *,
-//     -- Only calculate valid/exceed seconds if estimated_seconds > 0
-//     CASE
-//       WHEN estimated_seconds > 0
-//       THEN LEAST(GREATEST(estimated_seconds - (cumulative_seconds - session_seconds), 0), session_seconds)
-//       ELSE session_seconds
-//     END AS valid_seconds,
-
-//     CASE
-//       WHEN estimated_seconds > 0
-//       THEN GREATEST(cumulative_seconds - estimated_seconds, 0)
-//            - GREATEST(cumulative_seconds - estimated_seconds - session_seconds, 0)
-//       ELSE 0
-//     END AS exceed_seconds
-//   FROM AccumulatedWork
-// )
-
-// SELECT
-//   u.id AS user_id,
-//   COALESCE(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(NULLIF(u.last_name, ''), '')), 'Unknown') AS employee_name,
-//   u.employee_id,
-//   COALESCE(SUM(fc.session_seconds), 0) AS total_worked_seconds,
-//   COALESCE(SUM(fc.valid_seconds), 0) AS within_estimate_seconds,
-//   COALESCE(SUM(fc.exceed_seconds), 0) AS exceed_seconds,
-// COALESCE(MAX(fc.estimated_seconds), 0) AS estimated_seconds
-
-// FROM users u
-// LEFT JOIN FinalCalc fc ON fc.user_id = u.id
-// WHERE u.deleted_at IS NULL
-
-//           ${searchFilter}
-//           ${teamFilter}
-
-//               GROUP BY u.id, u.first_name, u.last_name, u.employee_id
-//               ORDER BY employee_name
-//               LIMIT ? OFFSET ?
-//             `;
-
-//     const [rows] = await db.query(sql, dataParams);
-
-//     const pagination = getPagination(currentPage, perPage, totalUsers);
-
-//     const data = rows.map((item, index) => ({
-//       s_no: offset + index + 1,
-//       employee_name: item.employee_name,
-//       employee_id: item.employee_id,
-//       team_id: item.team_id,
-//       total_estimated_hours: convertSecondsToReadableTime(
-//         item.total_estimated_seconds
-//       ),
-//       total_worked_hours: convertSecondsToReadableTime(
-//         item.total_worked_seconds
-//       ),
-//       total_extended_hours: convertSecondsToReadableTime(
-//         item.total_extended_seconds
-//       ),
-//       difference_hours: convertSecondsToReadableTime(
-//         item.total_worked_seconds - item.total_estimated_seconds
-//       ),
-//     }));
-
-//     res.status(200).json({
-//       status: 200,
-//       message: data.length
-//         ? "Productivity retrieved successfully"
-//         : "No data found",
-//       data,
-//       pagination,
-//     });
-//   } catch (error) {
-//     console.error("Error:", error);
-//     res.status(500).json({
-//       status: 500,
-//       message: "Internal server error",
-//       error: error.message,
-//     });
-//   }
-// };
 
 exports.getTeamwiseProductivity = async (req, res) => {
+
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Teamwise Productivity Start Execution Time');
   try {
     const {
       team_id,
@@ -814,6 +563,8 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ),
     }));
 
+    console.timeEnd('Get Teamwise Productivity Start Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     res.status(200).json({
       status: 200,
       message: data.length
