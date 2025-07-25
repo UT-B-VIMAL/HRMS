@@ -31,13 +31,12 @@ const autoPauseUnpausedTasks = async () => {
       const seconds = String(timeDiffSeconds % 60).padStart(2, '0');
       const timeDiffFormatted = `${hours}:${minutes}:${seconds}`;
 
-      // Update timeline end_time
+    
       await db.execute(
         `UPDATE sub_tasks_user_timeline SET end_time = ?, updated_at = NOW() WHERE id = ?`,
         [currentDateTime, row.id]
       );
 
-      // Update worked hours
       if (row.subtask_id) {
         await db.execute(
           `UPDATE sub_tasks SET active_status = 0, total_hours_worked = ADDTIME(IFNULL(total_hours_worked, '00:00:00'), ?) WHERE id = ?`,
