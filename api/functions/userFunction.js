@@ -20,6 +20,8 @@ exports.createUser = async (payload, res, req) => {
   } = payload;
 
   try {
+    console.time('create users API Response');
+    console.log(`[API Start] ${new Date().toISOString()}`);
     const accessToken = req.headers.authorization?.split(' ')[1];
     if (!accessToken) {
       return errorResponse(res, 'Access token is required', 401);
@@ -87,7 +89,8 @@ exports.createUser = async (payload, res, req) => {
     ];
 
     const [result] = await db.query(insertQuery, values);
-
+ console.timeEnd('create users End API Response');
+       console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       { id: result.insertId, ...payload, employee_id: formattedEmployeeId, keycloakUserId: keycloakId },
@@ -279,6 +282,8 @@ exports.createUserWithoutRole = async (payload, res, req) => {
 // Get User
 exports.getUser = async (id, res) => {
   try {
+    console.time('single user API Response');
+    console.log(`[API Start] ${new Date().toISOString()}`);
     const query = `
       SELECT 
         u.*, 
@@ -300,7 +305,8 @@ exports.getUser = async (id, res) => {
     if (rows.length === 0) {
       return errorResponse(res, null, 'User not found', 204);
     }
-
+ console.timeEnd('single users End API Response');
+       console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, rows[0], 'User retrieved successfully');
   } catch (error) {
     console.error('Error retrieving user:', error.message);
@@ -311,6 +317,8 @@ exports.getUser = async (id, res) => {
 
 exports.getAllUsers = async (req, res) => {
   try {
+    console.time('All users API Response');
+    console.log(`[API Start] ${new Date().toISOString()}`);
     const { search = '', page = 1, perPage = 10, team_id } = req.query;
     const currentPage = parseInt(page, 10);
     const perPageLimit = parseInt(perPage, 10);
@@ -417,7 +425,8 @@ exports.getAllUsers = async (req, res) => {
       s_no: offset + index + 1,
       ...user,
     }));
-
+       console.timeEnd('All users End API Response');
+       console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       data,
@@ -447,7 +456,8 @@ exports.updateUser = async (id, payload, res, req) => {
   } = payload;
 
   try {
-
+console.time('update users API Response');
+    console.log(`[API Start] ${new Date().toISOString()}`);
     const accessToken = req.headers.authorization?.split(' ')[1];
     if (!accessToken) {
       return errorResponse(res, 'Access token is required', 401);
@@ -521,7 +531,8 @@ exports.updateUser = async (id, payload, res, req) => {
     };
 
     await editUserInKeycloak(keycloak_id, userPayload);
-
+ console.timeEnd('update users End API Response');
+       console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, { id, ...payload }, 'User updated successfully');
   } catch (error) {
     console.error('Error:', error.message);
@@ -533,6 +544,8 @@ exports.updateUser = async (id, payload, res, req) => {
 // Delete User 
 exports.deleteUser = async (id, res) => {
   try {
+    console.time('delete users API Response');
+    console.log(`[API Start] ${new Date().toISOString()}`);
     const selectQuery = `SELECT keycloak_id FROM users WHERE id = ?`;
     const [rows] = await db.query(selectQuery, [id]);
 
@@ -596,7 +609,8 @@ exports.deleteUser = async (id, res) => {
     }
 
     await deleteUserInKeycloak(keycloakId);
-
+ console.timeEnd('delete users End API Response');
+       console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, null, 'User deleted successfully');
   } catch (error) {
     console.error('Error deleting user:', error.message);
