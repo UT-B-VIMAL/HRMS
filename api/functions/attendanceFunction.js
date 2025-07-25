@@ -118,7 +118,7 @@ console.log(`[API Start] ${new Date().toISOString()}`);
     queryParams.push(dynamicDate, `${dynamicDate}%`);
 
     // First run COUNT query
-    const [countResult] = await db.query(`SELECT COUNT(*) AS total ${baseQuery}`, queryParams);
+    const [countResult] = await db.query(`SELECT COUNT(DISTINCT u.id) AS total ${baseQuery}`, queryParams);
     const totalRecords = countResult[0]?.total || 0;
 
     const pagination = getPagination(page, perPage, totalRecords);
@@ -126,7 +126,7 @@ console.log(`[API Start] ${new Date().toISOString()}`);
 
     // Now fetch paginated data
     const paginatedQuery = `
-      SELECT 
+      SELECT DISTINCT
         u.id AS user_id, 
         COALESCE(CONCAT(u.first_name, ' ', u.last_name)) AS first_name, 
         u.employee_id,
