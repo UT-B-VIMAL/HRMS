@@ -284,6 +284,8 @@ const { hasPermission } = require("../../controllers/permissionController");
 
 exports.get_idleEmployee = async (req, res) => {
   try {
+    console.time('Idle API Response');
+console.log(`[API Start] ${new Date().toISOString()}`);
     const { team_id, page = 1, perPage = 10 } = req.query;
     const accessToken = req.headers.authorization?.split(' ')[1];
 
@@ -433,7 +435,8 @@ exports.get_idleEmployee = async (req, res) => {
         idle_reason: await getIdleReason(row.id),
       }))
     );
-
+console.timeEnd('Idle API Response');
+console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       data,

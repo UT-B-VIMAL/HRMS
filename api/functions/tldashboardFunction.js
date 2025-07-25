@@ -1513,6 +1513,9 @@ exports.fetchTlviewproductdata = async (req, res) => {
 };
 
 exports.tltaskpendinglist = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('TL Task Pending List Execution Time');
+
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken)
@@ -1690,7 +1693,8 @@ exports.tltaskpendinglist = async (req, res) => {
         });
       }
     }
-
+console.timeEnd('TL Task Pending List Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       filteredProjects,
@@ -1712,6 +1716,8 @@ function convertSecondsToReadableTime(seconds) {
 }
 
 exports.getTeamWorkedHrs = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Team Worked Hours Execution Time');
   try {
     const { from_date, to_date, associative } = req.query;
     const accessToken = req.headers.authorization?.split(" ")[1];
@@ -1897,6 +1903,8 @@ exports.getTeamWorkedHrs = async (req, res) => {
       }
     }
 
+    console.timeEnd('Get Team Worked Hours Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, data, "Team worked hours fetched successfully", 200);
   } catch (error) {
     console.error("Error in getTeamWorkedHrs:", error);

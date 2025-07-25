@@ -26,6 +26,8 @@ const { userSockets } = require("../../helpers/notificationHelper");
 
 // Insert Task
 exports.createSubTask = async (payload, res, req) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Create SubTask Execution Time');
   const { task_id, name, created_by } = payload;
 
   try {
@@ -73,6 +75,8 @@ exports.createSubTask = async (payload, res, req) => {
 
     const [result] = await db.query(insertQuery, values);
 
+    console.timeEnd('Create SubTask Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     // Return success response
     return successResponse(
       res,
@@ -305,6 +309,8 @@ exports.bulkimportSubTask = async (payload, res, req) => {
 
 // Show Task
 exports.getSubTask = async (id, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get SubTask Execution Time');
   try {
     // Subtask query (expects a single result due to primary key)
     const subtaskQuery = `
@@ -533,7 +539,8 @@ ORDER BY h.id DESC;
       histories: historiesData,
       comments: commentsData,
     };
-
+console.timeEnd('Get SubTask Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       data,
@@ -547,6 +554,8 @@ ORDER BY h.id DESC;
 
 // Show All Task
 exports.getAllSubTasks = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get All SubTasks Execution Time');
   try {
     const { task_id } = req.query;
 
@@ -569,6 +578,8 @@ exports.getAllSubTasks = async (req, res) => {
       );
     }
 
+    console.timeEnd('Get All SubTasks Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, rows, "SubTasks retrieved successfully");
   } catch (error) {
     return errorResponse(res, error.message, "Error retrieving subtasks", 500);
@@ -577,6 +588,8 @@ exports.getAllSubTasks = async (req, res) => {
 
 // Update Task
 exports.updateSubTask = async (id, payload, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Update SubTask Execution Time');
   const {
     product_id,
     project_id,
@@ -699,6 +712,8 @@ exports.updateSubTask = async (id, payload, res) => {
     if (result.affectedRows === 0) {
       return errorResponse(res, null, "SubTask not found", 204);
     }
+    console.timeEnd('Update SubTask Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       { id, ...payload },
@@ -711,6 +726,8 @@ exports.updateSubTask = async (id, payload, res) => {
 
 // Delete Task
 exports.deleteSubTask = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Delete SubTask Execution Time');
   const id = req.params.id;
 
   const accessToken = req.headers.authorization?.split(" ")[1];
@@ -786,6 +803,8 @@ exports.deleteSubTask = async (req, res) => {
       updated_by || null,
       15
     );
+    console.timeEnd('Delete SubTask Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(res, null, "SubTask deleted successfully");
   } catch (error) {
@@ -794,6 +813,8 @@ exports.deleteSubTask = async (req, res) => {
 };
 
 exports.updatesubTaskData = async (id, payload, res, req) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Update SubTask Data Execution Time');
   const {
     status,
     name,
@@ -1459,6 +1480,8 @@ exports.updatesubTaskData = async (id, payload, res, req) => {
         );
       }
     }
+    console.timeEnd('Update SubTask Data Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(
       res,
