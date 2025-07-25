@@ -1874,34 +1874,43 @@ const lastActiveTask = async (userId) => {
         END
     ) AS total_hours_worked,
 
-   CASE 
-        WHEN 
-            (CASE 
+   -- Calculate time_left
+CASE
+    WHEN 
+        TIME_TO_SEC(
+            CASE 
                 WHEN stut.subtask_id IS NOT NULL THEN s.estimated_hours
                 ELSE t.estimated_hours
-            END) = '00:00:00'
-        THEN '00:00:00'
-        ELSE SEC_TO_TIME(
-            TIME_TO_SEC(
-                CASE 
-                    WHEN stut.subtask_id IS NOT NULL THEN s.estimated_hours
-                    ELSE t.estimated_hours
-                END
-            ) -
-            (
+            END
+        ) = 0
+    THEN '00:00:00'
+    
+    ELSE
+        SEC_TO_TIME(
+            GREATEST(
                 TIME_TO_SEC(
                     CASE 
-                        WHEN stut.subtask_id IS NOT NULL THEN s.total_hours_worked
-                        ELSE t.total_hours_worked
+                        WHEN stut.subtask_id IS NOT NULL THEN s.estimated_hours
+                        ELSE t.estimated_hours
                     END
-                ) +
-                CASE 
-                    WHEN stut.end_time IS NULL THEN TIMESTAMPDIFF(SECOND, stut.start_time, UTC_TIMESTAMP())
-                    ELSE 0
-                END
+                ) - 
+                (
+                    TIME_TO_SEC(
+                        CASE 
+                            WHEN stut.subtask_id IS NOT NULL THEN s.total_hours_worked
+                            ELSE t.total_hours_worked
+                        END
+                    ) +
+                    CASE 
+                        WHEN stut.end_time IS NULL THEN TIMESTAMPDIFF(SECOND, stut.start_time, UTC_TIMESTAMP())
+                        ELSE 0
+                    END
+                ), 
+                0
             )
         )
-    END AS time_left
+END AS time_left
+
 
         FROM sub_tasks_user_timeline stut
         LEFT JOIN sub_tasks s ON stut.subtask_id = s.id
