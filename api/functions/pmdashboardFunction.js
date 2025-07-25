@@ -1361,23 +1361,6 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       attendanceUsers: 'dashboard.exclude_from_attendance'
     };
     const excludedRoleMap = {};
-
-    // for (const [key, permissionName] of Object.entries(exclusionChecks)) {
-    //   const hasAccess = await hasPermission(permissionName, accessToken);
-    //   console.log(`Checking permission for ${permissionName}: ${hasAccess}`);
-      
-    //   if (hasAccess) {
-    //     const [rows] = await db.query(`
-    //       SELECT rhp.role_id
-    //       FROM role_has_permissions rhp
-    //       JOIN permissions p ON rhp.permission_id = p.id
-    //       WHERE p.name = ?
-    //     `, [permissionName]);
-    //     excludedRoleMap[key] = rows.map(r => r.role_id);
-    //   } else {
-    //     excludedRoleMap[key] = [];
-    //   }
-    // }
     for (const [key, permissionName] of Object.entries(exclusionChecks)) {
   const [rows] = await db.query(`
     SELECT rhp.role_id
@@ -1404,7 +1387,6 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       const params = team_id ? [formattedDate, team_id] : [formattedDate];
       return excludedRoles.length ? [...params, ...excludedRoles] : params;
     };
-    console.log(buildParams(excludedRoleMap.totalUsers));
 
     // Total Users
     const [totalUsers] = await db.query(`
@@ -1434,12 +1416,13 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     `, buildParams(excludedRoleMap.attendanceUsers));
 
     if (
-      associateUsers.length === 0 ||
-      totalUsers.length === 0 ||
-      attendanceUsers.length === 0
-    ) {
-      return errorResponse(res, null, "No users found", 404);
-    }
+  associateUsers.length === 0 &&
+  totalUsers.length === 0 &&
+  attendanceUsers.length === 0
+) {
+  return errorResponse(res, null, "No users found", 404);
+}
+
 
     const associateIds = associateUsers.map((u) => u.user_id);
     const attendanceIds = attendanceUsers.map((u) => u.user_id);
@@ -1460,25 +1443,29 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     });
 
     // Step 3: Working activity data
-    let timelineQuery = `
-  SELECT user_id
-  FROM sub_tasks_user_timeline
-  WHERE DATE(start_time) = ?
-    AND user_id IN (?)
-`;
-    const isToday = formattedDate === new Date().toISOString().split("T")[0];
+    let timelineRows = [];
+if (associateIds.length > 0) {
+  let timelineQuery = `
+    SELECT user_id
+    FROM sub_tasks_user_timeline
+    WHERE DATE(start_time) = ?
+      AND user_id IN (?)
+  `;
 
-    if (isToday) {
-      timelineQuery += ` AND end_time IS NULL`;
-    }
+  const isToday = formattedDate === new Date().toISOString().split("T")[0];
+  if (isToday) {
+    timelineQuery += ` AND end_time IS NULL`;
+  }
 
-    timelineQuery += ` GROUP BY user_id`;
+  timelineQuery += ` GROUP BY user_id`;
 
-    const [timelineRows] = await db.query(timelineQuery, [
-      formattedDate,
-      associateIds,
-    ]);
-    const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
+  [timelineRows] = await db.query(timelineQuery, [
+    formattedDate,
+    associateIds,
+  ]);
+}
+const workingUserIds = new Set(timelineRows.map((r) => r.user_id));
+
 
     // Step 4: Initialize result map
     const resultMap = {};
@@ -1500,6 +1487,8 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
     // Fill total strength first
     totalUsers.forEach((user) => {
       const groupKey = team_id ? user.team_id : defaultGroupKey;
+      
+      
       if (!resultMap[groupKey]) {
         resultMap[groupKey] = {
           team_id: user.team_id,
