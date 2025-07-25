@@ -78,11 +78,15 @@ function convertSecondsToHHMMSS(totalSeconds) {
     .join(":");
 };
 
-const convertToSeconds = (timeString) => {
-  const [hours, minutes, seconds] = timeString.split(":").map(Number);
-  return hours * 3600 + minutes * 60 + seconds;
-};
+const convertToSeconds = (timeStr) => {
+ if (!timeStr || typeof timeStr !== 'string') {
+    return 0; // or throw an error if you prefer
+  }
 
+  const parts = timeStr.split(':');
+  const [h = 0, m = 0, s = 0] = parts.map(Number);
+  return h * 3600 + m * 60 + s;
+};
 function calculateRemainingHours(estimated, worked) {
   const estimatedSeconds = convertToSeconds(estimated);
   const workedSeconds = convertToSeconds(worked);
@@ -94,8 +98,29 @@ const calculatePercentage = (value, total) => {
   if (!total || total === 0) return "0%";
   return ((value / total) * 100).toFixed(2) + "%";
 };
+function secondsToTimeString(totalSeconds) {
+  const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+  const s = String(totalSeconds % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+function getTimeLeft(estimated, worked,timeDifference = 0) {
 
+  const estSeconds = convertToSeconds(estimated);
+  const workedSeconds = convertToSeconds(worked);
+  const timeDifferenceSeconds = convertToSeconds(timeDifference);
+  const leftSeconds = Math.max(estSeconds - workedSeconds -timeDifferenceSeconds, 0); // avoid negative
+  console.log("Left Seconds:", leftSeconds);
+  return secondsToTimeString(leftSeconds);
+}
 
+function getTimeDifference(currentTime, lastTime) {
+
+  const currentSeconds = convertToSeconds(currentTime);
+  const lastTimeSeconds = convertToSeconds(lastTime);
+  const leftSeconds = Math.max(currentSeconds - lastTimeSeconds, 0); // avoid negative
+  return secondsToTimeString(leftSeconds);// returns the difference in seconds
+}
 function parseTimeTakenToSeconds(timeTaken) {
   const regex = /(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?/;
   const matches = timeTaken.match(regex);
@@ -108,4 +133,4 @@ function parseTimeTakenToSeconds(timeTaken) {
   return (days * 8 * 3600) + (hours * 3600) + (minutes * 60) + seconds;
 }
 
-module.exports = { successResponse, errorResponse, getResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage,parseTimeTakenToSeconds };
+module.exports = { successResponse, errorResponse, getResponse,getPagination,calculateNewWorkedTime,convertSecondsToHHMMSS,convertToSeconds,calculateRemainingHours,calculatePercentage,parseTimeTakenToSeconds,getTimeLeft,getTimeDifference };
