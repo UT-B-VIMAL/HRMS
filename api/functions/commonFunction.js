@@ -65,15 +65,14 @@ exports.getAllData = async (req, res) => {
                     values
                 );
                 subtaskUsers.forEach(row => userIds.add(row.user_id));
-                } else {
+            } else {
                     // No filters provided, return all active team_ids
                     const [teamRows] = await db.query(
-                        `SELECT DISTINCT team_id FROM users WHERE deleted_at IS NULL AND team_id IS NOT NULL`
+                        `SELECT id FROM teams WHERE deleted_at IS NULL`
                     );
-                    teamIds = teamRows.map(t => t.team_id);
+                    teamIds = teamRows.map(t => t.id);
                 }
 
-   
         if (userIds.size > 0) {
         const userIdList = [...userIds];
         const [teamRows] = await db.query(
@@ -81,14 +80,15 @@ exports.getAllData = async (req, res) => {
             [userIdList]
         );
         teamIds = teamRows.map(t => t.team_id);
-    } 
-
+        
+       } 
+    
     if (teamIds.length === 0) {
         teamIds = [-1]; // fallback to avoid SQL error
     }
 
     query = `SELECT DISTINCT teams.id, teams.name FROM teams LEFT JOIN users ON teams.id = users.team_id WHERE teams.deleted_at IS NULL AND users.deleted_at IS NULL AND teams.id IN (?)`;
-
+    
     queryParams.push(teamIds);
     if( hasOwnTeamFilter && user_id) {
            const users = await this.getAuthUserDetails(user_id, res);
@@ -97,7 +97,7 @@ exports.getAllData = async (req, res) => {
             query += " AND teams.id IN (?)";
             queryParams.push(teamIds);
     }
-    } else if (type === "users") {
+} else if (type === "users") {
         query = `SELECT id, role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id IN (${hasUserProductsIds.map(() => '?').join(',')})`;
         queryParams.push(...hasUserProductsIds);
     }
