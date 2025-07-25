@@ -252,7 +252,7 @@ exports.createTask = async (payload, res, req) => {
 
     const [result] = await db.query(query, values);
 
-    console.timeEnd('Create Task End Time');
+    console.timeEnd('Create Task Start Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
 
@@ -473,7 +473,7 @@ exports.bulkimportTask = async (payload, res, req) => {
 exports.getTask = async (queryParams, res, req) => {
   try {
     console.log(`[API Start] ${new Date().toISOString()}`);
-    console.time('Get Task Start Execution Time');
+    console.time('Get Task Execution Time');
 
     const { id } = queryParams;
     const accessToken = req.headers.authorization?.split(" ")[1];
@@ -851,7 +851,7 @@ WHERE
       comments: commentsData,
     };
 
-    console.timeEnd('Get Task End Execution Time');
+    console.timeEnd('Get Task Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(
@@ -870,7 +870,7 @@ WHERE
 exports.getAllTasks = async (res) => {
   try {
     console.log(`[API Start] ${new Date().toISOString()}`);
-    console.time('Get All Tasks Start Execution Time');
+    console.time('Get All Tasks Execution Time');
 
     const query = "SELECT * FROM tasks ORDER BY id DESC";
     const [rows] = await db.query(query);
@@ -878,7 +878,7 @@ exports.getAllTasks = async (res) => {
     if (rows.length === 0) {
       return errorResponse(res, null, "No tasks found", 204);
     }
-    console.timeEnd('Get All Tasks End Execution Time');
+    console.timeEnd('Get All Tasks Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(res, rows, "Tasks retrieved successfully");
@@ -890,7 +890,7 @@ exports.getAllTasks = async (res) => {
 exports.updateTask = async (id, payload, res, req) => {
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Update Task Start Execution Time');
+  console.time('Update Task Execution Time');
   try {
     const {
       product_id,
@@ -1157,7 +1157,7 @@ exports.updateTask = async (id, payload, res, req) => {
       return errorResponse(res, null, "No changes made to the task", 200);
     }
 
-    console.timeEnd('Update Task End Execution Time');
+    console.timeEnd('Update Task Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(
@@ -1188,7 +1188,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
 
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Update Task Data Start Execution Time');
+  console.time('Update Task Data Execution Time');
 
   const statusFlagMapping = {
     status: 1,
@@ -1742,7 +1742,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
       }
     }
 
-    console.timeEnd('Update Task Data End Execution Time');
+    console.timeEnd('Update Task Data Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(
@@ -1758,7 +1758,7 @@ exports.updateTaskData = async (id, payload, res, req) => {
 exports.deleteTask = async (req, res) => {
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Delete Task Start Execution Time');
+  console.time('Delete Task  Execution Time');
 
   const id = req.params.id;
   const accessToken = req.headers.authorization?.split(" ")[1];
@@ -1832,7 +1832,7 @@ exports.deleteTask = async (req, res) => {
       return errorResponse(res, null, "Task not found", 404);
     }
 
-   console.timeEnd('Delete Task End Execution Time');
+   console.timeEnd('Delete Task Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
   
 
@@ -1998,7 +1998,7 @@ exports.getTaskList = async (req, res) => {
 
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Get Task List Start Execution Time');
+  console.time('Get Task List Execution Time');
 
   try {
     
@@ -2624,7 +2624,7 @@ exports.getTaskList = async (req, res) => {
     };
 
     
-    console.timeEnd('Get Task List Start Execution Time');
+    console.timeEnd('Get Task List Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(res, data, "Task data retrieved successfully", 200);
@@ -2650,7 +2650,7 @@ function calculateTimeLeft(estimatedHours, totalHoursWorked, timeDifference) {
 exports.doneTaskList = async (req, res) => {
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Get Done Task List Start Execution Time');
+  console.time('Get Done Task List Execution Time');
 
   try {
     const {
@@ -2843,7 +2843,7 @@ exports.doneTaskList = async (req, res) => {
       ...row,
     }));
 
-    console.timeEnd('Get Done Task List Start Execution Time');
+    console.timeEnd('Get Done Task List Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
     successResponse(
       res,
@@ -3278,7 +3278,7 @@ exports.updateTaskTimeLine = async (req, res) => {
 
 exports.deleteTaskList = async (req, res) => {
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Get Deleted Task List Start Execution Time');
+  console.time('Get Deleted Task List Execution Time');
   
   try {
     const {
@@ -3459,7 +3459,7 @@ exports.deleteTaskList = async (req, res) => {
       ...row,
     }));
 
-    console.timeEnd('Get Deleted Task List Start Execution Time');
+    console.timeEnd('Get Deleted Task List Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     successResponse(
@@ -3480,7 +3480,7 @@ exports.deleteTaskList = async (req, res) => {
 exports.restoreTasks = async (req, res) => {
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Restore Task Start Execution Time');
+  console.time('Restore Task Execution Time');
 
   try {
     const { task_id, subtask_id, user_id } = req.body;
@@ -3805,7 +3805,7 @@ exports.getWorkReportData = async (queryParams, res) => {
     }));
 
 
-    console.timeEnd('Get Work Report Data Start Execution Time');
+    console.timeEnd('Get Work Report Data Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     successResponse(
