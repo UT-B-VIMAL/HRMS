@@ -30,7 +30,7 @@ function convertSecondsToReadableTime(totalSeconds) {
 exports.get_individualStatus = async (req, res) => {
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Get Individual Status Start Execution Time');
+  console.time('Get Individual Status Execution Time');
 
   try {
     const {
@@ -320,7 +320,7 @@ exports.get_individualStatus = async (req, res) => {
     }));
 
 
-   console.timeEnd('Get Individual Status Start Execution Time');
+   console.timeEnd('Get Individual Status Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(
@@ -342,7 +342,7 @@ exports.get_individualStatus = async (req, res) => {
 exports.getTeamwiseProductivity = async (req, res) => {
 
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('Get Teamwise Productivity Start Execution Time');
+  console.time('Get Teamwise Productivity Execution Time');
   try {
     const {
       team_id,
@@ -563,7 +563,7 @@ exports.getTeamwiseProductivity = async (req, res) => {
       ),
     }));
 
-    console.timeEnd('Get Teamwise Productivity Start Execution Time');
+    console.timeEnd('Get Teamwise Productivity Execution Time');
     console.log(`[API End] ${new Date().toISOString()}`);
     res.status(200).json({
       status: 200,
