@@ -230,6 +230,8 @@ exports.getProject = async (id, res) => {
 
 // Get All Projects
 exports.getAllProjects = async (queryParams, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get All Projects Execution Time');
   const { search, page, perPage = 10 } = queryParams;
 
   let query = `SELECT 
@@ -275,6 +277,8 @@ exports.getAllProjects = async (queryParams, res) => {
     const pagination =
       page && perPage ? getPagination(page, perPage, totalRecords) : null;
 
+    console.timeEnd('Get All Projects Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       rowsWithSerialNo,
@@ -296,6 +300,8 @@ exports.getAllProjects = async (queryParams, res) => {
 };
 
 exports.projectStatus = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Project Status Execution Time');
   try {
     const {
       product_id,
@@ -641,6 +647,8 @@ exports.projectStatus = async (req, res) => {
 
     const pagination = getPagination(page, perPage, totalRecords);
 
+    console.timeEnd('Get Project Status Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     successResponse(
       res,
       paginatedData, 
@@ -657,6 +665,8 @@ exports.projectStatus = async (req, res) => {
 };
 
 exports.projectRequest = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Project Request Execution Time');
   try {
     const {
       project_id,
@@ -869,8 +879,9 @@ exports.projectRequest = async (req, res) => {
       s_no: offset + index + 1,
       ...row,
     }));
-
-    successResponse(
+    console.timeEnd('Get Project Request Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+    return successResponse(
       res,
       data,
       data.length === 0
@@ -970,6 +981,8 @@ exports.getRequestupdate = async (req, res) => {
 };
 
 exports.getRequestchange = async (_id, payload, res, req) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Request Change Execution Time');
   let id = _id;
   let typeLocal = payload.type;
   const {
@@ -1277,6 +1290,8 @@ const userId = updatedRecord.user_id;
       [userId, notificationPayload.title, notificationPayload.body, 0]
     );
 
+    console.timeEnd('Get Request Change Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       { id },
