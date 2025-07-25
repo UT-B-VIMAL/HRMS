@@ -1161,6 +1161,8 @@ exports.fetchPmdatas = async (req, res) => {
 };
 
 exports.fetchUserTasksByProduct = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Dashboard Product Graph Execution Time');
   const accessToken = req.headers.authorization?.split(" ")[1];
   if (!accessToken) {
     return errorResponse(res, "Access token is required", 401);
@@ -1317,6 +1319,8 @@ exports.fetchUserTasksByProduct = async (req, res) => {
         };
       })
     );
+    console.timeEnd('Dashboard Product Graph Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(
       res,
@@ -1331,6 +1335,8 @@ exports.fetchUserTasksByProduct = async (req, res) => {
 };
 
 exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Dashboard Team Utilization and Attendance Execution Time');
   const accessToken = req.headers.authorization?.split(" ")[1];
   if (!accessToken) {
     return errorResponse(res, "Access token is required", 401);
@@ -1583,6 +1589,8 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
       idle_employees: group.idle_employees,
     }));
 
+    console.timeEnd('Dashboard Team Utilization and Attendance Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       {
@@ -1599,6 +1607,8 @@ exports.fetchTeamUtilizationAndAttendance = async (req, res) => {
 };
 
 exports.getProjectCompletion = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Dashboard Project Completion Execution Time');
   try {
     const { product_id, project_id, team_id, associate_id } = req.query;
 
@@ -2203,6 +2213,8 @@ ORDER BY total_worked_hours DESC, total_estimated_hours DESC;
       teamUtilizationSql,
       teamUtilizationParams
     );
+    console.timeEnd('Dashboard Project Completion Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(res, {
       completed_tasks: completed_tasks,
