@@ -13,7 +13,8 @@ const { getUserIdFromAccessToken } = require("../utils/tokenUtils");
 
 exports.getAttendance = async (req, res) => {
   const { date, search, page = 1, perPage = 10 } = req.query;
-
+console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('UserAttendanceList');
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
@@ -160,7 +161,8 @@ exports.getAttendance = async (req, res) => {
       s_no: offset + index + 1,
       ...row,
     }));
-
+console.timeEnd('UserAttendanceList');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(
       res,
       rowsWithSerialNo,
@@ -178,7 +180,8 @@ exports.getAttendance = async (req, res) => {
 
 // Controller function
 exports.updateAttendanceData = async (req, res) => {
-
+console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('updateAttendance');
   let { id, date, attendanceType, halfDay, status , import_status } = req.body;
   const accessToken = req.headers.authorization?.split(" ")[1];
   if (!accessToken) {
@@ -278,7 +281,8 @@ exports.updateAttendanceData = async (req, res) => {
               }
           }
       }
-
+    console.timeEnd('updateAttendance');
+    console.log(`[API End] ${new Date().toISOString()}`);
       return successResponse(res, null, "Attendance Updated Successfully", 200);
   } catch (error) {
       console.error("Error processing attendance:", error);
@@ -288,7 +292,8 @@ exports.updateAttendanceData = async (req, res) => {
 
 exports.updateAttendanceAndNotify = async (req, res) => {
   const { user_id } = req.query;
-
+ console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Update Attendance and Notify');
   try {
     // Fetch user details
     // const accessToken = req.headers.authorization?.split(" ")[1];
@@ -403,7 +408,8 @@ exports.updateAttendanceAndNotify = async (req, res) => {
         );
       });
     }
-
+console.timeEnd('Update Attendance and Notify');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, null, "Attendance updated and notifications sent successfully", 200);
   } catch (error) {
     console.error("Error updating attendance and sending notifications:", error.message);
