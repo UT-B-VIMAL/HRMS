@@ -60,6 +60,9 @@ exports.createTask = async (payload, res, req) => {
     updated_at,
   } = payload;
 
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Create Task Start Time');
+
   try {
     const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
@@ -248,6 +251,10 @@ exports.createTask = async (payload, res, req) => {
     ];
 
     const [result] = await db.query(query, values);
+
+    console.timeEnd('Create Task Start Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+
 
     return successResponse(
       res,
@@ -465,6 +472,9 @@ exports.bulkimportTask = async (payload, res, req) => {
 
 exports.getTask = async (queryParams, res, req) => {
   try {
+    console.log(`[API Start] ${new Date().toISOString()}`);
+    console.time('Get Task Execution Time');
+
     const { id } = queryParams;
     const accessToken = req.headers.authorization?.split(" ")[1];
     if (!accessToken) {
@@ -841,6 +851,9 @@ WHERE
       comments: commentsData,
     };
 
+    console.timeEnd('Get Task Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+
     return successResponse(
       res,
       data,
@@ -856,12 +869,17 @@ WHERE
 // Get All Tasks
 exports.getAllTasks = async (res) => {
   try {
+    console.log(`[API Start] ${new Date().toISOString()}`);
+    console.time('Get All Tasks Execution Time');
+
     const query = "SELECT * FROM tasks ORDER BY id DESC";
     const [rows] = await db.query(query);
 
     if (rows.length === 0) {
       return errorResponse(res, null, "No tasks found", 204);
     }
+    console.timeEnd('Get All Tasks Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
 
     return successResponse(res, rows, "Tasks retrieved successfully");
   } catch (error) {
@@ -870,6 +888,9 @@ exports.getAllTasks = async (res) => {
 };
 
 exports.updateTask = async (id, payload, res, req) => {
+
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Update Task Execution Time');
   try {
     const {
       product_id,
@@ -1136,6 +1157,9 @@ exports.updateTask = async (id, payload, res, req) => {
       return errorResponse(res, null, "No changes made to the task", 200);
     }
 
+    console.timeEnd('Update Task Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+
     return successResponse(
       res,
       { id, ...updatedData },
@@ -1161,6 +1185,10 @@ exports.updateTaskData = async (id, payload, res, req) => {
     updated_by,
     updated_at,
   } = payload;
+
+
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Update Task Data Execution Time');
 
   const statusFlagMapping = {
     status: 1,
@@ -1713,6 +1741,10 @@ exports.updateTaskData = async (id, payload, res, req) => {
         );
       }
     }
+
+    console.timeEnd('Update Task Data Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+
     return successResponse(
       res,
       { id, ...payload },
@@ -1724,6 +1756,10 @@ exports.updateTaskData = async (id, payload, res, req) => {
 };
 
 exports.deleteTask = async (req, res) => {
+
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Delete Task  Execution Time');
+
   const id = req.params.id;
   const accessToken = req.headers.authorization?.split(" ")[1];
   if (!accessToken) {
@@ -1795,6 +1831,10 @@ exports.deleteTask = async (req, res) => {
     if (deleteResult.affectedRows === 0) {
       return errorResponse(res, null, "Task not found", 404);
     }
+
+   console.timeEnd('Delete Task Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+  
 
     return successResponse(res, null, "Task deleted successfully");
   } catch (error) {
@@ -1955,8 +1995,11 @@ const formatTime = (seconds) => {
 };
 
 exports.getTaskList = async (req, res) => {
+
+
   console.log(`[API Start] ${new Date().toISOString()}`);
-  console.time('API Response');
+  console.time('Get Task List Execution Time');
+
   try {
     
     const {
@@ -2580,8 +2623,10 @@ exports.getTaskList = async (req, res) => {
       lastActiveTask: lastActiveTaskData,
     };
 
-    console.timeEnd('API Response');
-    console.log(`[API End] ${new Date().toISOString()}`)
+    
+    console.timeEnd('Get Task List Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+
     return successResponse(res, data, "Task data retrieved successfully", 200);
   } catch (error) {
     console.error(error);
@@ -2603,6 +2648,10 @@ function calculateTimeLeft(estimatedHours, totalHoursWorked, timeDifference) {
 }
 
 exports.doneTaskList = async (req, res) => {
+
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Done Task List Execution Time');
+
   try {
     const {
       user_id,
@@ -2793,6 +2842,9 @@ exports.doneTaskList = async (req, res) => {
       s_no: offset + index + 1,
       ...row,
     }));
+
+    console.timeEnd('Get Done Task List Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
     successResponse(
       res,
       data,
@@ -2810,7 +2862,8 @@ exports.doneTaskList = async (req, res) => {
 
 // Helper functions for task actions
 exports.startTask = async (taskOrSubtask, type, id, res) => {
-  if (type === "task") {
+
+    if (type === "task") {
     const [subtasksexist] = await db.query(
       "SELECT * FROM sub_tasks WHERE task_id = ? AND deleted_at IS NULL",
       [id]
@@ -3224,6 +3277,9 @@ exports.updateTaskTimeLine = async (req, res) => {
 // };
 
 exports.deleteTaskList = async (req, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Deleted Task List Execution Time');
+  
   try {
     const {
       product_id,
@@ -3403,6 +3459,9 @@ exports.deleteTaskList = async (req, res) => {
       ...row,
     }));
 
+    console.timeEnd('Get Deleted Task List Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
+
     successResponse(
       res,
       data,
@@ -3419,6 +3478,10 @@ exports.deleteTaskList = async (req, res) => {
 };
 
 exports.restoreTasks = async (req, res) => {
+
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Restore Task Execution Time');
+
   try {
     const { task_id, subtask_id, user_id } = req.body;
     // const { error } = productSchema.validate(
@@ -3740,6 +3803,10 @@ exports.getWorkReportData = async (queryParams, res) => {
       s_no: offset + index + 1,
       ...row,
     }));
+
+
+    console.timeEnd('Get Work Report Data Execution Time');
+    console.log(`[API End] ${new Date().toISOString()}`);
 
     successResponse(
       res,

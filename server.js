@@ -242,7 +242,7 @@ apiRouter.put(
 );
 
 // Team Routes
-apiRouter.post("/team", RoleController.checkRole(['	team.add_team']), teamController.createTeam);
+apiRouter.post("/team", RoleController.checkRole(['team.add_team']), teamController.createTeam);
 apiRouter.put(
   "/team/:id",
   RoleController.checkRole(['team.edit_team']),
