@@ -60,6 +60,8 @@ const autoPauseUnpausedTasks = async () => {
 };
 
 // Schedule the cron job to run daily at 6:30 PM
-cron.schedule('05 16 * * *', async () => {
+cron.schedule('10 16 * * *', async () => {
   await autoPauseUnpausedTasks();
+}, {
+  timezone: 'Asia/Kolkata'
 });
