@@ -1860,8 +1860,58 @@ const lastActiveTask = async (userId) => {
                 s.reopen_status as subtask_reopen_status,
                 s.hold_status as subtask_hold_status,
                 t.hold_status as task_hold_status,
-                t.id as task_id
-                
+                t.id as task_id,
+                 SEC_TO_TIME(
+        TIME_TO_SEC(
+            CASE 
+                WHEN stut.subtask_id IS NOT NULL THEN s.total_hours_worked
+                ELSE t.total_hours_worked
+            END
+        ) +
+        CASE 
+            WHEN stut.end_time IS NULL THEN TIMESTAMPDIFF(SECOND, stut.start_time, UTC_TIMESTAMP())
+            ELSE 0
+        END
+    ) AS total_hours_worked,
+
+   -- Calculate time_left
+CASE
+    WHEN 
+        TIME_TO_SEC(
+            CASE 
+                WHEN stut.subtask_id IS NOT NULL THEN s.estimated_hours
+                ELSE t.estimated_hours
+            END
+        ) = 0
+    THEN '00:00:00'
+    
+    ELSE
+        SEC_TO_TIME(
+            GREATEST(
+                TIME_TO_SEC(
+                    CASE 
+                        WHEN stut.subtask_id IS NOT NULL THEN s.estimated_hours
+                        ELSE t.estimated_hours
+                    END
+                ) - 
+                (
+                    TIME_TO_SEC(
+                        CASE 
+                            WHEN stut.subtask_id IS NOT NULL THEN s.total_hours_worked
+                            ELSE t.total_hours_worked
+                        END
+                    ) +
+                    CASE 
+                        WHEN stut.end_time IS NULL THEN TIMESTAMPDIFF(SECOND, stut.start_time, UTC_TIMESTAMP())
+                        ELSE 0
+                    END
+                ), 
+                0
+            )
+        )
+END AS time_left
+
+
         FROM sub_tasks_user_timeline stut
         LEFT JOIN sub_tasks s ON stut.subtask_id = s.id
         LEFT JOIN products pd ON stut.product_id = pd.id
@@ -1890,41 +1940,20 @@ const lastActiveTask = async (userId) => {
         )
         AND t.deleted_at IS NULL 
         AND (s.deleted_at IS NULL OR s.id IS NULL)
-
+        
       ORDER BY stut.updated_at DESC
       LIMIT 1;
     `;
 
     // Use db.query for mysql2 promises and destructure result
     const [lastActiveTaskRows] = await db.query(query, [userId]);
-
+console.log("Last Active Task Rows:", lastActiveTaskRows);
     // If no active task is found, return null
     if (lastActiveTaskRows.length === 0) return null;
 
     const task = lastActiveTaskRows[0];
 
-    const lastStartTime =new Date(task.start_time);
-    const laststartTimeformatted = lastStartTime.toTimeString().split(' ')[0];
-    const now = moment.utc(); // Get current time in UTC
-    const timeDifference = getTimeDifference(now.format("HH:mm:ss"), laststartTimeformatted);
-    const timeDifferenceSeconds = convertToSeconds(timeDifference);
-    const totalWorkedTime = task.subtask_id
-      ? moment.duration(task.subtask_total_hours_worked).asSeconds()
-      : moment.duration(task.task_total_hours_worked).asSeconds();
-    let totaltimeTaken = 0;
-    if (task.end_time) {
-      totaltimeTaken = totalWorkedTime;
-    } else {
-      totaltimeTaken = totalWorkedTime + timeDifferenceSeconds;
-    }
-    const timeTaken = convertSecondsToHHMMSS(totaltimeTaken);
-   
-    task.time_left = getTimeLeft(task.subtask_id
-        ? task.subtask_estimated_hours
-        : task.task_estimated_hours,
-      task.subtask_id
-        ? task.subtask_total_hours_worked
-        : task.task_total_hours_worked,timeDifference);
+  
     task.timeline_id = task.id;
     // Add time left to the task or subtask object
     task.type = task.subtask_id ? "subtask" : "task";
@@ -1934,15 +1963,12 @@ const lastActiveTask = async (userId) => {
     task.estimated_hours = task.subtask_id
       ? task.subtask_estimated_hours
       : task.task_estimated_hours;
-    task.total_hours_worked = task.subtask_id
-      ? task.subtask_total_hours_worked
-      : task.task_total_hours_worked;
     task.id = task.subtask_id || task.task_id;
     task.time_exceed_status = task.subtask_id
-      ? task.subtask_total_hours_worked > task.subtask_estimated_hours
+      ? task.time_taken_in_seconds > task.subtask_estimated_hours
         ? true
         : false
-      : task.task_total_hours_worked > task.estimated_hours
+      : task.time_taken_in_seconds > task.estimated_hours
       ? true
       : false;
     task.assignedTo = task.subtask_id
@@ -1951,7 +1977,7 @@ const lastActiveTask = async (userId) => {
     task.assignedBy = task.subtask_id
       ? task.subtask_assigned_by
       : task.task_assigned_by;
-    task.timeTaken = timeTaken;
+    task.timeTaken = task.total_hours_worked;
     task.task_hold_status = task.subtask_id
       ? task.subtask_hold_status
       : task.task_hold_status;

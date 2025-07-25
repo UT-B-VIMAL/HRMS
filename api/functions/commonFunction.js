@@ -65,15 +65,14 @@ exports.getAllData = async (req, res) => {
                     values
                 );
                 subtaskUsers.forEach(row => userIds.add(row.user_id));
-                } else {
+            } else {
                     // No filters provided, return all active team_ids
                     const [teamRows] = await db.query(
-                        `SELECT DISTINCT team_id FROM users WHERE deleted_at IS NULL AND team_id IS NOT NULL`
+                        `SELECT id FROM teams WHERE deleted_at IS NULL`
                     );
-                    teamIds = teamRows.map(t => t.team_id);
+                    teamIds = teamRows.map(t => t.id);
                 }
 
-   
         if (userIds.size > 0) {
         const userIdList = [...userIds];
         const [teamRows] = await db.query(
@@ -81,14 +80,15 @@ exports.getAllData = async (req, res) => {
             [userIdList]
         );
         teamIds = teamRows.map(t => t.team_id);
-    } 
-
+        
+       } 
+    
     if (teamIds.length === 0) {
         teamIds = [-1]; // fallback to avoid SQL error
     }
 
     query = `SELECT DISTINCT teams.id, teams.name FROM teams LEFT JOIN users ON teams.id = users.team_id WHERE teams.deleted_at IS NULL AND users.deleted_at IS NULL AND teams.id IN (?)`;
-
+    
     queryParams.push(teamIds);
     if( hasOwnTeamFilter && user_id) {
            const users = await this.getAuthUserDetails(user_id, res);
@@ -97,7 +97,7 @@ exports.getAllData = async (req, res) => {
             query += " AND teams.id IN (?)";
             queryParams.push(teamIds);
     }
-    } else if (type === "users") {
+} else if (type === "users") {
         query = `SELECT id, role_id, COALESCE(CONCAT(first_name, ' ', last_name)) as name, employee_id, last_name FROM users WHERE deleted_at IS NULL AND role_id IN (${hasUserProductsIds.map(() => '?').join(',')})`;
         queryParams.push(...hasUserProductsIds);
     }
@@ -346,7 +346,54 @@ exports.getAllData = async (req, res) => {
     //     return errorResponse(res, err.message, "Error fetching Data", 500);
     // }
 };
+exports.getProductData=async(req, res) => {
+     const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) return errorResponse(res, "Access token is required", 401);
 
+    const user_id = await getUserIdFromAccessToken(accessToken);
+    const hasAllProducts = await hasPermission("dropdown.all_products", accessToken);
+    const hasTeamProducts = await hasPermission("dropdown.team_products", accessToken);
+    const hasUserProducts = await hasPermission("dropdown.user_products", accessToken);
+    const hasTaskpermission = await hasPermission("kanban_board.add_task", accessToken);
+
+    const users = await getAuthUserDetails(user_id, res);
+    if (!users) return;
+
+    let query = "";
+    let queryParams = [];
+
+    if (hasTeamProducts) {
+        const teamIds = users.team_id ? users.team_id.split(',') : [];
+        const [userRows] = await db.query("SELECT id FROM users WHERE deleted_at IS NULL AND team_id IN (?)", [teamIds]);
+        const userIds = userRows.map(row => row.id);
+
+        const [taskRows] = await db.query("SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id IN (?)", [userIds]);
+        const [subtaskRows] = await db.query("SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id IN (?)", [userIds]);
+
+        let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
+        if (productIds.length === 0) productIds = [-1];
+
+        query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
+        queryParams.push(productIds);
+    } else if (hasUserProducts) {
+        const [taskRows] = await db.query("SELECT DISTINCT product_id FROM tasks WHERE deleted_at IS NULL AND user_id=?", [user_id]);
+        const [subtaskRows] = await db.query("SELECT DISTINCT product_id FROM sub_tasks WHERE deleted_at IS NULL AND user_id=?", [user_id]);
+
+        let productIds = [...new Set([...taskRows.map(row => row.product_id), ...subtaskRows.map(row => row.product_id)])];
+        if (productIds.length === 0) productIds = [-1];
+
+        query = "SELECT id, name FROM products WHERE deleted_at IS NULL AND id IN (?)";
+        queryParams.push(productIds);
+    } else if (hasAllProducts || hasTaskpermission) {
+        query = "SELECT id, name FROM products WHERE deleted_at IS NULL";
+    } else {
+        return errorResponse(res, "Unauthorized", "You do not have permission to view products", 403);
+    }
+
+    const [rows] = await db.query(query, queryParams);
+    return successResponse(res, rows, "Products fetched successfully", 200);
+
+}
 exports.getAuthUserDetails = async (authUserId, res) => {
     try {
         const authUserQuery = "SELECT * FROM users WHERE deleted_at IS NULL AND id = ?";
