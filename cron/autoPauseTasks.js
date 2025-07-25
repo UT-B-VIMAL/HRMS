@@ -2,7 +2,8 @@ const cron = require('node-cron');
 const db = require('../config/db');
 
 const moment = require('moment-timezone');
-const db = require('./db');
+const { addHistorydata } = require('../api/functions/commonFunction');
+
 
 const autoPauseUnpausedTasks = async () => {
   try {
@@ -30,22 +31,38 @@ const autoPauseUnpausedTasks = async () => {
       const seconds = String(timeDiffSeconds % 60).padStart(2, '0');
       const timeDiffFormatted = `${hours}:${minutes}:${seconds}`;
 
-      // Update timeline end_time
+    
       await db.execute(
         `UPDATE sub_tasks_user_timeline SET end_time = ?, updated_at = NOW() WHERE id = ?`,
         [currentDateTime, row.id]
       );
 
-      // Update worked hours
       if (row.subtask_id) {
         await db.execute(
           `UPDATE sub_tasks SET active_status = 0, total_hours_worked = ADDTIME(IFNULL(total_hours_worked, '00:00:00'), ?) WHERE id = ?`,
           [timeDiffFormatted, row.subtask_id]
         );
+
+        await addHistorydata(
+          'InProgress',
+          'AutoPaused',
+          row.task_id,
+          row.subtask_id,
+          1,
+          1
+        );
       } else {
         await db.execute(
           `UPDATE tasks SET active_status = 0, total_hours_worked = ADDTIME(IFNULL(total_hours_worked, '00:00:00'), ?) WHERE id = ?`,
           [timeDiffFormatted, row.task_id]
+        );
+        await addHistorydata(
+          'InProgress',
+          'AutoPaused',
+          row.task_id,
+          null,
+          1,
+          1
         );
       }
     }
