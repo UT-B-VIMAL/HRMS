@@ -36,6 +36,8 @@ const getPagination = (page, perPage, totalRecords) => {
   });
 // Create Product
 exports.createProduct = async (payload, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('cREATE PRODUCT');
     const { name ,user_id } = payload;
     const { error } = productSchema.validate(
       { name, user_id },
@@ -61,7 +63,8 @@ exports.createProduct = async (payload, res) => {
     const query = "INSERT INTO products (name, created_by, updated_by) VALUES (?, ?, ?)";
     const values = [name, user_id, user_id];
     const [result] = await db.query(query, values);
-
+   console.timeEnd('Create Product');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, { id: result.insertId, name }, 'Product added successfully', 201);
   } catch (error) {
     console.error('Error inserting product:', error.message);
@@ -71,7 +74,8 @@ exports.createProduct = async (payload, res) => {
 
 // Update Product
 exports.updateProduct = async (id, payload, res) => {
-
+console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Update Product');
     const { name ,user_id } = payload;
     const { error } = productSchema.validate(
       { name, user_id },
@@ -102,7 +106,8 @@ exports.updateProduct = async (id, payload, res) => {
     const query = "UPDATE products SET name = ?, updated_by = ? WHERE id = ?";
     const values = [name, user_id, id];
     await db.query(query, values);
-
+    console.timeEnd('Update Product');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, { id, name }, 'Product updated successfully', 200);
   } catch (error) {
     console.error('Error updating product:', error.message);
@@ -112,6 +117,8 @@ exports.updateProduct = async (id, payload, res) => {
 
 // Delete Product
 exports.deleteProduct = async (id, res) => {
+console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Delete Product');
   try {
     const checkQuery = "SELECT COUNT(*) as count FROM products WHERE id = ? AND deleted_at IS NULL";
     const [checkResult] = await db.query(checkQuery, [id]);
@@ -134,7 +141,8 @@ exports.deleteProduct = async (id, res) => {
     }
     const query = "UPDATE products SET deleted_at = NOW() WHERE id = ?";
     await db.query(query, [id]);
-
+    console.timeEnd('Delete Product');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, { id }, 'Product deleted successfully', 200);
   } catch (error) {
     console.error('Error deleting product:', error.message);
@@ -144,6 +152,8 @@ exports.deleteProduct = async (id, res) => {
 
 // Get Single Product
 exports.getProduct = async (id, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get Product');
   try {
     const query = "SELECT * FROM products WHERE id = ? AND deleted_at IS NULL";
     const [result] = await db.query(query, [id]);
@@ -151,7 +161,8 @@ exports.getProduct = async (id, res) => {
     if (result.length === 0) {
       return errorResponse(res, "Product not found or deleted", "Not Found", 404);
     }
-
+    console.timeEnd('Get Product');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, result[0], 'Product fetched successfully', 200);
   } catch (error) {
     console.error('Error fetching product:', error.message);
@@ -161,6 +172,8 @@ exports.getProduct = async (id, res) => {
 
 // Get All Products
 exports.getAllProducts = async (queryParams, res) => {
+  console.log(`[API Start] ${new Date().toISOString()}`);
+  console.time('Get All Products');
   const { search, page , perPage =10 } = queryParams;
 
   let query = "SELECT * FROM products WHERE deleted_at IS NULL";
@@ -191,7 +204,8 @@ exports.getAllProducts = async (queryParams, res) => {
     }));
   
     const pagination = page && perPage ? getPagination(page, perPage, totalRecords) : null;
-
+    console.timeEnd('Get All Products');
+    console.log(`[API End] ${new Date().toISOString()}`);
     return successResponse(res, rowsWithSerialNo, rowsWithSerialNo.length === 0 ? 'No products found' : 'Products fetched successfully', 200, pagination);
   } catch (error) {
     console.error('Error fetching all products:', error.message);
